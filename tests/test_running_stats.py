@@ -22,8 +22,8 @@ def _game(game_id, week, home="Alpha", away="Beta", home_points=None, away_point
 def test_first_game_of_season_has_zero_history():
     games = [_game(1, 1, home_points=21, away_points=14, spread=-3.5)]
     stats = compute_running_stats(games)
-    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None}
-    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None}
+    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None}
+    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None}
 
 
 def test_no_lookahead_stats_reflect_only_strictly_prior_games():
@@ -81,7 +81,7 @@ def test_seasons_reset():
         _game(2, 1, season=2023, home_points=0, away_points=0, spread=-1.0),
     ]
     stats = compute_running_stats(games)
-    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None}
+    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None}
 
 
 def test_start_dates_override_week_order():
@@ -94,3 +94,35 @@ def test_start_dates_override_week_order():
     stats = compute_running_stats(games, start_dates=start_dates)
     assert stats[(2, "Alpha")]["games_played"] == 1
     assert stats[(1, "Alpha")]["games_played"] == 0
+
+
+def test_running_ppa_is_average_of_prior_games_only():
+    games = [
+        _game(1, 1, home_points=21, away_points=14, spread=-3.0),
+        _game(2, 2, home_points=28, away_points=7, spread=-3.0),
+        _game(3, 3, home_points=0, away_points=0, spread=-3.0),
+    ]
+    ppa = {
+        (1, "Alpha"): (0.40, -0.10),
+        (2, "Alpha"): (0.60, -0.30),
+        (3, "Alpha"): (9.99, 9.99),  # current game's PPA must never leak into its own entering stats
+        (1, "Beta"): (0.10, 0.20),
+    }
+    stats = compute_running_stats(games, ppa=ppa)
+    assert stats[(1, "Alpha")]["ppa_off"] is None
+    assert stats[(2, "Alpha")]["ppa_off"] == 0.40
+    assert stats[(3, "Alpha")]["ppa_off"] == 0.50
+    assert stats[(3, "Alpha")]["ppa_def"] == -0.20
+    assert stats[(2, "Beta")]["ppa_off"] == 0.10
+    assert stats[(3, "Beta")]["ppa_off"] == 0.10  # no row for game 2: average over available rows
+
+
+def test_ppa_handles_partial_none_values():
+    games = [
+        _game(1, 1, home_points=21, away_points=14, spread=-3.0),
+        _game(2, 2, home_points=0, away_points=0, spread=-3.0),
+    ]
+    ppa = {(1, "Alpha"): (None, -0.25)}
+    stats = compute_running_stats(games, ppa=ppa)
+    assert stats[(2, "Alpha")]["ppa_off"] is None
+    assert stats[(2, "Alpha")]["ppa_def"] == -0.25
