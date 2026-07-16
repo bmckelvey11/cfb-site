@@ -77,6 +77,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         "raw_coaches": {},
         "raw_havoc": {},
         "raw_venues": {},
+        "raw_conferences": {},
         "graphql_game": {},
         "graphql_weather": {},
         "graphql_lines": {},
@@ -96,6 +97,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         _index_havoc(indexes["raw_havoc"], data_dir / "raw" / f"game_havoc_stats_{season}.json")
 
     _index_raw_file(indexes["raw_venues"], data_dir / "raw" / "venues.json", "id")
+    _index_conferences(indexes["raw_conferences"], data_dir / "raw" / "conferences.json")
 
     _index_raw_file(indexes["graphql_game"], data_dir / "graphql" / "game.json", "id")
     _index_raw_file(indexes["graphql_weather"], data_dir / "graphql" / "gameWeather.json", "gameId")
@@ -137,6 +139,10 @@ def _build_running_index(
 
 
 def _apply_feature(row: dict[str, Any], feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> None:
+    if feature.team_scoped and feature.join == "conference_name":
+        row[f"home_{feature.key}"] = _lookup_conference(feature, game.home_conference, indexes)
+        row[f"away_{feature.key}"] = _lookup_conference(feature, game.away_conference, indexes)
+        return
     value = _lookup(feature, game, indexes)
     if feature.team_scoped and feature.join in {"team_season", "team_name", "game_id"}:
         if feature.source_kind in {"raw_havoc", "graphql_game_team", "computed_running"}:
@@ -150,6 +156,13 @@ def _apply_feature(row: dict[str, Any], feature: FeatureDef, game: GameRecord, i
             row[f"away_{feature.key}"] = away_val
     else:
         row[feature.key] = value
+
+
+def _lookup_conference(feature: FeatureDef, conference: str | None, indexes: dict[str, Any]) -> Any:
+    if conference is None:
+        return None
+    record = indexes["raw_conferences"].get(conference)
+    return _field_value(record, feature.field) if record else None
 
 
 def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> Any:
@@ -302,6 +315,15 @@ def _index_coaches(bucket: dict[tuple[str, int], dict[str, Any]], path: Path, se
             school = season_row.get("school")
             if school:
                 bucket[(str(school), season)] = coach
+
+
+def _index_conferences(bucket: dict[str, dict[str, Any]], path: Path) -> None:
+    if not path.exists():
+        return
+    for row in json.loads(path.read_text(encoding="utf-8")):
+        name = row.get("name")
+        if name is not None:
+            bucket[str(name)] = row
 
 
 def _index_havoc(bucket: dict[tuple[int, str], dict[str, Any]], path: Path) -> None:

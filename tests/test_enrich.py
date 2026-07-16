@@ -151,3 +151,27 @@ def test_enrich_resolves_venue_fields_via_venue_id(tmp_path):
     assert row["venue_grass"] is False
     assert row["venue_elevation"] == "177.0"
     assert row["venue_capacity"] == 70000
+
+
+def test_enrich_resolves_conference_classification_per_side(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / "conferences.json").write_text(
+        json.dumps(
+            [
+                {"name": "ACC", "classification": "fbs"},
+                {"name": "Big Sky", "classification": "fcs"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", "ACC", "Big Sky", 21, 14, "consensus", -3.5, None)]
+    features = enrich_games(tmp_path, games)
+    assert features["1"]["home_conference_classification"] == "fbs"
+    assert features["1"]["away_conference_classification"] == "fcs"
+
+    games_no_conf = [GameRecord(2, season, 1, "Gamma", "Delta", None, None, 7, 3, "consensus", -1.0, None)]
+    features = enrich_games(tmp_path, games_no_conf)
+    assert features["2"]["home_conference_classification"] is None
