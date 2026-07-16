@@ -130,3 +130,24 @@ def test_save_features_writes_meta_and_load_reads_both_shapes(tmp_path):
     path.write_text(json.dumps({"2": {"neutralSite": False}}), encoding="utf-8")
     assert load_features(tmp_path) == {2: {"neutralSite": False}}
     assert load_features_meta(tmp_path) is None
+
+
+def test_enrich_resolves_venue_fields_via_venue_id(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"games_{season}.json").write_text(
+        json.dumps([{"id": 1, "season": season, "venueId": 55}]), encoding="utf-8"
+    )
+    (raw_dir / "venues.json").write_text(
+        json.dumps([{"id": 55, "dome": True, "grass": False, "elevation": "177.0", "capacity": 70000}]),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    features = enrich_games(tmp_path, games)
+    row = features["1"]
+    assert row["venue_dome"] is True
+    assert row["venue_grass"] is False
+    assert row["venue_elevation"] == "177.0"
+    assert row["venue_capacity"] == 70000

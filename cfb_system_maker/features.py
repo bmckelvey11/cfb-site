@@ -16,6 +16,7 @@ SourceKind = Literal[
     "raw_teams",
     "raw_coaches",
     "raw_havoc",
+    "raw_venues",
     "computed_running",
     "graphql_game",
     "graphql_weather",
@@ -133,6 +134,10 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
     FeatureDef("team_conference", "Team Conference", "metadata", "raw_teams", "conference", "team_name", "categorical", team_scoped=True),
     FeatureDef("coach_name", "Head Coach", "metadata", "raw_coaches", "coach_name", "team_season", "categorical", team_scoped=True),
     FeatureDef("coach_hire_date", "Coach Hire Date", "metadata", "raw_coaches", "hireDate", "team_season", "categorical", team_scoped=True),
+    FeatureDef("venue_dome", "Dome", "metadata", "raw_venues", "dome", "game_id", "bool"),
+    FeatureDef("venue_grass", "Grass Field", "metadata", "raw_venues", "grass", "game_id", "bool"),
+    FeatureDef("venue_elevation", "Venue Elevation", "metadata", "raw_venues", "elevation", "game_id", "numeric"),
+    FeatureDef("venue_capacity", "Venue Capacity", "metadata", "raw_venues", "capacity", "game_id", "numeric"),
     # --- season to date (computed, as-of-game) ---
     FeatureDef("running_games_played", "Games Played (to date)", "season_to_date", "computed_running", "games_played", "game_id", "numeric", team_scoped=True),
     FeatureDef("running_win_pct", "Win % (to date)", "season_to_date", "computed_running", "win_pct", "game_id", "numeric", team_scoped=True),

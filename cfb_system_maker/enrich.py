@@ -76,6 +76,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         "raw_teams": {},
         "raw_coaches": {},
         "raw_havoc": {},
+        "raw_venues": {},
         "graphql_game": {},
         "graphql_weather": {},
         "graphql_lines": {},
@@ -93,6 +94,8 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         _index_team_name_file(indexes["raw_teams"], data_dir / "raw" / f"teams_{season}.json")
         _index_coaches(indexes["raw_coaches"], data_dir / "raw" / f"coaches_{season}.json", season)
         _index_havoc(indexes["raw_havoc"], data_dir / "raw" / f"game_havoc_stats_{season}.json")
+
+    _index_raw_file(indexes["raw_venues"], data_dir / "raw" / "venues.json", "id")
 
     _index_raw_file(indexes["graphql_game"], data_dir / "graphql" / "game.json", "id")
     _index_raw_file(indexes["graphql_weather"], data_dir / "graphql" / "gameWeather.json", "gameId")
@@ -177,6 +180,12 @@ def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> A
 
     if feature.source_kind == "raw_coaches":
         return None
+
+    if feature.source_kind == "raw_venues":
+        game_row = indexes["raw_game"].get(game.game_id)
+        venue_id = game_row.get("venueId") if game_row else None
+        record = indexes["raw_venues"].get(int(venue_id)) if venue_id is not None else None
+        return _field_value(record, feature.field) if record else None
 
     if feature.source_kind == "raw_havoc":
         havoc = indexes["raw_havoc"]
