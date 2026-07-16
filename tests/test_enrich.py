@@ -69,3 +69,47 @@ def test_enrich_game_id_join_and_team_scoped_mapping(tmp_path):
 
     path = save_features(tmp_path, features)
     assert path.exists()
+
+
+def test_enrich_computes_running_stats_from_prior_games(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+
+    (raw_dir / f"games_{season}.json").write_text(
+        json.dumps(
+            [
+                {"id": 1, "season": season, "startDate": "2023-09-02 17:00:00+00:00"},
+                {"id": 2, "season": season, "startDate": "2023-09-09 17:00:00+00:00"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (raw_dir / f"ppa_games_{season}.json").write_text(
+        json.dumps(
+            [
+                {"gameId": 1, "team": "Alpha", "offense": {"overall": 0.5}, "defense": {"overall": -0.2}},
+                {"gameId": 1, "team": "Beta", "offense": {"overall": 0.1}, "defense": {"overall": 0.3}},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [
+        GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None),
+        GameRecord(2, season, 2, "Alpha", "Beta", None, None, 10, 20, "consensus", -3.5, None),
+    ]
+
+    features = enrich_games(tmp_path, games)
+
+    entering_g1 = features["1"]
+    assert entering_g1["home_running_games_played"] == 0
+    assert entering_g1["home_running_win_pct"] is None
+
+    entering_g2 = features["2"]
+    assert entering_g2["home_running_games_played"] == 1
+    assert entering_g2["home_running_win_pct"] == 1.0       # Alpha won game 1
+    assert entering_g2["home_running_ats_pct"] == 1.0        # -3.5, won by 7: covered
+    assert entering_g2["away_running_ats_pct"] == 0.0        # Beta failed to cover +3.5
+    assert entering_g2["home_running_ppa_off"] == 0.5
+    assert entering_g2["away_running_ppa_def"] == 0.3

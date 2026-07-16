@@ -6,6 +6,7 @@ from typing import Any
 
 from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, get_nested
 from cfb_system_maker.models import GameRecord
+from cfb_system_maker.running_stats import compute_running_stats
 from cfb_system_maker.storage import load_processed_games
 
 
@@ -75,13 +76,44 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
     _index_graphql_lines(indexes["graphql_lines"], data_dir / "graphql" / "gameLines.json")
     _index_graphql_game_team(indexes["graphql_game_team"], data_dir / "graphql" / "gameTeam.json", games)
 
+    indexes["computed_running"] = _build_running_index(data_dir, seasons, games, indexes["raw_game"])
+
     return indexes
+
+
+def _build_running_index(
+    data_dir: Path,
+    seasons: list[int],
+    games: list[GameRecord],
+    raw_games: dict[int, dict[str, Any]],
+) -> dict[tuple[int, str], dict[str, Any]]:
+    ppa: dict[tuple[int, str], tuple[float | None, float | None]] = {}
+    for season in seasons:
+        path = data_dir / "raw" / f"ppa_games_{season}.json"
+        if not path.exists():
+            continue
+        for row in json.loads(path.read_text(encoding="utf-8")):
+            game_id = row.get("gameId") if row.get("gameId") is not None else row.get("game_id")
+            team = row.get("team")
+            if game_id is None or team is None:
+                continue
+            offense = row.get("offense") or {}
+            defense = row.get("defense") or {}
+            ppa[(int(game_id), str(team))] = (offense.get("overall"), defense.get("overall"))
+
+    start_dates: dict[int, str] = {}
+    for game_id, row in raw_games.items():
+        start = row.get("startDate") or row.get("start_date")
+        if start:
+            start_dates[game_id] = str(start)
+
+    return compute_running_stats(games, ppa=ppa, start_dates=start_dates)
 
 
 def _apply_feature(row: dict[str, Any], feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> None:
     value = _lookup(feature, game, indexes)
     if feature.team_scoped and feature.join in {"team_season", "team_name", "game_id"}:
-        if feature.source_kind == "raw_havoc" or feature.source_kind == "graphql_game_team":
+        if feature.source_kind in {"raw_havoc", "graphql_game_team", "computed_running"}:
             home_val, away_val = value if isinstance(value, tuple) else (None, None)
             row[f"home_{feature.key}"] = home_val
             row[f"away_{feature.key}"] = away_val
@@ -128,6 +160,12 @@ def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> A
         home_val = _field_value(havoc.get((game.game_id, game.home_team)), feature.field)
         away_val = _field_value(havoc.get((game.game_id, game.away_team)), feature.field)
         return (home_val, away_val)
+
+    if feature.source_kind == "computed_running":
+        running = indexes["computed_running"]
+        home_stats = running.get((game.game_id, game.home_team)) or {}
+        away_stats = running.get((game.game_id, game.away_team)) or {}
+        return (home_stats.get(feature.field), away_stats.get(feature.field))
 
     if feature.source_kind == "graphql_game":
         record = indexes["graphql_game"].get(game.game_id)
