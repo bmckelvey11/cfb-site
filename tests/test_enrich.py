@@ -113,3 +113,20 @@ def test_enrich_computes_running_stats_from_prior_games(tmp_path):
     assert entering_g2["away_running_ats_pct"] == 0.0        # Beta failed to cover +3.5
     assert entering_g2["home_running_ppa_off"] == 0.5
     assert entering_g2["away_running_ppa_def"] == 0.3
+
+
+def test_save_features_writes_meta_and_load_reads_both_shapes(tmp_path):
+    from cfb_system_maker.enrich import load_features, load_features_meta
+    from cfb_system_maker.features import registry_version
+
+    path = save_features(tmp_path, {"1": {"neutralSite": True}})
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["_meta"]["registry_version"] == registry_version()
+    assert payload["_meta"]["game_count"] == 1
+    assert load_features(tmp_path) == {1: {"neutralSite": True}}
+    assert load_features_meta(tmp_path)["game_count"] == 1
+
+    # Legacy flat shape still loads, meta reads as None
+    path.write_text(json.dumps({"2": {"neutralSite": False}}), encoding="utf-8")
+    assert load_features(tmp_path) == {2: {"neutralSite": False}}
+    assert load_features_meta(tmp_path) is None

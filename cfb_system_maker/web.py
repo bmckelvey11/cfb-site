@@ -6,8 +6,8 @@ from pathlib import Path
 from flask import Flask, redirect, render_template, request, url_for
 
 from cfb_system_maker.backtest import run_backtest
-from cfb_system_maker.enrich import load_features
-from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef
+from cfb_system_maker.enrich import load_features, load_features_meta
+from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, registry_version
 from cfb_system_maker.models import BacktestResult, FeatureFilter, GameRecord, SystemFilter
 from cfb_system_maker.storage import list_systems, load_processed_games, load_system, save_system
 
@@ -31,9 +31,12 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 saved_systems=[],
                 load_error=None,
                 loaded_system="",
+                stale_registry=False,
             )
 
         feature_map = _try_load_features(app.config["DATA_DIR"])
+        meta = load_features_meta(app.config["DATA_DIR"]) if feature_map is not None else None
+        stale_registry = bool(meta and meta.get("registry_version") != registry_version())
         loaded_name = request.args.get("load_system", "")
         load_error = None
         if loaded_name:
@@ -60,6 +63,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             options=_options_from_games(games),
             feature_options=_feature_options(feature_map),
             features_enabled=feature_map is not None,
+            stale_registry=stale_registry,
             saved_systems=list_systems(app.config["DATA_DIR"]),
             result=result,
             result_dict=asdict(result),

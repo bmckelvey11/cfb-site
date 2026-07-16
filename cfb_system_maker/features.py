@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -167,6 +168,11 @@ FEATURE_BY_KEY: dict[str, FeatureDef] = {feature.key: feature for feature in FEA
 
 def registry_keys_unique() -> bool:
     return len(FEATURE_BY_KEY) == len(FEATURE_REGISTRY)
+
+
+def registry_version() -> str:
+    digest = hashlib.sha256(",".join(sorted(FEATURE_BY_KEY)).encode("utf-8")).hexdigest()
+    return digest[:12]
 
 
 def get_nested(row: dict[str, Any], path: str) -> Any:

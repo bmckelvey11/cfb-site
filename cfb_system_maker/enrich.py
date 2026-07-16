@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, get_nested
+from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, get_nested, registry_version
 from cfb_system_maker.models import GameRecord
 from cfb_system_maker.running_stats import compute_running_stats
 from cfb_system_maker.storage import load_processed_games
@@ -27,14 +28,36 @@ def enrich_games(data_dir: str | Path, games: list[GameRecord] | None = None) ->
 def save_features(data_dir: str | Path, features: dict[str, dict[str, Any]]) -> Path:
     path = Path(data_dir) / "processed" / "features.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(features, indent=2, sort_keys=True), encoding="utf-8")
+    payload = {"_meta": _build_meta(features), "games": features}
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     return path
 
 
+def _build_meta(features: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "registry_version": registry_version(),
+        "game_count": len(features),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def load_features(data_dir: str | Path) -> dict[int, dict[str, Any]]:
-    path = Path(data_dir) / "processed" / "features.json"
+    raw = json.loads(_features_path(data_dir).read_text(encoding="utf-8"))
+    rows = raw["games"] if "_meta" in raw and "games" in raw else raw
+    return {int(game_id): values for game_id, values in rows.items()}
+
+
+def load_features_meta(data_dir: str | Path) -> dict[str, Any] | None:
+    path = _features_path(data_dir)
+    if not path.exists():
+        return None
     raw = json.loads(path.read_text(encoding="utf-8"))
-    return {int(game_id): values for game_id, values in raw.items()}
+    meta = raw.get("_meta") if isinstance(raw, dict) else None
+    return meta if isinstance(meta, dict) else None
+
+
+def _features_path(data_dir: str | Path) -> Path:
+    return Path(data_dir) / "processed" / "features.json"
 
 
 def run_enrich(data_dir: str | Path) -> Path:

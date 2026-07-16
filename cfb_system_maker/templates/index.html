@@ -107,6 +107,9 @@
           {% if features_enabled %}
           <section class="feature-filters">
             <h3>Feature Filters</h3>
+            {% if stale_registry %}
+            <p class="stale-warning">features.json was built with an older field registry — run <code>python -m cfb_system_maker enrich --data-dir data</code> to refresh.</p>
+            {% endif %}
             <p class="feature-hint">Check a filter to enable it. Un-checked filters are ignored.</p>
             {% for group in feature_options %}
               <fieldset class="feature-group {% if group.group == 'result_lookahead' %}lookahead{% endif %}">
