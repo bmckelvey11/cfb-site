@@ -1,0 +1,991 @@
+source,dataset,field,type,example
+rest,adjusted_player_passing,athleteId,string,530478
+rest,adjusted_player_passing,athleteName,string,Thomas Sirk
+rest,adjusted_player_passing,conference,string,American Athletic
+rest,adjusted_player_passing,plays,int,257
+rest,adjusted_player_passing,position,string,QB
+rest,adjusted_player_passing,team,string,East Carolina
+rest,adjusted_player_passing,wepa,float,0.28
+rest,adjusted_player_passing,year,int,2017
+rest,adjusted_player_rushing,athleteId,string,505616
+rest,adjusted_player_rushing,athleteName,string,David Hood
+rest,adjusted_player_rushing,conference,string,American Athletic
+rest,adjusted_player_rushing,plays,int,133
+rest,adjusted_player_rushing,position,string,RB
+rest,adjusted_player_rushing,team,string,Temple
+rest,adjusted_player_rushing,wepa,float,0.17
+rest,adjusted_player_rushing,year,int,2017
+rest,adjusted_team_season,conference,string,
+rest,adjusted_team_season,epa,object,"{""passing"": 0.18981714742010547, ""rushing"": 0.11967419515875"
+rest,adjusted_team_season,epa.passing,float,0.18981714742010547
+rest,adjusted_team_season,epa.rushing,float,0.1196741951587581
+rest,adjusted_team_season,epa.total,float,0.13782212032207225
+rest,adjusted_team_season,epaAllowed,object,"{""passing"": 0.25634192975756837, ""rushing"": 0.05805311079739"
+rest,adjusted_team_season,epaAllowed.passing,float,0.25634192975756837
+rest,adjusted_team_season,epaAllowed.rushing,float,0.058053110797391796
+rest,adjusted_team_season,epaAllowed.total,float,0.14188024403006866
+rest,adjusted_team_season,explosiveness,float,0.9721227237954676
+rest,adjusted_team_season,explosivenessAllowed,float,1.0213615945025472
+rest,adjusted_team_season,rushing,object,"{""highlightYards"": 1.9374384631461277, ""lineYards"": 2.909376"
+rest,adjusted_team_season,rushing.highlightYards,float,1.9374384631461277
+rest,adjusted_team_season,rushing.lineYards,float,2.90937680517274
+rest,adjusted_team_season,rushing.openFieldYards,float,1.2358051491157231
+rest,adjusted_team_season,rushing.secondLevelYards,float,1.070835801316689
+rest,adjusted_team_season,rushingAllowed,object,"{""highlightYards"": 1.9840231075142898, ""lineYards"": 2.742899"
+rest,adjusted_team_season,rushingAllowed.highlightYards,float,1.9840231075142898
+rest,adjusted_team_season,rushingAllowed.lineYards,float,2.74289982386197
+rest,adjusted_team_season,rushingAllowed.openFieldYards,float,1.2988759947879824
+rest,adjusted_team_season,rushingAllowed.secondLevelYards,float,1.0246354913070204
+rest,adjusted_team_season,successRate,object,"{""passingDowns"": 0.3252255630870741, ""standardDowns"": 0.4651"
+rest,adjusted_team_season,successRate.passingDowns,float,0.3252255630870741
+rest,adjusted_team_season,successRate.standardDowns,float,0.4651808975170755
+rest,adjusted_team_season,successRate.total,float,0.42004208156894984
+rest,adjusted_team_season,successRateAllowed,object,"{""passingDowns"": 0.323637420276615, ""standardDowns"": 0.46015"
+rest,adjusted_team_season,successRateAllowed.passingDowns,float,0.323637420276615
+rest,adjusted_team_season,successRateAllowed.standardDowns,float,0.4601516542577738
+rest,adjusted_team_season,successRateAllowed.total,float,0.3982371566377504
+rest,adjusted_team_season,team,string,Jacksonville State
+rest,adjusted_team_season,teamId,int,55
+rest,adjusted_team_season,year,int,2017
+rest,advanced_game_stats,defense,object,"{""drives"": 13, ""explosiveness"": 1.0441242206517853, ""lineYar"
+rest,advanced_game_stats,defense.drives,int,13
+rest,advanced_game_stats,defense.explosiveness,float,1.0441242206517853
+rest,advanced_game_stats,defense.lineYards,float,2.751851851851852
+rest,advanced_game_stats,defense.lineYardsTotal,int,74
+rest,advanced_game_stats,defense.openFieldYards,float,0.5555555555555556
+rest,advanced_game_stats,defense.openFieldYardsTotal,int,15
+rest,advanced_game_stats,defense.passingDowns,object,"{""explosiveness"": 2.2652802282982916, ""ppa"": 0.3488869507441"
+rest,advanced_game_stats,defense.passingPlays,object,"{""explosiveness"": 1.4332885446918315, ""ppa"": 0.0988175525214"
+rest,advanced_game_stats,defense.plays,int,63
+rest,advanced_game_stats,defense.powerSuccess,float,0.75
+rest,advanced_game_stats,defense.ppa,float,0.005617324633819418
+rest,advanced_game_stats,defense.rushingPlays,object,"{""explosiveness"": 0.6195813216990078, ""ppa"": -0.118649645883"
+rest,advanced_game_stats,defense.secondLevelYards,float,0.8148148148148148
+rest,advanced_game_stats,defense.secondLevelYardsTotal,int,22
+rest,advanced_game_stats,defense.standardDowns,object,"{""explosiveness"": 0.7049142185277559, ""ppa"": -0.166017488421"
+rest,advanced_game_stats,defense.stuffRate,float,0.25925925925925924
+rest,advanced_game_stats,defense.successRate,float,0.36507936507936506
+rest,advanced_game_stats,defense.totalPPA,float,0.3538914519306233
+rest,advanced_game_stats,gameId,int,401281942
+rest,advanced_game_stats,offense,object,"{""drives"": 12, ""explosiveness"": 1.3573789107386853, ""lineYar"
+rest,advanced_game_stats,offense.drives,int,12
+rest,advanced_game_stats,offense.explosiveness,float,1.3573789107386853
+rest,advanced_game_stats,offense.lineYards,float,2.9166666666666665
+rest,advanced_game_stats,offense.lineYardsTotal,int,105
+rest,advanced_game_stats,offense.openFieldYards,float,1.0555555555555556
+rest,advanced_game_stats,offense.openFieldYardsTotal,int,38
+rest,advanced_game_stats,offense.passingDowns,object,"{""explosiveness"": 2.7518151633639034, ""ppa"": 0.7746567155591"
+rest,advanced_game_stats,offense.passingPlays,object,"{""explosiveness"": 1.7711772450817347, ""ppa"": 0.6360418094242"
+rest,advanced_game_stats,offense.plays,int,76
+rest,advanced_game_stats,offense.powerSuccess,float,0.4
+rest,advanced_game_stats,offense.ppa,float,0.3445710675917783
+rest,advanced_game_stats,offense.rushingPlays,object,"{""explosiveness"": 0.8462162624325653, ""ppa"": 0.0207146877779"
+rest,advanced_game_stats,offense.secondLevelYards,float,1.277777777777778
+rest,advanced_game_stats,offense.secondLevelYardsTotal,int,46
+rest,advanced_game_stats,offense.standardDowns,object,"{""explosiveness"": 0.9855292433719604, ""ppa"": 0.2012091849359"
+rest,advanced_game_stats,offense.stuffRate,float,0.19444444444444445
+rest,advanced_game_stats,offense.successRate,float,0.5
+rest,advanced_game_stats,offense.totalPPA,float,26.18740113697515
+rest,advanced_game_stats,opponent,string,Miami
+rest,advanced_game_stats,season,int,2021
+rest,advanced_game_stats,seasonType,string,regular
+rest,advanced_game_stats,team,string,Alabama
+rest,advanced_game_stats,week,int,1
+rest,advanced_season_stats,conference,string,Mountain West
+rest,advanced_season_stats,defense,object,"{""drives"": 130, ""explosiveness"": 1.4212885393966674, ""fieldP"
+rest,advanced_season_stats,defense.drives,int,130
+rest,advanced_season_stats,defense.explosiveness,float,1.4212885393966674
+rest,advanced_season_stats,defense.fieldPosition,object,"{""averagePredictedPoints"": -1.182, ""averageStart"": 73.1}"
+rest,advanced_season_stats,defense.havoc,object,"{""db"": 0.063, ""frontSeven"": 0.124, ""total"": 0.187}"
+rest,advanced_season_stats,defense.lineYards,float,2.8865714285714286
+rest,advanced_season_stats,defense.lineYardsTotal,int,1010
+rest,advanced_season_stats,defense.openFieldYards,float,1.18
+rest,advanced_season_stats,defense.openFieldYardsTotal,int,0
+rest,advanced_season_stats,defense.passingDowns,object,"{""explosiveness"": 2.0831141294359883, ""ppa"": 0.3285583882101"
+rest,advanced_season_stats,defense.passingPlays,object,"{""explosiveness"": 1.6315074298785266, ""ppa"": 0.2133191834803"
+rest,advanced_season_stats,defense.plays,int,716
+rest,advanced_season_stats,defense.pointsPerOpportunity,float,3.6315789473684212
+rest,advanced_season_stats,defense.powerSuccess,float,0.8285714285714286
+rest,advanced_season_stats,defense.ppa,float,0.18137086001220984
+rest,advanced_season_stats,defense.rushingPlays,object,"{""explosiveness"": 1.1948989650315884, ""ppa"": 0.1695192498182"
+rest,advanced_season_stats,defense.secondLevelYards,float,0.9542857142857143
+rest,advanced_season_stats,defense.secondLevelYardsTotal,int,334
+rest,advanced_season_stats,defense.standardDowns,object,"{""explosiveness"": 1.1326199309752616, ""ppa"": 0.0938450915738"
+rest,advanced_season_stats,defense.stuffRate,float,0.16857142857142857
+rest,advanced_season_stats,defense.successRate,float,0.3770949720670391
+rest,advanced_season_stats,defense.totalOpportunies,int,57
+rest,advanced_season_stats,defense.totalPPA,float,129.86153576874224
+rest,advanced_season_stats,offense,object,"{""drives"": 139, ""explosiveness"": 1.1568474446955372, ""fieldP"
+rest,advanced_season_stats,offense.drives,int,139
+rest,advanced_season_stats,offense.explosiveness,float,1.1568474446955372
+rest,advanced_season_stats,offense.fieldPosition,object,"{""averagePredictedPoints"": 1.448, ""averageStart"": 69.5}"
+rest,advanced_season_stats,offense.havoc,object,"{""db"": 0.017, ""frontSeven"": 0.066, ""total"": 0.084}"
+rest,advanced_season_stats,offense.lineYards,float,3.447
+rest,advanced_season_stats,offense.lineYardsTotal,int,2758
+rest,advanced_season_stats,offense.openFieldYards,float,1.1675
+rest,advanced_season_stats,offense.openFieldYardsTotal,int,934
+rest,advanced_season_stats,offense.passingDowns,object,"{""explosiveness"": 2.1405546611014836, ""ppa"": 0.4873340725190"
+rest,advanced_season_stats,offense.passingPlays,object,"{""explosiveness"": 2.287744775581018, ""ppa"": 0.50809669036864"
+rest,advanced_season_stats,offense.plays,int,920
+rest,advanced_season_stats,offense.pointsPerOpportunity,float,4.324324324324325
+rest,advanced_season_stats,offense.powerSuccess,float,0.7962962962962963
+rest,advanced_season_stats,offense.ppa,float,0.2830652092594701
+rest,advanced_season_stats,offense.rushingPlays,object,"{""explosiveness"": 1.0136203421031809, ""ppa"": 0.2569353789450"
+rest,advanced_season_stats,offense.secondLevelYards,float,1.06
+rest,advanced_season_stats,offense.secondLevelYardsTotal,int,848
+rest,advanced_season_stats,offense.standardDowns,object,"{""explosiveness"": 0.9335345995918883, ""ppa"": 0.2101550840252"
+rest,advanced_season_stats,offense.stuffRate,float,0.1125
+rest,advanced_season_stats,offense.successRate,float,0.4641304347826087
+rest,advanced_season_stats,offense.totalOpportunies,int,74
+rest,advanced_season_stats,offense.totalPPA,float,260.4199925187125
+rest,advanced_season_stats,season,int,2021
+rest,advanced_season_stats,team,string,Air Force
+rest,calendar,endDate,string,2017-09-05 06:59:00+00:00
+rest,calendar,firstGameStart,string,2017-07-26 07:00:00+00:00
+rest,calendar,lastGameStart,string,2017-09-05 06:59:00+00:00
+rest,calendar,season,int,2017
+rest,calendar,seasonType,string,regular
+rest,calendar,startDate,string,2017-07-26 07:00:00+00:00
+rest,calendar,week,int,1
+rest,coaches,firstName,string,Steve
+rest,coaches,hireDate,string,2012-12-04 00:00:00+00:00
+rest,coaches,lastName,string,Addazio
+rest,coaches,seasons,list,"[{""games"": 13, ""losses"": 6, ""postseasonRank"": null, ""preseas"
+rest,conference_sp,conference,string,ACC
+rest,conference_sp,defense,object,"{""explosiveness"": null, ""havoc"": {""db"": null, ""frontSeven"": "
+rest,conference_sp,defense.havoc,object,"{""db"": null, ""frontSeven"": null, ""total"": null}"
+rest,conference_sp,defense.rating,float,25.95
+rest,conference_sp,offense,object,"{""explosiveness"": null, ""pace"": null, ""passing"": null, ""pass"
+rest,conference_sp,offense.rating,float,31.814285714285713
+rest,conference_sp,rating,float,6.121428571428571
+rest,conference_sp,specialTeams,object,"{""rating"": null}"
+rest,conference_sp,year,int,2021
+rest,conference_sp,specialTeams.rating,float,0.17857142857142858
+rest,conferences,classification,string,ii
+rest,conferences,id,int,187
+rest,conferences,name,string,Carolinas
+rest,conferences,shortName,string,Conference Carolinas
+rest,conferences,abbreviation,string,MAC
+rest,draft_picks,collegeAthleteId,int,3122132
+rest,draft_picks,collegeConference,string,SEC
+rest,draft_picks,collegeId,int,245
+rest,draft_picks,collegeTeam,string,Texas A&M
+rest,draft_picks,height,int,77
+rest,draft_picks,hometownInfo,object,"{""city"": ""Arlington"", ""country"": ""USA"", ""countyFips"": ""48439"
+rest,draft_picks,hometownInfo.city,string,Arlington
+rest,draft_picks,hometownInfo.country,string,USA
+rest,draft_picks,hometownInfo.countyFips,string,48439
+rest,draft_picks,hometownInfo.latitude,string,32.701938999999996
+rest,draft_picks,hometownInfo.longitude,string,-97.10562379033699
+rest,draft_picks,hometownInfo.state,string,TX
+rest,draft_picks,name,string,Myles Garrett
+rest,draft_picks,nflAthleteId,int,51534
+rest,draft_picks,nflTeam,string,Cleveland
+rest,draft_picks,nflTeamId,int,5
+rest,draft_picks,overall,int,1
+rest,draft_picks,pick,int,1
+rest,draft_picks,position,string,Defensive End
+rest,draft_picks,preDraftGrade,int,95
+rest,draft_picks,preDraftPositionRanking,int,1
+rest,draft_picks,preDraftRanking,int,1
+rest,draft_picks,round,int,1
+rest,draft_picks,weight,int,272
+rest,draft_picks,year,int,2017
+rest,draft_positions,abbreviation,string,C
+rest,draft_positions,name,string,Center
+rest,draft_teams,displayName,string,Cincinnati Bengals
+rest,draft_teams,location,string,Cincinnati
+rest,draft_teams,logo,string,https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/cin.png
+rest,draft_teams,nickname,string,Bengals
+rest,drives,defense,string,Florida State
+rest,drives,defenseConference,string,ACC
+rest,drives,driveNumber,int,1
+rest,drives,driveResult,string,MISSED FG
+rest,drives,elapsed,object,"{""minutes"": 4, ""seconds"": 3}"
+rest,drives,elapsed.minutes,int,4
+rest,drives,elapsed.seconds,int,3
+rest,drives,endDefenseScore,int,0
+rest,drives,endOffenseScore,int,0
+rest,drives,endPeriod,int,1
+rest,drives,endTime,object,"{""minutes"": 10, ""seconds"": 57}"
+rest,drives,endTime.minutes,int,10
+rest,drives,endTime.seconds,int,57
+rest,drives,endYardline,int,75
+rest,drives,endYardsToGoal,int,25
+rest,drives,gameId,int,400933827
+rest,drives,id,string,4009338271
+rest,drives,isHomeOffense,bool,True
+rest,drives,offense,string,Alabama
+rest,drives,offenseConference,string,SEC
+rest,drives,plays,int,9
+rest,drives,scoring,bool,False
+rest,drives,startDefenseScore,int,0
+rest,drives,startOffenseScore,int,0
+rest,drives,startPeriod,int,1
+rest,drives,startTime,object,"{""minutes"": 15, ""seconds"": 0}"
+rest,drives,startTime.minutes,int,15
+rest,drives,startTime.seconds,int,0
+rest,drives,startYardline,int,25
+rest,drives,startYardsToGoal,int,75
+rest,drives,yards,int,50
+rest,elo,conference,string,Mountain West
+rest,elo,elo,int,1730
+rest,elo,team,string,Air Force
+rest,elo,year,int,2021
+rest,fbs_teams,abbreviation,string,AF
+rest,fbs_teams,alternateColor,string,#ffffff
+rest,fbs_teams,alternateNames,list,"[""AF"", ""Air Force""]"
+rest,fbs_teams,classification,string,fbs
+rest,fbs_teams,color,string,#004a7b
+rest,fbs_teams,conference,string,Mountain West
+rest,fbs_teams,division,string,Mountain
+rest,fbs_teams,id,int,2005
+rest,fbs_teams,location,object,"{""capacity"": 46692, ""city"": ""Colorado Springs"", ""constructio"
+rest,fbs_teams,location.capacity,int,46692
+rest,fbs_teams,location.city,string,Colorado Springs
+rest,fbs_teams,location.constructionYear,int,1962
+rest,fbs_teams,location.countryCode,string,US
+rest,fbs_teams,location.dome,bool,False
+rest,fbs_teams,location.elevation,string,2024.875732
+rest,fbs_teams,location.grass,bool,False
+rest,fbs_teams,location.id,int,3713
+rest,fbs_teams,location.latitude,float,38.9969701
+rest,fbs_teams,location.longitude,float,-104.8436165
+rest,fbs_teams,location.name,string,Falcon Stadium
+rest,fbs_teams,location.state,string,CO
+rest,fbs_teams,location.timezone,string,America/Denver
+rest,fbs_teams,location.zip,string,80840
+rest,fbs_teams,logos,list,"[""http://a.espncdn.com/i/teamlogos/ncaa/500/2005.png"", ""http"
+rest,fbs_teams,mascot,string,Falcons
+rest,fbs_teams,school,string,Air Force
+rest,fbs_teams,twitter,string,@AF_Football
+rest,field_goal_ep,distance,int,17
+rest,field_goal_ep,expectedPoints,float,2.85
+rest,field_goal_ep,yardsToGoal,int,0
+rest,fpi,conference,string,FBS Independents
+rest,fpi,efficiencies,object,"{""defense"": 76.81, ""offense"": 65.49, ""overall"": 75.258, ""spe"
+rest,fpi,efficiencies.defense,float,76.81
+rest,fpi,efficiencies.offense,float,65.49
+rest,fpi,efficiencies.overall,float,75.258
+rest,fpi,efficiencies.specialTeams,float,49.223
+rest,fpi,fpi,float,16.663
+rest,fpi,resumeRanks,object,"{""averageWinProbability"": 11, ""fpi"": 6, ""gameControl"": 9, ""r"
+rest,fpi,resumeRanks.averageWinProbability,int,11
+rest,fpi,resumeRanks.fpi,int,6
+rest,fpi,resumeRanks.gameControl,int,9
+rest,fpi,resumeRanks.strengthOfRecord,int,10
+rest,fpi,resumeRanks.strengthOfSchedule,int,43
+rest,fpi,team,string,Notre Dame
+rest,fpi,year,int,2021
+rest,fpi,resumeRanks.remainingStrengthOfSchedule,int,3
+rest,game_havoc_stats,conference,string,SEC
+rest,game_havoc_stats,defense,object,"{""dbHavocEvents"": 6, ""dbHavocRate"": 0.09523809523809523, ""fr"
+rest,game_havoc_stats,defense.dbHavocEvents,int,6
+rest,game_havoc_stats,defense.dbHavocRate,float,0.09523809523809523
+rest,game_havoc_stats,defense.frontSevenHavocEvents,int,8
+rest,game_havoc_stats,defense.frontSevenHavocRate,float,0.12698412698412698
+rest,game_havoc_stats,defense.havocRate,float,0.2222222222222222
+rest,game_havoc_stats,defense.totalHavocEvents,int,14
+rest,game_havoc_stats,defense.totalPlays,int,63
+rest,game_havoc_stats,gameId,int,401281942
+rest,game_havoc_stats,offense,object,"{""dbHavocEvents"": 1, ""dbHavocRate"": 0.013157894736842105, ""f"
+rest,game_havoc_stats,offense.dbHavocEvents,int,1
+rest,game_havoc_stats,offense.dbHavocRate,float,0.013157894736842105
+rest,game_havoc_stats,offense.frontSevenHavocEvents,int,12
+rest,game_havoc_stats,offense.frontSevenHavocRate,float,0.15789473684210525
+rest,game_havoc_stats,offense.havocRate,float,0.17105263157894737
+rest,game_havoc_stats,offense.totalHavocEvents,int,13
+rest,game_havoc_stats,offense.totalPlays,int,76
+rest,game_havoc_stats,opponent,string,Miami
+rest,game_havoc_stats,opponentConference,string,ACC
+rest,game_havoc_stats,season,int,2021
+rest,game_havoc_stats,seasonType,string,regular
+rest,game_havoc_stats,team,string,Alabama
+rest,game_havoc_stats,week,int,1
+rest,game_player_stats,id,int,400935247
+rest,game_player_stats,teams,list,"[{""categories"": [{""name"": ""defensive"", ""types"": [{""athletes"""
+rest,game_team_stats,id,int,401239884
+rest,game_team_stats,teams,list,"[{""conference"": ""Southland"", ""homeAway"": ""away"", ""points"": 1"
+rest,games,awayClassification,string,fcs
+rest,games,awayConference,string,OVC
+rest,games,awayId,int,2046
+rest,games,awayLineScores,list,"[7, 3, 0, 7]"
+rest,games,awayPoints,int,17
+rest,games,awayTeam,string,Austin Peay
+rest,games,completed,bool,True
+rest,games,conferenceGame,bool,False
+rest,games,highlights,string,
+rest,games,homeClassification,string,fcs
+rest,games,homeConference,string,Southland
+rest,games,homeId,int,2110
+rest,games,homeLineScores,list,"[0, 6, 7, 11]"
+rest,games,homePoints,int,24
+rest,games,homeTeam,string,Central Arkansas
+rest,games,id,int,401218616
+rest,games,neutralSite,bool,True
+rest,games,season,int,2020
+rest,games,seasonType,string,regular
+rest,games,startDate,string,2020-08-30 01:00:00+00:00
+rest,games,startTimeTBD,bool,False
+rest,games,venue,string,Cramton Bowl
+rest,games,venueId,int,3689
+rest,games,week,int,1
+rest,games,attendance,int,12716
+rest,games,awayPostgameWinProbability,float,0.0019191196145156297
+rest,games,excitementIndex,float,2.226002
+rest,games,homePostgameWinProbability,float,0.9980808803854844
+rest,games,awayPostgameElo,int,1272
+rest,games,awayPregameElo,int,1227
+rest,games,homePostgameElo,int,1406
+rest,games,homePregameElo,int,1451
+rest,games,notes,string,Cricket MEAC/SWAC Challenge
+rest,kicker_paar,athleteId,string,536384
+rest,kicker_paar,athleteName,string,Nick Bartolotta
+rest,kicker_paar,attempts,int,2
+rest,kicker_paar,conference,string,SEC
+rest,kicker_paar,paar,float,0.75
+rest,kicker_paar,team,string,Missouri
+rest,kicker_paar,year,int,2017
+rest,lines,awayClassification,string,fcs
+rest,lines,awayConference,string,Big Sky
+rest,lines,awayScore,int,6
+rest,lines,awayTeam,string,Sacramento State
+rest,lines,awayTeamId,int,16
+rest,lines,homeClassification,string,fbs
+rest,lines,homeConference,string,Sun Belt
+rest,lines,homeScore,int,28
+rest,lines,homeTeam,string,Idaho
+rest,lines,homeTeamId,int,70
+rest,lines,id,int,400944827
+rest,lines,lines,list,"[{""awayMoneyline"": null, ""formattedSpread"": ""Idaho -23.5"", """
+rest,lines,season,int,2017
+rest,lines,seasonType,string,regular
+rest,lines,startDate,string,2017-09-01 01:00:00+00:00
+rest,lines,week,int,1
+rest,media,awayConference,string,Southland
+rest,media,awayTeam,string,Central Arkansas
+rest,media,homeConference,string,Conference USA
+rest,media,homeTeam,string,UAB
+rest,media,id,int,401238035
+rest,media,isStartTimeTBD,bool,False
+rest,media,mediaType,string,web
+rest,media,outlet,string,ESPN3
+rest,media,season,int,2020
+rest,media,seasonType,string,regular
+rest,media,startTime,string,2020-09-04 00:00:00+00:00
+rest,media,week,int,1
+rest,play_stat_types,id,int,1
+rest,play_stat_types,name,string,Incompletion
+rest,play_stats,athleteId,string,4241474
+rest,play_stats,athleteName,string,Brian Robinson Jr.
+rest,play_stats,clock,object,"{""minutes"": 14, ""seconds"": 55}"
+rest,play_stats,clock.minutes,int,14
+rest,play_stats,clock.seconds,int,55
+rest,play_stats,conference,string,SEC
+rest,play_stats,distance,int,10
+rest,play_stats,down,int,1
+rest,play_stats,driveId,string,4012819421
+rest,play_stats,gameId,int,401281942
+rest,play_stats,opponent,string,Miami
+rest,play_stats,opponentScore,int,0
+rest,play_stats,period,int,1
+rest,play_stats,playId,string,401281942101854401
+rest,play_stats,season,int,2021
+rest,play_stats,stat,int,3
+rest,play_stats,statType,string,Rush
+rest,play_stats,team,string,Alabama
+rest,play_stats,teamScore,int,0
+rest,play_stats,week,int,1
+rest,play_stats,yardsToGoal,int,75
+rest,play_types,abbreviation,string,RUSH
+rest,play_types,id,int,5
+rest,play_types,text,string,Rush
+rest,player_season_stats,category,string,defensive
+rest,player_season_stats,conference,string,SEC
+rest,player_season_stats,player,string,Trey Sanders
+rest,player_season_stats,playerId,string,107494
+rest,player_season_stats,position,string,RB
+rest,player_season_stats,season,int,2021
+rest,player_season_stats,stat,string,0
+rest,player_season_stats,statType,string,PD
+rest,player_season_stats,team,string,Alabama
+rest,player_usage,conference,string,SEC
+rest,player_usage,id,string,107494
+rest,player_usage,name,string,Trey Sanders
+rest,player_usage,position,string,RB
+rest,player_usage,season,int,2021
+rest,player_usage,team,string,Alabama
+rest,player_usage,usage,object,"{""firstDown"": 0.097, ""overall"": 0.095, ""pass"": 0.015, ""passi"
+rest,player_usage,usage.firstDown,float,0.097
+rest,player_usage,usage.overall,float,0.095
+rest,player_usage,usage.pass,float,0.015
+rest,player_usage,usage.passingDowns,float,0.042
+rest,player_usage,usage.rush,float,0.188
+rest,player_usage,usage.secondDown,float,0.116
+rest,player_usage,usage.standardDowns,float,0.119
+rest,player_usage,usage.thirdDown,float,0.054
+rest,plays,away,string,Nebraska
+rest,plays,clock,object,"{""minutes"": 15, ""seconds"": 0}"
+rest,plays,clock.minutes,int,15
+rest,plays,clock.seconds,int,0
+rest,plays,defense,string,Nebraska
+rest,plays,defenseConference,string,Big Ten
+rest,plays,defenseScore,int,0
+rest,plays,defenseTimeouts,int,3
+rest,plays,distance,int,10
+rest,plays,down,int,1
+rest,plays,driveId,string,4012827141
+rest,plays,driveNumber,int,1
+rest,plays,gameId,int,401282714
+rest,plays,home,string,Illinois
+rest,plays,id,string,401282714101849902
+rest,plays,offense,string,Illinois
+rest,plays,offenseConference,string,Big Ten
+rest,plays,offenseScore,int,0
+rest,plays,offenseTimeouts,int,3
+rest,plays,period,int,1
+rest,plays,playNumber,int,1
+rest,plays,playText,string,James McCourt kickoff for 65 yds for a touchback
+rest,plays,playType,string,Kickoff
+rest,plays,scoring,bool,False
+rest,plays,wallclock,string,2021-08-28T17:20:38.000Z
+rest,plays,yardline,int,35
+rest,plays,yardsGained,int,0
+rest,plays,yardsToGoal,int,65
+rest,plays,ppa,float,-0.9369396927154333
+rest,ppa_games,conference,string,Mountain West
+rest,ppa_games,defense,object,"{""firstDown"": -0.03, ""overall"": 0.24, ""passing"": 0.35, ""rush"
+rest,ppa_games,defense.firstDown,float,-0.03
+rest,ppa_games,defense.overall,float,0.24
+rest,ppa_games,defense.passing,float,0.35
+rest,ppa_games,defense.rushing,float,0.18
+rest,ppa_games,defense.secondDown,float,-0.08
+rest,ppa_games,defense.thirdDown,float,1.01
+rest,ppa_games,gameId,int,401310861
+rest,ppa_games,offense,object,"{""firstDown"": 0.3, ""overall"": 0.37, ""passing"": 0.4, ""rushing"
+rest,ppa_games,offense.firstDown,float,0.3
+rest,ppa_games,offense.overall,float,0.37
+rest,ppa_games,offense.passing,float,0.4
+rest,ppa_games,offense.rushing,float,0.37
+rest,ppa_games,offense.secondDown,float,0.16
+rest,ppa_games,offense.thirdDown,float,0.76
+rest,ppa_games,opponent,string,Lafayette
+rest,ppa_games,season,int,2021
+rest,ppa_games,seasonType,string,regular
+rest,ppa_games,team,string,Air Force
+rest,ppa_games,week,int,1
+rest,ppa_players_games,averagePPA,object,"{""all"": 0.481, ""pass"": 1.012, ""rush"": 0.369}"
+rest,ppa_players_games,averagePPA.all,float,0.481
+rest,ppa_players_games,averagePPA.pass,float,1.012
+rest,ppa_players_games,averagePPA.rush,float,0.369
+rest,ppa_players_games,id,string,4428119
+rest,ppa_players_games,name,string,Lew Nichols
+rest,ppa_players_games,opponent,string,Missouri
+rest,ppa_players_games,position,string,RB
+rest,ppa_players_games,season,int,2021
+rest,ppa_players_games,seasonType,string,regular
+rest,ppa_players_games,team,string,Central Michigan
+rest,ppa_players_games,week,int,1
+rest,ppa_players_season,averagePPA,object,"{""all"": 0.057, ""firstDown"": 0, ""pass"": 0.406, ""passingDowns"""
+rest,ppa_players_season,averagePPA.all,float,0.057
+rest,ppa_players_season,averagePPA.firstDown,int,0
+rest,ppa_players_season,averagePPA.pass,float,0.406
+rest,ppa_players_season,averagePPA.passingDowns,float,0.327
+rest,ppa_players_season,averagePPA.rush,float,0.023
+rest,ppa_players_season,averagePPA.secondDown,float,0.038
+rest,ppa_players_season,averagePPA.standardDowns,float,0.013
+rest,ppa_players_season,averagePPA.thirdDown,float,0.449
+rest,ppa_players_season,conference,string,SEC
+rest,ppa_players_season,id,string,107494
+rest,ppa_players_season,name,string,Trey Sanders
+rest,ppa_players_season,position,string,RB
+rest,ppa_players_season,season,int,2021
+rest,ppa_players_season,team,string,Alabama
+rest,ppa_players_season,totalPPA,object,"{""all"": 4.472, ""firstDown"": -0.004, ""pass"": 2.844, ""passingD"
+rest,ppa_players_season,totalPPA.all,float,4.472
+rest,ppa_players_season,totalPPA.firstDown,float,-0.004
+rest,ppa_players_season,totalPPA.pass,float,2.844
+rest,ppa_players_season,totalPPA.passingDowns,float,3.596
+rest,ppa_players_season,totalPPA.rush,float,1.628
+rest,ppa_players_season,totalPPA.secondDown,float,1.259
+rest,ppa_players_season,totalPPA.standardDowns,float,0.876
+rest,ppa_players_season,totalPPA.thirdDown,float,4.039
+rest,ppa_teams,conference,string,Mountain West
+rest,ppa_teams,defense,object,"{""cumulative"": {""passing"": 765.8, ""rushing"": 59.3, ""total"": "
+rest,ppa_teams,defense.cumulative,object,"{""passing"": 765.8, ""rushing"": 59.3, ""total"": 129.9}"
+rest,ppa_teams,defense.firstDown,float,0.01
+rest,ppa_teams,defense.overall,float,0.18
+rest,ppa_teams,defense.passing,float,0.21
+rest,ppa_teams,defense.rushing,float,0.17
+rest,ppa_teams,defense.secondDown,float,0.12
+rest,ppa_teams,defense.thirdDown,float,0.63
+rest,ppa_teams,offense,object,"{""cumulative"": {""passing"": 59.45, ""rushing"": 205.5, ""total"":"
+rest,ppa_teams,offense.cumulative,object,"{""passing"": 59.45, ""rushing"": 205.5, ""total"": 260.4}"
+rest,ppa_teams,offense.firstDown,float,0.1
+rest,ppa_teams,offense.overall,float,0.28
+rest,ppa_teams,offense.passing,float,0.51
+rest,ppa_teams,offense.rushing,float,0.26
+rest,ppa_teams,offense.secondDown,float,0.2
+rest,ppa_teams,offense.thirdDown,float,0.61
+rest,ppa_teams,season,int,2021
+rest,ppa_teams,team,string,Air Force
+rest,predicted_points,predictedPoints,float,6.06
+rest,predicted_points,yardLine,int,99
+rest,pregame_win_prob,awayTeam,string,Lafayette
+rest,pregame_win_prob,gameId,int,401310861
+rest,pregame_win_prob,homeTeam,string,Air Force
+rest,pregame_win_prob,homeWinProbability,float,0.997
+rest,pregame_win_prob,season,int,2021
+rest,pregame_win_prob,seasonType,string,regular
+rest,pregame_win_prob,spread,float,-40.5
+rest,pregame_win_prob,week,int,1
+rest,rankings,polls,list,"[{""poll"": ""AP Top 25"", ""ranks"": [{""conference"": ""FBS Indepen"
+rest,rankings,season,int,2021
+rest,rankings,seasonType,string,regular
+rest,rankings,week,int,5
+rest,records,awayGames,object,"{""games"": 5, ""losses"": 3, ""ties"": 0, ""wins"": 2}"
+rest,records,awayGames.games,int,5
+rest,records,awayGames.losses,int,3
+rest,records,awayGames.ties,int,0
+rest,records,awayGames.wins,int,2
+rest,records,classification,string,fbs
+rest,records,conference,string,SEC
+rest,records,conferenceGames,object,"{""games"": 10, ""losses"": 4, ""ties"": 0, ""wins"": 6}"
+rest,records,conferenceGames.games,int,10
+rest,records,conferenceGames.losses,int,4
+rest,records,conferenceGames.ties,int,0
+rest,records,conferenceGames.wins,int,6
+rest,records,division,string,West
+rest,records,expectedWins,float,4.657129368921421
+rest,records,homeGames,object,"{""games"": 5, ""losses"": 1, ""ties"": 0, ""wins"": 4}"
+rest,records,homeGames.games,int,5
+rest,records,homeGames.losses,int,1
+rest,records,homeGames.ties,int,0
+rest,records,homeGames.wins,int,4
+rest,records,neutralSiteGames,object,"{""games"": 1, ""losses"": 1, ""ties"": 0, ""wins"": 0}"
+rest,records,neutralSiteGames.games,int,1
+rest,records,neutralSiteGames.losses,int,1
+rest,records,neutralSiteGames.ties,int,0
+rest,records,neutralSiteGames.wins,int,0
+rest,records,postseason,object,"{""games"": 1, ""losses"": 1, ""ties"": 0, ""wins"": 0}"
+rest,records,postseason.games,int,1
+rest,records,postseason.losses,int,1
+rest,records,postseason.ties,int,0
+rest,records,postseason.wins,int,0
+rest,records,regularSeason,object,"{""games"": 10, ""losses"": 4, ""ties"": 0, ""wins"": 6}"
+rest,records,regularSeason.games,int,10
+rest,records,regularSeason.losses,int,4
+rest,records,regularSeason.ties,int,0
+rest,records,regularSeason.wins,int,6
+rest,records,team,string,Auburn
+rest,records,teamId,int,2
+rest,records,total,object,"{""games"": 11, ""losses"": 5, ""ties"": 0, ""wins"": 6}"
+rest,records,total.games,int,11
+rest,records,total.losses,int,5
+rest,records,total.ties,int,0
+rest,records,total.wins,int,6
+rest,records,year,int,2020
+rest,recruiting_groups,averageRating,float,0.781604479497938
+rest,recruiting_groups,averageStars,string,2.3134328358208955
+rest,recruiting_groups,commits,string,67
+rest,recruiting_groups,conference,string,Mountain West
+rest,recruiting_groups,positionGroup,string,Defensive Back
+rest,recruiting_groups,team,string,Air Force
+rest,recruiting_groups,totalRating,float,52.367504
+rest,recruiting_teams,points,float,327.91
+rest,recruiting_teams,rank,int,1
+rest,recruiting_teams,team,string,Alabama
+rest,recruiting_teams,year,int,2021
+rest,recruits,city,string,Southlake
+rest,recruits,committedTo,string,Ohio State
+rest,recruits,country,string,USA
+rest,recruits,height,int,75
+rest,recruits,hometownInfo,object,"{""fipsCode"": ""48439"", ""latitude"": 32.9412363, ""longitude"": -"
+rest,recruits,hometownInfo.fipsCode,string,48439
+rest,recruits,hometownInfo.latitude,float,32.9412363
+rest,recruits,hometownInfo.longitude,float,-97.1341783
+rest,recruits,id,string,115742
+rest,recruits,name,string,Quinn Ewers
+rest,recruits,position,string,QB
+rest,recruits,ranking,int,1
+rest,recruits,rating,int,1
+rest,recruits,recruitType,string,HighSchool
+rest,recruits,school,string,Southlake Carroll
+rest,recruits,stars,int,5
+rest,recruits,stateProvince,string,TX
+rest,recruits,weight,int,206
+rest,recruits,year,int,2021
+rest,recruits,athleteId,string,4431274
+rest,returning_production,conference,string,Mountain West
+rest,returning_production,passingUsage,int,1
+rest,returning_production,percentPPA,float,0.77
+rest,returning_production,percentPassingPPA,int,1
+rest,returning_production,percentReceivingPPA,float,0.54
+rest,returning_production,percentRushingPPA,float,0.777
+rest,returning_production,receivingUsage,float,0.745
+rest,returning_production,rushingUsage,float,0.662
+rest,returning_production,season,int,2021
+rest,returning_production,team,string,Air Force
+rest,returning_production,totalPPA,float,127.1
+rest,returning_production,totalPassingPPA,int,35
+rest,returning_production,totalReceivingPPA,float,20.8
+rest,returning_production,totalRushingPPA,float,71.3
+rest,returning_production,usage,float,0.724
+rest,roster,firstName,string,Trey
+rest,roster,height,int,72
+rest,roster,homeCity,string,Port Saint Joe
+rest,roster,homeCountry,string,USA
+rest,roster,homeCountyFIPS,string,12045
+rest,roster,homeLatitude,float,29.8118757
+rest,roster,homeLongitude,float,-85.302974
+rest,roster,homeState,string,FL
+rest,roster,id,string,107494
+rest,roster,jersey,int,2
+rest,roster,lastName,string,Sanders
+rest,roster,position,string,RB
+rest,roster,recruitIds,list,"[""122283""]"
+rest,roster,team,string,Alabama
+rest,roster,weight,int,215
+rest,roster,year,int,4
+rest,sp,conference,string,SEC
+rest,sp,defense,object,"{""explosiveness"": null, ""havoc"": {""db"": null, ""frontSeven"": "
+rest,sp,defense.havoc,object,"{""db"": null, ""frontSeven"": null, ""total"": null}"
+rest,sp,defense.ranking,int,1
+rest,sp,defense.rating,float,10.3
+rest,sp,offense,object,"{""explosiveness"": null, ""pace"": null, ""passing"": null, ""pass"
+rest,sp,offense.ranking,int,2
+rest,sp,offense.rating,float,41.4
+rest,sp,ranking,int,1
+rest,sp,rating,int,32
+rest,sp,specialTeams,object,"{""rating"": null}"
+rest,sp,team,string,Georgia
+rest,sp,year,int,2021
+rest,sp,specialTeams.rating,float,1.7
+rest,srs,conference,string,SEC
+rest,srs,division,string,East
+rest,srs,ranking,int,1
+rest,srs,rating,float,27.871146476697078
+rest,srs,team,string,Georgia
+rest,srs,year,int,2021
+rest,stat_categories,value,string,completionAttempts
+rest,talent,talent,float,1004.04
+rest,talent,team,string,Alabama
+rest,talent,year,int,2021
+rest,team_stats,conference,string,Mountain West
+rest,team_stats,season,int,2021
+rest,team_stats,statName,string,firstDowns
+rest,team_stats,statValue,object,"{""actual_instance"": 284, ""any_of_schemas"": [""float"", ""str""],"
+rest,team_stats,statValue.actual_instance,int,284
+rest,team_stats,statValue.any_of_schemas,list,"[""float"", ""str""]"
+rest,team_stats,statValue.anyof_schema_2_validator,int,284
+rest,team_stats,team,string,Air Force
+rest,teams,abbreviation,string,ACU
+rest,teams,alternateColor,string,#b1b3b3
+rest,teams,alternateNames,list,"[""ACU"", ""Abilene Chrstn""]"
+rest,teams,classification,string,fcs
+rest,teams,color,string,#592d82
+rest,teams,conference,string,AWC
+rest,teams,id,int,2000
+rest,teams,location,object,"{""capacity"": 12000, ""city"": ""Abilene"", ""constructionYear"": 2"
+rest,teams,location.capacity,int,12000
+rest,teams,location.city,string,Abilene
+rest,teams,location.constructionYear,int,2017
+rest,teams,location.countryCode,string,US
+rest,teams,location.dome,bool,False
+rest,teams,location.elevation,string,520.9
+rest,teams,location.grass,bool,False
+rest,teams,location.id,int,5440
+rest,teams,location.latitude,float,32.472275
+rest,teams,location.longitude,float,-99.710464
+rest,teams,location.name,string,Wildcat Stadium (TX)
+rest,teams,location.state,string,TX
+rest,teams,location.timezone,string,America/Chicago
+rest,teams,location.zip,string,79601
+rest,teams,logos,list,"[""http://a.espncdn.com/i/teamlogos/ncaa/500/2000.png"", ""http"
+rest,teams,mascot,string,Wildcats
+rest,teams,school,string,Abilene Christian
+rest,teams,twitter,string,@ACUFootball
+rest,teams,division,string,Mountain
+rest,teams_ats,atsLosses,int,1
+rest,teams_ats,atsPushes,int,0
+rest,teams_ats,atsWins,int,0
+rest,teams_ats,avgCoverMargin,int,-15
+rest,teams_ats,games,int,1
+rest,teams_ats,team,string,Abilene Christian
+rest,teams_ats,teamId,int,2000
+rest,teams_ats,year,int,2021
+rest,teams_ats,conference,string,MWC
+rest,transfer_portal,destination,string,UTSA
+rest,transfer_portal,eligibility,string,Immediate
+rest,transfer_portal,firstName,string,Cameron
+rest,transfer_portal,lastName,string,Wilkins
+rest,transfer_portal,origin,string,Missouri
+rest,transfer_portal,position,string,LB
+rest,transfer_portal,season,int,2021
+rest,transfer_portal,stars,int,3
+rest,transfer_portal,transferDate,string,2021-07-31 14:46:00+00:00
+rest,transfer_portal,rating,float,0.84
+rest,user_info,patronLevel,int,2
+rest,user_info,remainingCalls,int,29185
+rest,venues,capacity,int,4000
+rest,venues,city,string,Portales
+rest,venues,countryCode,string,US
+rest,venues,dome,bool,False
+rest,venues,id,int,5938
+rest,venues,latitude,float,34.1861922
+rest,venues,longitude,float,-103.334397
+rest,venues,name,string,Al Whitehead Field at Greyhound Stadium
+rest,venues,state,string,NM
+rest,venues,zip,string,88130
+rest,venues,constructionYear,int,1995
+rest,venues,elevation,string,1.718581796
+rest,venues,grass,bool,False
+rest,venues,timezone,string,America/New_York
+rest,weather,awayConference,string,American Athletic
+rest,weather,awayTeam,string,Navy
+rest,weather,dewPoint,float,70.3
+rest,weather,gameIndoors,bool,False
+rest,weather,homeConference,string,American Athletic
+rest,weather,homeTeam,string,Tulane
+rest,weather,humidity,float,88.8
+rest,weather,id,int,401212522
+rest,weather,precipitation,float,0.039
+rest,weather,pressure,float,1015.2
+rest,weather,season,int,2020
+rest,weather,seasonType,string,regular
+rest,weather,snowfall,int,0
+rest,weather,startTime,string,2020-09-19 16:00:00+00:00
+rest,weather,temperature,float,73.8
+rest,weather,venue,string,Yulman Stadium
+rest,weather,venueId,int,4729
+rest,weather,weatherCondition,string,Light Rain
+rest,weather,weatherConditionCode,int,7
+rest,weather,week,int,3
+rest,weather,windDirection,int,60
+rest,weather,windSpeed,float,21.1
+graphql,adjustedPlayerMetrics,athleteId,int,4689825
+graphql,adjustedPlayerMetrics,metricType,string,rushing
+graphql,adjustedPlayerMetrics,metricValue,float,0.26339672033864303
+graphql,adjustedPlayerMetrics,plays,int,31
+graphql,adjustedPlayerMetrics,year,int,2022
+graphql,adjustedTeamMetrics,epa,float,0.22182078234630467
+graphql,adjustedTeamMetrics,epaAllowed,float,0.1520520977612131
+graphql,adjustedTeamMetrics,explosiveness,float,0.9583456633821861
+graphql,adjustedTeamMetrics,explosivenessAllowed,float,1.0533735573379186
+graphql,adjustedTeamMetrics,highlightYards,float,2.1642854948724755
+graphql,adjustedTeamMetrics,highlightYardsAllowed,float,2.256027633995513
+graphql,adjustedTeamMetrics,lineYards,float,3.1798259420390873
+graphql,adjustedTeamMetrics,lineYardsAllowed,float,2.820071973146156
+graphql,adjustedTeamMetrics,openFieldYards,float,1.3861378795994255
+graphql,adjustedTeamMetrics,openFieldYardsAllowed,float,1.4950985801632308
+graphql,adjustedTeamMetrics,passingDownsSuccess,float,0.327324717127899
+graphql,adjustedTeamMetrics,passingDownsSuccessAllowed,float,0.3048068466335002
+graphql,adjustedTeamMetrics,passingEpa,float,0.34205124068779014
+graphql,adjustedTeamMetrics,passingEpaAllowed,float,0.22957003465865164
+graphql,adjustedTeamMetrics,rushingEpa,float,0.1394717476765935
+graphql,adjustedTeamMetrics,rushingEpaAllowed,float,0.10101762317363798
+graphql,adjustedTeamMetrics,secondLevelYards,float,1.174354822203887
+graphql,adjustedTeamMetrics,secondLevelYardsAllowed,float,1.162804645783268
+graphql,adjustedTeamMetrics,standardDownsSuccess,float,0.4995680795227229
+graphql,adjustedTeamMetrics,standardDownsSuccessAllowed,float,0.45767950058746826
+graphql,adjustedTeamMetrics,success,float,0.4484417739618125
+graphql,adjustedTeamMetrics,successAllowed,float,0.41248909213139473
+graphql,adjustedTeamMetrics,teamId,int,326
+graphql,adjustedTeamMetrics,year,int,2024
+graphql,athlete,firstName,string,Derek
+graphql,athlete,id,int,5305883
+graphql,athlete,lastName,string,Reagans Lll
+graphql,athlete,name,string,Derek Reagans Lll
+graphql,athlete,teamId,int,195
+graphql,athlete,height,int,76
+graphql,athlete,hometownId,int,1608
+graphql,athlete,jersey,int,58
+graphql,athlete,positionId,int,30
+graphql,athlete,weight,int,240
+graphql,athleteTeam,athleteId,int,377649
+graphql,athleteTeam,endYear,int,2009
+graphql,athleteTeam,startYear,int,2008
+graphql,athleteTeam,teamId,int,2229
+graphql,calendar,endDate,string,2020-09-08T06:59:00
+graphql,calendar,seasonType,string,regular
+graphql,calendar,startDate,string,2020-08-25T07:00:00
+graphql,calendar,week,int,1
+graphql,calendar,year,int,2020
+graphql,coach,firstName,string,Steve
+graphql,coach,id,int,1
+graphql,coach,lastName,string,Addazio
+graphql,coachSeason,games,int,4
+graphql,coachSeason,losses,int,3
+graphql,coachSeason,ties,int,0
+graphql,coachSeason,wins,int,1
+graphql,coachSeason,year,int,2020
+graphql,coachSeason,postseasonRank,int,12
+graphql,coachSeason,preseasonRank,int,23
+graphql,conference,division,string,ii
+graphql,conference,id,int,187
+graphql,conference,name,string,Carolinas
+graphql,conference,shortName,string,Conference Carolinas
+graphql,conference,abbreviation,string,MAC
+graphql,conference,srName,string,American
+graphql,currentTeams,abbreviation,string,SEC
+graphql,currentTeams,classification,string,fbs
+graphql,currentTeams,conference,string,SEC
+graphql,currentTeams,conferenceId,int,8
+graphql,currentTeams,school,string,Auburn
+graphql,currentTeams,teamId,int,2
+graphql,currentTeams,division,string,West
+graphql,draftPicks,collegeId,int,3915511
+graphql,draftPicks,collegeTeamId,int,99
+graphql,draftPicks,grade,int,94
+graphql,draftPicks,height,int,76
+graphql,draftPicks,name,string,Joe Burrow
+graphql,draftPicks,nflTeamId,int,4
+graphql,draftPicks,overall,int,1
+graphql,draftPicks,overallRank,int,2
+graphql,draftPicks,pick,int,1
+graphql,draftPicks,positionId,int,8
+graphql,draftPicks,positionRank,int,1
+graphql,draftPicks,round,int,1
+graphql,draftPicks,weight,int,221
+graphql,draftPicks,year,int,2020
+graphql,game,attendance,int,66881
+graphql,game,awayClassification,string,fbs
+graphql,game,awayConference,string,Ind
+graphql,game,awayConferenceId,int,18
+graphql,game,awayEndElo,int,2173
+graphql,game,awayLineScores,list,"[0, 3, 7, 17]"
+graphql,game,awayPoints,int,27
+graphql,game,awayPostgameWinProb,float,0.6591097066343521
+graphql,game,awayStartElo,int,2173
+graphql,game,awayTeam,string,Notre Dame
+graphql,game,awayTeamId,int,87
+graphql,game,conferenceGame,bool,False
+graphql,game,excitement,float,8.3289956444
+graphql,game,homeClassification,string,fbs
+graphql,game,homeConference,string,B1G
+graphql,game,homeConferenceId,int,5
+graphql,game,homeEndElo,int,2063
+graphql,game,homeLineScores,list,"[0, 10, 0, 14]"
+graphql,game,homePoints,int,24
+graphql,game,homePostgameWinProb,float,0.34089029336564786
+graphql,game,homeStartElo,int,2063
+graphql,game,homeTeam,string,Penn State
+graphql,game,homeTeamId,int,213
+graphql,game,id,int,401677189
+graphql,game,neutralSite,bool,True
+graphql,game,notes,string,College Football Playoff Semifinal at the Capital One Orange
+graphql,game,season,int,2024
+graphql,game,seasonType,string,postseason
+graphql,game,startDate,string,2025-01-10T00:30:00
+graphql,game,startTimeTbd,bool,False
+graphql,game,status,string,completed
+graphql,game,venueId,int,3948
+graphql,game,week,int,1
+graphql,gameLines,gameId,int,401110840
+graphql,gameLines,linesProviderId,int,999999
+graphql,gameLines,overUnder,float,49.0
+graphql,gameLines,spread,float,-14.0
+graphql,gameLines,moneylineAway,int,120
+graphql,gameLines,moneylineHome,int,-142
+graphql,gameLines,overUnderOpen,float,43.5
+graphql,gameLines,spreadOpen,float,-1.0
+graphql,gameMedia,mediaType,string,tv
+graphql,gameMedia,name,string,ESPN2
+graphql,gamePlayerStat,athleteId,int,4240528
+graphql,gamePlayerStat,gameTeamId,int,311
+graphql,gamePlayerStat,id,int,82257
+graphql,gamePlayerStat,stat,string,1
+graphql,gameTeam,endElo,int,1990
+graphql,gameTeam,gameId,int,400935229
+graphql,gameTeam,homeAway,string,away
+graphql,gameTeam,lineScores,list,"[3, 10, 22, 14]"
+graphql,gameTeam,points,int,49
+graphql,gameTeam,startElo,int,1966
+graphql,gameTeam,teamId,int,194
+graphql,gameTeam,winProb,float,0.9933549257631206
+graphql,gameWeather,dewpoint,float,70.3
+graphql,gameWeather,gameId,int,401212522
+graphql,gameWeather,humidity,float,88.8
+graphql,gameWeather,precipitation,float,0.039
+graphql,gameWeather,pressure,float,1015.2
+graphql,gameWeather,snowfall,int,0
+graphql,gameWeather,temperature,float,73.8
+graphql,gameWeather,weatherConditionCode,int,7
+graphql,gameWeather,windDirection,int,60
+graphql,gameWeather,windSpeed,float,21.1
+graphql,historicalTeam,abbreviation,string,PRIN
+graphql,historicalTeam,active,bool,True
+graphql,historicalTeam,altColor,string,ff6000
+graphql,historicalTeam,classification,string,fbs
+graphql,historicalTeam,conference,string,FBS Independents
+graphql,historicalTeam,conferenceAbbreviation,string,Ind
+graphql,historicalTeam,conferenceId,int,18
+graphql,historicalTeam,conferenceShortName,string,FBS Independents
+graphql,historicalTeam,countryCode,string,US
+graphql,historicalTeam,displayName,string,Princeton Tigers
+graphql,historicalTeam,endYear,int,1916
+graphql,historicalTeam,id,int,163
+graphql,historicalTeam,images,list,"[""http://a.espncdn.com/i/teamlogos/ncaa/500/163.png"", ""http:"
+graphql,historicalTeam,mascot,string,Tigers
+graphql,historicalTeam,nickname,string,Princeton
+graphql,historicalTeam,school,string,Princeton
+graphql,historicalTeam,shortDisplayName,string,Princeton
+graphql,historicalTeam,startYear,int,1897
+graphql,historicalTeam,twitter,string,@PUTigerFootball
+graphql,historicalTeam,color,string,004a81
+graphql,historicalTeam,ncaaName,string,Army West Point
+graphql,historicalTeam,altName,string,Amherst
+graphql,poll,season,int,2020
+graphql,poll,seasonType,string,regular
+graphql,poll,week,int,1
+graphql,pollRank,firstPlaceVotes,int,20
+graphql,pollRank,points,int,0
+graphql,pollRank,rank,int,1
+graphql,predictedPoints,distance,int,1
+graphql,predictedPoints,down,int,1
+graphql,predictedPoints,predictedPoints,float,6.061978724879557
+graphql,predictedPoints,yardLine,int,1
+graphql,ratings,conference,string,Conference USA
+graphql,ratings,conferenceId,int,12
+graphql,ratings,elo,int,997
+graphql,ratings,fpi,float,-21.253
+graphql,ratings,fpiAvgWinProbabilityRank,int,121
+graphql,ratings,fpiDefensiveEfficiency,float,28.354
+graphql,ratings,fpiGameControlRank,int,122
+graphql,ratings,fpiOffensiveEfficiency,float,14.308
+graphql,ratings,fpiOverallEfficiency,float,16.573
+graphql,ratings,fpiResumeRank,int,132
+graphql,ratings,fpiSosRank,int,129
+graphql,ratings,fpiSpecialTeamsEfficiency,float,51.052
+graphql,ratings,fpiStrengthOfRecordRank,int,122
+graphql,ratings,spDefense,float,35.6
+graphql,ratings,spOffense,int,16
+graphql,ratings,spOverall,float,-21.2
+graphql,ratings,spSpecialTeams,float,-1.6
+graphql,ratings,srs,float,-19.4
+graphql,ratings,team,string,Florida International
+graphql,ratings,teamId,int,2229
+graphql,ratings,year,int,2023
+graphql,ratings,fpiRemainingSosRank,int,2
+graphql,recruit,height,int,75
+graphql,recruit,id,int,108699
+graphql,recruit,name,string,Jeremiah Smith
+graphql,recruit,ranking,int,1
+graphql,recruit,rating,float,0.9997
+graphql,recruit,recruitType,string,HighSchool
+graphql,recruit,stars,int,5
+graphql,recruit,weight,int,214
+graphql,recruit,year,int,2024
+graphql,recruitingTeam,id,int,3177
+graphql,recruitingTeam,points,float,313.34
+graphql,recruitingTeam,rank,int,1
+graphql,recruitingTeam,year,int,2020
+graphql,teamTalent,talent,float,990.47
+graphql,teamTalent,year,int,2020
+graphql,transfer,eligibility,string,Immediate
+graphql,transfer,firstName,string,Cameron
+graphql,transfer,lastName,string,Wilkins
+graphql,transfer,season,int,2021
+graphql,transfer,stars,int,3
+graphql,transfer,transferDate,string,2021-07-31T14:46:00
+graphql,transfer,rating,float,0.89

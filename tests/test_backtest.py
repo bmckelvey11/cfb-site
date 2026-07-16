@@ -1,0 +1,131 @@
+from cfb_system_maker.backtest import run_backtest
+from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
+
+
+def test_home_favorite_cover_wins_at_minus_110():
+    games = [
+        GameRecord(
+            game_id=1,
+            season=2023,
+            week=1,
+            home_team="Michigan",
+            away_team="East Carolina",
+            home_conference="Big Ten",
+            away_conference="American",
+            home_points=30,
+            away_points=14,
+            provider="consensus",
+            spread=-14.5,
+            total=52.5,
+        )
+    ]
+
+    result = run_backtest(games, SystemFilter(side="home", favorite=True))
+
+    assert result.bets == 1
+    assert result.wins == 1
+    assert result.losses == 0
+    assert result.pushes == 0
+    assert round(result.profit, 4) == 0.9091
+    assert round(result.roi, 4) == 0.9091
+
+
+def test_away_underdog_push_counts_no_profit_or_loss():
+    games = [
+        GameRecord(
+            game_id=2,
+            season=2023,
+            week=2,
+            home_team="Texas",
+            away_team="Wyoming",
+            home_conference="SEC",
+            away_conference="Mountain West",
+            home_points=31,
+            away_points=17,
+            provider="consensus",
+            spread=-14.0,
+            total=45.0,
+        )
+    ]
+
+    result = run_backtest(games, SystemFilter(side="away", underdog=True))
+
+    assert result.bets == 1
+    assert result.wins == 0
+    assert result.losses == 0
+    assert result.pushes == 1
+    assert result.profit == 0
+    assert result.roi == 0
+
+
+def test_filters_limit_by_team_conference_week_and_spread_range():
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 28, 21, "consensus", -6.5, 49.5),
+        GameRecord(2, 2023, 2, "C", "D", "Big Ten", "MAC", 17, 20, "consensus", -3.0, 39.0),
+        GameRecord(3, 2022, 1, "A", "E", "ACC", "Sun Belt", 10, 21, "consensus", 2.5, 44.0),
+    ]
+
+    result = run_backtest(
+        games,
+        SystemFilter(
+            side="home",
+            seasons={2023},
+            weeks={1},
+            teams={"A"},
+            conferences={"ACC"},
+            min_spread=-7,
+            max_spread=-1,
+        ),
+    )
+
+    assert result.bets == 1
+    assert result.bet_details[0].team == "A"
+
+
+def test_over_under_bets_grade_against_total_points():
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 31, 24, "consensus", -6.5, 52.5),
+        GameRecord(2, 2023, 1, "C", "D", "ACC", "SEC", 20, 17, "consensus", -3.0, 37.0),
+    ]
+
+    over = run_backtest(games, SystemFilter(bet_type="total", total_side="over"))
+    under = run_backtest(games, SystemFilter(bet_type="total", total_side="under"))
+
+    assert over.bets == 2
+    assert over.wins == 1
+    assert over.pushes == 1
+    assert over.bet_details[0].team == "Over"
+    assert over.bet_details[0].line == 52.5
+    assert under.losses == 1
+    assert under.pushes == 1
+
+
+def test_feature_filter_excludes_games_with_null_feature():
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 28, 21, "consensus", -6.5, 49.5),
+        GameRecord(2, 2023, 1, "C", "D", "ACC", "SEC", 24, 21, "consensus", -3.0, 45.0),
+    ]
+    feature_map = {1: {"weather_temperature": 55.0}, 2: {}}
+    system = SystemFilter(
+        side="home",
+        feature_filters=(FeatureFilter("weather_temperature", "gte", 50.0),),
+    )
+
+    result = run_backtest(games, system, feature_map=feature_map)
+
+    assert result.bets == 1
+    assert result.bet_details[0].game_id == 1
+
+
+def test_system_stats_include_edge_and_wilson_bounds():
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 28, 21, "consensus", -6.5, 49.5),
+        GameRecord(2, 2023, 1, "C", "D", "ACC", "SEC", 24, 21, "consensus", -3.0, 45.0),
+    ]
+    result = run_backtest(games, SystemFilter(side="home"))
+
+    assert result.stats is not None
+    assert result.stats.break_even_rate == 0.5238
+    assert result.stats.wilson_low <= result.hit_rate <= result.stats.wilson_high
+    assert 0.0 <= result.stats.p_value <= 1.0
+    assert result.stats.low_sample is True

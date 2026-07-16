@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CFB System Maker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="filter-panel" aria-label="System filters">
+        <div class="brand">
+          <span class="brand-mark">CFB</span>
+          <div>
+            <h1>CFB System Maker</h1>
+            <p>{{ options.seasons|length and (options.seasons[0] ~ "-" ~ options.seasons[-1]) or "No data" }}</p>
+          </div>
+        </div>
+
+        <form method="get" class="filters" autocomplete="off">
+          <fieldset>
+            <legend>Bet Type</legend>
+            <select name="bet_type">
+              <option value="spread" {% if form.bet_type == "spread" %}selected{% endif %}>Spread</option>
+              <option value="total" {% if form.bet_type == "total" %}selected{% endif %}>Over/Under</option>
+            </select>
+          </fieldset>
+
+          <fieldset>
+            <legend>Spread Side</legend>
+            <div class="segmented">
+              <label><input type="radio" name="side" value="home" {% if form.side == "home" %}checked{% endif %}> Home</label>
+              <label><input type="radio" name="side" value="away" {% if form.side == "away" %}checked{% endif %}> Away</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Total Side</legend>
+            <div class="segmented">
+              <label><input type="radio" name="total_side" value="over" {% if form.total_side == "over" %}checked{% endif %}> Over</label>
+              <label><input type="radio" name="total_side" value="under" {% if form.total_side == "under" %}checked{% endif %}> Under</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Position</legend>
+            <div class="check-grid">
+              <label class="check"><input type="checkbox" name="favorite" {% if form.favorite %}checked{% endif %}> Favorite</label>
+              <label class="check"><input type="checkbox" name="underdog" {% if form.underdog %}checked{% endif %}> Underdog</label>
+              <label class="check"><input type="checkbox" name="home" {% if form.home %}checked{% endif %}> Home only</label>
+              <label class="check"><input type="checkbox" name="away" {% if form.away %}checked{% endif %}> Away only</label>
+            </div>
+          </fieldset>
+
+          <div class="field-grid">
+            <label>Season
+              <select name="filter_seasons">
+                <option value="">All Seasons</option>
+                {% for season in options.seasons %}<option value="{{ season }}" {% if form.season == season|string %}selected{% endif %}>{{ season }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Week
+              <select name="filter_weeks">
+                <option value="">All Weeks</option>
+                {% for week in options.weeks %}<option value="{{ week }}" {% if form.week == week|string %}selected{% endif %}>{{ week }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Team
+              <select name="filter_teams">
+                <option value="">All Teams</option>
+                {% for team in options.teams %}<option value="{{ team }}" {% if form.team == team %}selected{% endif %}>{{ team }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Conference
+              <select name="filter_conferences">
+                <option value="">All Conferences</option>
+                {% for conference in options.conferences %}<option value="{{ conference }}" {% if form.conference == conference %}selected{% endif %}>{{ conference }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="full-width">Provider
+              <select name="filter_providers">
+                <option value="">All Providers</option>
+                {% for provider in options.providers %}<option value="{{ provider }}" {% if form.provider == provider %}selected{% endif %}>{{ provider }}</option>{% endfor %}
+              </select>
+            </label>
+          </div>
+
+          <section class="range-filter">
+            <div class="range-head">
+              <span>Line Range</span>
+              <strong>{{ "Over/Under" if form.bet_type == "total" else "Spread" }}</strong>
+            </div>
+            <label>Spread Between</label>
+            <div class="range-row">
+              <input name="min_spread" value="{{ form.min_spread }}" type="number" step="0.5" placeholder="-60">
+              <span>and</span>
+              <input name="max_spread" value="{{ form.max_spread }}" type="number" step="0.5" placeholder="60">
+            </div>
+            <label>Total Between</label>
+            <div class="range-row">
+              <input name="min_total" value="{{ form.min_total }}" type="number" step="0.5" placeholder="20">
+              <span>and</span>
+              <input name="max_total" value="{{ form.max_total }}" type="number" step="0.5" placeholder="90">
+            </div>
+          </section>
+
+          {% if features_enabled %}
+          <section class="feature-filters">
+            <h3>Feature Filters</h3>
+            <p class="feature-hint">Check a filter to enable it. Un-checked filters are ignored.</p>
+            {% for group in feature_options %}
+              <fieldset class="feature-group {% if group.group == 'result_lookahead' %}lookahead{% endif %}">
+                <legend>
+                  {{ group.group|replace('_', ' ')|title }}
+                  {% if group.group == 'result_lookahead' %}
+                    <span class="lookahead-warning">lookahead — analysis only</span>
+                  {% endif %}
+                </legend>
+                {% for feature in group.features %}
+                  {% set active = namespace(filt=none) %}
+                  {% for filt in form.feature_filters %}
+                    {% if filt.key == feature.key %}{% set active.filt = filt %}{% endif %}
+                  {% endfor %}
+                  <details {% if feature.key in enabled_feature_keys %}open{% endif %}>
+                    <summary>
+                      <label class="feature-enable">
+                        <input type="checkbox" name="ff_enable" value="{{ feature.key }}"
+                          {% if feature.key in enabled_feature_keys %}checked{% endif %}>
+                        {{ feature.label }}
+                      </label>
+                    </summary>
+                    <div class="feature-row">
+                      {% if feature.team_scoped %}
+                        <select name="ff_perspective">
+                          <option value="home" {% if active.filt and active.filt.perspective == 'home' %}selected{% endif %}>Home</option>
+                          <option value="away" {% if active.filt and active.filt.perspective == 'away' %}selected{% endif %}>Away</option>
+                          {% if form.bet_type == "spread" %}
+                            <option value="bet_side" {% if active.filt and active.filt.perspective == 'bet_side' %}selected{% endif %}>Bet-side</option>
+                            <option value="opponent" {% if active.filt and active.filt.perspective == 'opponent' %}selected{% endif %}>Opponent</option>
+                          {% else %}
+                            <option value="either" {% if active.filt and active.filt.perspective == 'either' %}selected{% endif %}>Either</option>
+                          {% endif %}
+                        </select>
+                      {% else %}
+                        <input type="hidden" name="ff_perspective" value="single">
+                      {% endif %}
+                      <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                      <select name="ff_op">
+                        {% if feature.control == "bool" %}
+                          <option value="eq" {% if active.filt and active.filt.op == 'eq' %}selected{% endif %}>is</option>
+                        {% elif feature.control == "categorical" %}
+                          <option value="eq" {% if active.filt and active.filt.op == 'eq' %}selected{% endif %}>equals</option>
+                          <option value="in" {% if active.filt and active.filt.op == 'in' %}selected{% endif %}>in list</option>
+                        {% else %}
+                          <option value="gte" {% if active.filt and active.filt.op == 'gte' %}selected{% endif %}>≥</option>
+                          <option value="lte" {% if active.filt and active.filt.op == 'lte' %}selected{% endif %}>≤</option>
+                        {% endif %}
+                      </select>
+                      {% if feature.control == "bool" %}
+                        <select name="ff_value">
+                          <option value="true" {% if active.filt and active.filt.value == true %}selected{% endif %}>Yes</option>
+                          <option value="false" {% if active.filt and active.filt.value == false %}selected{% endif %}>No</option>
+                        </select>
+                      {% elif feature.control == "categorical" %}
+                        <input name="ff_value" placeholder="value or comma list"
+                          value="{% if active.filt %}{{ active.filt.value if active.filt.value is string else active.filt.value|join(',') }}{% endif %}">
+                      {% else %}
+                        <input name="ff_value" type="number" step="any"
+                          value="{% if active.filt %}{{ active.filt.value }}{% endif %}"
+                          placeholder="{% if feature.min_value is not none %}{{ feature.min_value }}–{{ feature.max_value }}{% endif %}">
+                      {% endif %}
+                    </div>
+                  </details>
+                {% endfor %}
+              </fieldset>
+            {% endfor %}
+          </section>
+          {% else %}
+          <p class="feature-disabled">Run <code>python -m cfb_system_maker enrich --data-dir data</code> to enable feature filters.</p>
+          {% endif %}
+
+          <div class="form-actions">
+            <button type="submit">Run System</button>
+            <label class="save-inline">Save as
+              <input name="save_name" value="{{ form.save_name }}" placeholder="my-system">
+            </label>
+            <button type="submit" formaction="{{ url_for('save') }}" formmethod="post">Save System</button>
+          </div>
+        </form>
+
+        <section class="saved-systems">
+          <h3>Load System</h3>
+          {% if load_error %}<p class="load-error">{{ load_error }}</p>{% endif %}
+          {% if loaded_system %}<p class="loaded-system">Loaded: <strong>{{ loaded_system }}</strong></p>{% endif %}
+          {% if saved_systems %}
+          <ul>
+            {% for name in saved_systems %}
+              <li><a href="?load_system={{ name }}" {% if loaded_system == name %}aria-current="true"{% endif %}>{{ name }}</a></li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="no-saved-systems">No saved systems yet. Configure filters and click Save System.</p>
+          {% endif %}
+        </section>
+      </aside>
+
+      <section class="workspace">
+        {% if error == "missing_data" %}
+          <div class="empty-state">
+            <h2>No processed data found</h2>
+            <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025 --data-dir data</code>, then refresh.</p>
+          </div>
+        {% else %}
+          <header class="workspace-header">
+            <div>
+              <h2>Backtest Results</h2>
+              <p>Showing first {{ bets|length }} matched bets.</p>
+            </div>
+          </header>
+
+          <section class="metrics" aria-label="Backtest metrics">
+            <article><span>Bets</span><strong>{{ result.bets }}</strong></article>
+            <article><span>ROI</span><strong class="{{ 'positive' if result.roi > 0 else 'negative' if result.roi < 0 else '' }}">{{ "%.2f%%"|format(result.roi * 100) }}</strong></article>
+            <article><span>Profit</span><strong class="{{ 'positive' if result.profit > 0 else 'negative' if result.profit < 0 else '' }}">{{ "%.4f"|format(result.profit) }}</strong></article>
+            <article><span>Hit Rate</span><strong>{{ "%.2f%%"|format(result.hit_rate * 100) }}</strong></article>
+            <article><span>W-L-P</span><strong>{{ result.wins }}-{{ result.losses }}-{{ result.pushes }}</strong></article>
+            <article><span>Avg Line</span><strong>{{ "%.2f"|format(result.average_line) if result.average_line is not none else "-" }}</strong></article>
+          </section>
+
+          {% if result.stats %}
+          <section class="metrics stats-panel" aria-label="System quality statistics">
+            <article><span>Break-even</span><strong>{{ "%.2f%%"|format(result.stats.break_even_rate * 100) }}</strong></article>
+            <article><span>Edge</span><strong>{{ "%.2f%%"|format(result.stats.edge * 100) }}</strong></article>
+            <article><span>Wilson CI</span><strong>{{ "%.1f"|format(result.stats.wilson_low * 100) }}–{{ "%.1f"|format(result.stats.wilson_high * 100) }}%</strong></article>
+            <article><span>p-value</span><strong>{{ "%.4f"|format(result.stats.p_value) }}</strong></article>
+            <article><span>ROI t-stat</span><strong>{{ "%.2f"|format(result.stats.roi_t_stat) }}</strong></article>
+            {% if result.stats.low_sample %}<article class="warning"><span>Sample</span><strong>Low n</strong></article>{% endif %}
+          </section>
+          {% endif %}
+
+          <section class="filter-detail">
+            <div class="range-chart" aria-label="Money Won by Line Range">
+              <h3>Money Won</h3>
+              <svg viewBox="0 0 520 150" role="img">
+                <line x1="28" x2="492" y1="{{ chart.zero_y }}" y2="{{ chart.zero_y }}" class="zero-line" />
+                {% if chart.polyline %}<polyline points="{{ chart.polyline }}" />{% endif %}
+                {% for point in chart.points %}
+                  <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" />
+                {% endfor %}
+              </svg>
+              <div class="chart-axis"><span>{{ chart.min_x if chart.min_x is not none else "-" }}</span><span>{{ chart.max_x if chart.max_x is not none else "-" }}</span></div>
+            </div>
+          </section>
+
+          <section class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Season</th>
+                  <th>Week</th>
+                  <th>Team</th>
+                  <th>Opponent</th>
+                  <th>Side</th>
+                  <th>Spread</th>
+                  <th>Total</th>
+                  <th>Result</th>
+                  <th>Profit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for bet in bets %}
+                  <tr>
+                    <td>{{ bet.season }}</td>
+                    <td>{{ bet.week }}</td>
+                    <td>{{ bet.team }}</td>
+                    <td>{{ bet.opponent }}</td>
+                    <td>{{ bet.side }}</td>
+                    <td>{{ "%.1f"|format(bet.line) }}</td>
+                    <td>{{ "%.1f"|format(bet.total) if bet.total is not none else "-" }}</td>
+                    <td><span class="pill {{ bet.result }}">{{ bet.result }}</span></td>
+                    <td class="{{ 'positive' if bet.profit > 0 else 'negative' if bet.profit < 0 else '' }}">{{ "%.4f"|format(bet.profit) }}</td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="9" class="no-results">No bets matched these filters.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </section>
+        {% endif %}
+      </section>
+    </main>
+    <script>
+      window.addEventListener("pageshow", () => {
+        document.querySelectorAll("[data-initial]").forEach((input) => {
+          input.value = input.dataset.initial || "";
+          input.addEventListener("focus", () => input.removeAttribute("readonly"), { once: true });
+        });
+      });
+    </script>
+  </body>
+</html>
