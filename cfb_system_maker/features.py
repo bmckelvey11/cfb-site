@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-Group = Literal["pregame", "team_preseason", "metadata", "result_lookahead"]
+Group = Literal["pregame", "season_to_date", "team_preseason", "metadata", "result_lookahead"]
 Control = Literal["bool", "categorical", "numeric"]
 Join = Literal["game_id", "team_season", "team_name", "conference_name"]
 SourceKind = Literal[
@@ -15,6 +15,7 @@ SourceKind = Literal[
     "raw_teams",
     "raw_coaches",
     "raw_havoc",
+    "computed_running",
     "graphql_game",
     "graphql_weather",
     "graphql_lines",
@@ -131,6 +132,12 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
     FeatureDef("team_conference", "Team Conference", "metadata", "raw_teams", "conference", "team_name", "categorical", team_scoped=True),
     FeatureDef("coach_name", "Head Coach", "metadata", "raw_coaches", "coach_name", "team_season", "categorical", team_scoped=True),
     FeatureDef("coach_hire_date", "Coach Hire Date", "metadata", "raw_coaches", "hireDate", "team_season", "categorical", team_scoped=True),
+    # --- season to date (computed, as-of-game) ---
+    FeatureDef("running_games_played", "Games Played (to date)", "season_to_date", "computed_running", "games_played", "game_id", "numeric", team_scoped=True),
+    FeatureDef("running_win_pct", "Win % (to date)", "season_to_date", "computed_running", "win_pct", "game_id", "numeric", team_scoped=True),
+    FeatureDef("running_ats_pct", "ATS Win % (to date)", "season_to_date", "computed_running", "ats_pct", "game_id", "numeric", team_scoped=True),
+    FeatureDef("running_ppa_off", "Off PPA (to date)", "season_to_date", "computed_running", "ppa_off", "game_id", "numeric", team_scoped=True),
+    FeatureDef("running_ppa_def", "Def PPA (to date)", "season_to_date", "computed_running", "ppa_def", "game_id", "numeric", team_scoped=True),
     # --- result lookahead ---
     FeatureDef(
         "havoc_offense_rate",

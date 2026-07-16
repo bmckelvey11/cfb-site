@@ -308,7 +308,7 @@ def _feature_options(feature_map: dict[int, dict] | None) -> list[dict[str, obje
     for feature in FEATURE_REGISTRY:
         grouped.setdefault(feature.group, []).append(_feature_option(feature, feature_map))
     output: list[dict[str, object]] = []
-    for group in ("pregame", "team_preseason", "metadata", "result_lookahead"):
+    for group in ("pregame", "season_to_date", "team_preseason", "metadata", "result_lookahead"):
         if group in grouped:
             output.append({"group": group, "features": grouped[group]})
     return output

@@ -1,5 +1,13 @@
 from cfb_system_maker.features import FEATURE_BY_KEY, FEATURE_REGISTRY, feature_ok, registry_keys_unique
 
+RUNNING_KEYS = (
+    "running_games_played",
+    "running_win_pct",
+    "running_ats_pct",
+    "running_ppa_off",
+    "running_ppa_def",
+)
+
 
 def test_registry_keys_are_unique():
     assert registry_keys_unique()
@@ -7,10 +15,26 @@ def test_registry_keys_are_unique():
 
 
 def test_registry_groups_are_valid():
-    allowed = {"pregame", "team_preseason", "metadata", "result_lookahead"}
+    allowed = {"pregame", "season_to_date", "team_preseason", "metadata", "result_lookahead"}
     for feature in FEATURE_REGISTRY:
         assert feature.group in allowed
         assert feature.key in FEATURE_BY_KEY
+
+
+def test_season_to_date_features_registered():
+    assert registry_keys_unique()
+    for key in RUNNING_KEYS:
+        feature = FEATURE_BY_KEY[key]
+        assert feature.group == "season_to_date"
+        assert feature.source_kind == "computed_running"
+        assert feature.control == "numeric"
+        assert feature.team_scoped is True
+
+
+def test_season_to_date_fields_match_running_stats_output():
+    expected = {"games_played", "win_pct", "ats_pct", "ppa_off", "ppa_def"}
+    fields = {FEATURE_BY_KEY[key].field for key in RUNNING_KEYS}
+    assert fields == expected
 
 
 def test_feature_ok_numeric_gte():
