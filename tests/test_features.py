@@ -1,4 +1,10 @@
-from cfb_system_maker.features import FEATURE_BY_KEY, FEATURE_REGISTRY, feature_ok, registry_keys_unique
+from cfb_system_maker.features import (
+    FEATURE_BY_KEY,
+    FEATURE_REGISTRY,
+    feature_ok,
+    registry_keys_unique,
+    registry_version,
+)
 
 RUNNING_KEYS = (
     "running_games_played",
@@ -6,6 +12,10 @@ RUNNING_KEYS = (
     "running_ats_pct",
     "running_ppa_off",
     "running_ppa_def",
+    "running_success_off",
+    "running_success_def",
+    "running_explosiveness_off",
+    "running_explosiveness_def",
 )
 
 
@@ -32,9 +42,23 @@ def test_season_to_date_features_registered():
 
 
 def test_season_to_date_fields_match_running_stats_output():
-    expected = {"games_played", "win_pct", "ats_pct", "ppa_off", "ppa_def"}
+    expected = {
+        "games_played",
+        "win_pct",
+        "ats_pct",
+        "ppa_off",
+        "ppa_def",
+        "adv_success_off",
+        "adv_success_def",
+        "adv_explosiveness_off",
+        "adv_explosiveness_def",
+    }
     fields = {FEATURE_BY_KEY[key].field for key in RUNNING_KEYS}
     assert fields == expected
+
+
+def test_registry_version_changed_from_phase3_baseline():
+    assert registry_version() != "69084ed55504"
 
 
 def test_feature_ok_numeric_gte():

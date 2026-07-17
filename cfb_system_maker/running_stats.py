@@ -4,6 +4,14 @@ from typing import Any
 
 from cfb_system_maker.models import GameRecord
 
+# output stat key -> adv-dict inner key (each accumulated as a strictly-prior game-average)
+_ADV_FIELDS: dict[str, str] = {
+    "adv_success_off": "success_off",
+    "adv_success_def": "success_def",
+    "adv_explosiveness_off": "explosiveness_off",
+    "adv_explosiveness_def": "explosiveness_def",
+}
+
 
 def compute_running_stats(
     games: list[GameRecord],
@@ -29,8 +37,8 @@ def compute_running_stats(
         ats_wins = ats_losses = 0
         ppa_off_sum = ppa_def_sum = 0.0
         ppa_off_count = ppa_def_count = 0
-        adv_success_off_sum = 0.0
-        adv_success_off_count = 0
+        adv_sums: dict[str, float] = {out_key: 0.0 for out_key in _ADV_FIELDS}
+        adv_counts: dict[str, int] = {out_key: 0 for out_key in _ADV_FIELDS}
 
         for _sort_key, game_id, game, side in entries:
             decided = wins + losses
@@ -41,7 +49,10 @@ def compute_running_stats(
                 "ats_pct": round(ats_wins / ats_decided, 4) if ats_decided else None,
                 "ppa_off": round(ppa_off_sum / ppa_off_count, 4) if ppa_off_count else None,
                 "ppa_def": round(ppa_def_sum / ppa_def_count, 4) if ppa_def_count else None,
-                "adv_success_off": round(adv_success_off_sum / adv_success_off_count, 4) if adv_success_off_count else None,
+                **{
+                    out_key: round(adv_sums[out_key] / adv_counts[out_key], 4) if adv_counts[out_key] else None
+                    for out_key in _ADV_FIELDS
+                },
             }
 
             team_points = game.home_points if side == "home" else game.away_points
@@ -72,9 +83,10 @@ def compute_running_stats(
                     ppa_def_count += 1
             game_adv = adv.get((game_id, team))
             if game_adv:
-                success_off = game_adv.get("success_off")
-                if success_off is not None:
-                    adv_success_off_sum += float(success_off)
-                    adv_success_off_count += 1
+                for out_key, inner_key in _ADV_FIELDS.items():
+                    value = game_adv.get(inner_key)
+                    if value is not None:
+                        adv_sums[out_key] += float(value)
+                        adv_counts[out_key] += 1
 
     return stats

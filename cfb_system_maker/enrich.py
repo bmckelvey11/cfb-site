@@ -142,8 +142,12 @@ def _build_running_index(
             if game_id is None or team is None:
                 continue
             offense = row.get("offense") or {}
+            defense = row.get("defense") or {}
             adv[(int(game_id), str(team))] = {
                 "success_off": _coerce_numeric(offense.get("successRate")),
+                "success_def": _coerce_numeric(defense.get("successRate")),
+                "explosiveness_off": _coerce_numeric(offense.get("explosiveness")),
+                "explosiveness_def": _coerce_numeric(defense.get("explosiveness")),
             }
 
     start_dates: dict[int, str] = {}

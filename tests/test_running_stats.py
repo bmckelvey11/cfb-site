@@ -22,8 +22,8 @@ def _game(game_id, week, home="Alpha", away="Beta", home_points=None, away_point
 def test_first_game_of_season_has_zero_history():
     games = [_game(1, 1, home_points=21, away_points=14, spread=-3.5)]
     stats = compute_running_stats(games)
-    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None}
-    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None}
+    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
+    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
 
 
 def test_no_lookahead_stats_reflect_only_strictly_prior_games():
@@ -81,7 +81,7 @@ def test_seasons_reset():
         _game(2, 1, season=2023, home_points=0, away_points=0, spread=-1.0),
     ]
     stats = compute_running_stats(games)
-    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None}
+    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
 
 
 def test_start_dates_override_week_order():
@@ -133,6 +133,24 @@ def test_running_adv_success_off_is_average_of_prior_games_only():
     assert stats[(1, "Alpha")]["adv_success_off"] is None
     assert stats[(2, "Alpha")]["adv_success_off"] == 0.40
     assert stats[(3, "Alpha")]["adv_success_off"] == 0.50  # avg of priors, 9.99 excluded
+
+
+def test_running_adv_explosiveness_respects_season_reset_and_start_date_order():
+    # Prior-season game must not leak; start_date (not week) sets order.
+    games = [
+        _game(1, 10, season=2022, home_points=42, away_points=0, spread=-20.0),  # prior season
+        _game(2, 12, season=2023, home_points=21, away_points=14, spread=-3.0),  # dated later despite lower week
+        _game(3, 1, season=2023, home_points=10, away_points=20, spread=-3.0),   # bowl-style, dated last
+    ]
+    adv = {
+        (1, "Alpha"): {"explosiveness_off": 5.00},  # 2022 — must not fold into 2023
+        (2, "Alpha"): {"explosiveness_off": 1.20},
+        (3, "Alpha"): {"explosiveness_off": 9.99},  # own game must not leak
+    }
+    start_dates = {2: "2023-11-25 17:00:00+00:00", 3: "2023-12-30 17:00:00+00:00"}
+    stats = compute_running_stats(games, adv=adv, start_dates=start_dates)
+    assert stats[(2, "Alpha")]["adv_explosiveness_off"] is None  # season reset: no 2023 prior
+    assert stats[(3, "Alpha")]["adv_explosiveness_off"] == 1.20  # only game 2, ordered before game 3
 
 
 def test_ppa_handles_partial_none_values():
