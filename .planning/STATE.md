@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 01
-current_phase_name: system-editor-main-page
-status: verifying
+current_phase: 2
+current_phase_name: Integrity — Fade & Grade
+status: planning
 stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-07-17T06:09:38.479Z"
+last_updated: "2026-07-17T07:00:53.156Z"
 last_activity: 2026-07-17
-last_activity_desc: Phase 01 execution started
+last_activity_desc: Phase 01 complete, transitioned to Phase 2
 progress:
   total_phases: 1
   completed_phases: 1
@@ -20,25 +20,25 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-16)
+See: .planning/PROJECT.md (updated 2026-07-17)
 
 **Core value:** A saved system's main page reads like a Bet Labs system editor (stat chips, cumulative money-won graph, plain-English active filters) and configuring any filter opens a live popup — slider or value table, per-value Record/ROI/Money, before you commit — instead of static inline form fields.
-**Current focus:** Phase 01 — system-editor-main-page
+**Current focus:** Phase 2 — Integrity — Fade & Grade
 
 ## Current Position
 
-Phase: 01 (system-editor-main-page) — EXECUTING
-Plan: 5 of 5
-Status: Phase complete — ready for verification
-Last activity: 2026-07-17 — Phase 01 execution started
+Phase: 2 — Integrity — Fade & Grade
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-17 — Phase 01 complete, transitioned to Phase 2
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 5
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -46,7 +46,7 @@ Progress: [██████████] 100%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01 | 5 | - | - |
 
 **Recent Trend:**
 
@@ -71,17 +71,10 @@ Progress: [██████████] 100%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Roadmap: Keep current main-page layout (sidebar + workspace); filter configuration moves into popup modals (Phase 4) rather than replacing the whole page.
+- Roadmap: Grade chip UI slot shipped in Phase 1 (EDIT-02) as placeholder; actual composite grade computation wires in behind it in Phase 2 (INTG-02).
 - Roadmap: Data extension (DATA-01/02) sequenced as Phase 3 — after the UI phases that don't need it (Editor, Integrity), before the UI phases that benefit from it (Modal, Dashboard).
-- Roadmap: Grade chip UI slot ships in Phase 1 (EDIT-02); actual composite grade computation wires in behind it in Phase 2 (INTG-02).
-- [Phase ?]: Margin computation scoped to bet_type=='spread' systems only; total-bet systems keep '—' placeholder for Margin, matching the Grade chip precedent
-- [Phase ?]: Unknown feature_filters keys render a visible 'Unknown filter ... is unavailable' sentence in describe() instead of being silently dropped (01-REVIEWS.md finding #2, blocker).
-- [Phase ?]: Team-scoped feature sentences in describe() get a perspective-word prefix (Home/Away/Bet-side/Opponent/Either team's) matching features._perspective_to_side's vocabulary (01-REVIEWS.md finding #3).
-- [Phase ?]: [Phase 1, Plan 2]: Bets table moved behind ?tab=matches; two pre-existing tests updated to request tab=matches since they asserted on default-view bets-table HTML.
-- [Phase ?]: 01-04: _query_href_removing() index-aligns ff_key/ff_op/ff_value/ff_perspective by position but removes ff_enable by value match (subset list, never index-parallel to the other four).
-- [Phase ?]: 01-04: _query_args_from_form() materializes a loaded SavedSystem's canonical query state so ?load_system=name remove-links are real, followable filter removals instead of no-ops.
-- [Phase ?]: 01-05: load_system()/_system_from_dict() left completely unchanged; new load_saved_system() added instead, reusing _system_from_dict() internally to keep cli.py's --load contract untouched.
-- [Phase ?]: 01-05: Theory text renders via bare Jinja auto-escaping only (no |safe) at both sidebar textarea and workspace panel; enforced by grep + a behavioral stored-XSS test.
+- Phase 1: All query-href construction (`_query_href`/`_query_href_removing`) and free-text rendering (`theory`) use `urlencode`/Jinja auto-escape exclusively, no `\|safe` — this pattern must be followed by any new href/text-rendering surface added in Phase 2+.
+- Phase 1: T-01-03 accepted risk (`01-SECURITY.md`) — `describe()` silently drops a known-key feature filter whose `(op, control)` combo it doesn't render, though `feature_ok()` still applies it. Revisit if `FEATURE_REGISTRY` grows new op/control combos.
 
 ### Pending Todos
 
@@ -89,7 +82,7 @@ None yet.
 
 ### Blockers/Concerns
 
-None yet.
+- [Phase 1] T-01-03 accepted risk (`01-SECURITY.md`): describe()'s four hardcoded (op,control) render branches don't cover every combo `feature_ok()` will actually evaluate — a mismatch is reachable via crafted query params, not the normal form UI. Not a blocker for Phase 2, but worth closing before registry op/control combos multiply further.
 
 ## Deferred Items
 
@@ -101,6 +94,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-17T06:09:38.463Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-07-17T07:04:23.000Z
+Stopped at: Phase 01 complete, ready to plan Phase 2
 Resume file: None

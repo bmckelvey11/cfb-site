@@ -18,21 +18,21 @@ A saved system's main page reads like a Bet Labs system editor (stat chips, cumu
 - ✓ Statistical validation beyond Bet Labs: Wilson CI, z-score, permutation p-value, ROI t-stat, per-season breakdown + sign consistency, holdout-season split — existing
 - ✓ Data pipeline (fetch → build → enrich) run for 2013–2025, 12,965 games, `features.json` built — existing
 - ✓ `_range_chart` money-won-by-line SVG chart — existing
+- ✓ Cumulative "Money Won Over Time" graph — Phase 1
+- ✓ Stat-chip header restyle: Record / Margin / Money Won / ROI / Grade (Grade chip is a placeholder — composite grade computation lands in Phase 2) — Phase 1
+- ✓ Plain-English active-filter sentences (`describe(system)`) with per-row remove links — Phase 1
+- ✓ Tabbed workspace split: Results Graph | Past Matches (Current Matches tab remains future work, see Active) — Phase 1
+- ✓ `theory` free-text field on `SavedSystem` — Phase 1
 
 ### Active
 
-- [ ] Cumulative "Money Won Over Time" graph (sorted by season/week, running profit sum, $100-flat-stake convention)
-- [ ] Stat-chip header restyle: Record / Margin / Money Won / ROI / Grade
-- [ ] Plain-English active-filter sentences (`describe(system) -> list[str]`) replacing raw form state display
-- [ ] Tabbed workspace: Results Graph | Past Matches | Current Matches
-- [ ] `theory` free-text field on `SavedSystem` (hypothesis-first discipline)
+- [ ] Current Matches tab: evaluate upcoming (unplayed, lines-only) games against saved systems; show matched-filter details per game
 - [ ] Fade System toggle (`fade: bool` on `SystemFilter`, flips graded side)
 - [ ] System Grade letter (composite: sample size vs significance curve, ROI z-score, season sign-consistency, permutation p, filter-count / in-list-value-count overfitting penalties)
 - [ ] Filter popup modal: replaces inline sidebar `<details>` editing. Title bar with live Record/Money Won/ROI chips that recompute as controls move. Numeric filters: dual-handle slider + BETWEEN inputs + per-value money-won dot chart. Categorical/list filters: searchable sortable table (value | Record | ROI | Money). About Filter panel with `FeatureDef.description` text. Save Filter commits.
 - [ ] `GET /filter-detail` endpoint: per-value Record/ROI/Money for a candidate feature key, current system's other filters applied, candidate excluded
 - [ ] `GET /api/backtest` JSON endpoint for live chip recalculation without full page reload
 - [ ] My Systems dashboard (`/` becomes dashboard; editor moves to `/system`): saved-system table with sparkline, Create System panel, 2-3 bundled example systems
-- [ ] Current Matches: evaluate upcoming (unplayed, lines-only) games against saved systems; show matched-filter details per game
 - [ ] Alternate-line ("teaser") record popover off the Record chip
 - [ ] Data: backfill history further back than 2013 where CFBD coverage allows
 - [ ] Data: wire more CFBD REST/GraphQL endpoints (weather, player/coach, advanced stats, public-betting where available) into `FEATURE_REGISTRY` — grows the filter categories toward Bet Labs' Team Info / Line Info / Time Period / Matchup Info / Streaks / Stats / Player-Coach / Weather groups
@@ -65,10 +65,13 @@ A saved system's main page reads like a Bet Labs system editor (stat chips, cumu
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Keep current main-page layout (sidebar + workspace); filter configuration moves into popup modals rather than replacing the whole page | User explicitly likes the current main-page GUI; the popup-modal interaction is the specific gap vs Bet Labs | — Pending |
+| Keep current main-page layout (sidebar + workspace); filter configuration moves into popup modals rather than replacing the whole page | User explicitly likes the current main-page GUI; the popup-modal interaction is the specific gap vs Bet Labs | ✓ Validated — Phase 1 shipped stat chips/graph/filter sentences/theory into the existing layout, no page restructure |
 | Whole bet-labs-parity-plan in scope (not just the popup modal) | User chose broad scope over narrow slice when asked | — Pending |
 | Data extension (backfill + more CFBD/GraphQL endpoints into registry) included in this project | User wants both deeper history and broader feature coverage, not just UI work | — Pending |
 | Hide Duplicates deferred | Only relevant once systems can match both sides of a single game; not true of side-fixed systems today | — Pending |
+| Query-param `?tab=` full-page reload for Results Graph / Past Matches split (not client-side JS tabs) | Simpler, matches existing form-driven page-reload pattern; avoids introducing client-side state management | ✓ Implemented — Phase 1 |
+| `theory` field bundled into existing sidebar save form (not a separate save action) | Matches Bet Labs' single-form system editor; avoids a second persistence path | ✓ Implemented — Phase 1 |
+| `describe()`'s known-key-but-unrenderable-`(op,control)`-combo gap accepted as risk rather than fixed in Phase 1 | Low practical exploitability (requires hand-crafted query params), display/removal-affordance gap only, no data exposure — see `01-SECURITY.md` T-01-03 | ✓ Accepted — Phase 1, revisit if `FEATURE_REGISTRY` op/control combos grow |
 
 ## Evolution
 
@@ -88,4 +91,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-16 after initialization*
+*Last updated: 2026-07-17 after Phase 1*
