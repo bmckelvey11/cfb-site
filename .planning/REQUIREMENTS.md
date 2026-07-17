@@ -16,7 +16,7 @@
 ### Integrity (fade, grade)
 
 - [x] **INTG-01**: User can toggle "Fade System" on a system to grade the opposite side of every matched bet
-- [ ] **INTG-02**: User sees a composite System Grade letter combining sample size vs significance, ROI z-score, season sign-consistency, permutation p-value, and filter/value-count overfitting penalties
+- [x] **INTG-02**: User sees a composite System Grade letter combining sample size vs significance, ROI z-score, season sign-consistency, permutation p-value, and filter/value-count overfitting penalties
 
 ### Filter Popup Modal
 
@@ -63,7 +63,7 @@ None currently deferred — see Out of Scope for explicit exclusions instead.
 | EDIT-04 | Phase 1 | Complete |
 | EDIT-05 | Phase 1 | Complete |
 | INTG-01 | Phase 2 | Complete |
-| INTG-02 | Phase 2 | Pending |
+| INTG-02 | Phase 2 | Complete |
 | DATA-01 | Phase 3 | Pending |
 | DATA-02 | Phase 3 | Pending |
 | MODAL-01 | Phase 4 | Pending |

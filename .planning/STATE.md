@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 02
 current_phase_name: integrity-fade-grade
-status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-07-17T10:09:47.752Z"
+status: verifying
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-07-17T10:42:28.925Z"
 last_activity: 2026-07-17
 last_activity_desc: Phase 02 execution started
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-07-17)
 
 Phase: 02 (integrity-fade-grade) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-17 — Phase 02 execution started
 
-Progress: [█████████░] 86%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [█████████░] 86%
 | Phase 01 P04 | 10min | 2 tasks | 4 files |
 | Phase 01 P05 | 15min | 2 tasks | 7 files |
 | Phase 02 P01 | 25min | 2 tasks | 10 files |
+| Phase 02 P02 | 9min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - Phase 1: T-01-03 accepted risk (`01-SECURITY.md`) — `describe()` silently drops a known-key feature filter whose `(op, control)` combo it doesn't render, though `feature_ok()` still applies it. Revisit if `FEATURE_REGISTRY` grows new op/control combos.
 - [Phase ?]: Phase 2 Plan 1: Fade toggle checkbox lives outside filters-form's DOM (inside .workspace-header per D-01/UI-SPEC) and associates via HTML5 form="filters-form" attribute, matching favorite/underdog/home/away pattern.
 - [Phase ?]: Phase 2 Plan 1: Fade is read exclusively inside grade_bet/_grade_total_bet, never inside matches_system -- new boolean toggle fields must follow this grading-only pattern to preserve matched-count invariance (D-03).
+- [Phase ?]: Sample-size sub-score uses stats.wilson_low - stats.break_even_rate margin floored by decided<30, per D-04 (supersedes 02-RESEARCH.md's raw-bet-count-only example).
+- [Phase ?]: Grade chip renders result.grade via plain Jinja auto-escaping mirroring the Margin chip's conditional style, no |safe filter.
 
 ### Pending Todos
 
@@ -97,6 +100,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-17T10:09:47.725Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-07-17T10:42:28.904Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None

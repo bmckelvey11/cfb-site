@@ -68,7 +68,7 @@ Plans:
   2. User sees a System Grade letter rendered in the stat-chip header's Grade slot, computed from sample size vs significance, ROI z-score, season sign-consistency, permutation p-value, and filter/value-count overfitting penalties.
   3. The Fade toggle state persists across save and reload of the system.
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 Plans:
 **Wave 1**
 
@@ -76,7 +76,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — Composite System Grade: compute_grade + 5 sub-score helpers, overfitting penalty, Grade chip render — INTG-02
+- [x] 02-02-PLAN.md — Composite System Grade: compute_grade + 5 sub-score helpers, overfitting penalty, Grade chip render — INTG-02
 
 **UI hint**: yes
 
@@ -135,7 +135,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. System Editor Main Page | 5/5 | Complete    | 2026-07-17 |
-| 2. Integrity — Fade & Grade | 1/2 | In Progress|  |
+| 2. Integrity — Fade & Grade | 2/2 | In Progress|  |
 | 3. Data Depth & Breadth | 0/TBD | Not started | - |
 | 4. Filter Popup Modal | 0/TBD | Not started | - |
 | 5. Dashboard & Current Matches | 0/TBD | Not started | - |
