@@ -246,6 +246,10 @@ button:hover {
   margin-bottom: 18px;
 }
 
+.metrics.stat-chips {
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+}
+
 .metrics article {
   background: var(--panel);
   border: 1px solid var(--border);

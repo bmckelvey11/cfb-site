@@ -222,13 +222,12 @@
             </div>
           </header>
 
-          <section class="metrics" aria-label="Backtest metrics">
-            <article><span>Bets</span><strong>{{ result.bets }}</strong></article>
+          <section class="metrics stat-chips" aria-label="Backtest metrics">
+            <article><span>Record</span><strong>{{ result.wins }}-{{ result.losses }}-{{ result.pushes }}, {{ "%.1f"|format(result.hit_rate * 100) }}%</strong></article>
+            <article><span>Margin</span><strong class="{{ 'positive' if result.average_margin and result.average_margin > 0 else 'negative' if result.average_margin and result.average_margin < 0 else '' }}">{% if result.average_margin is not none %}{{ "%.1f"|format(result.average_margin) }}{% else %}&mdash;{% endif %}</strong></article>
+            <article><span>Money Won</span><strong class="{{ 'positive' if result.profit > 0 else 'negative' if result.profit < 0 else '' }}">{% if result.profit > 0 %}+${{ "{:,.0f}".format(result.profit * 100) }}{% elif result.profit < 0 %}-${{ "{:,.0f}".format(-result.profit * 100) }}{% else %}$0{% endif %}</strong></article>
             <article><span>ROI</span><strong class="{{ 'positive' if result.roi > 0 else 'negative' if result.roi < 0 else '' }}">{{ "%.2f%%"|format(result.roi * 100) }}</strong></article>
-            <article><span>Profit</span><strong class="{{ 'positive' if result.profit > 0 else 'negative' if result.profit < 0 else '' }}">{{ "%.4f"|format(result.profit) }}</strong></article>
-            <article><span>Hit Rate</span><strong>{{ "%.2f%%"|format(result.hit_rate * 100) }}</strong></article>
-            <article><span>W-L-P</span><strong>{{ result.wins }}-{{ result.losses }}-{{ result.pushes }}</strong></article>
-            <article><span>Avg Line</span><strong>{{ "%.2f"|format(result.average_line) if result.average_line is not none else "-" }}</strong></article>
+            <article><span>Grade</span><strong>&mdash;</strong></article>
           </section>
 
           {% if result.stats %}
