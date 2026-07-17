@@ -31,7 +31,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User sees each active filter rendered as a plain-English sentence (e.g. "the spread is between -14 and -3") with a control to remove it, instead of raw form state.
   4. User can switch between Results Graph and Past Matches tabs on the same page without losing the loaded system's context.
   5. User can write a free-text "theory" on a saved system, save it, and see it displayed above the filter list on reload.
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 01-01-PLAN.md — Stat-chip header (Record/Margin/Money Won/ROI/Grade placeholder) — EDIT-02
+- [ ] 01-02-PLAN.md — Cumulative Money Won Over Time graph + Results Graph/Past Matches tabs — EDIT-01, EDIT-04
+- [ ] 01-03-PLAN.md — describe() plain-English filter sentence renderer (TDD) — EDIT-03
+- [ ] 01-04-PLAN.md — Active-filter sentence list + remove links, wired into the page — EDIT-03
+- [ ] 01-05-PLAN.md — Theory field (save flow + sidebar/workspace display) — EDIT-05
 **UI hint**: yes
 
 ### Phase 2: Integrity — Fade & Grade
