@@ -5,8 +5,8 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: Filter Popup Modal
 status: executing
-stopped_at: Phase 4 planning complete
-last_updated: "2026-07-17T18:29:27.662Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-07-17T18:32:13.917Z"
 last_activity: 2026-07-17
 last_activity_desc: Phase 4 execution started
 progress:
@@ -14,7 +14,7 @@ progress:
   completed_phases: 3
   total_plans: 15
   completed_plans: 12
-  percent: 60
+  percent: 80
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-07-17)
 Phase: 4 (Filter Popup Modal) — EXECUTING
 Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-07-17 — Phase 4 execution started
+Last activity: 2026-07-17 — Completed 04-01-PLAN.md
 
-Progress: [██████████] 60%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -71,6 +71,8 @@ Progress: [██████████] 60%
 | Phase 03 P02 | 6 | 2 tasks | 2 files |
 | Phase 03 P04 | 12min | 2 tasks | 4 files |
 | Phase 03 P03 | 20min | 3 tasks | 1 file |
+| Phase 04 P01 | 7min | 2 tasks | 8 files |
+| Phase 04 P01 | 7min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -90,6 +92,9 @@ Recent decisions affecting current work:
 - [Phase ?]: Advanced to-date stats accumulated as game-average (parity with PPA path), not play-weighted (A2)
 - [Phase ?]: DATA-01 line floor confirmed as 2013; 'backfill earlier' closed by verification (live probe 03-03), not a code change.
 - Phase 3: DATA-01 closed by LIVE re-confirmation (03-03) — probe of current CFBD BettingApi returned 0 usable lines for 2008-2012 and 841 for 2013; earliest usable-line season = 2013, conditional pre-2013 backfill is a documented no-op.
+- [Phase ?]: Season draft uses checkboxes; Save writes comma-joined filter_seasons
+- [Phase ?]: Backdrop light-dismiss blocked via cancel.preventDefault; Escape handled as Cancel
+- [Phase ?]: Live chips render server JSON only via GET /api/backtest
 
 ### Pending Todos
 
@@ -109,6 +114,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-17T18:29:27.637Z
-Stopped at: Phase 4 UI-SPEC approved
-Resume file: .planning/phases/04-filter-popup-modal/04-UI-SPEC.md
+Last session: 2026-07-17T18:32:13.904Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None

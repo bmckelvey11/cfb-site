@@ -81,7 +81,7 @@ Each task was committed atomically:
 1. **Task 1: Wave 0 tests, descriptions, and lightweight summary seam** - `3d17904` (feat)
 2. **Task 2: /api/backtest + Season dialog Save/Cancel slice** - `c48d70e` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `9e425cd` (docs: complete plan)
 
 ## Files Created/Modified
 
