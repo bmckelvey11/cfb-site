@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from cfb_system_maker.backtest import run_backtest
+from cfb_system_maker.backtest import run_backtest, sign_consistency, split_holdout
 from cfb_system_maker.cfbd_client import fetch_games_and_lines
 from cfb_system_maker.enrich import run_enrich
 from cfb_system_maker.models import BacktestResult, SystemFilter
@@ -186,9 +186,17 @@ def _backtest(args: argparse.Namespace) -> int:
         feature_map = load_features(args.data_dir)
     except FileNotFoundError:
         pass
-    result = run_backtest(games, system, feature_map=feature_map)
     label = args.load or "Custom system"
-    print_result(label, result)
+    if args.holdout_seasons:
+        available_seasons = {game.season for game in games}
+        in_sample, holdout = split_holdout(system, set(args.holdout_seasons), available_seasons)
+        in_result = run_backtest(games, in_sample, feature_map=feature_map)
+        holdout_result = run_backtest(games, holdout, feature_map=feature_map)
+        print_result(f"{label} (in-sample)", in_result)
+        print_result(f"{label} (holdout)", holdout_result)
+    else:
+        result = run_backtest(games, system, feature_map=feature_map)
+        print_result(label, result)
     if args.save:
         save_system(args.save, system, args.data_dir)
         print(f"Saved system as {args.save}")
@@ -214,12 +222,19 @@ def print_result(name: str, result: BacktestResult) -> None:
     print(f"ROI: {result.roi:.2%}")
     if result.average_line is not None:
         print(f"Average line: {result.average_line:.2f}")
+    if result.season_breakdown:
+        print("Per-season breakdown:")
+        for record in result.season_breakdown:
+            print(f"  {record.season}: {record.wins}-{record.losses}-{record.pushes}  ROI {record.roi:.2%}")
+        profitable, total = sign_consistency(result.season_breakdown)
+        print(f"Profitable in {profitable}/{total} seasons")
     if result.stats:
         stats = result.stats
         print(f"Break-even: {stats.break_even_rate:.2%}")
         print(f"Edge: {stats.edge:.2%}")
         print(f"Wilson CI: {stats.wilson_low:.2%} - {stats.wilson_high:.2%}")
         print(f"p-value: {stats.p_value:.4f}")
+        print(f"Permutation p-value: {stats.permutation_p_value:.4f}")
         print(f"Longest streaks: W{stats.max_win_streak} / L{stats.max_loss_streak}")
         if stats.low_sample:
             print("Low sample warning (<30 decided bets)")
@@ -296,6 +311,7 @@ def _build_parser() -> argparse.ArgumentParser:
     backtest.add_argument("--max-total", type=float)
     backtest.add_argument("--save")
     backtest.add_argument("--load")
+    backtest.add_argument("--holdout-season", dest="holdout_seasons", type=int, action="append")
 
     web = subparsers.add_parser("web")
     web.add_argument("--data-dir", default="data")

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import math
+import random
+from dataclasses import replace
 from typing import Any
 
 from cfb_system_maker.features import feature_ok
-from cfb_system_maker.models import BacktestResult, BetDetail, GameRecord, SystemFilter, SystemStats
+from cfb_system_maker.models import BacktestResult, BetDetail, GameRecord, SeasonRecord, SystemFilter, SystemStats
 
 
 def run_backtest(
@@ -44,7 +46,53 @@ def run_backtest(
         average_stake=stake,
         bet_details=details,
         stats=compute_system_stats(details, hit_rate=hit_rate, roi=roi, american_odds=american_odds, stake=stake),
+        season_breakdown=tuple(compute_season_breakdown(details, stake=stake)),
     )
+
+
+def split_holdout(
+    system: SystemFilter,
+    holdout_seasons: set[int],
+    available_seasons: set[int],
+) -> tuple[SystemFilter, SystemFilter]:
+    base_seasons = system.seasons if system.seasons else available_seasons
+    in_sample_seasons = base_seasons - holdout_seasons
+    holdout_only_seasons = base_seasons & holdout_seasons
+    # empty means "no restriction" in matches_system; use a sentinel so an
+    # empty split yields zero bets, not everything.
+    if not in_sample_seasons:
+        in_sample_seasons = {-1}
+    if not holdout_only_seasons:
+        holdout_only_seasons = {-1}
+    return replace(system, seasons=in_sample_seasons), replace(system, seasons=holdout_only_seasons)
+
+
+def compute_season_breakdown(details: list[BetDetail], *, stake: float = 1.0) -> list[SeasonRecord]:
+    by_season: dict[int, list[BetDetail]] = {}
+    for bet in details:
+        by_season.setdefault(bet.season, []).append(bet)
+
+    records = []
+    for season in sorted(by_season):
+        bets = by_season[season]
+        wins = sum(1 for bet in bets if bet.result == "win")
+        losses = sum(1 for bet in bets if bet.result == "loss")
+        pushes = sum(1 for bet in bets if bet.result == "push")
+        profit = round(sum(bet.profit for bet in bets), 4)
+        risked = len(bets) * stake
+        roi = round(profit / risked, 4) if risked else 0.0
+        records.append(
+            SeasonRecord(
+                season=season, bets=len(bets), wins=wins, losses=losses,
+                pushes=pushes, profit=profit, roi=roi,
+            )
+        )
+    return records
+
+
+def sign_consistency(records: list[SeasonRecord]) -> tuple[int, int]:
+    profitable = sum(1 for record in records if record.roi > 0)
+    return profitable, len(records)
 
 
 def matches_system(
@@ -117,6 +165,8 @@ def compute_system_stats(
     roi: float,
     american_odds: int,
     stake: float,
+    iterations: int = 1000,
+    seed: int = 42,
 ) -> SystemStats:
     decided = sum(1 for bet in details if bet.result in {"win", "loss"})
     break_even_rate = _break_even_rate(american_odds)
@@ -126,6 +176,7 @@ def compute_system_stats(
     returns = [bet.profit / stake for bet in details if bet.result in {"win", "loss"}]
     roi_std_error, roi_t_stat = _roi_stats(returns, roi)
     max_win_streak, max_loss_streak = _streaks(sorted(details, key=lambda bet: (bet.season, bet.week, bet.game_id)))
+    permutation_p_value = _permutation_p_value(details, american_odds=american_odds, stake=stake, iterations=iterations, seed=seed)
 
     return SystemStats(
         break_even_rate=round(break_even_rate, 4),
@@ -139,6 +190,7 @@ def compute_system_stats(
         low_sample=decided < 30,
         max_win_streak=max_win_streak,
         max_loss_streak=max_loss_streak,
+        permutation_p_value=permutation_p_value,
     )
 
 
@@ -269,6 +321,36 @@ def _hit_rate_z_test(hit_rate: float, n: int, break_even_rate: float) -> tuple[f
     z_score = (hit_rate - break_even_rate) / denom
     p_value = 1 - _norm_cdf(z_score)
     return round(z_score, 4), round(p_value, 4)
+
+
+def _permutation_p_value(
+    details: list[BetDetail],
+    *,
+    american_odds: int,
+    stake: float,
+    iterations: int = 1000,
+    seed: int = 42,
+) -> float:
+    decided_bets = [bet for bet in details if bet.result in {"win", "loss"}]
+    decided = len(decided_bets)
+    if decided == 0:
+        return 1.0
+
+    observed_profit = sum(bet.profit for bet in decided_bets)
+    risked = decided * stake
+    observed_roi = observed_profit / risked
+
+    break_even_rate = _break_even_rate(american_odds)
+    win_profit = _profit_for_win(stake, american_odds)
+    loss_profit = -stake
+
+    rng = random.Random(seed)
+    at_or_above = 0
+    for _ in range(iterations):
+        profit = sum(win_profit if rng.random() < break_even_rate else loss_profit for _ in range(decided))
+        if profit / risked >= observed_roi:
+            at_or_above += 1
+    return round(at_or_above / iterations, 4)
 
 
 def _roi_stats(returns: list[float], roi: float) -> tuple[float, float]:

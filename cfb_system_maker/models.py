@@ -61,6 +61,7 @@ class SystemStats:
     low_sample: bool
     max_win_streak: int = 0
     max_loss_streak: int = 0
+    permutation_p_value: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,17 @@ class BetDetail:
 
 
 @dataclass(frozen=True)
+class SeasonRecord:
+    season: int
+    bets: int
+    wins: int
+    losses: int
+    pushes: int
+    profit: float
+    roi: float
+
+
+@dataclass(frozen=True)
 class BacktestResult:
     bets: int
     wins: int
@@ -91,6 +103,7 @@ class BacktestResult:
     average_stake: float
     bet_details: list[BetDetail]
     stats: SystemStats | None = None
+    season_breakdown: tuple[SeasonRecord, ...] = ()
 
 
 @dataclass(frozen=True)
