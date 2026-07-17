@@ -120,7 +120,24 @@ Plans:
   4. Categorical/list filters render a searchable, sortable table of value to Record/ROI/Money.
   5. The modal shows an About Filter panel with the feature's definition text, and Save Filter commits the change and closes the modal while Cancel discards it.
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Thin Season modal E2E: descriptions, run_backtest_summary, /api/backtest, Save/Cancel dialog — MODAL-01, MODAL-02, MODAL-05, MODAL-06
+
+**Wave 2** *(blocked on 04-01)*
+
+- [ ] 04-02-PLAN.md — All D-01 launchers + /filter-detail categorical/boolean value tables — MODAL-01, MODAL-04, MODAL-05
+
+**Wave 3** *(blocked on 04-02)*
+
+- [ ] 04-03-PLAN.md — Numeric dual-range + BETWEEN + money chart/list + describe coalesce — MODAL-03, MODAL-06
+
+**Wave 4** *(blocked on 04-03)*
+
+- [ ] 04-04-PLAN.md — Edit-from-sentence, perspective, debounce/stale/retry, a11y + responsive — MODAL-01, MODAL-02, MODAL-06
+
 **UI hint**: yes
 
 ### Phase 5: Dashboard & Current Matches
@@ -149,5 +166,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. System Editor Main Page | 5/5 | Complete    | 2026-07-17 |
 | 2. Integrity — Fade & Grade | 2/2 | Complete    | 2026-07-17 |
 | 3. Data Depth & Breadth | 4/4 | Complete    | 2026-07-17 |
-| 4. Filter Popup Modal | 0/TBD | Not started | - |
+| 4. Filter Popup Modal | 0/4 | Not started | - |
 | 5. Dashboard & Current Matches | 0/TBD | Not started | - |
