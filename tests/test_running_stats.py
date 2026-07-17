@@ -117,6 +117,24 @@ def test_running_ppa_is_average_of_prior_games_only():
     assert stats[(3, "Beta")]["ppa_off"] == 0.10  # no row for game 2: average over available rows
 
 
+def test_running_adv_success_off_is_average_of_prior_games_only():
+    games = [
+        _game(1, 1, home_points=21, away_points=14, spread=-3.0),
+        _game(2, 2, home_points=28, away_points=7, spread=-3.0),
+        _game(3, 3, home_points=0, away_points=0, spread=-3.0),
+    ]
+    adv = {
+        (1, "Alpha"): {"success_off": 0.40},
+        (2, "Alpha"): {"success_off": 0.60},
+        (3, "Alpha"): {"success_off": 9.99},  # current game's value must never leak into its own entering stats
+        (1, "Beta"): {"success_off": 0.10},
+    }
+    stats = compute_running_stats(games, adv=adv)
+    assert stats[(1, "Alpha")]["adv_success_off"] is None
+    assert stats[(2, "Alpha")]["adv_success_off"] == 0.40
+    assert stats[(3, "Alpha")]["adv_success_off"] == 0.50  # avg of priors, 9.99 excluded
+
+
 def test_ppa_handles_partial_none_values():
     games = [
         _game(1, 1, home_points=21, away_points=14, spread=-3.0),
