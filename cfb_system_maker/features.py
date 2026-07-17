@@ -40,16 +40,35 @@ class FeatureDef:
     team_scoped: bool = False
     lines_field: str | None = None  # nested under lines[0] for raw_lines
     source_file: str | None = None  # raw/json basename without season suffix
+    description: str = ""  # plain-text About Filter copy (D-19)
 
 
 FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
     # --- pregame (game_id) ---
-    FeatureDef("neutralSite", "Neutral Site", "pregame", "raw_game", "neutralSite", "game_id", "bool"),
-    FeatureDef("conferenceGame", "Conference Game", "pregame", "raw_game", "conferenceGame", "game_id", "bool"),
-    FeatureDef("venue", "Venue", "pregame", "raw_game", "venue", "game_id", "categorical"),
-    FeatureDef("seasonType", "Season Type", "pregame", "raw_game", "seasonType", "game_id", "categorical"),
-    FeatureDef("homePregameElo", "Home Pregame Elo", "pregame", "raw_game", "homePregameElo", "game_id", "numeric"),
-    FeatureDef("awayPregameElo", "Away Pregame Elo", "pregame", "raw_game", "awayPregameElo", "game_id", "numeric"),
+    FeatureDef(
+        "neutralSite", "Neutral Site", "pregame", "raw_game", "neutralSite", "game_id", "bool",
+        description="Whether the game is at a neutral site (true/false). Pregame schedule flag.",
+    ),
+    FeatureDef(
+        "conferenceGame", "Conference Game", "pregame", "raw_game", "conferenceGame", "game_id", "bool",
+        description="Whether both teams are in the same conference (true/false). Pregame schedule flag.",
+    ),
+    FeatureDef(
+        "venue", "Venue", "pregame", "raw_game", "venue", "game_id", "categorical",
+        description="Stadium or site name for the game. Categorical pregame location label.",
+    ),
+    FeatureDef(
+        "seasonType", "Season Type", "pregame", "raw_game", "seasonType", "game_id", "categorical",
+        description="Season segment label (for example regular or postseason). Pregame schedule category.",
+    ),
+    FeatureDef(
+        "homePregameElo", "Home Pregame Elo", "pregame", "raw_game", "homePregameElo", "game_id", "numeric",
+        description="Home team's Elo rating entering the game. Higher means stronger; pregame value.",
+    ),
+    FeatureDef(
+        "awayPregameElo", "Away Pregame Elo", "pregame", "raw_game", "awayPregameElo", "game_id", "numeric",
+        description="Away team's Elo rating entering the game. Higher means stronger; pregame value.",
+    ),
     FeatureDef(
         "pregame_win_prob",
         "Pregame Win Prob",
@@ -59,23 +78,79 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "game_id",
         "numeric",
         team_scoped=True,
+        description=(
+            "Team-scoped pregame win probability (0–1 scale). Higher means more favored. "
+            "Use perspective (bet-side/opponent/either) to choose which team; entering-game value."
+        ),
     ),
-    FeatureDef("spreadOpen", "Spread Open", "pregame", "raw_lines", "spreadOpen", "game_id", "numeric", lines_field="spreadOpen"),
-    FeatureDef("overUnderOpen", "Over/Under Open", "pregame", "raw_lines", "overUnderOpen", "game_id", "numeric", lines_field="overUnderOpen"),
-    FeatureDef("moneylineHome", "Home Moneyline", "pregame", "raw_lines", "homeMoneyline", "game_id", "numeric", lines_field="homeMoneyline"),
-    FeatureDef("moneylineAway", "Away Moneyline", "pregame", "raw_lines", "awayMoneyline", "game_id", "numeric", lines_field="awayMoneyline"),
-    FeatureDef("weather_temperature", "Temperature (F)", "pregame", "raw_weather", "temperature", "game_id", "numeric"),
-    FeatureDef("weather_windSpeed", "Wind Speed", "pregame", "raw_weather", "windSpeed", "game_id", "numeric"),
-    FeatureDef("weather_precipitation", "Precipitation", "pregame", "raw_weather", "precipitation", "game_id", "numeric"),
-    FeatureDef("weather_humidity", "Humidity", "pregame", "raw_weather", "humidity", "game_id", "numeric"),
-    FeatureDef("weather_dewPoint", "Dew Point", "pregame", "raw_weather", "dewPoint", "game_id", "numeric"),
-    FeatureDef("weather_pressure", "Pressure", "pregame", "raw_weather", "pressure", "game_id", "numeric"),
-    FeatureDef("weather_snowfall", "Snowfall", "pregame", "raw_weather", "snowfall", "game_id", "numeric"),
-    FeatureDef("gameIndoors", "Game Indoors", "pregame", "raw_weather", "gameIndoors", "game_id", "bool"),
-    FeatureDef("weather_condition", "Weather Condition", "pregame", "raw_weather", "weatherCondition", "game_id", "categorical"),
-    FeatureDef("weather_windDirection", "Wind Direction (deg)", "pregame", "raw_weather", "windDirection", "game_id", "numeric"),
-    FeatureDef("pregame_home_win_prob", "Home Win Prob (pregame)", "pregame", "raw_pregame_wp", "homeWinProbability", "game_id", "numeric"),
-    FeatureDef("media_outlet", "TV Network", "pregame", "raw_media", "outlet", "game_id", "categorical"),
+    FeatureDef(
+        "spreadOpen", "Spread Open", "pregame", "raw_lines", "spreadOpen", "game_id", "numeric",
+        lines_field="spreadOpen",
+        description="Opening home spread from the lines feed. Negative favors home; pregame market open.",
+    ),
+    FeatureDef(
+        "overUnderOpen", "Over/Under Open", "pregame", "raw_lines", "overUnderOpen", "game_id", "numeric",
+        lines_field="overUnderOpen",
+        description="Opening total (over/under) points from the lines feed. Pregame market open.",
+    ),
+    FeatureDef(
+        "moneylineHome", "Home Moneyline", "pregame", "raw_lines", "homeMoneyline", "game_id", "numeric",
+        lines_field="homeMoneyline",
+        description="Home moneyline in American odds. Negative is favored; pregame market number.",
+    ),
+    FeatureDef(
+        "moneylineAway", "Away Moneyline", "pregame", "raw_lines", "awayMoneyline", "game_id", "numeric",
+        lines_field="awayMoneyline",
+        description="Away moneyline in American odds. Negative is favored; pregame market number.",
+    ),
+    FeatureDef(
+        "weather_temperature", "Temperature (F)", "pregame", "raw_weather", "temperature", "game_id", "numeric",
+        description="Forecast or reported game temperature in degrees Fahrenheit. Pregame weather.",
+    ),
+    FeatureDef(
+        "weather_windSpeed", "Wind Speed", "pregame", "raw_weather", "windSpeed", "game_id", "numeric",
+        description="Wind speed for the game site (mph). Higher is windier; pregame weather.",
+    ),
+    FeatureDef(
+        "weather_precipitation", "Precipitation", "pregame", "raw_weather", "precipitation", "game_id", "numeric",
+        description="Precipitation amount for the game site. Higher means wetter; pregame weather.",
+    ),
+    FeatureDef(
+        "weather_humidity", "Humidity", "pregame", "raw_weather", "humidity", "game_id", "numeric",
+        description="Relative humidity percentage for the game site. Pregame weather.",
+    ),
+    FeatureDef(
+        "weather_dewPoint", "Dew Point", "pregame", "raw_weather", "dewPoint", "game_id", "numeric",
+        description="Dew point temperature (F) for the game site. Pregame weather.",
+    ),
+    FeatureDef(
+        "weather_pressure", "Pressure", "pregame", "raw_weather", "pressure", "game_id", "numeric",
+        description="Barometric pressure for the game site. Pregame weather.",
+    ),
+    FeatureDef(
+        "weather_snowfall", "Snowfall", "pregame", "raw_weather", "snowfall", "game_id", "numeric",
+        description="Snowfall amount for the game site. Higher means more snow; pregame weather.",
+    ),
+    FeatureDef(
+        "gameIndoors", "Game Indoors", "pregame", "raw_weather", "gameIndoors", "game_id", "bool",
+        description="Whether the game is played indoors (true/false). Pregame venue/weather flag.",
+    ),
+    FeatureDef(
+        "weather_condition", "Weather Condition", "pregame", "raw_weather", "weatherCondition", "game_id", "categorical",
+        description="Categorical weather condition label (for example Clear or Rain). Pregame weather.",
+    ),
+    FeatureDef(
+        "weather_windDirection", "Wind Direction (deg)", "pregame", "raw_weather", "windDirection", "game_id", "numeric",
+        description="Wind direction in degrees. Pregame weather compass heading.",
+    ),
+    FeatureDef(
+        "pregame_home_win_prob", "Home Win Prob (pregame)", "pregame", "raw_pregame_wp", "homeWinProbability", "game_id", "numeric",
+        description="Home win probability entering the game (0–1). Higher favors home; pregame model output.",
+    ),
+    FeatureDef(
+        "media_outlet", "TV Network", "pregame", "raw_media", "outlet", "game_id", "categorical",
+        description="Broadcast outlet or TV network name for the game. Pregame media label.",
+    ),
     # --- team preseason ---
     FeatureDef(
         "returning_ppa",
@@ -87,6 +162,10 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "numeric",
         team_scoped=True,
         source_file="returning_production",
+        description=(
+            "Share of prior-season PPA returning (0–1). Higher means more production returns. "
+            "Team-scoped; use perspective to pick which team. Preseason / entering-season value."
+        ),
     ),
     FeatureDef(
         "returning_usage",
@@ -98,6 +177,10 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "numeric",
         team_scoped=True,
         source_file="returning_production",
+        description=(
+            "Share of prior-season usage returning (0–1). Higher means more usage returns. "
+            "Team-scoped; use perspective to pick which team. Preseason / entering-season value."
+        ),
     ),
     FeatureDef(
         "team_talent",
@@ -109,6 +192,10 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "numeric",
         team_scoped=True,
         source_file="talent",
+        description=(
+            "Composite team talent rating for the season. Higher means more talent. "
+            "Team-scoped; use perspective to pick which team. Preseason rating."
+        ),
     ),
     FeatureDef(
         "recruiting_rank",
@@ -120,6 +207,10 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "numeric",
         team_scoped=True,
         source_file="recruiting_teams",
+        description=(
+            "Team recruiting class rank (1 is best). Lower rank is stronger. "
+            "Team-scoped; use perspective to pick which team. Preseason ranking."
+        ),
     ),
     FeatureDef(
         "recruiting_points",
@@ -131,6 +222,10 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "numeric",
         team_scoped=True,
         source_file="recruiting_teams",
+        description=(
+            "Team recruiting class points. Higher means a stronger class. "
+            "Team-scoped; use perspective to pick which team. Preseason score."
+        ),
     ),
     FeatureDef(
         "prior_off_wepa",
@@ -141,29 +236,139 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "team_season",
         "numeric",
         team_scoped=True,
+        description=(
+            "Prior-season offensive weighted EPA aggregate for the team. Higher is more productive. "
+            "Team-scoped; use perspective to pick which team. Preseason / prior-season value."
+        ),
     ),
     # --- metadata ---
-    FeatureDef("team_state", "Team State", "metadata", "raw_teams", "location.state", "team_name", "categorical", team_scoped=True),
-    FeatureDef("team_timezone", "Team Timezone", "metadata", "raw_teams", "location.timezone", "team_name", "categorical", team_scoped=True),
-    FeatureDef("team_capacity", "Stadium Capacity", "metadata", "raw_teams", "location.capacity", "team_name", "numeric", team_scoped=True),
-    FeatureDef("team_conference", "Team Conference", "metadata", "raw_teams", "conference", "team_name", "categorical", team_scoped=True),
-    FeatureDef("coach_name", "Head Coach", "metadata", "raw_coaches", "coach_name", "team_season", "categorical", team_scoped=True),
-    FeatureDef("coach_hire_date", "Coach Hire Date", "metadata", "raw_coaches", "hireDate", "team_season", "categorical", team_scoped=True),
-    FeatureDef("venue_dome", "Dome", "metadata", "raw_venues", "dome", "game_id", "bool"),
-    FeatureDef("venue_grass", "Grass Field", "metadata", "raw_venues", "grass", "game_id", "bool"),
-    FeatureDef("venue_elevation", "Venue Elevation", "metadata", "raw_venues", "elevation", "game_id", "numeric"),
-    FeatureDef("venue_capacity", "Venue Capacity", "metadata", "raw_venues", "capacity", "game_id", "numeric"),
-    FeatureDef("conference_classification", "Conference Classification", "metadata", "raw_conferences", "classification", "conference_name", "categorical", team_scoped=True),
+    FeatureDef(
+        "team_state", "Team State", "metadata", "raw_teams", "location.state", "team_name", "categorical",
+        team_scoped=True,
+        description="US state (or region) of the team's home location. Team-scoped categorical metadata.",
+    ),
+    FeatureDef(
+        "team_timezone", "Team Timezone", "metadata", "raw_teams", "location.timezone", "team_name", "categorical",
+        team_scoped=True,
+        description="Timezone of the team's home location. Team-scoped categorical metadata.",
+    ),
+    FeatureDef(
+        "team_capacity", "Stadium Capacity", "metadata", "raw_teams", "location.capacity", "team_name", "numeric",
+        team_scoped=True,
+        description="Home stadium listed capacity (seats). Team-scoped numeric metadata.",
+    ),
+    FeatureDef(
+        "team_conference", "Team Conference", "metadata", "raw_teams", "conference", "team_name", "categorical",
+        team_scoped=True,
+        description="Conference affiliation of the team. Team-scoped categorical metadata.",
+    ),
+    FeatureDef(
+        "coach_name", "Head Coach", "metadata", "raw_coaches", "coach_name", "team_season", "categorical",
+        team_scoped=True,
+        description="Head coach name for the team-season. Team-scoped categorical metadata.",
+    ),
+    FeatureDef(
+        "coach_hire_date", "Coach Hire Date", "metadata", "raw_coaches", "hireDate", "team_season", "categorical",
+        team_scoped=True,
+        description="Hire date string for the head coach. Team-scoped categorical metadata.",
+    ),
+    FeatureDef(
+        "venue_dome", "Dome", "metadata", "raw_venues", "dome", "game_id", "bool",
+        description="Whether the game venue is a dome (true/false). Venue metadata for the game.",
+    ),
+    FeatureDef(
+        "venue_grass", "Grass Field", "metadata", "raw_venues", "grass", "game_id", "bool",
+        description="Whether the game venue has a grass field (true/false). Venue metadata.",
+    ),
+    FeatureDef(
+        "venue_elevation", "Venue Elevation", "metadata", "raw_venues", "elevation", "game_id", "numeric",
+        description="Venue elevation (feet). Higher means higher altitude. Venue metadata.",
+    ),
+    FeatureDef(
+        "venue_capacity", "Venue Capacity", "metadata", "raw_venues", "capacity", "game_id", "numeric",
+        description="Venue seating capacity for the game site. Venue metadata.",
+    ),
+    FeatureDef(
+        "conference_classification", "Conference Classification", "metadata", "raw_conferences",
+        "classification", "conference_name", "categorical",
+        team_scoped=True,
+        description=(
+            "Conference classification (for example fbs/fcs). Team-scoped via the team's conference."
+        ),
+    ),
     # --- season to date (computed, as-of-game) ---
-    FeatureDef("running_games_played", "Games Played (to date)", "season_to_date", "computed_running", "games_played", "game_id", "numeric", team_scoped=True),
-    FeatureDef("running_win_pct", "Win % (to date)", "season_to_date", "computed_running", "win_pct", "game_id", "numeric", team_scoped=True),
-    FeatureDef("running_ats_pct", "ATS Win % (to date)", "season_to_date", "computed_running", "ats_pct", "game_id", "numeric", team_scoped=True),
-    FeatureDef("running_ppa_off", "Off PPA (to date)", "season_to_date", "computed_running", "ppa_off", "game_id", "numeric", team_scoped=True),
-    FeatureDef("running_ppa_def", "Def PPA (to date)", "season_to_date", "computed_running", "ppa_def", "game_id", "numeric", team_scoped=True),
-    FeatureDef("running_success_off", "Off Success Rate (to date)", "season_to_date", "computed_running", "adv_success_off", "game_id", "numeric", team_scoped=True),
-    FeatureDef("running_success_def", "Def Success Rate (to date)", "season_to_date", "computed_running", "adv_success_def", "game_id", "numeric", team_scoped=True),
-    FeatureDef("running_explosiveness_off", "Off Explosiveness (to date)", "season_to_date", "computed_running", "adv_explosiveness_off", "game_id", "numeric", team_scoped=True),
-    FeatureDef("running_explosiveness_def", "Def Explosiveness (to date)", "season_to_date", "computed_running", "adv_explosiveness_def", "game_id", "numeric", team_scoped=True),
+    FeatureDef(
+        "running_games_played", "Games Played (to date)", "season_to_date", "computed_running",
+        "games_played", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Games already played by the team entering this game (excludes the current game). "
+            "Team-scoped entering-game season-to-date count."
+        ),
+    ),
+    FeatureDef(
+        "running_win_pct", "Win % (to date)", "season_to_date", "computed_running",
+        "win_pct", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Win percentage from prior games this season (0–1). Entering-game value; current game excluded. "
+            "Team-scoped; use perspective to pick which team."
+        ),
+    ),
+    FeatureDef(
+        "running_ats_pct", "ATS Win % (to date)", "season_to_date", "computed_running",
+        "ats_pct", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Against-the-spread win percentage from prior games this season (0–1). "
+            "Entering-game value; current game excluded. Team-scoped."
+        ),
+    ),
+    FeatureDef(
+        "running_ppa_off", "Off PPA (to date)", "season_to_date", "computed_running",
+        "ppa_off", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Average offensive PPA from prior games this season. Higher is more productive. "
+            "Entering-game value; team-scoped."
+        ),
+    ),
+    FeatureDef(
+        "running_ppa_def", "Def PPA (to date)", "season_to_date", "computed_running",
+        "ppa_def", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Average defensive PPA allowed from prior games this season. Lower is better defense. "
+            "Entering-game value; team-scoped."
+        ),
+    ),
+    FeatureDef(
+        "running_success_off", "Off Success Rate (to date)", "season_to_date", "computed_running",
+        "adv_success_off", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Offensive success rate from prior games this season (0–1). Higher is better. "
+            "Entering-game value; team-scoped."
+        ),
+    ),
+    FeatureDef(
+        "running_success_def", "Def Success Rate (to date)", "season_to_date", "computed_running",
+        "adv_success_def", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Defensive success rate allowed from prior games this season (0–1). Lower is better. "
+            "Entering-game value; team-scoped."
+        ),
+    ),
+    FeatureDef(
+        "running_explosiveness_off", "Off Explosiveness (to date)", "season_to_date", "computed_running",
+        "adv_explosiveness_off", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Offensive explosiveness from prior games this season. Higher means more big plays. "
+            "Entering-game value; team-scoped."
+        ),
+    ),
+    FeatureDef(
+        "running_explosiveness_def", "Def Explosiveness (to date)", "season_to_date", "computed_running",
+        "adv_explosiveness_def", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Defensive explosiveness allowed from prior games this season. Lower is better. "
+            "Entering-game value; team-scoped."
+        ),
+    ),
     # --- result lookahead ---
     FeatureDef(
         "havoc_offense_rate",
@@ -174,6 +379,10 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "game_id",
         "numeric",
         team_scoped=True,
+        description=(
+            "Offense havoc rate for this completed game. Team-scoped. "
+            "Analysis-only / lookahead — uses post-game result data, not available for live betting."
+        ),
     ),
     FeatureDef(
         "havoc_defense_rate",
@@ -184,8 +393,18 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "game_id",
         "numeric",
         team_scoped=True,
+        description=(
+            "Defense havoc rate for this completed game. Team-scoped. "
+            "Analysis-only / lookahead — uses post-game result data, not available for live betting."
+        ),
     ),
-    FeatureDef("attendance", "Attendance", "result_lookahead", "raw_game", "attendance", "game_id", "numeric"),
+    FeatureDef(
+        "attendance", "Attendance", "result_lookahead", "raw_game", "attendance", "game_id", "numeric",
+        description=(
+            "Reported game attendance (people). Analysis-only / lookahead — typically known after kickoff "
+            "or final, not a pure pregame betting input."
+        ),
+    ),
 )
 
 FEATURE_BY_KEY: dict[str, FeatureDef] = {feature.key: feature for feature in FEATURE_REGISTRY}

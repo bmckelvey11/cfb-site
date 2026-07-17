@@ -24,6 +24,11 @@ def test_registry_keys_are_unique():
     assert len(FEATURE_REGISTRY) >= 20
 
 
+def test_registry_descriptions_are_nonempty():
+    for feature in FEATURE_REGISTRY:
+        assert feature.description.strip(), f"{feature.key} missing description"
+
+
 def test_registry_groups_are_valid():
     allowed = {"pregame", "season_to_date", "team_preseason", "metadata", "result_lookahead"}
     for feature in FEATURE_REGISTRY:

@@ -9,6 +9,41 @@ from cfb_system_maker.features import feature_ok
 from cfb_system_maker.models import BacktestResult, BetDetail, GameRecord, SeasonRecord, SystemFilter, SystemStats
 
 
+def run_backtest_summary(
+    games: list[GameRecord],
+    system: SystemFilter,
+    *,
+    stake: float = 1.0,
+    american_odds: int = -110,
+    feature_map: dict[int, dict[str, Any]] | None = None,
+) -> dict[str, float | int]:
+    """Match + grade only — Record / Money Won / ROI chips without stats or grade."""
+    feature_map = feature_map or {}
+    matched = [game for game in games if matches_system(game, system, feature_map)]
+    details = [
+        grade_bet(game, system, stake=stake, american_odds=american_odds)
+        for game in matched
+    ]
+    wins = sum(1 for bet in details if bet.result == "win")
+    losses = sum(1 for bet in details if bet.result == "loss")
+    pushes = sum(1 for bet in details if bet.result == "push")
+    bets = len(details)
+    decided = wins + losses
+    profit = round(sum(bet.profit for bet in details), 4)
+    risked = bets * stake
+    hit_rate = round(wins / decided, 4) if decided else 0.0
+    roi = round(profit / risked, 4) if risked else 0.0
+    return {
+        "wins": wins,
+        "losses": losses,
+        "pushes": pushes,
+        "hit_rate": hit_rate,
+        "profit": profit,
+        "money_won": profit * 100,
+        "roi": roi,
+    }
+
+
 def run_backtest(
     games: list[GameRecord],
     system: SystemFilter,
