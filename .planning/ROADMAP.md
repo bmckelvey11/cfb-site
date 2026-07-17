@@ -35,12 +35,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User can switch between Results Graph and Past Matches tabs on the same page without losing the loaded system's context.
   5. User can write a free-text "theory" on a saved system, save it, and see it displayed above the filter list on reload.
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 Plans:
 **Wave 1**
 
 - [x] 01-01-PLAN.md — Stat-chip header (Record/Margin/Money Won/ROI/Grade placeholder) — EDIT-02
-- [ ] 01-03-PLAN.md — describe() plain-English filter sentence renderer (TDD) — EDIT-03
+- [x] 01-03-PLAN.md — describe() plain-English filter sentence renderer (TDD) — EDIT-03
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -125,7 +125,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. System Editor Main Page | 1/5 | In Progress|  |
+| 1. System Editor Main Page | 2/5 | In Progress|  |
 | 2. Integrity — Fade & Grade | 0/TBD | Not started | - |
 | 3. Data Depth & Breadth | 0/TBD | Not started | - |
 | 4. Filter Popup Modal | 0/TBD | Not started | - |
