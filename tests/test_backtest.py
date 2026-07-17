@@ -1,7 +1,21 @@
 from dataclasses import replace
 
-from cfb_system_maker.backtest import compute_season_breakdown, compute_system_stats, grade_bet, run_backtest, sign_consistency, split_holdout
-from cfb_system_maker.models import BetDetail, FeatureFilter, GameRecord, SeasonRecord, SystemFilter
+from cfb_system_maker.backtest import (
+    _consistency_score,
+    _overfit_score,
+    _permutation_score,
+    _roi_significance_score,
+    _sample_size_score,
+    compute_grade,
+    compute_season_breakdown,
+    compute_system_stats,
+    count_overfit_filters,
+    grade_bet,
+    run_backtest,
+    sign_consistency,
+    split_holdout,
+)
+from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SeasonRecord, SystemFilter, SystemStats
 
 
 def test_home_favorite_cover_wins_at_minus_110():
@@ -436,3 +450,146 @@ def test_fade_does_not_change_matched_bet_count():
         normal.result != faded.result
         for normal, faded in zip(normal_result.bet_details, faded_result.bet_details)
     )
+
+
+def test_grade_sample_size_score_boundaries():
+    # bet-count floor overrides any margin, however favorable
+    assert _sample_size_score(29, wilson_low=0.90, break_even_rate=0.524) == 0.0
+
+    # break_even_rate=0.0 keeps margin == wilson_low exactly (no float rounding
+    # from an intervening add), so boundary comparisons are exact.
+    for decided in (30, 1000):
+        assert _sample_size_score(decided, wilson_low=-0.001, break_even_rate=0.0) == 0.0
+        assert _sample_size_score(decided, wilson_low=0.0, break_even_rate=0.0) == 0.3
+        assert _sample_size_score(decided, wilson_low=0.02, break_even_rate=0.0) == 0.6
+        assert _sample_size_score(decided, wilson_low=0.05, break_even_rate=0.0) == 0.8
+        assert _sample_size_score(decided, wilson_low=0.10, break_even_rate=0.0) == 1.0
+
+
+def test_grade_roi_significance_score_boundaries():
+    assert _roi_significance_score(-0.001) == 0.0
+    assert _roi_significance_score(0.0) == 0.2
+    assert _roi_significance_score(0.999) == 0.2
+    assert _roi_significance_score(1.0) == 0.5
+    assert _roi_significance_score(1.644) == 0.5
+    assert _roi_significance_score(1.645) == 0.75
+    assert _roi_significance_score(1.959) == 0.75
+    assert _roi_significance_score(1.96) == 1.0
+
+
+def test_grade_consistency_score_boundaries():
+    assert _consistency_score(0, 0) == 0.0
+    assert _consistency_score(2, 4) == 0.5
+    assert _consistency_score(4, 4) == 1.0
+
+
+def test_grade_permutation_score_boundaries():
+    assert _permutation_score(0.0) == 1.0
+    assert _permutation_score(0.0099) == 1.0
+    assert _permutation_score(0.01) == 0.8
+    assert _permutation_score(0.0499) == 0.8
+    assert _permutation_score(0.05) == 0.5
+    assert _permutation_score(0.0999) == 0.5
+    assert _permutation_score(0.10) == 0.25
+    assert _permutation_score(0.1999) == 0.25
+    assert _permutation_score(0.20) == 0.0
+
+
+def test_grade_overfit_score_boundaries():
+    assert _overfit_score(3) == 1.0
+    assert _overfit_score(7) == 0.75
+    assert _overfit_score(14) == 0.5
+    assert _overfit_score(24) == 0.25
+    assert _overfit_score(25) == 0.0
+
+
+def test_count_overfit_filters_follows_d06_counting_rule():
+    system = SystemFilter(
+        favorite=True,
+        min_spread=3.0,
+        providers={"consensus"},
+        teams={"A", "B", "C"},
+        feature_filters=(FeatureFilter(key="x", op="in", value=[1, 2, 3, 4]),),
+    )
+
+    assert count_overfit_filters(system) == 10  # 1 + 1 + 1 + 3 + 4
+
+    # fade must never be counted as an overfit-relevant filter (D-06)
+    assert count_overfit_filters(replace(system, fade=True)) == 10
+
+
+def _grade_stats(**overrides):
+    defaults = dict(
+        break_even_rate=0.524,
+        edge=0.0,
+        wilson_low=0.0,
+        wilson_high=0.0,
+        z_score=0.0,
+        p_value=1.0,
+        roi_std_error=0.0,
+        roi_t_stat=0.0,
+        low_sample=True,
+        permutation_p_value=1.0,
+    )
+    defaults.update(overrides)
+    return SystemStats(**defaults)
+
+
+def _grade_result(*, bets, wins, losses, stats, season_breakdown=()):
+    return BacktestResult(
+        bets=bets,
+        wins=wins,
+        losses=losses,
+        pushes=0,
+        hit_rate=(wins / (wins + losses)) if (wins + losses) else 0.0,
+        profit=0.0,
+        roi=0.0,
+        average_line=None,
+        average_stake=1.0,
+        bet_details=[],
+        stats=stats,
+        season_breakdown=season_breakdown,
+    )
+
+
+def test_compute_grade_returns_none_for_zero_matched_bets():
+    result = _grade_result(bets=0, wins=0, losses=0, stats=_grade_stats())
+
+    assert compute_grade(result, SystemFilter(side="home")) is None
+
+
+def test_compute_grade_returns_a_for_all_high_subscores():
+    stats = _grade_stats(wilson_low=0.7, z_score=3.0, permutation_p_value=0.001, low_sample=False)
+    season_breakdown = (
+        SeasonRecord(season=2021, bets=10, wins=8, losses=2, pushes=0, profit=1.0, roi=0.1),
+        SeasonRecord(season=2022, bets=10, wins=8, losses=2, pushes=0, profit=1.0, roi=0.1),
+    )
+    result = _grade_result(bets=40, wins=32, losses=8, stats=stats, season_breakdown=season_breakdown)
+    system = SystemFilter(side="home", favorite=True)  # 1 active filter value -> overfit_score 1.0
+
+    assert compute_grade(result, system) == "A"
+
+
+def test_compute_grade_returns_f_for_all_low_subscores():
+    stats = _grade_stats(wilson_low=0.1, z_score=-3.0, permutation_p_value=0.9)
+    result = _grade_result(bets=10, wins=3, losses=7, stats=stats, season_breakdown=())
+    system = SystemFilter(
+        side="home",
+        teams={f"Team{i}" for i in range(25)},  # 25 active filter values -> overfit_score 0.0
+    )
+
+    assert compute_grade(result, system) == "F"
+
+
+def test_run_backtest_populates_grade_field():
+    games = [
+        GameRecord(1, 2022, 1, "A", "B", "ACC", "SEC", 28, 21, "consensus", -6.5, 49.5),
+        GameRecord(2, 2023, 1, "A", "C", "ACC", "SEC", 30, 14, "consensus", -6.5, 49.5),
+    ]
+
+    result = run_backtest(games, SystemFilter(side="home", favorite=True))
+
+    assert result.grade is not None
+    assert len(result.grade) == 1
+    assert [r.season for r in result.season_breakdown] == [2022, 2023]
+    assert all(r.bets == 1 for r in result.season_breakdown)
