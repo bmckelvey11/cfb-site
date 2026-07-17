@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: Filter Popup Modal
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-07-17T18:45:57.041Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-07-17T18:54:00.000Z"
 last_activity: 2026-07-17
-last_activity_desc: Completed 04-01-PLAN.md
+last_activity_desc: Completed 04-02-PLAN.md
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
   completed_plans: 13
-  percent: 60
+  percent: 87
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-07-17)
 Phase: 4 (Filter Popup Modal) — EXECUTING
 Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-07-17 — Completed 04-01-PLAN.md
+Last activity: 2026-07-17 — Completed 04-02-PLAN.md
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 87%
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: [████████░░] 80%
 | Phase 03 P04 | 12min | 2 tasks | 4 files |
 | Phase 03 P03 | 20min | 3 tasks | 1 file |
 | Phase 04 P01 | 7min | 2 tasks | 8 files |
+| Phase 04 P02 | 18min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Recent decisions affecting current work:
 - [Phase ?]: Season draft uses checkboxes; Save writes comma-joined filter_seasons
 - [Phase ?]: Backdrop light-dismiss blocked via cancel.preventDefault; Escape handled as Cancel
 - [Phase ?]: Live chips render server JSON only via GET /api/backtest
+- Phase 4 Plan 2: Boolean domain always emits Yes/No rows even when a side has zero observed games
+- Phase 4 Plan 2: Numeric launchers open About + live chips; range editors deferred to 04-03
+- Phase 4 Plan 2: Feature Save updates existing per-feature fallback controls (not rebuilt parallel arrays from scratch)
 
 ### Pending Todos
 
@@ -113,6 +117,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-17T18:45:57.022Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-07-17T18:54:00.000Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None

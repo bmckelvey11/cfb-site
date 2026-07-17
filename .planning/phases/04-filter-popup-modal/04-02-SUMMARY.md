@@ -74,7 +74,7 @@ Each task was committed atomically:
 1. **Task 1: One-pass /filter-detail for categorical and boolean candidates** - `8e843c5` (feat)
 2. **Task 2: Grouped launchers + categorical/boolean table UI** - `8ebf819` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `114efe0` (docs: complete plan)
 
 ## Files Created/Modified
 
