@@ -129,3 +129,45 @@ def test_index_has_season_dialog_launcher_markup(tmp_path):
     assert "Save Filter" in html
     assert "Cancel" in html
     assert "About Filter" in html
+    assert 'aria-labelledby="filter-modal-title"' in html
+    assert 'name="filter_seasons"' in html
+    assert "filter_modal.js" in html
+
+
+def test_api_backtest_neutral_no_match_is_200_zeros(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    response = app.test_client().get("/api/backtest?side=home&filter_seasons=2099")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["wins"] == 0
+    assert payload["losses"] == 0
+    assert payload["pushes"] == 0
+    assert payload["profit"] == 0
+    assert payload["money_won"] == 0
+    assert payload["roi"] == 0
+
+
+def test_cancel_leaves_form_untouched_contract():
+    """Cancel/Escape discard path must not write filter_seasons before close."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "discardAndClose" in source
+    assert "writeSeasonsToForm" in source
+    # Save writes seasons; discard must not call writeSeasonsToForm
+    discard_block = source.split("function discardAndClose")[1].split("function ")[0]
+    assert "writeSeasonsToForm" not in discard_block
+    assert "filtersForm.submit" not in discard_block
+    assert "requestSubmit" not in discard_block
+
+
+def test_save_serializes_seasons_contract():
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "writeSeasonsToForm" in source
+    assert 'seasonSelect.value = joined' in source
+    assert "filter_seasons" in source
+    assert "requestSubmit" in source or "filtersForm.submit" in source

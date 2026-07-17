@@ -53,12 +53,21 @@
           </fieldset>
 
           <div class="field-grid">
-            <label>Season
-              <select name="filter_seasons">
-                <option value="">All Seasons</option>
-                {% for season in options.seasons %}<option value="{{ season }}" {% if form.season == season|string %}selected{% endif %}>{{ season }}</option>{% endfor %}
-              </select>
-            </label>
+            <div class="filter-launch-row">
+              <button
+                type="button"
+                class="filter-launcher"
+                data-candidate-id="core:season"
+                data-description="{{ season_filter.description }}"
+                aria-haspopup="dialog"
+              >{{ season_filter.label }}</button>
+              <label class="filter-fallback" data-fallback-for="core:season">Season
+                <select name="filter_seasons" id="filter-seasons">
+                  <option value="">All Seasons</option>
+                  {% for season in options.seasons %}<option value="{{ season }}" {% if form.season == season|string %}selected{% endif %}>{{ season }}</option>{% endfor %}
+                </select>
+              </label>
+            </div>
             <label>Week
               <select name="filter_weeks">
                 <option value="">All Weeks</option>
@@ -371,6 +380,45 @@
         {% endif %}
       </section>
     </main>
+
+    <dialog id="filter-modal" class="filter-modal" aria-labelledby="filter-modal-title">
+      <form method="dialog" class="filter-modal__shell" id="filter-modal-form">
+        <header class="filter-modal__header">
+          <h2 id="filter-modal-title" class="filter-modal__title">Filter</h2>
+          <div class="filter-modal__chips metrics stat-chips" aria-label="Live draft metrics">
+            <article>
+              <span>Record</span>
+              <strong id="filter-modal-record">0-0-0</strong>
+            </article>
+            <article>
+              <span>Money Won</span>
+              <strong id="filter-modal-money">$0</strong>
+            </article>
+            <article>
+              <span>ROI</span>
+              <strong id="filter-modal-roi">0%</strong>
+            </article>
+          </div>
+          <p id="filter-modal-status" class="filter-modal__status" aria-live="polite"></p>
+          <button type="button" class="filter-modal__close" id="filter-modal-close" aria-label="Close filter dialog">✕</button>
+        </header>
+        <div class="filter-modal__body">
+          <div class="filter-modal__main">
+            <div id="filter-modal-controls" class="filter-modal__controls"></div>
+            <p id="filter-modal-empty" class="filter-modal__hint" hidden>No bets match this draft.</p>
+          </div>
+          <aside class="filter-modal__about" aria-label="About Filter">
+            <h3>About Filter</h3>
+            <p id="filter-modal-about"></p>
+          </aside>
+        </div>
+        <footer class="filter-modal__footer">
+          <button type="button" class="filter-modal__cancel" id="filter-modal-cancel">Cancel</button>
+          <button type="button" class="filter-modal__save" id="filter-modal-save">Save Filter</button>
+        </footer>
+      </form>
+    </dialog>
+
     <script>
       window.addEventListener("pageshow", () => {
         document.querySelectorAll("[data-initial]").forEach((input) => {
@@ -379,5 +427,6 @@
         });
       });
     </script>
+    <script src="{{ url_for('static', filename='filter_modal.js') }}" defer></script>
   </body>
 </html>

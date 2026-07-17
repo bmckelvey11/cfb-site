@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, replace
 from pathlib import Path
 from urllib.parse import urlencode
@@ -7,7 +8,13 @@ from urllib.parse import urlencode
 from flask import Flask, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
-from cfb_system_maker.backtest import matches_system, run_backtest, sign_consistency, split_holdout
+from cfb_system_maker.backtest import (
+    matches_system,
+    run_backtest,
+    run_backtest_summary,
+    sign_consistency,
+    split_holdout,
+)
 from cfb_system_maker.describe import describe
 from cfb_system_maker.enrich import load_features, load_features_meta
 from cfb_system_maker.features import (
@@ -34,6 +41,99 @@ _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
     "providers": ("filter_providers",),
 }
 
+_ALLOWED_PERSPECTIVES = frozenset({"single", "home", "away", "bet_side", "opponent", "either"})
+_ALLOWED_OPS = frozenset({"eq", "in", "gte", "lte"})
+
+CORE_FILTER_META: dict[str, dict[str, str]] = {
+    "core:season": {
+        "label": "Season",
+        "control": "categorical",
+        "description": (
+            "Restrict bets to one or more seasons (calendar year of the CFB season). "
+            "Leave empty for all seasons in the dataset."
+        ),
+        "param": "filter_seasons",
+    },
+    "core:week": {
+        "label": "Week",
+        "control": "categorical",
+        "description": "Restrict bets to specific weeks within a season. Leave empty for all weeks.",
+        "param": "filter_weeks",
+    },
+    "core:team": {
+        "label": "Team",
+        "control": "categorical",
+        "description": "Restrict bets to games involving the selected team on the bet side.",
+        "param": "filter_teams",
+    },
+    "core:conference": {
+        "label": "Conference",
+        "control": "categorical",
+        "description": "Restrict bets to the selected conference on the bet side.",
+        "param": "filter_conferences",
+    },
+    "core:provider": {
+        "label": "Provider",
+        "control": "categorical",
+        "description": "Restrict bets to lines from the selected odds provider.",
+        "param": "filter_providers",
+    },
+    "core:spread_range": {
+        "label": "Spread Range",
+        "control": "numeric",
+        "description": (
+            "Restrict bets to a home-spread range (min/max). Spread is always the home spread; "
+            "negative means home favored."
+        ),
+        "param": "min_spread,max_spread",
+    },
+    "core:total_range": {
+        "label": "Total Range",
+        "control": "numeric",
+        "description": "Restrict bets to an over/under total range (min/max points).",
+        "param": "min_total,max_total",
+    },
+}
+
+
+class StrictParseError(Exception):
+    def __init__(self, error: str, message: str):
+        super().__init__(message)
+        self.error = error
+        self.message = message
+
+
+def filter_descriptor(candidate_id: str) -> dict[str, str] | None:
+    if candidate_id.startswith("core:"):
+        meta = CORE_FILTER_META.get(candidate_id)
+        if meta is None:
+            return None
+        return {"id": candidate_id, **meta}
+    key = candidate_id
+    if candidate_id.startswith("feature:"):
+        key = candidate_id.split(":", 1)[1]
+    feature = FEATURE_BY_KEY.get(key)
+    if feature is None:
+        return None
+    return {
+        "id": f"feature:{feature.key}",
+        "label": feature.label,
+        "control": feature.control,
+        "description": feature.description,
+        "param": feature.key,
+        "group": feature.group,
+    }
+
+
+def parse_system_strict(args: MultiDict | None = None) -> SystemFilter:
+    """Allowlist-parse query args for JSON APIs; raise StrictParseError on bad input."""
+    source = args if args is not None else request.args
+    _validate_feature_filters_strict(source)
+    _validate_numeric_fields_strict(source)
+    _validate_int_list_fields_strict(source)
+    form = _form_values_from_args(source)
+    return _system_from_form(form)
+
 
 def create_app(data_dir: str | Path = "data") -> Flask:
     app = Flask(__name__)
@@ -56,6 +156,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 load_error=None,
                 loaded_system="",
                 stale_registry=False,
+                season_filter=CORE_FILTER_META["core:season"],
             )
 
         feature_map = _try_load_features(app.config["DATA_DIR"])
@@ -105,6 +206,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             season_sign_consistency=sign_consistency(result.season_breakdown),
             tab=tab,
             sentences=sentences,
+            season_filter=CORE_FILTER_META["core:season"],
         )
 
     @app.post("/save")
@@ -177,6 +279,19 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             options=_options_from_games(games),
             holdout_seasons=holdout_seasons,
         )
+
+    @app.get("/api/backtest")
+    def api_backtest():
+        try:
+            system = parse_system_strict(request.args)
+        except StrictParseError as exc:
+            return {"error": exc.error, "message": exc.message}, 400
+        try:
+            games = load_processed_games(app.config["DATA_DIR"])
+        except FileNotFoundError:
+            return {"error": "missing_data", "message": "Processed games file not found."}, 503
+        feature_map = _try_load_features(app.config["DATA_DIR"])
+        return run_backtest_summary(games, system, feature_map=feature_map)
 
     @app.get("/favicon.ico")
     def favicon():
@@ -326,55 +441,93 @@ def _valid_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
 
 
 def _form_values() -> dict[str, object]:
-    filters = _feature_filters_from_request()
+    return _form_values_from_args(request.args)
+
+
+def _form_values_from_args(args: MultiDict) -> dict[str, object]:
+    filters = _feature_filters_from_values(args)
     return {
-        "side": _valid_choice(request.args.get("side", "home"), ("home", "away"), "home"),
-        "bet_type": _valid_choice(request.args.get("bet_type", "spread"), ("spread", "total"), "spread"),
-        "total_side": _valid_choice(request.args.get("total_side", "over"), ("over", "under"), "over"),
-        "favorite": request.args.get("favorite") == "on",
-        "underdog": request.args.get("underdog") == "on",
-        "home": request.args.get("home") == "on",
-        "away": request.args.get("away") == "on",
-        "fade": request.args.get("fade") == "on",
-        "season": request.args.get("filter_seasons", request.args.get("season", "")),
-        "week": request.args.get("filter_weeks", request.args.get("week", "")),
-        "team": request.args.get("filter_teams", request.args.get("team", "")),
-        "conference": request.args.get("filter_conferences", request.args.get("conference", "")),
-        "provider": request.args.get("filter_providers", request.args.get("provider", "")),
-        "min_spread": request.args.get("min_spread", ""),
-        "max_spread": request.args.get("max_spread", ""),
-        "min_total": request.args.get("min_total", ""),
-        "max_total": request.args.get("max_total", ""),
-        "save_name": request.args.get("save_name", ""),
-        "theory": request.args.get("theory", ""),
+        "side": _valid_choice(args.get("side", "home"), ("home", "away"), "home"),
+        "bet_type": _valid_choice(args.get("bet_type", "spread"), ("spread", "total"), "spread"),
+        "total_side": _valid_choice(args.get("total_side", "over"), ("over", "under"), "over"),
+        "favorite": args.get("favorite") == "on",
+        "underdog": args.get("underdog") == "on",
+        "home": args.get("home") == "on",
+        "away": args.get("away") == "on",
+        "fade": args.get("fade") == "on",
+        "season": args.get("filter_seasons", args.get("season", "")),
+        "week": args.get("filter_weeks", args.get("week", "")),
+        "team": args.get("filter_teams", args.get("team", "")),
+        "conference": args.get("filter_conferences", args.get("conference", "")),
+        "provider": args.get("filter_providers", args.get("provider", "")),
+        "min_spread": args.get("min_spread", ""),
+        "max_spread": args.get("max_spread", ""),
+        "min_total": args.get("min_total", ""),
+        "max_total": args.get("max_total", ""),
+        "save_name": args.get("save_name", ""),
+        "theory": args.get("theory", ""),
         "feature_filters": filters,
     }
+
+
+def _validate_feature_filters_strict(values: MultiDict) -> None:
+    enabled = set(values.getlist("ff_enable"))
+    keys = values.getlist("ff_key")
+    ops = values.getlist("ff_op")
+    raw_values = values.getlist("ff_value")
+    perspectives = values.getlist("ff_perspective")
+    for index, key in enumerate(keys):
+        if not key or key not in enabled:
+            continue
+        if key not in FEATURE_BY_KEY:
+            raise StrictParseError("unknown_feature", f"Unknown feature key: {key}")
+        if ":" in key:
+            raise StrictParseError("invalid_feature", f"Illegal feature key: {key}")
+        op = ops[index] if index < len(ops) else "eq"
+        if op not in _ALLOWED_OPS:
+            raise StrictParseError("invalid_op", f"Unsupported operator: {op}")
+        perspective = perspectives[index] if index < len(perspectives) else "single"
+        if perspective not in _ALLOWED_PERSPECTIVES:
+            raise StrictParseError("invalid_perspective", f"Illegal perspective: {perspective}")
+        raw_value = raw_values[index] if index < len(raw_values) else ""
+        if op in {"gte", "lte"}:
+            _parse_finite_float(raw_value, field=f"ff_value[{key}]")
+
+
+def _validate_numeric_fields_strict(values: MultiDict) -> None:
+    for field in ("min_spread", "max_spread", "min_total", "max_total"):
+        raw = values.get(field, "")
+        if raw and str(raw).strip():
+            _parse_finite_float(str(raw), field=field)
+
+
+def _validate_int_list_fields_strict(values: MultiDict) -> None:
+    for field, legacy in (("filter_seasons", "season"), ("filter_weeks", "week")):
+        raw = values.get(field, values.get(legacy, ""))
+        if not raw or not str(raw).strip():
+            continue
+        for part in str(raw).split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                int(part)
+            except ValueError as exc:
+                raise StrictParseError("invalid_integer", f"Invalid integer in {field}: {part}") from exc
+
+
+def _parse_finite_float(raw_value: str, *, field: str) -> float:
+    try:
+        number = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise StrictParseError("invalid_number", f"Invalid number for {field}") from exc
+    if not math.isfinite(number):
+        raise StrictParseError("invalid_number", f"Non-finite number for {field}")
+    return number
 
 
 def _form_values_from_post() -> dict[str, object]:
-    filters = _feature_filters_from_request()
-    return {
-        "side": _valid_choice(request.form.get("side", "home"), ("home", "away"), "home"),
-        "bet_type": _valid_choice(request.form.get("bet_type", "spread"), ("spread", "total"), "spread"),
-        "total_side": _valid_choice(request.form.get("total_side", "over"), ("over", "under"), "over"),
-        "favorite": request.form.get("favorite") == "on",
-        "underdog": request.form.get("underdog") == "on",
-        "home": request.form.get("home") == "on",
-        "away": request.form.get("away") == "on",
-        "fade": request.form.get("fade") == "on",
-        "season": request.form.get("filter_seasons", ""),
-        "week": request.form.get("filter_weeks", ""),
-        "team": request.form.get("filter_teams", ""),
-        "conference": request.form.get("filter_conferences", ""),
-        "provider": request.form.get("filter_providers", ""),
-        "min_spread": request.form.get("min_spread", ""),
-        "max_spread": request.form.get("max_spread", ""),
-        "min_total": request.form.get("min_total", ""),
-        "max_total": request.form.get("max_total", ""),
-        "save_name": request.form.get("save_name", ""),
-        "theory": request.form.get("theory", ""),
-        "feature_filters": filters,
-    }
+    return _form_values_from_args(request.form)
 
 
 def _enabled_feature_keys(feature_filters: list[dict[str, object]]) -> set[str]:
@@ -422,17 +575,21 @@ def _form_from_system(system: SystemFilter, loaded_name: str, theory: str = "") 
 
 
 def _feature_filters_from_request() -> list[dict[str, object]]:
-    enabled = set(request.values.getlist("ff_enable"))
-    keys = request.values.getlist("ff_key")
-    ops = request.values.getlist("ff_op")
-    values = request.values.getlist("ff_value")
-    perspectives = request.values.getlist("ff_perspective")
+    return _feature_filters_from_values(request.values)
+
+
+def _feature_filters_from_values(values: MultiDict) -> list[dict[str, object]]:
+    enabled = set(values.getlist("ff_enable"))
+    keys = values.getlist("ff_key")
+    ops = values.getlist("ff_op")
+    raw_values = values.getlist("ff_value")
+    perspectives = values.getlist("ff_perspective")
     filters: list[dict[str, object]] = []
     for index, key in enumerate(keys):
         if not key or key not in enabled:
             continue
         op = ops[index] if index < len(ops) else "eq"
-        raw_value = values[index] if index < len(values) else ""
+        raw_value = raw_values[index] if index < len(raw_values) else ""
         perspective = perspectives[index] if index < len(perspectives) else "single"
         parsed = _parse_filter_value(op, raw_value)
         if parsed is None:
