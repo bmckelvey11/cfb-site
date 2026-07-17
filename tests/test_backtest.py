@@ -230,3 +230,56 @@ def test_run_backtest_populates_season_breakdown():
 
     assert [r.season for r in result.season_breakdown] == [2022, 2023]
     assert all(r.bets == 1 for r in result.season_breakdown)
+
+
+def _bets(win_count, loss_count):
+    bets = []
+    game_id = 1
+    for _ in range(win_count):
+        bets.append(_bet(game_id, game_id, "win"))
+        game_id += 1
+    for _ in range(loss_count):
+        bets.append(_bet(game_id, game_id, "loss"))
+        game_id += 1
+    return bets
+
+
+def test_permutation_test_flags_injected_edge_as_low_p_value():
+    details = _bets(130, 70)  # 65% hit rate vs. 52.38% break-even at -110
+
+    stats = compute_system_stats(details, hit_rate=0.65, roi=0.1815, american_odds=-110, stake=1.0)
+
+    assert stats.permutation_p_value < 0.05
+
+
+def test_permutation_test_flags_noise_dataset_as_high_p_value():
+    details = _bets(262, 238)  # ~52.4% hit rate, essentially at break-even -> no edge
+
+    stats = compute_system_stats(details, hit_rate=0.524, roi=0.0, american_odds=-110, stake=1.0)
+
+    assert stats.permutation_p_value > 0.2
+
+
+def test_permutation_test_excludes_pushes_from_resampling():
+    edge = _bets(130, 70)
+    with_pushes = edge + [_bet(9001, 9001, "push"), _bet(9002, 9002, "push")]
+
+    stats_edge = compute_system_stats(edge, hit_rate=0.65, roi=0.1815, american_odds=-110, stake=1.0)
+    stats_with_pushes = compute_system_stats(with_pushes, hit_rate=0.65, roi=0.1815, american_odds=-110, stake=1.0)
+
+    assert stats_with_pushes.permutation_p_value == stats_edge.permutation_p_value
+
+
+def test_permutation_test_is_reproducible_with_fixed_seed():
+    details = _bets(130, 70)
+
+    first = compute_system_stats(details, hit_rate=0.65, roi=0.1815, american_odds=-110, stake=1.0)
+    second = compute_system_stats(details, hit_rate=0.65, roi=0.1815, american_odds=-110, stake=1.0)
+
+    assert first.permutation_p_value == second.permutation_p_value
+
+
+def test_permutation_test_defaults_to_no_signal_with_zero_decided_bets():
+    stats = compute_system_stats([], hit_rate=0.0, roi=0.0, american_odds=-110, stake=1.0)
+
+    assert stats.permutation_p_value == 1.0

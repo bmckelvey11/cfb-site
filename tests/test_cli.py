@@ -45,3 +45,13 @@ def test_backtest_command_prints_per_season_breakdown(tmp_path, capsys):
     assert exit_code == 0
     assert "Per-season breakdown:" in captured
     assert "Profitable in" in captured
+
+
+def test_backtest_command_prints_permutation_p_value(tmp_path, capsys):
+    assert main(["sample", "--data-dir", str(tmp_path)]) == 0
+
+    exit_code = main(["backtest", "--data-dir", str(tmp_path), "--side", "home", "--favorite"])
+
+    captured = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Permutation p-value:" in captured

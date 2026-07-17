@@ -61,6 +61,7 @@ class SystemStats:
     low_sample: bool
     max_win_streak: int = 0
     max_loss_streak: int = 0
+    permutation_p_value: float = 1.0
 
 
 @dataclass(frozen=True)

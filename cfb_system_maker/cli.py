@@ -226,6 +226,7 @@ def print_result(name: str, result: BacktestResult) -> None:
         print(f"Edge: {stats.edge:.2%}")
         print(f"Wilson CI: {stats.wilson_low:.2%} - {stats.wilson_high:.2%}")
         print(f"p-value: {stats.p_value:.4f}")
+        print(f"Permutation p-value: {stats.permutation_p_value:.4f}")
         print(f"Longest streaks: W{stats.max_win_streak} / L{stats.max_loss_streak}")
         if stats.low_sample:
             print("Low sample warning (<30 decided bets)")
