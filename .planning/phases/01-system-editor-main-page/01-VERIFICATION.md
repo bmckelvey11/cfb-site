@@ -1,14 +1,16 @@
 ---
 phase: 01-system-editor-main-page
 verified: 2026-07-17T06:35:42Z
-status: human_needed
+status: passed
 score: 5/5 roadmap success criteria verified (plus 20+ plan-level must-have truths verified by source inspection, grep, and live Flask test-client behavior)
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+
   - test: "Load or construct a system with 10+ simultaneously active filters (several core fields + several feature filters) so the `.active-filters-panel` renders 10+ sentence rows, and view the workspace at a typical viewport width."
     expected: "The `.active-filters` grid (display:grid; gap:8px; no max-height/scroll region) does not visually collide with the `.tabs` nav or the sections rendered below it."
     why_human: "01-04-PLAN.md's must_haves flags this explicitly as `verification: backstop` — CSS source (confirmed present: `.active-filters { display: grid; gap: 8px; ... }` with no max-height) proves the rule as written, but whether 10+ rows visually collide with adjacent sections is a rendered-layout judgment call, not something grep/static analysis can determine."
+
   - test: "Save a system with a long (280+ character) theory string and one containing non-ASCII/emoji characters, reload the page, and view the `.theory-panel` and sidebar `<textarea>` rendering in a browser."
     expected: "Long/unicode text wraps within the panel (`white-space: normal; overflow-wrap: anywhere`, confirmed present in styles.css) with no horizontal overflow and no truncation or mojibake."
     why_human: "01-05-PLAN.md's must_haves flags this explicitly as `verification: backstop`. The SUMMARY claims a manual round-trip check was already done (35-char unicode + 300-char strings survived save/load without truncation), but actual on-screen wrap behavior in a real browser viewport was not independently re-confirmed by this verification pass."
