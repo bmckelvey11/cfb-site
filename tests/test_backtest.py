@@ -28,6 +28,8 @@ def test_home_favorite_cover_wins_at_minus_110():
     assert result.pushes == 0
     assert round(result.profit, 4) == 0.9091
     assert round(result.roi, 4) == 0.9091
+    assert result.bet_details[0].margin == 1.5
+    assert result.average_margin == 1.5
 
 
 def test_away_underdog_push_counts_no_profit_or_loss():
@@ -98,6 +100,31 @@ def test_over_under_bets_grade_against_total_points():
     assert over.bet_details[0].line == 52.5
     assert under.losses == 1
     assert under.pushes == 1
+
+
+def test_average_margin_is_none_for_total_bet_systems():
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 31, 24, "consensus", -6.5, 52.5),
+        GameRecord(2, 2023, 1, "C", "D", "ACC", "SEC", 20, 17, "consensus", -3.0, 37.0),
+    ]
+
+    over = run_backtest(games, SystemFilter(bet_type="total", total_side="over"))
+
+    assert over.average_margin is None
+    assert all(bet.margin == 0.0 for bet in over.bet_details)
+
+
+def test_average_margin_averages_across_multiple_spread_bets():
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 30, 14, "consensus", -14.5, 52.5),
+        GameRecord(2, 2023, 2, "C", "D", "ACC", "SEC", 20, 21, "consensus", -3.0, 45.0),
+    ]
+
+    result = run_backtest(games, SystemFilter(side="home"))
+
+    assert result.bet_details[0].margin == 1.5
+    assert result.bet_details[1].margin == -4.0
+    assert result.average_margin == round((1.5 + -4.0) / 2, 4)
 
 
 def test_feature_filter_excludes_games_with_null_feature():

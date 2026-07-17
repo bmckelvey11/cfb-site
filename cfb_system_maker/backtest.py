@@ -47,6 +47,7 @@ def run_backtest(
         bet_details=details,
         stats=compute_system_stats(details, hit_rate=hit_rate, roi=roi, american_odds=american_odds, stake=stake),
         season_breakdown=tuple(compute_season_breakdown(details, stake=stake)),
+        average_margin=(round(sum(bet.margin for bet in details) / bets, 4) if bets and system.bet_type == "spread" else None),
     )
 
 
@@ -248,6 +249,7 @@ def grade_bet(
         line=spread,
         result=result,
         profit=round(profit, 4),
+        margin=round(cover_margin, 4),
     )
 
 

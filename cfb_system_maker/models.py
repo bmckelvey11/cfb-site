@@ -77,6 +77,7 @@ class BetDetail:
     line: float
     result: str
     profit: float
+    margin: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,7 @@ class BacktestResult:
     bet_details: list[BetDetail]
     stats: SystemStats | None = None
     season_breakdown: tuple[SeasonRecord, ...] = ()
+    average_margin: float | None = None
 
 
 @dataclass(frozen=True)
