@@ -174,6 +174,7 @@ def _backtest(args: argparse.Namespace) -> int:
             underdog=args.underdog,
             home=args.home,
             away=args.away,
+            fade=args.fade,
             min_spread=args.min_spread,
             max_spread=args.max_spread,
             min_total=args.min_total,
@@ -305,6 +306,7 @@ def _build_parser() -> argparse.ArgumentParser:
     backtest.add_argument("--underdog", action="store_true")
     backtest.add_argument("--home", action="store_true")
     backtest.add_argument("--away", action="store_true")
+    backtest.add_argument("--fade", action="store_true")
     backtest.add_argument("--min-spread", type=float)
     backtest.add_argument("--max-spread", type=float)
     backtest.add_argument("--min-total", type=float)

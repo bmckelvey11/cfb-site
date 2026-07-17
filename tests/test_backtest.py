@@ -1,4 +1,6 @@
-from cfb_system_maker.backtest import compute_season_breakdown, compute_system_stats, run_backtest, sign_consistency, split_holdout
+from dataclasses import replace
+
+from cfb_system_maker.backtest import compute_season_breakdown, compute_system_stats, grade_bet, run_backtest, sign_consistency, split_holdout
 from cfb_system_maker.models import BetDetail, FeatureFilter, GameRecord, SeasonRecord, SystemFilter
 
 
@@ -349,3 +351,88 @@ def test_split_holdout_returns_sentinel_in_sample_when_holdout_covers_all_season
 
     assert in_sample.seasons == {-1}
     assert holdout.seasons == {2023}
+
+
+def test_fade_flips_spread_win_to_loss():
+    game = GameRecord(
+        game_id=1,
+        season=2023,
+        week=1,
+        home_team="Michigan",
+        away_team="East Carolina",
+        home_conference="Big Ten",
+        away_conference="American",
+        home_points=30,
+        away_points=14,
+        provider="consensus",
+        spread=-14.5,
+        total=52.5,
+    )
+
+    bet = grade_bet(game, SystemFilter(side="home", favorite=True, fade=True))
+
+    assert bet.result == "loss"
+    assert bet.margin == -1.5
+
+
+def test_fade_preserves_spread_push():
+    game = GameRecord(
+        game_id=2,
+        season=2023,
+        week=2,
+        home_team="Texas",
+        away_team="Wyoming",
+        home_conference="SEC",
+        away_conference="Mountain West",
+        home_points=31,
+        away_points=17,
+        provider="consensus",
+        spread=-14.0,
+        total=45.0,
+    )
+
+    bet = grade_bet(game, SystemFilter(side="away", underdog=True, fade=True))
+
+    assert bet.result == "push"
+
+
+def test_fade_flips_total_bet_result():
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 31, 24, "consensus", -6.5, 52.5),
+        GameRecord(2, 2023, 1, "C", "D", "ACC", "SEC", 20, 17, "consensus", -3.0, 37.0),
+    ]
+
+    result = run_backtest(games, SystemFilter(bet_type="total", total_side="over", fade=True))
+
+    assert result.bet_details[0].result == "loss"
+    assert result.bet_details[1].result == "push"
+
+
+def test_fade_does_not_change_matched_bet_count():
+    games = [
+        GameRecord(
+            game_id=1, season=2023, week=1, home_team="Michigan", away_team="East Carolina",
+            home_conference="Big Ten", away_conference="American", home_points=30, away_points=14,
+            provider="consensus", spread=-14.5, total=52.5,
+        ),
+        GameRecord(
+            game_id=2, season=2023, week=2, home_team="Texas", away_team="Wyoming",
+            home_conference="SEC", away_conference="Mountain West", home_points=31, away_points=17,
+            provider="consensus", spread=-14.0, total=45.0,
+        ),
+        GameRecord(
+            game_id=3, season=2023, week=3, home_team="Ohio State", away_team="Indiana",
+            home_conference="Big Ten", away_conference="Big Ten", home_points=45, away_points=10,
+            provider="consensus", spread=-20.5, total=55.5,
+        ),
+    ]
+    system = SystemFilter(side="home", favorite=True)
+
+    normal_result = run_backtest(games, system)
+    faded_result = run_backtest(games, replace(system, fade=True))
+
+    assert normal_result.bets == faded_result.bets
+    assert any(
+        normal.result != faded.result
+        for normal, faded in zip(normal_result.bet_details, faded_result.bet_details)
+    )

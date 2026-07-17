@@ -40,6 +40,7 @@ class SystemFilter:
     underdog: bool = False
     home: bool = False
     away: bool = False
+    fade: bool = False
     providers: set[str] = field(default_factory=set)
     min_spread: float | None = None
     max_spread: float | None = None

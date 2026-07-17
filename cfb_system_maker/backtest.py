@@ -205,6 +205,8 @@ def grade_bet(
     if isinstance(system, str):
         system = SystemFilter(side=system)
     normalized_side = system.side.lower()
+    if system.fade:
+        normalized_side = "away" if normalized_side == "home" else "home"
     if game.home_points is None or game.away_points is None:
         raise ValueError("game must have spread and final score")
     if system.bet_type == "total":
@@ -271,10 +273,14 @@ def _grade_total_bet(
     else:
         winner = "push"
 
+    effective_total_side = system.total_side
+    if system.fade:
+        effective_total_side = "under" if effective_total_side == "over" else "over"
+
     if winner == "push":
         result = "push"
         profit = 0.0
-    elif winner == system.total_side:
+    elif winner == effective_total_side:
         result = "win"
         profit = _profit_for_win(stake, american_odds)
     else:
@@ -285,9 +291,9 @@ def _grade_total_bet(
         game_id=game.game_id,
         season=game.season,
         week=game.week,
-        team=system.total_side.title(),
+        team=effective_total_side.title(),
         opponent=f"{game.away_team} at {game.home_team}",
-        side=system.total_side,
+        side=effective_total_side,
         spread=0.0,
         total=game.total,
         line=game.total,

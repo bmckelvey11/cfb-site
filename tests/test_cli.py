@@ -36,6 +36,20 @@ def test_backtest_command_accepts_filters(tmp_path, capsys):
     assert "Bets: 2" in captured
 
 
+def test_backtest_command_fade_flag_flips_grading(tmp_path, capsys):
+    assert main(["sample", "--data-dir", str(tmp_path)]) == 0
+
+    main(["backtest", "--data-dir", str(tmp_path), "--side", "home", "--favorite"])
+    normal_output = capsys.readouterr().out
+
+    main(["backtest", "--data-dir", str(tmp_path), "--side", "home", "--favorite", "--fade"])
+    faded_output = capsys.readouterr().out
+
+    assert normal_output != faded_output
+    assert "Bets: 2" in normal_output
+    assert "Bets: 2" in faded_output
+
+
 def test_backtest_command_prints_per_season_breakdown(tmp_path, capsys):
     assert main(["sample", "--data-dir", str(tmp_path)]) == 0
 
