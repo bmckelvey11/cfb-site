@@ -269,6 +269,50 @@ button:hover {
   font-size: 22px;
 }
 
+.active-filters-panel {
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 18px;
+}
+
+.active-filters {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.active-filters li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px;
+  background: var(--panel-strong);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.remove-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 36px;
+  color: var(--loss);
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 16px;
+}
+
+.no-active-filters {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .tabs {
   display: flex;
   gap: 8px;

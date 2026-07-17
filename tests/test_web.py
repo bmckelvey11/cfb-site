@@ -1,4 +1,5 @@
 import re
+from urllib.parse import parse_qs
 
 from cfb_system_maker.backtest import run_backtest
 from cfb_system_maker.models import BacktestResult, BetDetail, SystemFilter
@@ -339,3 +340,123 @@ def test_web_tab_switch_preserves_load_system_and_round_trips(tmp_path):
     second_html = second_response.get_data(as_text=True)
     assert "load_system=away-dogs" in second_html
     assert "Money Won Over Time" in second_html
+
+
+def _remove_href_for(html: str, aria_label: str) -> str:
+    match = re.search(
+        r'<a class="remove-filter" href="([^"]*)" aria-label="' + re.escape(aria_label) + r'">',
+        html,
+    )
+    assert match is not None, f"remove-filter link with aria-label {aria_label!r} not found"
+    return match.group(1).replace("&amp;", "&")
+
+
+def test_web_spread_range_remove_href_omits_both_bounds_and_preserves_other_params(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/?side=away&underdog=on&min_spread=3")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    href = _remove_href_for(html, "Remove filter: the spread is at least 3")
+
+    assert "min_spread" not in href
+    assert "max_spread" not in href
+    assert "side=away" in href
+    assert "underdog=on" in href
+
+
+def test_web_feature_filter_remove_href_keeps_five_arrays_aligned(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get(
+        "/?side=home"
+        "&ff_enable=weather_temperature&ff_enable=weather_windSpeed"
+        "&ff_key=weather_temperature&ff_key=weather_windSpeed"
+        "&ff_op=gte&ff_op=lte"
+        "&ff_value=40&ff_value=20"
+        "&ff_perspective=single&ff_perspective=single"
+    )
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    href = _remove_href_for(html, "Remove filter: Temperature (F) is at least 40")
+
+    parsed = parse_qs(href.lstrip("?"))
+    assert parsed["ff_key"] == ["weather_windSpeed"]
+    assert parsed["ff_op"] == ["lte"]
+    assert parsed["ff_value"] == ["20"]
+    assert parsed["ff_perspective"] == ["single"]
+    assert parsed["ff_enable"] == ["weather_windSpeed"]
+
+
+def test_web_loaded_system_remove_link_materializes_and_drops_load_system(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/save",
+        data={
+            "save_name": "two-filters",
+            "bet_type": "spread",
+            "side": "away",
+            "total_side": "over",
+            "underdog": "on",
+            "min_spread": "3",
+        },
+    )
+
+    response = client.get("/?load_system=two-filters&tab=matches")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "the team is an underdog" in html
+    assert "the spread is at least 3" in html
+
+    href = _remove_href_for(html, "Remove filter: the team is an underdog")
+    assert "load_system" not in href
+    assert "save_name=two-filters" in href
+    assert "tab=matches" in href
+
+    second_response = client.get("/" + href)
+    assert second_response.status_code == 200
+    second_html = second_response.get_data(as_text=True)
+
+    assert "the team is an underdog" not in second_html
+    assert "the spread is at least 3" in second_html
+    assert 'name="underdog" checked' not in second_html
+    # save_name survives as URL state (carried in the tab-nav href, which preserves the full query string)
+    graph_link_match = re.search(r'<a href="([^"]*)"[^>]*>Results Graph</a>', second_html)
+    assert graph_link_match is not None
+    assert "save_name=two-filters" in graph_link_match.group(1).replace("&amp;", "&")
+    assert 'aria-current="page">Past Matches</a>' in second_html
+
+
+def test_web_no_active_filters_shows_empty_state_copy(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "No filters applied yet — every game in the dataset is included." in html
+
+
+def test_web_active_filter_sentence_renders_with_remove_control(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/?side=home&favorite=on")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "the team is a favorite" in html
+    assert 'aria-label="Remove filter: the team is a favorite"' in html

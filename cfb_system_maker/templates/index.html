@@ -230,6 +230,18 @@
             <article><span>Grade</span><strong>&mdash;</strong></article>
           </section>
 
+          <section class="active-filters-panel">
+            {% if sentences %}
+            <ul class="active-filters">
+              {% for row in sentences %}
+                <li>{{ row.text }} <a class="remove-filter" href="{{ row.remove_href }}" aria-label="Remove filter: {{ row.text }}">&times;</a></li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="no-active-filters">No filters applied yet — every game in the dataset is included.</p>
+            {% endif %}
+          </section>
+
           <nav class="tabs">
             <a href="{{ query_href(tab='graph') }}" {% if tab == 'graph' %}aria-current="page"{% endif %}>Results Graph</a>
             <a href="{{ query_href(tab='matches') }}" {% if tab == 'matches' %}aria-current="page"{% endif %}>Past Matches</a>
