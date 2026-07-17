@@ -18,6 +18,7 @@ SourceKind = Literal[
     "raw_havoc",
     "raw_venues",
     "raw_conferences",
+    "raw_pregame_wp",
     "computed_running",
     "graphql_game",
     "graphql_weather",
@@ -71,6 +72,8 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
     FeatureDef("weather_snowfall", "Snowfall", "pregame", "raw_weather", "snowfall", "game_id", "numeric"),
     FeatureDef("gameIndoors", "Game Indoors", "pregame", "raw_weather", "gameIndoors", "game_id", "bool"),
     FeatureDef("weather_condition", "Weather Condition", "pregame", "raw_weather", "weatherCondition", "game_id", "categorical"),
+    FeatureDef("weather_windDirection", "Wind Direction (deg)", "pregame", "raw_weather", "windDirection", "game_id", "numeric"),
+    FeatureDef("pregame_home_win_prob", "Home Win Prob (pregame)", "pregame", "raw_pregame_wp", "homeWinProbability", "game_id", "numeric"),
     FeatureDef("media_outlet", "TV Network", "pregame", "raw_media", "outlet", "game_id", "categorical"),
     # --- team preseason ---
     FeatureDef(

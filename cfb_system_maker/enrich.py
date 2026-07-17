@@ -78,6 +78,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         "raw_havoc": {},
         "raw_venues": {},
         "raw_conferences": {},
+        "raw_pregame_wp": {},
         "graphql_game": {},
         "graphql_weather": {},
         "graphql_lines": {},
@@ -95,6 +96,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         _index_team_name_file(indexes["raw_teams"], data_dir / "raw" / f"teams_{season}.json")
         _index_coaches(indexes["raw_coaches"], data_dir / "raw" / f"coaches_{season}.json", season)
         _index_havoc(indexes["raw_havoc"], data_dir / "raw" / f"game_havoc_stats_{season}.json")
+        _index_raw_file(indexes["raw_pregame_wp"], data_dir / "raw" / f"pregame_win_prob_{season}.json", "gameId")
 
     _index_raw_file(indexes["raw_venues"], data_dir / "raw" / "venues.json", "id")
     _index_conferences(indexes["raw_conferences"], data_dir / "raw" / "conferences.json")
@@ -183,6 +185,10 @@ def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> A
 
     if feature.source_kind == "raw_media":
         record = indexes["raw_media"].get(game.game_id)
+        return _field_value(record, feature.field) if record else None
+
+    if feature.source_kind == "raw_pregame_wp":
+        record = indexes["raw_pregame_wp"].get(game.game_id)
         return _field_value(record, feature.field) if record else None
 
     if feature.source_kind == "raw_team_season":

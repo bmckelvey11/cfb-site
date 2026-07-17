@@ -175,3 +175,20 @@ def test_enrich_resolves_conference_classification_per_side(tmp_path):
     games_no_conf = [GameRecord(2, season, 1, "Gamma", "Delta", None, None, 7, 3, "consensus", -1.0, None)]
     features = enrich_games(tmp_path, games_no_conf)
     assert features["2"]["home_conference_classification"] is None
+
+
+def test_enrich_wind_direction_and_rest_pregame_win_prob(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"weather_{season}.json").write_text(
+        json.dumps([{"id": 1, "windDirection": 270}]), encoding="utf-8"
+    )
+    (raw_dir / f"pregame_win_prob_{season}.json").write_text(
+        json.dumps([{"gameId": 1, "homeWinProbability": 0.731}]), encoding="utf-8"
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    features = enrich_games(tmp_path, games)
+    assert features["1"]["weather_windDirection"] == 270
+    assert features["1"]["pregame_home_win_prob"] == 0.731
