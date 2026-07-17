@@ -568,3 +568,96 @@ def test_numeric_feature_fallback_has_paired_gte_lte_slots(tmp_path):
     assert 'data-bound="max"' in html
     assert 'name="ff_op" value="gte"' in html or 'value="gte"' in html
     assert 'name="ff_op" value="lte"' in html or 'value="lte"' in html
+
+
+def test_default_perspective_spread_bet_side_total_either():
+    from cfb_system_maker.web import default_perspective
+
+    assert default_perspective(SystemFilter(bet_type="spread")) == "bet_side"
+    assert default_perspective(SystemFilter(bet_type="total")) == "either"
+
+
+def test_edit_metadata_for_core_and_feature_sentences():
+    from cfb_system_maker.web import edit_metadata_for_sentence
+
+    seasons = edit_metadata_for_sentence(
+        SystemFilter(seasons={2023, 2024}),
+        {"text": "the season is 2023, 2024", "key": "seasons"},
+    )
+    assert seasons is not None
+    assert seasons["candidate_id"] == "core:season"
+    assert seasons["values"] == [2023, 2024]
+
+    spread = edit_metadata_for_sentence(
+        SystemFilter(bet_type="spread", min_spread=-14.0, max_spread=-3.0),
+        {"text": "the spread is between -14 and -3", "key": "spread_range"},
+    )
+    assert spread is not None
+    assert spread["candidate_id"] == "core:spread_range"
+    assert spread["min"] == -14.0
+    assert spread["max"] == -3.0
+
+    feature = edit_metadata_for_sentence(
+        SystemFilter(
+            feature_filters=(
+                FeatureFilter("running_win_pct", "gte", 0.4, perspective="opponent"),
+                FeatureFilter("running_win_pct", "lte", 0.7, perspective="opponent"),
+            )
+        ),
+        {"text": "Opponent Win % (to date) is between 0.4 and 0.7", "key": "ff:running_win_pct"},
+    )
+    assert feature is not None
+    assert feature["candidate_id"] == "feature:running_win_pct"
+    assert feature["perspective"] == "opponent"
+    assert feature["min"] == 0.4
+    assert feature["max"] == 0.7
+
+    assert (
+        edit_metadata_for_sentence(
+            SystemFilter(favorite=True),
+            {"text": "the team is a favorite", "key": "favorite"},
+        )
+        is None
+    )
+
+
+def test_index_active_filters_have_edit_beside_remove(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {str(game.game_id): {"neutralSite": True, "running_win_pct_home": 0.5} for game in games},
+    )
+    app = create_app(data_dir=tmp_path)
+    html = app.test_client().get(
+        "/?side=home&filter_seasons=2023"
+        "&ff_enable=neutralSite&ff_key=neutralSite&ff_op=eq&ff_value=true&ff_perspective=single"
+    ).get_data(as_text=True)
+
+    assert ">Edit<" in html
+    assert 'aria-label="Edit filter: the season is 2023"' in html
+    assert 'data-candidate-id="core:season"' in html
+    assert 'class="edit-filter"' in html
+    assert 'class="remove-filter"' in html
+    assert 'aria-label="Remove filter: the season is 2023"' in html
+    assert 'aria-label="Edit filter:' in html
+    # Feature sentence also editable
+    assert "data-candidate-id=\"feature:neutralSite\"" in html
+    # Global toggles are not Edit-modal filters
+    fav_html = app.test_client().get("/?side=home&favorite=on").get_data(as_text=True)
+    assert "the team is a favorite" in fav_html
+    assert 'aria-label="Edit filter: the team is a favorite"' not in fav_html
+    assert 'aria-label="Remove filter: the team is a favorite"' in fav_html
+
+
+def test_filter_modal_js_edit_prefill_and_perspective_contract():
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "edit-filter" in source or "openCandidate" in source
+    assert "Bet-side" in source
+    assert "Opponent" in source
+    assert "Either" in source
+    assert "defaultPerspective" in source or "bet_side" in source
+    assert "team_scoped" in source or "team-scoped" in source or "data-team-scoped" in source
+    assert "perspective" in source
