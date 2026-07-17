@@ -22,8 +22,8 @@ def _game(game_id, week, home="Alpha", away="Beta", home_points=None, away_point
 def test_first_game_of_season_has_zero_history():
     games = [_game(1, 1, home_points=21, away_points=14, spread=-3.5)]
     stats = compute_running_stats(games)
-    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None}
-    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None}
+    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None}
+    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None}
 
 
 def test_no_lookahead_stats_reflect_only_strictly_prior_games():
@@ -81,7 +81,7 @@ def test_seasons_reset():
         _game(2, 1, season=2023, home_points=0, away_points=0, spread=-1.0),
     ]
     stats = compute_running_stats(games)
-    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None}
+    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None}
 
 
 def test_start_dates_override_week_order():

@@ -149,6 +149,7 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
     FeatureDef("running_ats_pct", "ATS Win % (to date)", "season_to_date", "computed_running", "ats_pct", "game_id", "numeric", team_scoped=True),
     FeatureDef("running_ppa_off", "Off PPA (to date)", "season_to_date", "computed_running", "ppa_off", "game_id", "numeric", team_scoped=True),
     FeatureDef("running_ppa_def", "Def PPA (to date)", "season_to_date", "computed_running", "ppa_def", "game_id", "numeric", team_scoped=True),
+    FeatureDef("running_success_off", "Off Success Rate (to date)", "season_to_date", "computed_running", "adv_success_off", "game_id", "numeric", team_scoped=True),
     # --- result lookahead ---
     FeatureDef(
         "havoc_offense_rate",

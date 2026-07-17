@@ -115,6 +115,71 @@ def test_enrich_computes_running_stats_from_prior_games(tmp_path):
     assert entering_g2["away_running_ppa_def"] == 0.3
 
 
+def test_enrich_surfaces_running_success_off_from_prior_games(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+
+    (raw_dir / f"games_{season}.json").write_text(
+        json.dumps(
+            [
+                {"id": 1, "season": season, "startDate": "2023-09-02 17:00:00+00:00"},
+                {"id": 2, "season": season, "startDate": "2023-09-09 17:00:00+00:00"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (raw_dir / f"advanced_game_stats_{season}.json").write_text(
+        json.dumps(
+            [
+                {"gameId": 1, "team": "Alpha", "offense": {"successRate": 0.47}},
+                {"gameId": 1, "team": "Beta", "offense": {"successRate": 0.33}},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [
+        GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None),
+        GameRecord(2, season, 2, "Alpha", "Beta", None, None, 10, 20, "consensus", -3.5, None),
+    ]
+
+    features = enrich_games(tmp_path, games)
+
+    assert features["1"]["home_running_success_off"] is None  # first game: no prior
+    assert features["2"]["home_running_success_off"] == 0.47  # only prior game (Alpha, game 1)
+    assert features["2"]["away_running_success_off"] == 0.33  # Beta's prior game 1
+
+
+def test_enrich_success_off_fails_closed_on_dict_shaped_field(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+
+    (raw_dir / f"games_{season}.json").write_text(
+        json.dumps(
+            [
+                {"id": 1, "season": season, "startDate": "2023-09-02 17:00:00+00:00"},
+                {"id": 2, "season": season, "startDate": "2023-09-09 17:00:00+00:00"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    # Malformed: successRate is a dict, not a float. Must yield None, never raise.
+    (raw_dir / f"advanced_game_stats_{season}.json").write_text(
+        json.dumps([{"gameId": 1, "team": "Alpha", "offense": {"successRate": {"total": 0.5}}}]),
+        encoding="utf-8",
+    )
+
+    games = [
+        GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None),
+        GameRecord(2, season, 2, "Alpha", "Beta", None, None, 10, 20, "consensus", -3.5, None),
+    ]
+
+    features = enrich_games(tmp_path, games)  # must not raise
+    assert features["2"]["home_running_success_off"] is None
+
+
 def test_save_features_writes_meta_and_load_reads_both_shapes(tmp_path):
     from cfb_system_maker.enrich import load_features, load_features_meta
     from cfb_system_maker.features import registry_version

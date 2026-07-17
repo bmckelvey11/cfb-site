@@ -131,13 +131,36 @@ def _build_running_index(
             defense = row.get("defense") or {}
             ppa[(int(game_id), str(team))] = (offense.get("overall"), defense.get("overall"))
 
+    adv: dict[tuple[int, str], dict[str, float | None]] = {}
+    for season in seasons:
+        path = data_dir / "raw" / f"advanced_game_stats_{season}.json"
+        if not path.exists():
+            continue
+        for row in json.loads(path.read_text(encoding="utf-8")):
+            game_id = row.get("gameId") if row.get("gameId") is not None else row.get("game_id")
+            team = row.get("team")
+            if game_id is None or team is None:
+                continue
+            offense = row.get("offense") or {}
+            adv[(int(game_id), str(team))] = {
+                "success_off": _coerce_numeric(offense.get("successRate")),
+            }
+
     start_dates: dict[int, str] = {}
     for game_id, row in raw_games.items():
         start = row.get("startDate") or row.get("start_date")
         if start:
             start_dates[game_id] = str(start)
 
-    return compute_running_stats(games, ppa=ppa, start_dates=start_dates)
+    return compute_running_stats(games, ppa=ppa, adv=adv, start_dates=start_dates)
+
+
+def _coerce_numeric(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
 
 def _apply_feature(row: dict[str, Any], feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> None:
