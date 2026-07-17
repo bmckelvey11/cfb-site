@@ -425,3 +425,21 @@ code {
   margin: 4px 0 0;
   padding-left: 18px;
 }
+
+.compare-page .workspace {
+  width: 100%;
+}
+.compare-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.compare-table th,
+.compare-table td {
+  text-align: left;
+}
+.compare-link {
+  margin-top: 8px;
+}

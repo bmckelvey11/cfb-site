@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Compare Systems - CFB System Maker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="app-shell compare-page">
+      <section class="workspace">
+        <header class="workspace-header">
+          <div>
+            <h2>Compare Systems</h2>
+            <p><a href="{{ url_for('index') }}">&larr; Back to backtester</a></p>
+          </div>
+        </header>
+
+        {% if error == "missing_data" %}
+          <div class="empty-state">
+            <h2>No processed data found</h2>
+            <p>Run <code>python -m cfb_system_maker build --season 2023 --data-dir data</code>, then refresh.</p>
+          </div>
+        {% else %}
+          <form method="get" class="compare-picker">
+            {% for name in saved_systems %}
+              <label class="check">
+                <input type="checkbox" name="system" value="{{ name }}" {% if name in selected %}checked{% endif %}> {{ name }}
+              </label>
+            {% else %}
+              <p class="no-saved-systems">No saved systems yet - save one from the backtester first.</p>
+            {% endfor %}
+            {% if saved_systems %}<button type="submit">Compare</button>{% endif %}
+          </form>
+
+          {% if rows %}
+          <section class="table-wrap">
+            <table class="compare-table">
+              <thead>
+                <tr><th>Metric</th>{% for row in rows %}<th>{{ row.name }}</th>{% endfor %}</tr>
+              </thead>
+              <tbody>
+                <tr><td>Bet</td>{% for row in rows %}<td>{{ row.system.bet_type }} / {{ row.system.total_side if row.system.bet_type == 'total' else row.system.side }}</td>{% endfor %}</tr>
+                <tr><td>Bets</td>{% for row in rows %}<td>{{ row.result.bets }}</td>{% endfor %}</tr>
+                <tr><td>W-L-P</td>{% for row in rows %}<td>{{ row.result.wins }}-{{ row.result.losses }}-{{ row.result.pushes }}</td>{% endfor %}</tr>
+                <tr><td>Hit rate</td>{% for row in rows %}<td>{{ "%.2f%%"|format(row.result.hit_rate * 100) }}</td>{% endfor %}</tr>
+                <tr><td>ROI</td>{% for row in rows %}<td class="{{ 'positive' if row.result.roi > 0 else 'negative' if row.result.roi < 0 else '' }}">{{ "%.2f%%"|format(row.result.roi * 100) }}</td>{% endfor %}</tr>
+                <tr><td>Profit</td>{% for row in rows %}<td>{{ "%.4f"|format(row.result.profit) }}</td>{% endfor %}</tr>
+                <tr><td>Edge</td>{% for row in rows %}<td>{{ "%.2f%%"|format(row.result.stats.edge * 100) }}</td>{% endfor %}</tr>
+                <tr><td>Wilson CI</td>{% for row in rows %}<td>{{ "%.1f"|format(row.result.stats.wilson_low * 100) }}-{{ "%.1f"|format(row.result.stats.wilson_high * 100) }}%</td>{% endfor %}</tr>
+                <tr><td>p-value</td>{% for row in rows %}<td>{{ "%.4f"|format(row.result.stats.p_value) }}</td>{% endfor %}</tr>
+                <tr><td>ROI t-stat</td>{% for row in rows %}<td>{{ "%.2f"|format(row.result.stats.roi_t_stat) }}</td>{% endfor %}</tr>
+                <tr><td>Streaks</td>{% for row in rows %}<td>W{{ row.result.stats.max_win_streak }} / L{{ row.result.stats.max_loss_streak }}</td>{% endfor %}</tr>
+                <tr><td>Sample</td>{% for row in rows %}<td>{{ "Low n" if row.result.stats.low_sample else "OK" }}</td>{% endfor %}</tr>
+              </tbody>
+            </table>
+          </section>
+          {% endif %}
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

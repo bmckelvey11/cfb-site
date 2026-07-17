@@ -88,6 +88,31 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         save_system(name, _system_from_form(form), app.config["DATA_DIR"])
         return redirect(url_for("index", **{"load_system": name}))
 
+    @app.get("/compare")
+    def compare():
+        try:
+            games = load_processed_games(app.config["DATA_DIR"])
+        except FileNotFoundError:
+            return render_template("compare.html", error="missing_data", rows=[], selected=[], saved_systems=[])
+
+        feature_map = _try_load_features(app.config["DATA_DIR"])
+        selected = request.args.getlist("system")
+        rows = []
+        for name in selected:
+            try:
+                system = load_system(name, app.config["DATA_DIR"])
+            except FileNotFoundError:
+                continue
+            result = run_backtest(games, system, feature_map=feature_map)
+            rows.append({"name": name, "system": system, "result": result})
+        return render_template(
+            "compare.html",
+            error=None,
+            rows=rows,
+            selected=selected,
+            saved_systems=list_systems(app.config["DATA_DIR"]),
+        )
+
     @app.get("/favicon.ico")
     def favicon():
         return "", 204
