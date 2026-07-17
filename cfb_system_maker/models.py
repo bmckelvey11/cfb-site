@@ -59,6 +59,8 @@ class SystemStats:
     roi_std_error: float
     roi_t_stat: float
     low_sample: bool
+    max_win_streak: int = 0
+    max_loss_streak: int = 0
 
 
 @dataclass(frozen=True)

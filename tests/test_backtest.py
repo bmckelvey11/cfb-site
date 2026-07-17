@@ -1,5 +1,5 @@
-from cfb_system_maker.backtest import run_backtest
-from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
+from cfb_system_maker.backtest import compute_system_stats, run_backtest
+from cfb_system_maker.models import BetDetail, FeatureFilter, GameRecord, SystemFilter
 
 
 def test_home_favorite_cover_wins_at_minus_110():
@@ -129,3 +129,41 @@ def test_system_stats_include_edge_and_wilson_bounds():
     assert result.stats.wilson_low <= result.hit_rate <= result.stats.wilson_high
     assert 0.0 <= result.stats.p_value <= 1.0
     assert result.stats.low_sample is True
+
+
+def _bet(game_id, week, result):
+    profit = 0.9091 if result == "win" else (-1.0 if result == "loss" else 0.0)
+    return BetDetail(
+        game_id=game_id,
+        season=2023,
+        week=week,
+        team="Alpha",
+        opponent="Beta",
+        side="home",
+        spread=-3.0,
+        total=None,
+        line=-3.0,
+        result=result,
+        profit=profit,
+    )
+
+
+def test_streaks_are_chronological_and_pushes_do_not_break_them():
+    # Chronological order: W W P W L L — but pass details shuffled to prove sorting.
+    details = [
+        _bet(4, 4, "win"),
+        _bet(1, 1, "win"),
+        _bet(6, 6, "loss"),
+        _bet(2, 2, "win"),
+        _bet(5, 5, "loss"),
+        _bet(3, 3, "push"),
+    ]
+    stats = compute_system_stats(details, hit_rate=0.6, roi=0.1, american_odds=-110, stake=1.0)
+    assert stats.max_win_streak == 3
+    assert stats.max_loss_streak == 2
+
+
+def test_streaks_default_to_zero_with_no_bets():
+    stats = compute_system_stats([], hit_rate=0.0, roi=0.0, american_odds=-110, stake=1.0)
+    assert stats.max_win_streak == 0
+    assert stats.max_loss_streak == 0

@@ -237,6 +237,7 @@
             <article><span>Wilson CI</span><strong>{{ "%.1f"|format(result.stats.wilson_low * 100) }}–{{ "%.1f"|format(result.stats.wilson_high * 100) }}%</strong></article>
             <article><span>p-value</span><strong>{{ "%.4f"|format(result.stats.p_value) }}</strong></article>
             <article><span>ROI t-stat</span><strong>{{ "%.2f"|format(result.stats.roi_t_stat) }}</strong></article>
+            <article><span>Streaks</span><strong>W{{ result.stats.max_win_streak }} / L{{ result.stats.max_loss_streak }}</strong></article>
             {% if result.stats.low_sample %}<article class="warning"><span>Sample</span><strong>Low n</strong></article>{% endif %}
           </section>
           {% endif %}

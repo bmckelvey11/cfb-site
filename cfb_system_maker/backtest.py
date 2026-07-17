@@ -125,6 +125,7 @@ def compute_system_stats(
     z_score, p_value = _hit_rate_z_test(hit_rate, decided, break_even_rate)
     returns = [bet.profit / stake for bet in details if bet.result in {"win", "loss"}]
     roi_std_error, roi_t_stat = _roi_stats(returns, roi)
+    max_win_streak, max_loss_streak = _streaks(sorted(details, key=lambda bet: (bet.season, bet.week, bet.game_id)))
 
     return SystemStats(
         break_even_rate=round(break_even_rate, 4),
@@ -136,6 +137,8 @@ def compute_system_stats(
         roi_std_error=roi_std_error,
         roi_t_stat=roi_t_stat,
         low_sample=decided < 30,
+        max_win_streak=max_win_streak,
+        max_loss_streak=max_loss_streak,
     )
 
 
@@ -277,6 +280,22 @@ def _roi_stats(returns: list[float], roi: float) -> tuple[float, float]:
     std_error = math.sqrt(variance / n) if variance > 0 else 0.0
     t_stat = roi / std_error if std_error else 0.0
     return round(std_error, 4), round(t_stat, 4)
+
+
+def _streaks(details: list[BetDetail]) -> tuple[int, int]:
+    best_win = best_loss = win_run = loss_run = 0
+    for bet in details:
+        if bet.result == "win":
+            win_run += 1
+            loss_run = 0
+        elif bet.result == "loss":
+            loss_run += 1
+            win_run = 0
+        else:
+            continue  # pushes neither extend nor break a streak
+        best_win = max(best_win, win_run)
+        best_loss = max(best_loss, loss_run)
+    return best_win, best_loss
 
 
 def _norm_cdf(z: float) -> float:
