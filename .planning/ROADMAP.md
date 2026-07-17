@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: System Editor Main Page** - The main page reads like a Bet Labs system editor: stat chips, cumulative money-won graph, plain-English filter sentences, tabs, and a theory field. (completed 2026-07-17)
 - [x] **Phase 2: Integrity — Fade & Grade** - Users can fade a system to grade the opposite side and see a composite letter grade in the stat-chip header. (completed 2026-07-17)
 - [ ] **Phase 3: Data Depth & Breadth** - Historical coverage extends further back than 2013 and more CFBD/GraphQL endpoints are wired into the feature registry as filterable features.
-- [ ] **Phase 4: Filter Popup Modal** - Clicking any filter opens a live-recalculating popup (slider or value table, live Record/Money/ROI, About Filter) instead of static inline fields.
+- [x] **Phase 4: Filter Popup Modal** - Clicking any filter opens a live-recalculating popup (slider or value table, live Record/Money/ROI, About Filter) instead of static inline fields. (completed 2026-07-17)
 - [ ] **Phase 5: Dashboard & Current Matches** - A My Systems dashboard replaces the editor as the landing page, and saved systems are evaluated live against upcoming games.
 
 ## Phase Details
@@ -120,7 +120,7 @@ Plans:
   4. Categorical/list filters render a searchable, sortable table of value to Record/ROI/Money.
   5. The modal shows an About Filter panel with the feature's definition text, and Save Filter commits the change and closes the modal while Cancel discards it.
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans complete
 Plans:
 **Wave 1**
 
@@ -136,7 +136,7 @@ Plans:
 
 **Wave 4** *(blocked on 04-03)*
 
-- [ ] 04-04-PLAN.md — Edit-from-sentence, perspective, debounce/stale/retry, a11y + responsive — MODAL-01, MODAL-02, MODAL-06
+- [x] 04-04-PLAN.md — Edit-from-sentence, perspective, debounce/stale/retry, a11y + responsive — MODAL-01, MODAL-02, MODAL-06
 
 **UI hint**: yes
 
@@ -166,5 +166,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. System Editor Main Page | 5/5 | Complete    | 2026-07-17 |
 | 2. Integrity — Fade & Grade | 2/2 | Complete    | 2026-07-17 |
 | 3. Data Depth & Breadth | 4/4 | Complete    | 2026-07-17 |
-| 4. Filter Popup Modal | 3/4 | In Progress|  |
+| 4. Filter Popup Modal | 4/4 | Complete   | 2026-07-17 |
 | 5. Dashboard & Current Matches | 0/TBD | Not started | - |
