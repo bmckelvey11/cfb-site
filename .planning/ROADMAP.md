@@ -88,7 +88,7 @@ Plans:
 **Requirements**: DATA-01, DATA-02
 **Success Criteria** (what must be TRUE):
 
-  1. User can build/load a system with a season filter earlier than 2013 and get non-empty backtest results, confirming backfilled game/line coverage.
+  1. The tool correctly handles the earliest CFBD line-covered season (2013, confirmed by a live coverage probe): a system filtered to the floor season returns non-empty results, and pre-floor seasons (e.g. 2012 — games but no usable lines) cleanly contribute zero rows. If the probe finds usable pre-2013 lines, those seasons are backfilled and become filterable. *(Reframed 2026-07-17 after research verified 2013 is the CFBD betting-line floor — original "earlier than 2013 → non-empty results" was unsatisfiable via CFBD, the only wired source.)*
   2. User sees new filter categories or features available when configuring a system (e.g. weather, player/coach, advanced stats) sourced from newly wired CFBD/GraphQL endpoints that were not present before this phase.
   3. Newly added registry features follow the existing no-lookahead convention — computable pre-game (entering-game state) or explicitly tagged into the `result_lookahead` group, verified by the existing `tests/` construct-and-assert pattern.
 
