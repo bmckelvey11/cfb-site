@@ -166,5 +166,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. System Editor Main Page | 5/5 | Complete    | 2026-07-17 |
 | 2. Integrity — Fade & Grade | 2/2 | Complete    | 2026-07-17 |
 | 3. Data Depth & Breadth | 4/4 | Complete    | 2026-07-17 |
-| 4. Filter Popup Modal | 0/4 | Not started | - |
+| 4. Filter Popup Modal | 0/4 | Planned | 2026-07-17 |
 | 5. Dashboard & Current Matches | 0/TBD | Not started | - |
