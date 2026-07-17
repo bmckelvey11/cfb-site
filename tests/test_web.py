@@ -1,7 +1,7 @@
 import re
 from urllib.parse import parse_qs
 
-from cfb_system_maker.backtest import run_backtest
+from cfb_system_maker.backtest import compute_grade, run_backtest
 from cfb_system_maker.models import BacktestResult, BetDetail, SystemFilter
 from cfb_system_maker.sample_data import SAMPLE_GAMES_2023, SAMPLE_LINES_2023
 from cfb_system_maker.normalize import normalize_games
@@ -126,12 +126,13 @@ def test_web_index_loads_filters_and_default_results(tmp_path):
     assert "Michigan" in html
 
     expected = run_backtest(games, SystemFilter(side="home"))
+    expected_grade = compute_grade(expected, SystemFilter(side="home"))
     metrics_html = _metrics_section(html)
     assert metrics_html.count("<article>") == 5
     assert _chip_labels(metrics_html) == ["Record", "Margin", "Money Won", "ROI", "Grade"]
     assert f"{expected.wins}-{expected.losses}-{expected.pushes}, {expected.hit_rate * 100:.1f}%" in metrics_html
     assert _money_won_text(expected.profit) in metrics_html
-    assert '<article><span>Grade</span><strong>&mdash;</strong></article>' in metrics_html
+    assert f"<span>Grade</span><strong>{expected_grade}</strong>" in metrics_html
 
 
 def test_web_filters_apply_to_results(tmp_path):
@@ -192,6 +193,34 @@ def test_web_money_won_chip_renders_unsigned_zero_for_no_matched_bets(tmp_path):
     assert '<article><span>Money Won</span><strong class="">$0</strong></article>' in metrics_html
     # zero matched bets also leaves average_margin at None -> em dash, same as total-bet systems
     assert '<article><span>Margin</span><strong class="">&mdash;</strong></article>' in metrics_html
+
+
+def test_web_grade_chip_renders_computed_letter_for_default_system(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    metrics_html = _metrics_section(response.get_data(as_text=True))
+    expected = run_backtest(games, SystemFilter(side="home"))
+    expected_grade = compute_grade(expected, SystemFilter(side="home"))
+    assert f"<span>Grade</span><strong>{expected_grade}</strong>" in metrics_html
+
+
+def test_web_grade_chip_renders_em_dash_for_zero_matched_bets(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/?season=2099")
+    metrics_html = _metrics_section(response.get_data(as_text=True))
+    assert "<span>Grade</span><strong>&mdash;</strong>" in metrics_html
+
+    faded_response = app.test_client().get("/?season=2099&fade=on")
+    faded_metrics_html = _metrics_section(faded_response.get_data(as_text=True))
+    assert "<span>Grade</span><strong>&mdash;</strong>" in faded_metrics_html
 
 
 def test_web_has_all_dropdowns_market_choice_and_range_chart(tmp_path):

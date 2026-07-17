@@ -230,7 +230,7 @@
             <article><span>Margin</span><strong class="{{ 'positive' if result.average_margin and result.average_margin > 0 else 'negative' if result.average_margin and result.average_margin < 0 else '' }}">{% if result.average_margin is not none %}{{ "%.1f"|format(result.average_margin) }}{% else %}&mdash;{% endif %}</strong></article>
             <article><span>Money Won</span><strong class="{{ 'positive' if result.profit > 0 else 'negative' if result.profit < 0 else '' }}">{% if result.profit > 0 %}+${{ "{:,.0f}".format(result.profit * 100) }}{% elif result.profit < 0 %}-${{ "{:,.0f}".format(-result.profit * 100) }}{% else %}$0{% endif %}</strong></article>
             <article><span>ROI</span><strong class="{{ 'positive' if result.roi > 0 else 'negative' if result.roi < 0 else '' }}">{{ "%.2f%%"|format(result.roi * 100) }}</strong></article>
-            <article><span>Grade</span><strong>&mdash;</strong></article>
+            <article><span>Grade</span><strong>{% if result.grade %}{{ result.grade }}{% else %}&mdash;{% endif %}</strong></article>
           </section>
 
           {% if form.theory %}
