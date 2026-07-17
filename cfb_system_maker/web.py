@@ -46,6 +46,7 @@ _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
 _ALLOWED_PERSPECTIVES = frozenset({"single", "home", "away", "bet_side", "opponent", "either"})
 _ALLOWED_OPS = frozenset({"eq", "in", "gte", "lte"})
 _MAX_IN_LIST = 256
+_CHART_POINTS_CAP = 60
 _CORE_CANDIDATE_CLEAR: dict[str, dict[str, object]] = {
     "core:season": {"seasons": frozenset()},
     "core:week": {"weeks": frozenset()},
@@ -283,6 +284,84 @@ def _value_description(value: object, control: str) -> str:
     return str(value)
 
 
+def downsample_chart_points(
+    rows: list[dict[str, object]],
+    *,
+    cap: int = _CHART_POINTS_CAP,
+) -> list[dict[str, object]]:
+    """Deterministic visual downsample of exact numeric rows (D-09). Domain bounds stay on rows."""
+    if not rows:
+        return []
+    items = [(float(row["value"]), float(row["money"])) for row in rows]  # type: ignore[arg-type]
+    if len(items) > cap:
+        step = max(1, len(items) // cap)
+        items = items[::step]
+        if len(items) > cap:
+            items = items[:cap]
+        # Always keep the last observed extreme when stride skips it
+        last = (float(rows[-1]["value"]), float(rows[-1]["money"]))  # type: ignore[arg-type]
+        if items[-1][0] != last[0]:
+            if len(items) >= cap:
+                items[-1] = last
+            else:
+                items.append(last)
+
+    width = 520
+    height = 150
+    pad_x = 28
+    pad_y = 18
+    values = [money for _, money in items] + [0.0]
+    min_money = min(values)
+    max_money = max(values)
+    span = max_money - min_money or 1.0
+
+    points: list[dict[str, object]] = []
+    for index, (value, money) in enumerate(items):
+        x = pad_x if len(items) == 1 else pad_x + (width - pad_x * 2) * index / (len(items) - 1)
+        y = height - pad_y - ((money - min_money) / span) * (height - pad_y * 2)
+        points.append(
+            {
+                "value": value,
+                "money": money,
+                "x": round(x, 2),
+                "y": round(y, 2),
+            }
+        )
+    return points
+
+
+def serialize_numeric_draft(
+    candidate_id: str,
+    minimum: float,
+    maximum: float,
+    *,
+    perspective: str = "single",
+) -> dict[str, object]:
+    """Canonical form updates for a validated numeric Save draft (D-06 / D-07)."""
+    if not math.isfinite(minimum) or not math.isfinite(maximum):
+        raise StrictParseError("invalid_bounds", "Bounds must be finite numbers.")
+    if minimum > maximum:
+        raise StrictParseError("reversed_bounds", "Max must be greater than or equal to min.")
+
+    if candidate_id == "core:spread_range":
+        return {"min_spread": float(minimum), "max_spread": float(maximum)}
+    if candidate_id == "core:total_range":
+        return {"min_total": float(minimum), "max_total": float(maximum)}
+    if candidate_id.startswith("feature:"):
+        key = candidate_id.split(":", 1)[1]
+        if key not in FEATURE_BY_KEY:
+            raise StrictParseError("unknown_candidate", f"Unknown candidate_id: {candidate_id}")
+        if FEATURE_BY_KEY[key].control != "numeric":
+            raise StrictParseError("invalid_candidate", f"Candidate is not numeric: {candidate_id}")
+        return {
+            "feature_filters": [
+                {"key": key, "op": "gte", "value": float(minimum), "perspective": perspective},
+                {"key": key, "op": "lte", "value": float(maximum), "perspective": perspective},
+            ]
+        }
+    raise StrictParseError("unknown_candidate", f"Unknown candidate_id: {candidate_id}")
+
+
 def parse_system_strict(args: MultiDict | None = None) -> SystemFilter:
     """Allowlist-parse query args for JSON APIs; raise StrictParseError on bad input."""
     source = args if args is not None else request.args
@@ -493,6 +572,8 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             perspective=perspective,
         )
         domain_values = [row["value"] for row in rows]
+        is_numeric = descriptor["control"] == "numeric"
+        chart_points = downsample_chart_points(rows) if is_numeric else []
         return {
             "candidate_id": candidate_id,
             "label": descriptor["label"],
@@ -504,11 +585,11 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             "allowed_perspectives": allowed,
             "domain": {
                 "values": domain_values,
-                "min": min(domain_values) if domain_values and descriptor["control"] == "numeric" else None,
-                "max": max(domain_values) if domain_values and descriptor["control"] == "numeric" else None,
+                "min": min(domain_values) if domain_values and is_numeric else None,
+                "max": max(domain_values) if domain_values and is_numeric else None,
             },
             "rows": rows,
-            "chart_points": [],
+            "chart_points": chart_points,
         }
 
     @app.get("/favicon.ico")
