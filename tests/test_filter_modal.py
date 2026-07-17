@@ -661,3 +661,23 @@ def test_filter_modal_js_edit_prefill_and_perspective_contract():
     assert "defaultPerspective" in source or "bet_side" in source
     assert "team_scoped" in source or "team-scoped" in source or "data-team-scoped" in source
     assert "perspective" in source
+
+
+def test_filter_modal_js_debounce_stale_retry_and_focus_contract():
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "250" in source
+    assert "AbortController" in source
+    assert "liveGeneration" in source or "generation" in source
+    assert "Updating…" in source
+    assert "Couldn’t update live stats." in source
+    assert "Retry" in source
+    assert "discardAndClose" in source
+    # Backdrop click must not close/commit
+    assert "event.target === dialog" in source
+    css = Path("cfb_system_maker/static/styles.css").read_text(encoding="utf-8")
+    assert "900px" in css
+    assert "focus-visible" in css
+    html = Path("cfb_system_maker/templates/index.html").read_text(encoding="utf-8")
+    assert 'aria-labelledby="filter-modal-title"' in html

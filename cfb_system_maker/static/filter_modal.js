@@ -40,6 +40,10 @@
   let state = null;
   let lastSummary = null;
   let liveOk = false;
+  let liveGeneration = 0;
+  let liveAbort = null;
+  let liveTimer = null;
+  const LIVE_DEBOUNCE_MS = 250;
 
   const PERSPECTIVE_OPTIONS = [
     { value: "bet_side", label: "Bet-side" },
@@ -118,10 +122,43 @@
   }
 
   function setUpdating(updating) {
-    statusEl.textContent = updating ? "Updating…" : "";
+    statusEl.replaceChildren();
+    if (updating) {
+      statusEl.textContent = "Updating…";
+    }
     recordEl.style.opacity = updating ? "0.55" : "1";
     moneyEl.style.opacity = updating ? "0.55" : "1";
     roiEl.style.opacity = updating ? "0.55" : "1";
+  }
+
+  function showLiveError() {
+    statusEl.textContent = "";
+    statusEl.replaceChildren();
+    const msg = document.createElement("span");
+    msg.textContent = "Couldn’t update live stats. ";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "filter-modal__retry";
+    retry.textContent = "Retry";
+    retry.addEventListener("click", () => {
+      refreshLive({ immediate: true });
+    });
+    statusEl.appendChild(msg);
+    statusEl.appendChild(retry);
+    recordEl.style.opacity = "1";
+    moneyEl.style.opacity = "1";
+    roiEl.style.opacity = "1";
+  }
+
+  function abortLiveFetch() {
+    if (liveTimer != null) {
+      window.clearTimeout(liveTimer);
+      liveTimer = null;
+    }
+    if (liveAbort) {
+      liveAbort.abort();
+      liveAbort = null;
+    }
   }
 
   function committedCoreList(paramName) {
@@ -306,11 +343,13 @@
     return params;
   }
 
-  function refreshLive() {
+  function refreshLive(options) {
+    const immediate = options && options.immediate;
     if (!state) {
       return;
     }
     if (state.kind === "feature" && state.control === "bool" && state.selected.length !== 1) {
+      abortLiveFetch();
       saveBtn.disabled = true;
       liveOk = false;
       setUpdating(false);
@@ -318,38 +357,69 @@
       return;
     }
     if (state.kind === "numeric" && !boundsAreValid()) {
+      abortLiveFetch();
       saveBtn.disabled = true;
       liveOk = false;
       setUpdating(false);
+      statusEl.textContent = "Max must be greater than or equal to min.";
       return;
     }
-    setUpdating(true);
+
+    abortLiveFetch();
     saveBtn.disabled = true;
     liveOk = false;
-    const url = "/api/backtest?" + draftQuery().toString();
-    fetch(url, { headers: { Accept: "application/json" } })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("live_failed");
-        }
-        return response.json();
-      })
-      .then((summary) => {
-        lastSummary = summary;
-        liveOk = true;
-        renderChips(summary);
-        setUpdating(false);
-        updateSaveEnabled();
-        statusEl.textContent = "";
-      })
-      .catch(() => {
-        setUpdating(false);
-        if (lastSummary) {
-          renderChips(lastSummary);
-        }
-        statusEl.textContent = "Couldn’t update live stats.";
-        saveBtn.disabled = true;
-      });
+    const run = () => {
+      liveTimer = null;
+      if (!state) {
+        return;
+      }
+      const generation = ++liveGeneration;
+      if (liveAbort) {
+        liveAbort.abort();
+      }
+      liveAbort = new AbortController();
+      setUpdating(true);
+      const url = "/api/backtest?" + draftQuery().toString();
+      fetch(url, { headers: { Accept: "application/json" }, signal: liveAbort.signal })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("live_failed");
+          }
+          return response.json();
+        })
+        .then((summary) => {
+          if (generation !== liveGeneration) {
+            return;
+          }
+          lastSummary = summary;
+          liveOk = true;
+          renderChips(summary);
+          setUpdating(false);
+          updateSaveEnabled();
+          statusEl.textContent = "";
+        })
+        .catch((err) => {
+          if (err && err.name === "AbortError") {
+            return;
+          }
+          if (generation !== liveGeneration) {
+            return;
+          }
+          setUpdating(false);
+          if (lastSummary) {
+            renderChips(lastSummary);
+          }
+          liveOk = false;
+          saveBtn.disabled = true;
+          showLiveError();
+        });
+    };
+
+    if (immediate) {
+      run();
+    } else {
+      liveTimer = window.setTimeout(run, LIVE_DEBOUNCE_MS);
+    }
   }
 
   function updateSaveEnabled() {
@@ -1072,10 +1142,16 @@
   }
 
   function discardAndClose() {
+    abortLiveFetch();
+    liveGeneration += 1;
+    liveOk = false;
     state = null;
     setViewToggleVisible(false);
     if (exploreEl) {
       exploreEl.innerHTML = "";
+    }
+    if (statusEl) {
+      statusEl.textContent = "";
     }
     dialog.close();
     if (launcher) {
@@ -1200,11 +1276,16 @@
     if (lookahead) {
       aboutEl.textContent = description + (description ? "\n\n" : "") + lookahead;
     }
+    abortLiveFetch();
     lastSummary = null;
     liveOk = false;
+    liveGeneration += 1;
     controlsEl.innerHTML = "";
     if (exploreEl) {
       exploreEl.innerHTML = "";
+    }
+    if (statusEl) {
+      statusEl.textContent = "";
     }
     renderChips({ wins: 0, losses: 0, pushes: 0, money_won: 0, roi: 0 });
     dialog.showModal();
@@ -1328,17 +1409,13 @@
 
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();
-  });
-
-  dialog.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      discardAndClose();
-    }
+    discardAndClose();
   });
 
   dialog.addEventListener("click", (event) => {
+    // Backdrop clicks neither commit nor discard (D-21).
     if (event.target === dialog) {
+      event.preventDefault();
       event.stopPropagation();
     }
   });
