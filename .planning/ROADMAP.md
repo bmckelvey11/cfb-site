@@ -13,7 +13,7 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: System Editor Main Page** - The main page reads like a Bet Labs system editor: stat chips, cumulative money-won graph, plain-English filter sentences, tabs, and a theory field.
+- [x] **Phase 1: System Editor Main Page** - The main page reads like a Bet Labs system editor: stat chips, cumulative money-won graph, plain-English filter sentences, tabs, and a theory field. (completed 2026-07-17)
 - [ ] **Phase 2: Integrity — Fade & Grade** - Users can fade a system to grade the opposite side and see a composite letter grade in the stat-chip header.
 - [ ] **Phase 3: Data Depth & Breadth** - Historical coverage extends further back than 2013 and more CFBD/GraphQL endpoints are wired into the feature registry as filterable features.
 - [ ] **Phase 4: Filter Popup Modal** - Clicking any filter opens a live-recalculating popup (slider or value table, live Record/Money/ROI, About Filter) instead of static inline fields.
@@ -68,7 +68,16 @@ Plans:
   2. User sees a System Grade letter rendered in the stat-chip header's Grade slot, computed from sample size vs significance, ROI z-score, season sign-consistency, permutation p-value, and filter/value-count overfitting penalties.
   3. The Fade toggle state persists across save and reload of the system.
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Fade toggle: fade-flip grading logic, CLI --fade flag, storage/web round-trip, checkbox UI — INTG-01
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Composite System Grade: compute_grade + 5 sub-score helpers, overfitting penalty, Grade chip render — INTG-02
+
 **UI hint**: yes
 
 ### Phase 3: Data Depth & Breadth
@@ -125,8 +134,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. System Editor Main Page | 5/5 | In Progress|  |
-| 2. Integrity — Fade & Grade | 0/TBD | Not started | - |
+| 1. System Editor Main Page | 5/5 | Complete    | 2026-07-17 |
+| 2. Integrity — Fade & Grade | 0/2 | Not started | - |
 | 3. Data Depth & Breadth | 0/TBD | Not started | - |
 | 4. Filter Popup Modal | 0/TBD | Not started | - |
 | 5. Dashboard & Current Matches | 0/TBD | Not started | - |
