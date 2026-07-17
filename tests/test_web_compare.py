@@ -40,3 +40,30 @@ def test_compare_missing_data_state(tmp_path):
     app = create_app(tmp_path)
     html = app.test_client().get("/compare").get_data(as_text=True)
     assert "No processed data" in html
+
+
+def test_compare_shows_holdout_columns_when_holdout_season_selected(tmp_path):
+    app = _setup(tmp_path)
+
+    html = app.test_client().get("/compare?system=home-favs&holdout_season=2023").get_data(as_text=True)
+
+    assert "home-favs (in-sample)" in html
+    assert "home-favs (holdout)" in html
+
+
+def test_compare_without_holdout_season_keeps_single_column_per_system(tmp_path):
+    app = _setup(tmp_path)
+
+    html = app.test_client().get("/compare?system=home-favs").get_data(as_text=True)
+
+    assert "home-favs (in-sample)" not in html
+    assert ">home-favs<" in html
+
+
+def test_compare_shows_permutation_p_and_profitable_seasons_rows(tmp_path):
+    app = _setup(tmp_path)
+
+    html = app.test_client().get("/compare?system=home-favs&system=away-dogs").get_data(as_text=True)
+
+    assert "Permutation p" in html
+    assert "Profitable seasons" in html

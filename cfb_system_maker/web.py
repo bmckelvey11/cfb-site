@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flask import Flask, redirect, render_template, request, url_for
 
-from cfb_system_maker.backtest import matches_system, run_backtest, sign_consistency
+from cfb_system_maker.backtest import matches_system, run_backtest, sign_consistency, split_holdout
 from cfb_system_maker.enrich import load_features, load_features_meta
 from cfb_system_maker.features import (
     FEATURE_BY_KEY,
@@ -94,24 +94,58 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         try:
             games = load_processed_games(app.config["DATA_DIR"])
         except FileNotFoundError:
-            return render_template("compare.html", error="missing_data", rows=[], selected=[], saved_systems=[])
+            return render_template(
+                "compare.html",
+                error="missing_data",
+                rows=[],
+                selected=[],
+                saved_systems=[],
+                options=_empty_options(),
+                holdout_seasons=set(),
+            )
 
         feature_map = _try_load_features(app.config["DATA_DIR"])
         selected = request.args.getlist("system")
+        holdout_seasons = {int(value) for value in request.args.getlist("holdout_season") if value.strip()}
+        available_seasons = {game.season for game in games}
         rows = []
         for name in selected:
             try:
                 system = load_system(name, app.config["DATA_DIR"])
             except FileNotFoundError:
                 continue
-            result = run_backtest(games, system, feature_map=feature_map)
-            rows.append({"name": name, "system": system, "result": result})
+            if holdout_seasons:
+                in_sample, holdout = split_holdout(system, holdout_seasons, available_seasons)
+                in_result = run_backtest(games, in_sample, feature_map=feature_map)
+                holdout_result = run_backtest(games, holdout, feature_map=feature_map)
+                rows.append({
+                    "name": f"{name} (in-sample)",
+                    "system": in_sample,
+                    "result": in_result,
+                    "sign_consistency": sign_consistency(in_result.season_breakdown),
+                })
+                rows.append({
+                    "name": f"{name} (holdout)",
+                    "system": holdout,
+                    "result": holdout_result,
+                    "sign_consistency": sign_consistency(holdout_result.season_breakdown),
+                })
+            else:
+                result = run_backtest(games, system, feature_map=feature_map)
+                rows.append({
+                    "name": name,
+                    "system": system,
+                    "result": result,
+                    "sign_consistency": sign_consistency(result.season_breakdown),
+                })
         return render_template(
             "compare.html",
             error=None,
             rows=rows,
             selected=selected,
             saved_systems=list_systems(app.config["DATA_DIR"]),
+            options=_options_from_games(games),
+            holdout_seasons=holdout_seasons,
         )
 
     @app.get("/favicon.ico")

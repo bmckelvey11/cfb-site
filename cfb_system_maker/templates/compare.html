@@ -30,7 +30,16 @@
             {% else %}
               <p class="no-saved-systems">No saved systems yet - save one from the backtester first.</p>
             {% endfor %}
-            {% if saved_systems %}<button type="submit">Compare</button>{% endif %}
+            {% if saved_systems %}
+            <label>Holdout season(s)
+              <select name="holdout_season" multiple size="4">
+                {% for season in options.seasons %}
+                  <option value="{{ season }}" {% if season in holdout_seasons %}selected{% endif %}>{{ season }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="submit">Compare</button>
+            {% endif %}
           </form>
 
           {% if rows %}
@@ -52,6 +61,8 @@
                 <tr><td>ROI t-stat</td>{% for row in rows %}<td>{{ "%.2f"|format(row.result.stats.roi_t_stat) }}</td>{% endfor %}</tr>
                 <tr><td>Streaks</td>{% for row in rows %}<td>W{{ row.result.stats.max_win_streak }} / L{{ row.result.stats.max_loss_streak }}</td>{% endfor %}</tr>
                 <tr><td>Sample</td>{% for row in rows %}<td>{{ "Low n" if row.result.stats.low_sample else "OK" }}</td>{% endfor %}</tr>
+                <tr><td>Permutation p</td>{% for row in rows %}<td>{{ "%.4f"|format(row.result.stats.permutation_p_value) }}</td>{% endfor %}</tr>
+                <tr><td>Profitable seasons</td>{% for row in rows %}<td>{{ row.sign_consistency[0] }}/{{ row.sign_consistency[1] }}</td>{% endfor %}</tr>
               </tbody>
             </table>
           </section>
