@@ -9,6 +9,8 @@ from flask import Flask, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from cfb_system_maker.backtest import (
+    _side_spread,
+    grade_bet,
     matches_system,
     run_backtest,
     run_backtest_summary,
@@ -43,6 +45,16 @@ _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
 
 _ALLOWED_PERSPECTIVES = frozenset({"single", "home", "away", "bet_side", "opponent", "either"})
 _ALLOWED_OPS = frozenset({"eq", "in", "gte", "lte"})
+_MAX_IN_LIST = 256
+_CORE_CANDIDATE_CLEAR: dict[str, dict[str, object]] = {
+    "core:season": {"seasons": frozenset()},
+    "core:week": {"weeks": frozenset()},
+    "core:team": {"teams": frozenset()},
+    "core:conference": {"conferences": frozenset()},
+    "core:provider": {"providers": frozenset()},
+    "core:spread_range": {"min_spread": None, "max_spread": None},
+    "core:total_range": {"min_total": None, "max_total": None},
+}
 
 CORE_FILTER_META: dict[str, dict[str, str]] = {
     "core:season": {
@@ -103,26 +115,172 @@ class StrictParseError(Exception):
         self.message = message
 
 
-def filter_descriptor(candidate_id: str) -> dict[str, str] | None:
+def filter_descriptor(candidate_id: str) -> dict[str, object] | None:
     if candidate_id.startswith("core:"):
         meta = CORE_FILTER_META.get(candidate_id)
         if meta is None:
             return None
-        return {"id": candidate_id, **meta}
+        return {
+            "id": candidate_id,
+            "key": candidate_id.split(":", 1)[1],
+            "team_scoped": False,
+            "group": "core",
+            "lookahead_warning": False,
+            **meta,
+        }
     key = candidate_id
     if candidate_id.startswith("feature:"):
         key = candidate_id.split(":", 1)[1]
     feature = FEATURE_BY_KEY.get(key)
     if feature is None:
         return None
+    lookahead = feature.group == "result_lookahead"
     return {
         "id": f"feature:{feature.key}",
+        "key": feature.key,
         "label": feature.label,
         "control": feature.control,
         "description": feature.description,
         "param": feature.key,
         "group": feature.group,
+        "team_scoped": feature.team_scoped,
+        "lookahead_warning": "lookahead — analysis only" if lookahead else False,
     }
+
+
+def remove_candidate_filters(system: SystemFilter, candidate_id: str) -> SystemFilter:
+    """Clear every committed representation of the candidate; keep Fade and other filters."""
+    if candidate_id in _CORE_CANDIDATE_CLEAR:
+        updates = dict(_CORE_CANDIDATE_CLEAR[candidate_id])
+        # dataclasses.replace needs mutable sets where the model uses set
+        for field, value in list(updates.items()):
+            if isinstance(value, frozenset):
+                updates[field] = set(value)
+        return replace(system, **updates)
+    if candidate_id.startswith("feature:"):
+        key = candidate_id.split(":", 1)[1]
+        remaining = tuple(filt for filt in system.feature_filters if filt.key != key)
+        return replace(system, feature_filters=remaining)
+    raise StrictParseError("unknown_candidate", f"Unknown candidate_id: {candidate_id}")
+
+
+def resolve_candidate_value(
+    game: GameRecord,
+    system: SystemFilter,
+    descriptor: dict[str, object],
+    perspective: str,
+    *,
+    feature_map: dict[int, dict] | None = None,
+) -> object | tuple[object, ...] | None:
+    candidate_id = str(descriptor["id"])
+    if candidate_id == "core:season":
+        return game.season
+    if candidate_id == "core:week":
+        return game.week
+    if candidate_id == "core:provider":
+        return game.provider
+    if candidate_id == "core:team":
+        return game.home_team if system.side.lower() == "home" else game.away_team
+    if candidate_id == "core:conference":
+        return game.home_conference if system.side.lower() == "home" else game.away_conference
+    if candidate_id == "core:spread_range":
+        if game.spread is None:
+            return None
+        return _side_spread(game.spread, system.side)
+    if candidate_id == "core:total_range":
+        return game.total
+    if candidate_id.startswith("feature:"):
+        key = str(descriptor["key"])
+        feature = FEATURE_BY_KEY.get(key)
+        if feature is None:
+            return None
+        filt = FeatureFilter(key=key, op="eq", value=True, perspective=perspective)
+        return resolve_feature_value(
+            (feature_map or {}).get(game.game_id, {}),
+            feature,
+            filt,
+            system,
+        )
+    return None
+
+
+def aggregate_filter_value_rows(
+    games: list[GameRecord],
+    base_system: SystemFilter,
+    descriptor: dict[str, object],
+    *,
+    feature_map: dict[int, dict] | None,
+    perspective: str,
+    stake: float = 1.0,
+    american_odds: int = -110,
+) -> list[dict[str, object]]:
+    """One-pass per-value Record/ROI/Money with the candidate already removed from base_system."""
+    feature_map = feature_map or {}
+    control = str(descriptor.get("control", ""))
+    buckets: dict[object, list] = {}
+
+    if control == "bool":
+        # Fixed domain Yes/No even before observing values
+        buckets[False] = []
+        buckets[True] = []
+
+    for game in games:
+        if not matches_system(game, base_system, feature_map):
+            continue
+        raw = resolve_candidate_value(
+            game, base_system, descriptor, perspective, feature_map=feature_map
+        )
+        if raw is None:
+            continue
+        if isinstance(raw, tuple):
+            values = []
+            for item in raw:
+                if item is not None and item not in values:
+                    values.append(item)
+        else:
+            values = [raw]
+        detail = grade_bet(game, base_system, stake=stake, american_odds=american_odds)
+        for value in values:
+            buckets.setdefault(value, []).append(detail)
+
+    rows: list[dict[str, object]] = []
+    for value, details in buckets.items():
+        wins = sum(1 for bet in details if bet.result == "win")
+        losses = sum(1 for bet in details if bet.result == "loss")
+        pushes = sum(1 for bet in details if bet.result == "push")
+        bets = len(details)
+        decided = wins + losses
+        profit = round(sum(bet.profit for bet in details), 4)
+        risked = bets * stake
+        roi = round(profit / risked, 4) if risked else 0.0
+        description = _value_description(value, control)
+        rows.append(
+            {
+                "value": value,
+                "description": description,
+                "wins": wins,
+                "losses": losses,
+                "pushes": pushes,
+                "record": f"{wins}-{losses}-{pushes}",
+                "roi": roi,
+                "money": profit * 100,
+            }
+        )
+
+    if control == "bool":
+        order = {"No": 0, "Yes": 1}
+        rows.sort(key=lambda row: order.get(str(row["description"]), 99))
+    elif control == "numeric":
+        rows.sort(key=lambda row: float(row["value"]))  # type: ignore[arg-type]
+    else:
+        rows.sort(key=lambda row: str(row["description"]))
+    return rows
+
+
+def _value_description(value: object, control: str) -> str:
+    if control == "bool":
+        return "Yes" if value is True else "No"
+    return str(value)
 
 
 def parse_system_strict(args: MultiDict | None = None) -> SystemFilter:
@@ -293,11 +451,79 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         feature_map = _try_load_features(app.config["DATA_DIR"])
         return run_backtest_summary(games, system, feature_map=feature_map)
 
+    @app.get("/filter-detail")
+    def filter_detail():
+        candidate_id = (request.args.get("candidate_id") or "").strip()
+        if not candidate_id:
+            return {"error": "missing_candidate", "message": "candidate_id is required."}, 400
+        descriptor = filter_descriptor(candidate_id)
+        if descriptor is None:
+            return {"error": "unknown_candidate", "message": f"Unknown candidate_id: {candidate_id}"}, 400
+        try:
+            system = parse_system_strict(request.args)
+        except StrictParseError as exc:
+            return {"error": exc.error, "message": exc.message}, 400
+        try:
+            games = load_processed_games(app.config["DATA_DIR"])
+        except FileNotFoundError:
+            return {"error": "missing_data", "message": "Processed games file not found."}, 503
+
+        team_scoped = bool(descriptor.get("team_scoped"))
+        if team_scoped:
+            allowed = _allowed_perspectives_for_system(system)
+            perspective = (request.args.get("perspective") or "").strip() or _default_perspective(system)
+            if perspective not in allowed:
+                return {
+                    "error": "invalid_perspective",
+                    "message": f"Illegal perspective for candidate: {perspective}",
+                }, 400
+        else:
+            allowed = ["single"]
+            perspective = "single"
+
+        feature_map = _try_load_features(app.config["DATA_DIR"])
+        base_system = remove_candidate_filters(system, candidate_id)
+        rows = aggregate_filter_value_rows(
+            games,
+            base_system,
+            descriptor,
+            feature_map=feature_map,
+            perspective=perspective,
+        )
+        domain_values = [row["value"] for row in rows]
+        return {
+            "candidate_id": candidate_id,
+            "label": descriptor["label"],
+            "control": descriptor["control"],
+            "description": descriptor["description"],
+            "lookahead_warning": descriptor.get("lookahead_warning", False),
+            "team_scoped": team_scoped,
+            "perspective": perspective,
+            "allowed_perspectives": allowed,
+            "domain": {
+                "values": domain_values,
+                "min": min(domain_values) if domain_values and descriptor["control"] == "numeric" else None,
+                "max": max(domain_values) if domain_values and descriptor["control"] == "numeric" else None,
+            },
+            "rows": rows,
+            "chart_points": [],
+        }
+
     @app.get("/favicon.ico")
     def favicon():
         return "", 204
 
     return app
+
+
+def _default_perspective(system: SystemFilter) -> str:
+    return "bet_side" if system.bet_type == "spread" else "either"
+
+
+def _allowed_perspectives_for_system(system: SystemFilter) -> list[str]:
+    if system.bet_type == "spread":
+        return ["home", "away", "bet_side", "opponent"]
+    return ["home", "away", "either"]
 
 
 def _feature_coverage(
@@ -492,6 +718,13 @@ def _validate_feature_filters_strict(values: MultiDict) -> None:
         raw_value = raw_values[index] if index < len(raw_values) else ""
         if op in {"gte", "lte"}:
             _parse_finite_float(raw_value, field=f"ff_value[{key}]")
+        if op == "in":
+            parts = [part.strip() for part in str(raw_value).split(",") if part.strip()]
+            if len(parts) > _MAX_IN_LIST:
+                raise StrictParseError(
+                    "list_too_large",
+                    f"In-list for {key} exceeds {_MAX_IN_LIST} values",
+                )
 
 
 def _validate_numeric_fields_strict(values: MultiDict) -> None:
@@ -506,14 +739,25 @@ def _validate_int_list_fields_strict(values: MultiDict) -> None:
         raw = values.get(field, values.get(legacy, ""))
         if not raw or not str(raw).strip():
             continue
-        for part in str(raw).split(","):
-            part = part.strip()
-            if not part:
-                continue
+        parts = [part.strip() for part in str(raw).split(",") if part.strip()]
+        if len(parts) > _MAX_IN_LIST:
+            raise StrictParseError("list_too_large", f"{field} exceeds {_MAX_IN_LIST} values")
+        for part in parts:
             try:
                 int(part)
             except ValueError as exc:
                 raise StrictParseError("invalid_integer", f"Invalid integer in {field}: {part}") from exc
+    for field, legacy in (
+        ("filter_teams", "team"),
+        ("filter_conferences", "conference"),
+        ("filter_providers", "provider"),
+    ):
+        raw = values.get(field, values.get(legacy, ""))
+        if not raw or not str(raw).strip():
+            continue
+        parts = [part.strip() for part in str(raw).split(",") if part.strip()]
+        if len(parts) > _MAX_IN_LIST:
+            raise StrictParseError("list_too_large", f"{field} exceeds {_MAX_IN_LIST} values")
 
 
 def _parse_finite_float(raw_value: str, *, field: str) -> float:
