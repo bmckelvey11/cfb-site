@@ -315,6 +315,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 loaded_system="",
                 stale_registry=False,
                 season_filter=CORE_FILTER_META["core:season"],
+                core_filters=CORE_FILTER_META,
             )
 
         feature_map = _try_load_features(app.config["DATA_DIR"])
@@ -365,6 +366,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             tab=tab,
             sentences=sentences,
             season_filter=CORE_FILTER_META["core:season"],
+            core_filters=CORE_FILTER_META,
         )
 
     @app.post("/save")
@@ -936,11 +938,15 @@ def _feature_options(feature_map: dict[int, dict] | None) -> list[dict[str, obje
 
 def _feature_option(feature: FeatureDef, feature_map: dict[int, dict] | None) -> dict[str, object]:
     values = _scan_values(feature, feature_map or {})
+    lookahead = feature.group == "result_lookahead"
     return {
         "key": feature.key,
+        "candidate_id": f"feature:{feature.key}",
         "label": feature.label,
         "control": feature.control,
         "team_scoped": feature.team_scoped,
+        "description": feature.description,
+        "lookahead_warning": "lookahead — analysis only" if lookahead else "",
         "values": values,
         "min_value": min(values) if values and feature.control == "numeric" else None,
         "max_value": max(values) if values and feature.control == "numeric" else None,

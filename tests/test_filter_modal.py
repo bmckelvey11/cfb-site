@@ -155,15 +155,15 @@ def test_api_backtest_neutral_no_match_is_200_zeros(tmp_path):
 
 
 def test_cancel_leaves_form_untouched_contract():
-    """Cancel/Escape discard path must not write filter_seasons before close."""
+    """Cancel/Escape discard path must not write canonical controls before close."""
     from pathlib import Path
 
     source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
     assert "discardAndClose" in source
-    assert "writeSeasonsToForm" in source
-    # Save writes seasons; discard must not call writeSeasonsToForm
+    assert "writeCoreListToForm" in source
     discard_block = source.split("function discardAndClose")[1].split("function ")[0]
-    assert "writeSeasonsToForm" not in discard_block
+    assert "writeCoreListToForm" not in discard_block
+    assert "writeFeatureToForm" not in discard_block
     assert "filtersForm.submit" not in discard_block
     assert "requestSubmit" not in discard_block
 
@@ -172,9 +172,9 @@ def test_save_serializes_seasons_contract():
     from pathlib import Path
 
     source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
-    assert "writeSeasonsToForm" in source
-    assert 'seasonSelect.value = joined' in source
+    assert "writeCoreListToForm" in source
     assert "filter_seasons" in source
+    assert "select.value = joined" in source
     assert "requestSubmit" in source or "filtersForm.submit" in source
 
 
@@ -328,3 +328,65 @@ def test_filter_detail_empty_domain_is_200(tmp_path):
     payload = response.get_json()
     assert payload["rows"] == []
     assert "domain" in payload
+
+
+def test_index_has_grouped_launchers_and_fallback(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {str(game.game_id): {"neutralSite": False, "venue": "Dome"} for game in games},
+    )
+    html = create_app(data_dir=tmp_path).test_client().get("/").get_data(as_text=True)
+    for candidate in (
+        "core:season",
+        "core:week",
+        "core:team",
+        "core:conference",
+        "core:provider",
+        "core:spread_range",
+        "core:total_range",
+        "feature:neutralSite",
+        "feature:running_win_pct",
+        "feature:team_talent",
+        "feature:team_state",
+        "feature:attendance",
+    ):
+        assert f'data-candidate-id="{candidate}"' in html
+    assert html.count('id="filter-modal"') == 1
+    assert 'name="filter_weeks"' in html
+    assert 'name="ff_enable"' in html
+    assert 'data-fallback-for="core:season"' in html
+    assert "lookahead — analysis only" in html
+    assert 'class="feature-group lookahead"' in html or "feature-group lookahead" in html
+
+
+def test_filter_modal_js_has_table_search_sort_and_commit():
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "Search values" in source
+    assert "aria-sort" in source
+    assert "Description" in source
+    assert "filter-modal__table" in source
+    assert "writeCoreListToForm" in source
+    assert "writeFeatureToForm" in source
+    assert "filtersForm.requestSubmit" in source or "filtersForm.submit" in source
+    discard_block = source.split("function discardAndClose")[1].split("function ")[0]
+    assert "writeCoreListToForm" not in discard_block
+    assert "writeFeatureToForm" not in discard_block
+    assert "filtersForm.submit" not in discard_block
+    assert "requestSubmit" not in discard_block
+
+
+def test_categorical_boolean_save_commit_serialization_contract():
+    """Save writes ff_*/core list into filters-form then submits; Cancel does not."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "function saveAndSubmit" in source
+    save_block = source.split("function saveAndSubmit")[1].split("function ")[0]
+    assert "writeCoreListToForm" in save_block or "writeFeatureToForm" in save_block
+    assert "requestSubmit" in save_block or "filtersForm.submit" in save_block
+    assert 'opEl.value = "in"' in source
+    assert 'opEl.value = "eq"' in source

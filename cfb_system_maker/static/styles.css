@@ -732,6 +732,57 @@ code {
   gap: 8px;
 }
 
+.filter-modal__search {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.filter-modal__table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.filter-modal__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.filter-modal__table th,
+.filter-modal__table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.filter-modal__table th {
+  background: var(--panel-strong);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.filter-modal__sort {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  min-height: auto;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.filter-modal__sort:hover {
+  color: var(--accent);
+  background: transparent;
+}
+
 .filter-modal__footer {
   display: flex;
   justify-content: flex-end;
