@@ -55,35 +55,33 @@ None currently deferred — see Out of Scope for explicit exclusions instead.
 
 ## Traceability
 
-Filled in by roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EDIT-01 | TBD | Pending |
-| EDIT-02 | TBD | Pending |
-| EDIT-03 | TBD | Pending |
-| EDIT-04 | TBD | Pending |
-| EDIT-05 | TBD | Pending |
-| INTG-01 | TBD | Pending |
-| INTG-02 | TBD | Pending |
-| MODAL-01 | TBD | Pending |
-| MODAL-02 | TBD | Pending |
-| MODAL-03 | TBD | Pending |
-| MODAL-04 | TBD | Pending |
-| MODAL-05 | TBD | Pending |
-| MODAL-06 | TBD | Pending |
-| DASH-01 | TBD | Pending |
-| DASH-02 | TBD | Pending |
-| DASH-03 | TBD | Pending |
-| DASH-04 | TBD | Pending |
-| DATA-01 | TBD | Pending |
-| DATA-02 | TBD | Pending |
+| EDIT-01 | Phase 1 | Pending |
+| EDIT-02 | Phase 1 | Pending |
+| EDIT-03 | Phase 1 | Pending |
+| EDIT-04 | Phase 1 | Pending |
+| EDIT-05 | Phase 1 | Pending |
+| INTG-01 | Phase 2 | Pending |
+| INTG-02 | Phase 2 | Pending |
+| DATA-01 | Phase 3 | Pending |
+| DATA-02 | Phase 3 | Pending |
+| MODAL-01 | Phase 4 | Pending |
+| MODAL-02 | Phase 4 | Pending |
+| MODAL-03 | Phase 4 | Pending |
+| MODAL-04 | Phase 4 | Pending |
+| MODAL-05 | Phase 4 | Pending |
+| MODAL-06 | Phase 4 | Pending |
+| DASH-01 | Phase 5 | Pending |
+| DASH-02 | Phase 5 | Pending |
+| DASH-03 | Phase 5 | Pending |
+| DASH-04 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️ (roadmap creation next)
+- Mapped to phases: 19
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-16*
-*Last updated: 2026-07-16 after initial definition*
+*Last updated: 2026-07-16 after roadmap creation (5 phases, 100% coverage)*
