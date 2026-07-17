@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from cfb_system_maker.models import FeatureFilter, SystemFilter
 from cfb_system_maker.storage import list_systems, load_saved_system, load_system, save_system
 
@@ -77,6 +79,22 @@ def test_save_load_system_round_trips_fade(tmp_path):
 
     loaded = load_saved_system("faded", tmp_path)
     assert loaded.system.fade is True
+
+
+def test_save_system_rejects_path_traversal_name(tmp_path):
+    with pytest.raises(ValueError):
+        save_system("../../outside_secret", SystemFilter(), tmp_path)
+    assert not (tmp_path.parent.parent / "outside_secret.json").exists()
+
+
+def test_load_system_rejects_path_traversal_name(tmp_path):
+    with pytest.raises(ValueError):
+        load_system("../../outside_secret", tmp_path)
+
+
+def test_load_saved_system_rejects_path_traversal_name(tmp_path):
+    with pytest.raises(ValueError):
+        load_saved_system("../../outside_secret", tmp_path)
 
 
 def test_load_saved_system_backward_compatible_with_missing_fade_key(tmp_path):

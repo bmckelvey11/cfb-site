@@ -68,7 +68,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 saved = load_saved_system(loaded_name, app.config["DATA_DIR"])
                 system = saved.system
                 form = _form_from_system(system, loaded_name, saved.theory)
-            except FileNotFoundError:
+            except (FileNotFoundError, ValueError):
                 load_error = f"System '{loaded_name}' not found."
                 form = _form_values()
                 system = _system_from_form(form)
@@ -113,7 +113,10 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         name = str(form.get("save_name", "")).strip()
         if not name:
             return redirect(url_for("index"))
-        save_system(name, _system_from_form(form), app.config["DATA_DIR"], theory=form.get("theory", ""))
+        try:
+            save_system(name, _system_from_form(form), app.config["DATA_DIR"], theory=form.get("theory", ""))
+        except ValueError:
+            return redirect(url_for("index"))
         return redirect(url_for("index", **{"load_system": name}))
 
     @app.get("/compare")
@@ -139,7 +142,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         for name in selected:
             try:
                 system = load_system(name, app.config["DATA_DIR"])
-            except FileNotFoundError:
+            except (FileNotFoundError, ValueError):
                 continue
             if holdout_seasons:
                 in_sample, holdout = split_holdout(system, holdout_seasons, available_seasons)

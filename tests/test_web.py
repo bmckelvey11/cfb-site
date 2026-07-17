@@ -293,6 +293,43 @@ def test_web_save_and_load_system(tmp_path):
     assert 'name="min_spread" value="3' in html
 
 
+def test_web_save_rejects_path_traversal_name_without_writing_outside_data_dir(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    save_response = client.post(
+        "/save",
+        data={"save_name": "../../outside_secret", "bet_type": "spread", "side": "home", "total_side": "over"},
+    )
+    assert save_response.status_code == 302
+    assert not (tmp_path.parent.parent / "outside_secret.json").exists()
+
+
+def test_web_load_system_path_traversal_name_treated_as_not_found(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/?load_system=../../secret_system")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "not found" in html
+    assert "Loaded:" not in html
+
+
+def test_web_compare_ignores_path_traversal_system_name(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/compare?system=../../secret_system")
+
+    assert response.status_code == 200
+
+
 def test_web_index_shows_per_season_breakdown_and_permutation_p(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

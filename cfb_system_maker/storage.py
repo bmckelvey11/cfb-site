@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from dataclasses import asdict, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from cfb_system_maker.models import FeatureFilter, GameRecord, SavedSystem, SystemFilter
+
+_SYSTEM_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _safe_system_name(name: str) -> str:
+    if not _SYSTEM_NAME_RE.match(name):
+        raise ValueError(f"invalid system name: {name!r}")
+    return name
 
 
 def save_raw_json(data_dir: str | Path, name: str, season: int, rows: list[dict[str, Any]]) -> Path:
@@ -77,6 +86,7 @@ def _optional_float(value: str) -> float | None:
 
 
 def save_system(name: str, system: SystemFilter, data_dir: str | Path, theory: str = "") -> Path:
+    name = _safe_system_name(name)
     saved = SavedSystem(
         name=name,
         saved_at=datetime.now(timezone.utc).isoformat(),
@@ -90,12 +100,14 @@ def save_system(name: str, system: SystemFilter, data_dir: str | Path, theory: s
 
 
 def load_system(name: str, data_dir: str | Path) -> SystemFilter:
+    name = _safe_system_name(name)
     path = Path(data_dir) / "systems" / f"{name}.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     return _system_from_dict(payload)
 
 
 def load_saved_system(name: str, data_dir: str | Path) -> SavedSystem:
+    name = _safe_system_name(name)
     path = Path(data_dir) / "systems" / f"{name}.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     return SavedSystem(
