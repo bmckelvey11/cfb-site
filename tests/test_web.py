@@ -155,6 +155,19 @@ def test_web_filters_apply_to_results(tmp_path):
     assert '<strong class="negative">' + _money_won_text(expected.profit) + "</strong>" in metrics_html
 
 
+def test_web_malformed_choice_params_fall_back_to_defaults_instead_of_500(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/?bet_type=nonsense&side=sideways&total_side=whenever")
+
+    assert response.status_code == 200
+    expected = run_backtest(games, SystemFilter(side="home"))
+    metrics_html = _metrics_section(response.get_data(as_text=True))
+    assert f"{expected.wins}-{expected.losses}-{expected.pushes}, {expected.hit_rate * 100:.1f}%" in metrics_html
+
+
 def test_web_margin_chip_shows_em_dash_for_total_bet_systems(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

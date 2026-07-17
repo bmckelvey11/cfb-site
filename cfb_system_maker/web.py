@@ -317,12 +317,16 @@ def _empty_form() -> dict[str, object]:
     }
 
 
+def _valid_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
+    return value if value in allowed else default
+
+
 def _form_values() -> dict[str, object]:
     filters = _feature_filters_from_request()
     return {
-        "side": request.args.get("side", "home"),
-        "bet_type": request.args.get("bet_type", "spread"),
-        "total_side": request.args.get("total_side", "over"),
+        "side": _valid_choice(request.args.get("side", "home"), ("home", "away"), "home"),
+        "bet_type": _valid_choice(request.args.get("bet_type", "spread"), ("spread", "total"), "spread"),
+        "total_side": _valid_choice(request.args.get("total_side", "over"), ("over", "under"), "over"),
         "favorite": request.args.get("favorite") == "on",
         "underdog": request.args.get("underdog") == "on",
         "home": request.args.get("home") == "on",
@@ -345,9 +349,9 @@ def _form_values() -> dict[str, object]:
 def _form_values_from_post() -> dict[str, object]:
     filters = _feature_filters_from_request()
     return {
-        "side": request.form.get("side", "home"),
-        "bet_type": request.form.get("bet_type", "spread"),
-        "total_side": request.form.get("total_side", "over"),
+        "side": _valid_choice(request.form.get("side", "home"), ("home", "away"), "home"),
+        "bet_type": _valid_choice(request.form.get("bet_type", "spread"), ("spread", "total"), "spread"),
+        "total_side": _valid_choice(request.form.get("total_side", "over"), ("over", "under"), "over"),
         "favorite": request.form.get("favorite") == "on",
         "underdog": request.form.get("underdog") == "on",
         "home": request.form.get("home") == "on",
