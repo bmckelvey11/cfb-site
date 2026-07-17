@@ -22,7 +22,7 @@
 
 - [x] **MODAL-01**: Clicking a filter in the sidebar opens a popup modal instead of expanding it inline
 - [x] **MODAL-02**: Modal header shows live Record/Money Won/ROI chips that recompute as the user adjusts the filter's controls, before saving
-- [ ] **MODAL-03**: Numeric filters show a dual-handle range slider with BETWEEN-value inputs plus a per-value money-won chart across the filter's domain
+- [x] **MODAL-03**: Numeric filters show a dual-handle range slider with BETWEEN-value inputs plus a per-value money-won chart across the filter's domain
 - [x] **MODAL-04**: Categorical/list filters show a searchable, sortable table of value → Record/ROI/Money
 - [x] **MODAL-05**: Modal shows an "About Filter" panel with the feature's exact definition text
 - [x] **MODAL-06**: Saving a filter in the modal commits it to the system and closes the modal; canceling discards the change
@@ -68,7 +68,7 @@ None currently deferred — see Out of Scope for explicit exclusions instead.
 | DATA-02 | Phase 3 | Complete |
 | MODAL-01 | Phase 4 | Complete |
 | MODAL-02 | Phase 4 | Complete |
-| MODAL-03 | Phase 4 | Pending |
+| MODAL-03 | Phase 4 | Complete |
 | MODAL-04 | Phase 4 | Complete |
 | MODAL-05 | Phase 4 | Complete |
 | MODAL-06 | Phase 4 | Complete |
