@@ -113,3 +113,4 @@ class SavedSystem:
     name: str
     saved_at: str
     system: SystemFilter
+    theory: str = ""

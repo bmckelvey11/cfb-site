@@ -76,11 +76,12 @@ def _optional_float(value: str) -> float | None:
     return float(value) if value != "" else None
 
 
-def save_system(name: str, system: SystemFilter, data_dir: str | Path) -> Path:
+def save_system(name: str, system: SystemFilter, data_dir: str | Path, theory: str = "") -> Path:
     saved = SavedSystem(
         name=name,
         saved_at=datetime.now(timezone.utc).isoformat(),
         system=system,
+        theory=theory,
     )
     path = Path(data_dir) / "systems" / f"{name}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -92,6 +93,17 @@ def load_system(name: str, data_dir: str | Path) -> SystemFilter:
     path = Path(data_dir) / "systems" / f"{name}.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     return _system_from_dict(payload)
+
+
+def load_saved_system(name: str, data_dir: str | Path) -> SavedSystem:
+    path = Path(data_dir) / "systems" / f"{name}.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return SavedSystem(
+        name=str(payload.get("name", name)),
+        saved_at=str(payload.get("saved_at", "")),
+        system=_system_from_dict(payload),
+        theory=str(payload.get("theory", "")),
+    )
 
 
 def list_systems(data_dir: str | Path) -> list[str]:
@@ -106,6 +118,7 @@ def _system_to_dict(saved: SavedSystem) -> dict[str, Any]:
     return {
         "name": saved.name,
         "saved_at": saved.saved_at,
+        "theory": saved.theory,
         "system": {
             "bet_type": system.bet_type,
             "side": system.side,
