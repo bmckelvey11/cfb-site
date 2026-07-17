@@ -41,6 +41,67 @@ def test_normalize_joins_games_to_consensus_lines():
     assert record.total == 52.5
 
 
+def test_line_less_game_contributes_zero_records():
+    # DATA-01 floor gate (D-02): a game whose betting row has an empty `lines`
+    # list yields no GameRecord. This is the clean pre-2013 behavior — 2012 has
+    # games but zero usable lines, so it contributes 0 rows.
+    games = [
+        {
+            "id": 42,
+            "season": 2012,
+            "week": 1,
+            "homeTeam": "Alabama",
+            "awayTeam": "Michigan",
+            "homePoints": 41,
+            "awayPoints": 14,
+        }
+    ]
+    lines = [{"id": 42, "lines": []}]
+
+    assert normalize_games(games, lines, provider="consensus") == []
+
+
+def test_all_unusable_lines_contribute_zero_records():
+    # A betting row whose lines all lack both spread and overUnder is line-less
+    # under _select_line ("require a usable line") and contributes 0 rows.
+    games = [
+        {
+            "id": 43,
+            "season": 2012,
+            "week": 1,
+            "homeTeam": "Ohio State",
+            "awayTeam": "Purdue",
+            "homePoints": 29,
+            "awayPoints": 22,
+        }
+    ]
+    lines = [{"id": 43, "lines": [{"provider": "consensus", "spread": None, "overUnder": None}]}]
+
+    assert normalize_games(games, lines, provider="consensus") == []
+
+
+def test_usable_line_contributes_one_record():
+    # Floor season (2013) is non-empty: a game with a usable consensus line
+    # yields exactly one GameRecord.
+    games = [
+        {
+            "id": 44,
+            "season": 2013,
+            "week": 1,
+            "homeTeam": "Clemson",
+            "awayTeam": "Georgia",
+            "homePoints": 38,
+            "awayPoints": 35,
+        }
+    ]
+    lines = [{"id": 44, "lines": [{"provider": "consensus", "spread": -3.5, "overUnder": 62.5}]}]
+
+    records = normalize_games(games, lines, provider="consensus")
+
+    assert len(records) == 1
+    assert records[0].season == 2013
+
+
 def test_normalize_uses_first_usable_line_when_provider_missing():
     games = [
         {
