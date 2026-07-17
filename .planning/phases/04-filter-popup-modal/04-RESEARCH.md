@@ -454,7 +454,7 @@ This ordering makes the server contract testable before browser behavior depends
 |---|-------|---------|---------------|
 | — | None. Recommendations are grounded in locked context, live code, local measurements, or cited official documentation. | — | — |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 No blocking product decisions remain; D-01 through D-23 determine the behavior. The planner still needs to choose exact JSON field names, chart point cap, and whether numeric List view is fetched lazily, all explicitly within Claude's discretion as long as exact bounds/live metrics are preserved. [VERIFIED: CONTEXT Claude's Discretion and D-09]
 
