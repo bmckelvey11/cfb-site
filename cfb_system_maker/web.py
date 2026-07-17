@@ -18,7 +18,7 @@ from cfb_system_maker.features import (
     resolve_feature_value,
 )
 from cfb_system_maker.models import BacktestResult, FeatureFilter, GameRecord, SystemFilter
-from cfb_system_maker.storage import list_systems, load_processed_games, load_system, save_system
+from cfb_system_maker.storage import list_systems, load_processed_games, load_saved_system, load_system, save_system
 
 _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
     "favorite": ("favorite",),
@@ -65,8 +65,9 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         load_error = None
         if loaded_name:
             try:
-                system = load_system(loaded_name, app.config["DATA_DIR"])
-                form = _form_from_system(system, loaded_name)
+                saved = load_saved_system(loaded_name, app.config["DATA_DIR"])
+                system = saved.system
+                form = _form_from_system(system, loaded_name, saved.theory)
             except FileNotFoundError:
                 load_error = f"System '{loaded_name}' not found."
                 form = _form_values()
@@ -112,7 +113,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         name = str(form.get("save_name", "")).strip()
         if not name:
             return redirect(url_for("index"))
-        save_system(name, _system_from_form(form), app.config["DATA_DIR"])
+        save_system(name, _system_from_form(form), app.config["DATA_DIR"], theory=form.get("theory", ""))
         return redirect(url_for("index", **{"load_system": name}))
 
     @app.get("/compare")
@@ -335,7 +336,8 @@ def _form_values() -> dict[str, object]:
         "max_spread": request.args.get("max_spread", ""),
         "min_total": request.args.get("min_total", ""),
         "max_total": request.args.get("max_total", ""),
-        "save_name": "",
+        "save_name": request.args.get("save_name", ""),
+        "theory": request.args.get("theory", ""),
         "feature_filters": filters,
     }
 
@@ -360,6 +362,7 @@ def _form_values_from_post() -> dict[str, object]:
         "min_total": request.form.get("min_total", ""),
         "max_total": request.form.get("max_total", ""),
         "save_name": request.form.get("save_name", ""),
+        "theory": request.form.get("theory", ""),
         "feature_filters": filters,
     }
 
@@ -375,7 +378,7 @@ def _active_filter(feature_filters: list[dict[str, object]], key: str) -> dict[s
     return None
 
 
-def _form_from_system(system: SystemFilter, loaded_name: str) -> dict[str, object]:
+def _form_from_system(system: SystemFilter, loaded_name: str, theory: str = "") -> dict[str, object]:
     return {
         "side": system.side,
         "bet_type": system.bet_type,
@@ -394,6 +397,7 @@ def _form_from_system(system: SystemFilter, loaded_name: str) -> dict[str, objec
         "min_total": system.min_total if system.min_total is not None else "",
         "max_total": system.max_total if system.max_total is not None else "",
         "save_name": loaded_name,
+        "theory": theory,
         "feature_filters": [
             {
                 "key": filt.key,

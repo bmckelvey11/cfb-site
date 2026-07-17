@@ -409,6 +409,7 @@ def test_web_loaded_system_remove_link_materializes_and_drops_load_system(tmp_pa
             "total_side": "over",
             "underdog": "on",
             "min_spread": "3",
+            "theory": "Fade home dogs late season.",
         },
     )
 
@@ -417,11 +418,13 @@ def test_web_loaded_system_remove_link_materializes_and_drops_load_system(tmp_pa
     html = response.get_data(as_text=True)
     assert "the team is an underdog" in html
     assert "the spread is at least 3" in html
+    assert "Fade home dogs late season." in html
 
     href = _remove_href_for(html, "Remove filter: the team is an underdog")
     assert "load_system" not in href
     assert "save_name=two-filters" in href
     assert "tab=matches" in href
+    assert "theory=" in href
 
     second_response = client.get("/" + href)
     assert second_response.status_code == 200
@@ -430,6 +433,7 @@ def test_web_loaded_system_remove_link_materializes_and_drops_load_system(tmp_pa
     assert "the team is an underdog" not in second_html
     assert "the spread is at least 3" in second_html
     assert 'name="underdog" checked' not in second_html
+    assert "Fade home dogs late season." in second_html
     # save_name survives as URL state (carried in the tab-nav href, which preserves the full query string)
     graph_link_match = re.search(r'<a href="([^"]*)"[^>]*>Results Graph</a>', second_html)
     assert graph_link_match is not None
@@ -460,3 +464,77 @@ def test_web_active_filter_sentence_renders_with_remove_control(tmp_path):
     html = response.get_data(as_text=True)
     assert "the team is a favorite" in html
     assert 'aria-label="Remove filter: the team is a favorite"' in html
+
+
+def test_web_save_and_load_system_preserves_theory(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    save_response = client.post(
+        "/save",
+        data={
+            "save_name": "theory-system",
+            "bet_type": "spread",
+            "side": "home",
+            "total_side": "over",
+            "theory": "Fade the public.",
+        },
+    )
+    assert save_response.status_code == 302
+
+    load_response = client.get("/?load_system=theory-system")
+    html = load_response.get_data(as_text=True)
+    assert 'name="theory"' in html
+    assert "Fade the public." in html
+
+
+def test_web_fresh_index_does_not_render_theory_panel(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "theory-panel" not in html
+
+
+def test_web_theory_round_trips_through_get_form_submission(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/?theory=Unsaved+hypothesis&save_name=draft")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'name="theory"' in html
+    assert "Unsaved hypothesis" in html
+    assert 'class="theory-panel"' in html
+    assert 'value="draft"' in html
+
+
+def test_web_theory_is_escaped_and_never_rendered_via_safe_filter(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/save",
+        data={
+            "save_name": "xss-theory",
+            "bet_type": "spread",
+            "side": "home",
+            "total_side": "over",
+            "theory": '<script>alert(1)</script> "quoted"',
+        },
+    )
+
+    response = client.get("/?load_system=xss-theory")
+    html = response.get_data(as_text=True)
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html

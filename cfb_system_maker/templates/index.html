@@ -182,6 +182,8 @@
           <p class="feature-disabled">Run <code>python -m cfb_system_maker enrich --data-dir data</code> to enable feature filters.</p>
           {% endif %}
 
+          <label class="theory-field full-width">Theory<textarea name="theory" placeholder="Add the theory behind your system.">{{ form.theory }}</textarea></label>
+
           <div class="form-actions">
             <button type="submit">Run System</button>
             <label class="save-inline">Save as
@@ -229,6 +231,13 @@
             <article><span>ROI</span><strong class="{{ 'positive' if result.roi > 0 else 'negative' if result.roi < 0 else '' }}">{{ "%.2f%%"|format(result.roi * 100) }}</strong></article>
             <article><span>Grade</span><strong>&mdash;</strong></article>
           </section>
+
+          {% if form.theory %}
+          <section class="theory-panel">
+            <h3>Theory</h3>
+            <p>{{ form.theory }}</p>
+          </section>
+          {% endif %}
 
           <section class="active-filters-panel">
             {% if sentences %}

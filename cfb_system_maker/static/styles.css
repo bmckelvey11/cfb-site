@@ -195,6 +195,17 @@ button:hover {
   background: var(--accent-dark);
 }
 
+.theory-field textarea {
+  min-height: 80px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
 .range-filter {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -267,6 +278,21 @@ button:hover {
 
 .metrics strong {
   font-size: 22px;
+}
+
+.theory-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 18px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.theory-panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
 }
 
 .active-filters-panel {
