@@ -70,3 +70,42 @@ def test_load_saved_system_backward_compatible_with_missing_theory_key(tmp_path)
 
     loaded = load_saved_system("legacy", tmp_path)
     assert loaded.theory == ""
+
+
+def test_save_load_system_round_trips_fade(tmp_path):
+    save_system("faded", SystemFilter(side="home", fade=True), tmp_path)
+
+    loaded = load_saved_system("faded", tmp_path)
+    assert loaded.system.fade is True
+
+
+def test_load_saved_system_backward_compatible_with_missing_fade_key(tmp_path):
+    systems_dir = tmp_path / "systems"
+    systems_dir.mkdir(parents=True)
+    payload = {
+        "name": "legacy",
+        "saved_at": "2020-01-01T00:00:00+00:00",
+        "system": {
+            "bet_type": "spread",
+            "side": "home",
+            "total_side": "over",
+            "seasons": [],
+            "weeks": [],
+            "teams": [],
+            "conferences": [],
+            "favorite": False,
+            "underdog": False,
+            "home": False,
+            "away": False,
+            "providers": [],
+            "min_spread": None,
+            "max_spread": None,
+            "min_total": None,
+            "max_total": None,
+            "feature_filters": [],
+        },
+    }
+    (systems_dir / "legacy.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    loaded = load_saved_system("legacy", tmp_path)
+    assert loaded.system.fade is False

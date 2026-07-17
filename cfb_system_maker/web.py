@@ -222,7 +222,7 @@ def _query_args_from_form(form: dict[str, object]) -> MultiDict:
         ("side", str(form.get("side", "home"))),
         ("total_side", str(form.get("total_side", "over"))),
     ]
-    for key in ("favorite", "underdog", "home", "away"):
+    for key in ("favorite", "underdog", "home", "away", "fade"):
         if form.get(key):
             args.append((key, "on"))
     for form_key, query_key in (
@@ -303,6 +303,7 @@ def _empty_form() -> dict[str, object]:
         "underdog": False,
         "home": False,
         "away": False,
+        "fade": False,
         "season": "",
         "week": "",
         "team": "",
@@ -331,6 +332,7 @@ def _form_values() -> dict[str, object]:
         "underdog": request.args.get("underdog") == "on",
         "home": request.args.get("home") == "on",
         "away": request.args.get("away") == "on",
+        "fade": request.args.get("fade") == "on",
         "season": request.args.get("filter_seasons", request.args.get("season", "")),
         "week": request.args.get("filter_weeks", request.args.get("week", "")),
         "team": request.args.get("filter_teams", request.args.get("team", "")),
@@ -356,6 +358,7 @@ def _form_values_from_post() -> dict[str, object]:
         "underdog": request.form.get("underdog") == "on",
         "home": request.form.get("home") == "on",
         "away": request.form.get("away") == "on",
+        "fade": request.form.get("fade") == "on",
         "season": request.form.get("filter_seasons", ""),
         "week": request.form.get("filter_weeks", ""),
         "team": request.form.get("filter_teams", ""),
@@ -391,6 +394,7 @@ def _form_from_system(system: SystemFilter, loaded_name: str, theory: str = "") 
         "underdog": system.underdog,
         "home": system.home,
         "away": system.away,
+        "fade": system.fade,
         "season": next(iter(system.seasons), "") if len(system.seasons) == 1 else "",
         "week": next(iter(system.weeks), "") if len(system.weeks) == 1 else "",
         "team": next(iter(system.teams), "") if len(system.teams) == 1 else "",
@@ -477,6 +481,7 @@ def _system_from_form(form: dict[str, object]) -> SystemFilter:
         underdog=bool(form["underdog"]),
         home=bool(form["home"]),
         away=bool(form["away"]),
+        fade=bool(form["fade"]),
         providers=_str_set(str(form["provider"])),
         min_spread=_optional_float(str(form["min_spread"])),
         max_spread=_optional_float(str(form["max_spread"])),

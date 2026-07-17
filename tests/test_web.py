@@ -355,6 +355,43 @@ def test_web_tab_switch_preserves_load_system_and_round_trips(tmp_path):
     assert "Money Won Over Time" in second_html
 
 
+def test_web_tab_switch_preserves_load_system_and_round_trips_fade(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/save",
+        data={
+            "save_name": "away-dogs-fade",
+            "bet_type": "spread",
+            "side": "away",
+            "total_side": "over",
+            "underdog": "on",
+            "min_spread": "3",
+            "fade": "on",
+        },
+    )
+
+    response = client.get("/?load_system=away-dogs-fade&tab=matches")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'name="fade" form="filters-form" checked' in html
+
+    match = re.search(r'<a href="([^"]*)"[^>]*>Results Graph</a>', html)
+    assert match is not None
+    graph_href = match.group(1).replace("&amp;", "&")
+    assert "tab=graph" in graph_href
+    assert "load_system=away-dogs-fade" in graph_href
+
+    second_response = client.get("/" + graph_href)
+    assert second_response.status_code == 200
+    second_html = second_response.get_data(as_text=True)
+    assert "load_system=away-dogs-fade" in second_html
+    assert 'name="fade" form="filters-form" checked' in second_html
+
+
 def _remove_href_for(html: str, aria_label: str) -> str:
     match = re.search(
         r'<a class="remove-filter" href="([^"]*)" aria-label="' + re.escape(aria_label) + r'">',
@@ -454,6 +491,39 @@ def test_web_loaded_system_remove_link_materializes_and_drops_load_system(tmp_pa
     assert 'aria-current="page">Past Matches</a>' in second_html
 
 
+def test_web_loaded_system_remove_link_preserves_fade(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/save",
+        data={
+            "save_name": "two-filters-fade",
+            "bet_type": "spread",
+            "side": "away",
+            "total_side": "over",
+            "underdog": "on",
+            "min_spread": "3",
+            "fade": "on",
+        },
+    )
+
+    response = client.get("/?load_system=two-filters-fade&tab=matches")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'name="fade" form="filters-form" checked' in html
+
+    href = _remove_href_for(html, "Remove filter: the team is an underdog")
+    assert "fade=on" in href
+
+    second_response = client.get("/" + href)
+    assert second_response.status_code == 200
+    second_html = second_response.get_data(as_text=True)
+    assert 'name="fade" form="filters-form" checked' in second_html
+
+
 def test_web_no_active_filters_shows_empty_state_copy(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
@@ -501,6 +571,29 @@ def test_web_save_and_load_system_preserves_theory(tmp_path):
     html = load_response.get_data(as_text=True)
     assert 'name="theory"' in html
     assert "Fade the public." in html
+
+
+def test_web_save_and_load_system_preserves_fade(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    save_response = client.post(
+        "/save",
+        data={
+            "save_name": "faded-system",
+            "bet_type": "spread",
+            "side": "home",
+            "total_side": "over",
+            "fade": "on",
+        },
+    )
+    assert save_response.status_code == 302
+
+    load_response = client.get("/?load_system=faded-system")
+    html = load_response.get_data(as_text=True)
+    assert 'name="fade" form="filters-form" checked' in html
 
 
 def test_web_fresh_index_does_not_render_theory_panel(tmp_path):

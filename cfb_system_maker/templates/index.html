@@ -17,7 +17,7 @@
           </div>
         </div>
 
-        <form method="get" class="filters" autocomplete="off">
+        <form id="filters-form" method="get" class="filters" autocomplete="off">
           <fieldset>
             <legend>Bet Type</legend>
             <select name="bet_type">
@@ -222,6 +222,7 @@
               <h2>Backtest Results</h2>
               <p>Showing first {{ bets|length }} matched bets.</p>
             </div>
+            <label class="check"><input type="checkbox" name="fade" form="filters-form" {% if form.fade %}checked{% endif %}> Fade System</label>
           </header>
 
           <section class="metrics stat-chips" aria-label="Backtest metrics">
