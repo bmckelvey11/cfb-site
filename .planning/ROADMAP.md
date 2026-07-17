@@ -68,11 +68,11 @@ Plans:
   2. User sees a System Grade letter rendered in the stat-chip header's Grade slot, computed from sample size vs significance, ROI z-score, season sign-consistency, permutation p-value, and filter/value-count overfitting penalties.
   3. The Fade toggle state persists across save and reload of the system.
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Fade toggle: fade-flip grading logic, CLI --fade flag, storage/web round-trip, checkbox UI — INTG-01
+- [x] 02-01-PLAN.md — Fade toggle: fade-flip grading logic, CLI --fade flag, storage/web round-trip, checkbox UI — INTG-01
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -135,7 +135,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. System Editor Main Page | 5/5 | Complete    | 2026-07-17 |
-| 2. Integrity — Fade & Grade | 0/2 | Not started | - |
+| 2. Integrity — Fade & Grade | 1/2 | In Progress|  |
 | 3. Data Depth & Breadth | 0/TBD | Not started | - |
 | 4. Filter Popup Modal | 0/TBD | Not started | - |
 | 5. Dashboard & Current Matches | 0/TBD | Not started | - |

@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 2
-current_phase_name: Integrity — Fade & Grade
+current_phase: 02
+current_phase_name: integrity-fade-grade
 status: executing
-stopped_at: Phase 2 UI-SPEC approved
-last_updated: "2026-07-17T09:17:26.236Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-07-17T10:09:47.752Z"
 last_activity: 2026-07-17
-last_activity_desc: Phase 01 complete, transitioned to Phase 2
+last_activity_desc: Phase 02 execution started
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
 ---
 
 # Project State
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-17)
 
 **Core value:** A saved system's main page reads like a Bet Labs system editor (stat chips, cumulative money-won graph, plain-English active filters) and configuring any filter opens a live popup — slider or value table, per-value Record/ROI/Money, before you commit — instead of static inline form fields.
-**Current focus:** Phase 2 — Integrity — Fade & Grade
+**Current focus:** Phase 02 — integrity-fade-grade
 
 ## Current Position
 
-Phase: 2 — Integrity — Fade & Grade
-Plan: Not started
+Phase: 02 (integrity-fade-grade) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-07-17 — Phase 01 complete, transitioned to Phase 2
+Last activity: 2026-07-17 — Phase 02 execution started
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 11min | 2 tasks | 5 files |
 | Phase 01 P04 | 10min | 2 tasks | 4 files |
 | Phase 01 P05 | 15min | 2 tasks | 7 files |
+| Phase 02 P01 | 25min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - Roadmap: Data extension (DATA-01/02) sequenced as Phase 3 — after the UI phases that don't need it (Editor, Integrity), before the UI phases that benefit from it (Modal, Dashboard).
 - Phase 1: All query-href construction (`_query_href`/`_query_href_removing`) and free-text rendering (`theory`) use `urlencode`/Jinja auto-escape exclusively, no `\|safe` — this pattern must be followed by any new href/text-rendering surface added in Phase 2+.
 - Phase 1: T-01-03 accepted risk (`01-SECURITY.md`) — `describe()` silently drops a known-key feature filter whose `(op, control)` combo it doesn't render, though `feature_ok()` still applies it. Revisit if `FEATURE_REGISTRY` grows new op/control combos.
+- [Phase ?]: Phase 2 Plan 1: Fade toggle checkbox lives outside filters-form's DOM (inside .workspace-header per D-01/UI-SPEC) and associates via HTML5 form="filters-form" attribute, matching favorite/underdog/home/away pattern.
+- [Phase ?]: Phase 2 Plan 1: Fade is read exclusively inside grade_bet/_grade_total_bet, never inside matches_system -- new boolean toggle fields must follow this grading-only pattern to preserve matched-count invariance (D-03).
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-17T08:26:07.589Z
-Stopped at: Phase 2 UI-SPEC approved
-Resume file: .planning/phases/02-integrity-fade-grade/02-UI-SPEC.md
+Last session: 2026-07-17T10:09:47.725Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
