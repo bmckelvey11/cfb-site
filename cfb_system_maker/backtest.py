@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import random
+from dataclasses import replace
 from typing import Any
 
 from cfb_system_maker.features import feature_ok
@@ -47,6 +48,23 @@ def run_backtest(
         stats=compute_system_stats(details, hit_rate=hit_rate, roi=roi, american_odds=american_odds, stake=stake),
         season_breakdown=tuple(compute_season_breakdown(details, stake=stake)),
     )
+
+
+def split_holdout(
+    system: SystemFilter,
+    holdout_seasons: set[int],
+    available_seasons: set[int],
+) -> tuple[SystemFilter, SystemFilter]:
+    base_seasons = system.seasons if system.seasons else available_seasons
+    in_sample_seasons = base_seasons - holdout_seasons
+    holdout_only_seasons = base_seasons & holdout_seasons
+    # empty means "no restriction" in matches_system; use a sentinel so an
+    # empty split yields zero bets, not everything.
+    if not in_sample_seasons:
+        in_sample_seasons = {-1}
+    if not holdout_only_seasons:
+        holdout_only_seasons = {-1}
+    return replace(system, seasons=in_sample_seasons), replace(system, seasons=holdout_only_seasons)
 
 
 def compute_season_breakdown(details: list[BetDetail], *, stake: float = 1.0) -> list[SeasonRecord]:

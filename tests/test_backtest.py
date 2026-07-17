@@ -1,4 +1,4 @@
-from cfb_system_maker.backtest import compute_season_breakdown, compute_system_stats, run_backtest, sign_consistency
+from cfb_system_maker.backtest import compute_season_breakdown, compute_system_stats, run_backtest, sign_consistency, split_holdout
 from cfb_system_maker.models import BetDetail, FeatureFilter, GameRecord, SeasonRecord, SystemFilter
 
 
@@ -283,3 +283,42 @@ def test_permutation_test_defaults_to_no_signal_with_zero_decided_bets():
     stats = compute_system_stats([], hit_rate=0.0, roi=0.0, american_odds=-110, stake=1.0)
 
     assert stats.permutation_p_value == 1.0
+
+
+def test_split_holdout_separates_in_sample_and_holdout_seasons():
+    system = SystemFilter(side="home", seasons={2020, 2021, 2022, 2023})
+
+    in_sample, holdout = split_holdout(system, {2023}, {2020, 2021, 2022, 2023})
+
+    assert in_sample.seasons == {2020, 2021, 2022}
+    assert holdout.seasons == {2023}
+
+
+def test_split_holdout_uses_available_seasons_when_system_has_no_season_filter():
+    system = SystemFilter(side="home")  # empty seasons = unrestricted
+
+    in_sample, holdout = split_holdout(system, {2023}, {2020, 2021, 2022, 2023})
+
+    assert in_sample.seasons == {2020, 2021, 2022}
+    assert holdout.seasons == {2023}
+
+
+def test_split_holdout_returns_sentinel_holdout_when_no_overlap_remains():
+    system = SystemFilter(side="home", seasons={2023})
+
+    in_sample, holdout = split_holdout(system, {2020}, {2020, 2021, 2022, 2023})
+
+    # 2020 isn't in the system's own season set -> holdout side must match
+    # nothing, not fall back to "no restriction" (empty set means unrestricted
+    # in matches_system, so an empty result here must use the sentinel instead).
+    assert holdout.seasons == {-1}
+    assert in_sample.seasons == {2023}
+
+
+def test_split_holdout_returns_sentinel_in_sample_when_holdout_covers_all_seasons():
+    system = SystemFilter(side="home", seasons={2023})
+
+    in_sample, holdout = split_holdout(system, {2023}, {2020, 2021, 2022, 2023})
+
+    assert in_sample.seasons == {-1}
+    assert holdout.seasons == {2023}
