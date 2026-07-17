@@ -14,7 +14,7 @@
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: System Editor Main Page** - The main page reads like a Bet Labs system editor: stat chips, cumulative money-won graph, plain-English filter sentences, tabs, and a theory field. (completed 2026-07-17)
-- [ ] **Phase 2: Integrity — Fade & Grade** - Users can fade a system to grade the opposite side and see a composite letter grade in the stat-chip header.
+- [x] **Phase 2: Integrity — Fade & Grade** - Users can fade a system to grade the opposite side and see a composite letter grade in the stat-chip header. (completed 2026-07-17)
 - [ ] **Phase 3: Data Depth & Breadth** - Historical coverage extends further back than 2013 and more CFBD/GraphQL endpoints are wired into the feature registry as filterable features.
 - [ ] **Phase 4: Filter Popup Modal** - Clicking any filter opens a live-recalculating popup (slider or value table, live Record/Money/ROI, About Filter) instead of static inline fields.
 - [ ] **Phase 5: Dashboard & Current Matches** - A My Systems dashboard replaces the editor as the landing page, and saved systems are evaluated live against upcoming games.
@@ -135,7 +135,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. System Editor Main Page | 5/5 | Complete    | 2026-07-17 |
-| 2. Integrity — Fade & Grade | 2/2 | In Progress|  |
+| 2. Integrity — Fade & Grade | 2/2 | Complete    | 2026-07-17 |
 | 3. Data Depth & Breadth | 0/TBD | Not started | - |
 | 4. Filter Popup Modal | 0/TBD | Not started | - |
 | 5. Dashboard & Current Matches | 0/TBD | Not started | - |
