@@ -107,6 +107,7 @@ class BacktestResult:
     stats: SystemStats | None = None
     season_breakdown: tuple[SeasonRecord, ...] = ()
     average_margin: float | None = None
+    grade: str | None = None
 
 
 @dataclass(frozen=True)

@@ -34,7 +34,7 @@ def run_backtest(
     hit_rate = round(wins / decided, 4) if decided else 0.0
     roi = round(profit / risked, 4) if risked else 0.0
 
-    return BacktestResult(
+    result = BacktestResult(
         bets=bets,
         wins=wins,
         losses=losses,
@@ -49,6 +49,7 @@ def run_backtest(
         season_breakdown=tuple(compute_season_breakdown(details, stake=stake)),
         average_margin=(round(sum(bet.margin for bet in details) / bets, 4) if bets and system.bet_type == "spread" else None),
     )
+    return replace(result, grade=compute_grade(result, system))
 
 
 def split_holdout(
@@ -94,6 +95,112 @@ def compute_season_breakdown(details: list[BetDetail], *, stake: float = 1.0) ->
 def sign_consistency(records: list[SeasonRecord]) -> tuple[int, int]:
     profitable = sum(1 for record in records if record.roi > 0)
     return profitable, len(records)
+
+
+_GRADE_BANDS: tuple[tuple[float, str], ...] = (
+    (0.85, "A"),
+    (0.70, "B"),
+    (0.55, "C"),
+    (0.35, "D"),
+    (0.00, "F"),
+)
+
+
+def _sample_size_score(decided: int, wilson_low: float, break_even_rate: float) -> float:
+    if decided < 30:
+        return 0.0
+    margin = wilson_low - break_even_rate
+    if margin < 0.0:
+        return 0.0
+    if margin < 0.02:
+        return 0.3
+    if margin < 0.05:
+        return 0.6
+    if margin < 0.10:
+        return 0.8
+    return 1.0
+
+
+def _roi_significance_score(z_score: float) -> float:
+    if z_score < 0:
+        return 0.0
+    if z_score < 1.0:
+        return 0.2
+    if z_score < 1.645:
+        return 0.5
+    if z_score < 1.96:
+        return 0.75
+    return 1.0
+
+
+def _consistency_score(profitable: int, total_seasons: int) -> float:
+    if total_seasons == 0:
+        return 0.0
+    return profitable / total_seasons
+
+
+def _permutation_score(p_value: float) -> float:
+    if p_value < 0.01:
+        return 1.0
+    if p_value < 0.05:
+        return 0.8
+    if p_value < 0.10:
+        return 0.5
+    if p_value < 0.20:
+        return 0.25
+    return 0.0
+
+
+def _overfit_score(active_filter_value_count: int) -> float:
+    if active_filter_value_count <= 3:
+        return 1.0
+    if active_filter_value_count <= 7:
+        return 0.75
+    if active_filter_value_count <= 14:
+        return 0.5
+    if active_filter_value_count <= 24:
+        return 0.25
+    return 0.0
+
+
+def count_overfit_filters(system: SystemFilter) -> int:
+    count = 0
+    for flag in (system.favorite, system.underdog, system.home, system.away):
+        if flag:
+            count += 1
+    for bound in (system.min_spread, system.max_spread, system.min_total, system.max_total):
+        if bound is not None:
+            count += 1
+    if system.providers:
+        count += 1
+    for values in (system.teams, system.conferences, system.seasons, system.weeks):
+        count += len(values)
+    for filt in system.feature_filters:
+        if filt.op == "in" and isinstance(filt.value, (list, tuple, set)):
+            count += len(filt.value)
+        else:
+            count += 1
+    return count
+
+
+def compute_grade(result: BacktestResult, system: SystemFilter) -> str | None:
+    if result.bets == 0:
+        return None
+    decided = result.wins + result.losses
+    stats = result.stats
+    profitable, total_seasons = sign_consistency(result.season_breakdown)
+    scores = [
+        _sample_size_score(decided, stats.wilson_low, stats.break_even_rate),
+        _roi_significance_score(stats.z_score),
+        _consistency_score(profitable, total_seasons),
+        _permutation_score(stats.permutation_p_value),
+        _overfit_score(count_overfit_filters(system)),
+    ]
+    average = sum(scores) / len(scores)
+    for threshold, letter in _GRADE_BANDS:
+        if average >= threshold:
+            return letter
+    return "F"
 
 
 def matches_system(
