@@ -37,7 +37,7 @@
 ### Data
 
 - [ ] **DATA-01**: Historical game/line coverage is backfilled further back than the current 2013 floor where CFBD coverage allows
-- [ ] **DATA-02**: Additional CFBD REST/GraphQL endpoints (weather, player/coach, advanced stats, and other available fields) are wired into `FEATURE_REGISTRY` as new filterable features, following the existing no-lookahead / entering-game convention
+- [x] **DATA-02**: Additional CFBD REST/GraphQL endpoints (weather, player/coach, advanced stats, and other available fields) are wired into `FEATURE_REGISTRY` as new filterable features, following the existing no-lookahead / entering-game convention
 
 ## v2 Requirements
 
@@ -65,7 +65,7 @@ None currently deferred — see Out of Scope for explicit exclusions instead.
 | INTG-01 | Phase 2 | Complete |
 | INTG-02 | Phase 2 | Complete |
 | DATA-01 | Phase 3 | Pending |
-| DATA-02 | Phase 3 | Pending |
+| DATA-02 | Phase 3 | Complete |
 | MODAL-01 | Phase 4 | Pending |
 | MODAL-02 | Phase 4 | Pending |
 | MODAL-03 | Phase 4 | Pending |
