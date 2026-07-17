@@ -242,6 +242,17 @@
           </section>
           {% endif %}
 
+          {% if coverage %}
+          <section class="coverage" aria-label="Feature filter coverage">
+            <h3>Filter Coverage</h3>
+            <ul>
+              {% for item in coverage %}
+                <li><strong>{{ item.label }}</strong>: {{ item.pct }}% of core-filtered games have a value (null values fail closed)</li>
+              {% endfor %}
+            </ul>
+          </section>
+          {% endif %}
+
           <section class="filter-detail">
             <div class="range-chart" aria-label="Money Won by Line Range">
               <h3>Money Won</h3>

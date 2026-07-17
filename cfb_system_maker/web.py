@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from flask import Flask, redirect, render_template, request, url_for
 
-from cfb_system_maker.backtest import run_backtest
+from cfb_system_maker.backtest import matches_system, run_backtest
 from cfb_system_maker.enrich import load_features, load_features_meta
-from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, registry_version
+from cfb_system_maker.features import (
+    FEATURE_BY_KEY,
+    FEATURE_REGISTRY,
+    FeatureDef,
+    registry_version,
+    resolve_feature_value,
+)
 from cfb_system_maker.models import BacktestResult, FeatureFilter, GameRecord, SystemFilter
 from cfb_system_maker.storage import list_systems, load_processed_games, load_system, save_system
 
@@ -53,6 +59,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             system = _system_from_form(form)
 
         result = run_backtest(games, system, feature_map=feature_map)
+        coverage = _feature_coverage(games, system, feature_map)
         return render_template(
             "index.html",
             error=None,
@@ -69,6 +76,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             result_dict=asdict(result),
             bets=result.bet_details[:250],
             chart=_range_chart(result),
+            coverage=coverage,
         )
 
     @app.post("/save")
@@ -85,6 +93,33 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         return "", 204
 
     return app
+
+
+def _feature_coverage(
+    games: list[GameRecord],
+    system: SystemFilter,
+    feature_map: dict[int, dict] | None,
+) -> list[dict[str, object]]:
+    if not system.feature_filters or feature_map is None:
+        return []
+    core = replace(system, feature_filters=())
+    matched = [game for game in games if matches_system(game, core, feature_map)]
+    if not matched:
+        return []
+    output: list[dict[str, object]] = []
+    for filt in system.feature_filters:
+        feature = FEATURE_BY_KEY.get(filt.key)
+        if feature is None:
+            continue
+        non_null = 0
+        for game in matched:
+            value = resolve_feature_value(feature_map.get(game.game_id, {}), feature, filt, core)
+            if filt.perspective == "either" and isinstance(value, tuple):
+                value = value[0] if value[0] is not None else value[1]
+            if value is not None:
+                non_null += 1
+        output.append({"key": filt.key, "label": feature.label, "pct": round(100 * non_null / len(matched), 1)})
+    return output
 
 
 def _try_load_features(data_dir: Path) -> dict[int, dict] | None:

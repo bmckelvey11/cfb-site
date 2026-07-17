@@ -51,3 +51,25 @@ def test_stale_registry_warning_shows_only_for_old_sidecar(tmp_path):
     save_features(tmp_path, rows)
     html = create_app(tmp_path).test_client().get("/").get_data(as_text=True)
     assert "older field registry" not in html
+
+
+def test_coverage_panel_reports_non_null_share(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    from cfb_system_maker.storage import save_processed_games
+
+    save_processed_games(tmp_path, games)
+    rows = {}
+    for index, game in enumerate(games):
+        rows[str(game.game_id)] = {"weather_temperature": 50.0 if index == 0 else None}
+    save_features(tmp_path, rows)
+
+    app = create_app(tmp_path)
+    html = app.test_client().get(
+        "/?side=home&ff_enable=weather_temperature&ff_key=weather_temperature&ff_op=gte&ff_value=1&ff_perspective=single"
+    ).get_data(as_text=True)
+    assert "Filter Coverage" in html
+    assert "Temperature (F)" in html
+
+    # No enabled filters: panel absent
+    html = app.test_client().get("/?side=home").get_data(as_text=True)
+    assert "Filter Coverage" not in html

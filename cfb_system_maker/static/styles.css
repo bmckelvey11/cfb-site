@@ -416,3 +416,12 @@ code {
   padding: 8px 10px;
   font-size: 0.85rem;
 }
+
+.coverage {
+  font-size: 0.85rem;
+  margin: 12px 0;
+}
+.coverage ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
