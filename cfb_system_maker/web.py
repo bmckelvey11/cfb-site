@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flask import Flask, redirect, render_template, request, url_for
 
-from cfb_system_maker.backtest import matches_system, run_backtest
+from cfb_system_maker.backtest import matches_system, run_backtest, sign_consistency
 from cfb_system_maker.enrich import load_features, load_features_meta
 from cfb_system_maker.features import (
     FEATURE_BY_KEY,
@@ -77,6 +77,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             bets=result.bet_details[:250],
             chart=_range_chart(result),
             coverage=coverage,
+            season_sign_consistency=sign_consistency(result.season_breakdown),
         )
 
     @app.post("/save")

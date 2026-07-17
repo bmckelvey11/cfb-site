@@ -103,3 +103,17 @@ def test_web_save_and_load_system(tmp_path):
     assert "away-dogs" in html
     assert 'name="underdog" checked' in html
     assert 'name="min_spread" value="3' in html
+
+
+def test_web_index_shows_per_season_breakdown_and_permutation_p(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/?side=home&favorite=on")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Per-Season Breakdown" in html
+    assert "Permutation p" in html
+    assert "Profitable in" in html

@@ -237,9 +237,29 @@
             <article><span>Edge</span><strong>{{ "%.2f%%"|format(result.stats.edge * 100) }}</strong></article>
             <article><span>Wilson CI</span><strong>{{ "%.1f"|format(result.stats.wilson_low * 100) }}–{{ "%.1f"|format(result.stats.wilson_high * 100) }}%</strong></article>
             <article><span>p-value</span><strong>{{ "%.4f"|format(result.stats.p_value) }}</strong></article>
+            <article><span>Permutation p</span><strong>{{ "%.4f"|format(result.stats.permutation_p_value) }}</strong></article>
             <article><span>ROI t-stat</span><strong>{{ "%.2f"|format(result.stats.roi_t_stat) }}</strong></article>
             <article><span>Streaks</span><strong>W{{ result.stats.max_win_streak }} / L{{ result.stats.max_loss_streak }}</strong></article>
             {% if result.stats.low_sample %}<article class="warning"><span>Sample</span><strong>Low n</strong></article>{% endif %}
+          </section>
+          {% endif %}
+
+          {% if result.season_breakdown %}
+          <section class="table-wrap season-breakdown" aria-label="Per-season breakdown">
+            <h3>Per-Season Breakdown</h3>
+            <p>Profitable in {{ season_sign_consistency[0] }}/{{ season_sign_consistency[1] }} seasons</p>
+            <table>
+              <thead><tr><th>Season</th><th>W-L-P</th><th>ROI</th></tr></thead>
+              <tbody>
+                {% for record in result.season_breakdown %}
+                  <tr>
+                    <td>{{ record.season }}</td>
+                    <td>{{ record.wins }}-{{ record.losses }}-{{ record.pushes }}</td>
+                    <td class="{{ 'positive' if record.roi > 0 else 'negative' if record.roi < 0 else '' }}">{{ "%.2f%%"|format(record.roi * 100) }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </section>
           {% endif %}
 
