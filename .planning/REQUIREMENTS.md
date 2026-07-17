@@ -11,7 +11,7 @@
 - [x] **EDIT-02**: User sees a stat-chip header (Record, Margin, Money Won, ROI, Grade) instead of the current plain metrics row
 - [x] **EDIT-03**: User sees each active filter rendered as a plain-English sentence (e.g. "the spread is between -14 and -3") instead of raw form controls, with a way to remove it
 - [x] **EDIT-04**: User can switch between Results Graph and Past Matches views via tabs on the same page
-- [ ] **EDIT-05**: User can write and save a free-text "theory" (hypothesis) on a saved system, shown above its filter list
+- [x] **EDIT-05**: User can write and save a free-text "theory" (hypothesis) on a saved system, shown above its filter list
 
 ### Integrity (fade, grade)
 
@@ -61,7 +61,7 @@ None currently deferred — see Out of Scope for explicit exclusions instead.
 | EDIT-02 | Phase 1 | Complete |
 | EDIT-03 | Phase 1 | Complete |
 | EDIT-04 | Phase 1 | Complete |
-| EDIT-05 | Phase 1 | Pending |
+| EDIT-05 | Phase 1 | Complete |
 | INTG-01 | Phase 2 | Pending |
 | INTG-02 | Phase 2 | Pending |
 | DATA-01 | Phase 3 | Pending |

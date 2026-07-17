@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 01
 current_phase_name: system-editor-main-page
-status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-07-17T05:58:23.508Z"
+status: verifying
+stopped_at: Completed 01-05-PLAN.md
+last_updated: "2026-07-17T06:09:38.479Z"
 last_activity: 2026-07-17
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-07-16)
 
 Phase: 01 (system-editor-main-page) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-17 — Phase 01 execution started
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [████████░░] 80%
 | Phase 01 P03 | 4min | 2 tasks | 2 files |
 | Phase 01 P02 | 11min | 2 tasks | 5 files |
 | Phase 01 P04 | 10min | 2 tasks | 4 files |
+| Phase 01 P05 | 15min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 1, Plan 2]: Bets table moved behind ?tab=matches; two pre-existing tests updated to request tab=matches since they asserted on default-view bets-table HTML.
 - [Phase ?]: 01-04: _query_href_removing() index-aligns ff_key/ff_op/ff_value/ff_perspective by position but removes ff_enable by value match (subset list, never index-parallel to the other four).
 - [Phase ?]: 01-04: _query_args_from_form() materializes a loaded SavedSystem's canonical query state so ?load_system=name remove-links are real, followable filter removals instead of no-ops.
+- [Phase ?]: 01-05: load_system()/_system_from_dict() left completely unchanged; new load_saved_system() added instead, reusing _system_from_dict() internally to keep cli.py's --load contract untouched.
+- [Phase ?]: 01-05: Theory text renders via bare Jinja auto-escaping only (no |safe) at both sidebar textarea and workspace panel; enforced by grep + a behavioral stored-XSS test.
 
 ### Pending Todos
 
@@ -98,6 +101,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-17T05:58:23.496Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-07-17T06:09:38.463Z
+Stopped at: Completed 01-05-PLAN.md
 Resume file: None
