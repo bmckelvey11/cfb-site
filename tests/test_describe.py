@@ -113,6 +113,34 @@ def test_describe_feature_filter_numeric_gte_and_lte():
     assert {"text": f"{label} is at most 32.5", "key": "ff:weather_temperature"} in lte_result
 
 
+def test_describe_feature_filter_numeric_gte_lte_coalesces_to_between():
+    label = FEATURE_BY_KEY["weather_temperature"].label
+    system = SystemFilter(
+        feature_filters=(
+            FeatureFilter(key="weather_temperature", op="gte", value=40.0),
+            FeatureFilter(key="weather_temperature", op="lte", value=70.0),
+        )
+    )
+    result = describe(system)
+    between = [row for row in result if row["key"] == "ff:weather_temperature"]
+    assert between == [{"text": f"{label} is between 40 and 70", "key": "ff:weather_temperature"}]
+
+
+def test_describe_feature_filter_numeric_exact_and_perspective_coalesce():
+    label = FEATURE_BY_KEY["returning_ppa"].label
+    exact = describe(
+        SystemFilter(
+            feature_filters=(
+                FeatureFilter(key="returning_ppa", op="gte", value=0.5, perspective="bet_side"),
+                FeatureFilter(key="returning_ppa", op="lte", value=0.5, perspective="bet_side"),
+            )
+        )
+    )
+    assert {"text": f"Bet-side {label} is exactly 0.5", "key": "ff:returning_ppa"} in exact
+    keys = [row["key"] for row in exact if row["key"] == "ff:returning_ppa"]
+    assert keys == ["ff:returning_ppa"]
+
+
 def test_describe_unknown_feature_key_renders_warning_sentence():
     system = SystemFilter(feature_filters=(FeatureFilter(key="does_not_exist", op="eq", value=True),))
     result = describe(system)

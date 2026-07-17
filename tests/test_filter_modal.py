@@ -390,3 +390,114 @@ def test_categorical_boolean_save_commit_serialization_contract():
     assert "requestSubmit" in save_block or "filtersForm.submit" in save_block
     assert 'opEl.value = "in"' in source
     assert 'opEl.value = "eq"' in source
+
+
+def test_serialize_numeric_draft_core_and_feature_pairs():
+    from cfb_system_maker.web import serialize_numeric_draft
+
+    spread = serialize_numeric_draft("core:spread_range", -14.0, -3.0)
+    assert spread == {"min_spread": -14.0, "max_spread": -3.0}
+
+    total = serialize_numeric_draft("core:total_range", 40.0, 55.0)
+    assert total == {"min_total": 40.0, "max_total": 55.0}
+
+    feature = serialize_numeric_draft(
+        "feature:weather_temperature", 50.0, 80.0, perspective="single"
+    )
+    assert feature == {
+        "feature_filters": [
+            {
+                "key": "weather_temperature",
+                "op": "gte",
+                "value": 50.0,
+                "perspective": "single",
+            },
+            {
+                "key": "weather_temperature",
+                "op": "lte",
+                "value": 80.0,
+                "perspective": "single",
+            },
+        ]
+    }
+
+
+def test_downsample_chart_points_caps_at_60_preserves_domain_extremes():
+    from cfb_system_maker.web import downsample_chart_points
+
+    rows = [
+        {
+            "value": float(i),
+            "description": str(i),
+            "wins": 1,
+            "losses": 0,
+            "pushes": 0,
+            "record": "1-0-0",
+            "roi": 0.1,
+            "money": float(i) - 50,
+        }
+        for i in range(120)
+    ]
+    points = downsample_chart_points(rows, cap=60)
+    assert len(points) <= 60
+    assert len(points) < len(rows)
+    values = [point["value"] for point in points]
+    assert min(values) == 0.0
+    assert max(values) == 119.0
+    for point in points:
+        assert "money" in point
+        assert "x" in point and "y" in point
+
+
+def test_filter_detail_numeric_domain_rows_and_chart_points(tmp_path):
+    games = [
+        _game(i, season=2023, week=i, home_points=28, away_points=21, spread=-float(i), total=40.0 + i)
+        for i in range(1, 71)
+    ]
+    save_processed_games(tmp_path, games)
+    temps = {str(i): {"weather_temperature": 30.0 + i} for i in range(1, 71)}
+    save_features(tmp_path, temps)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    feature_resp = client.get("/filter-detail?candidate_id=feature:weather_temperature&side=home")
+    assert feature_resp.status_code == 200
+    feature_payload = feature_resp.get_json()
+    assert feature_payload["control"] == "numeric"
+    assert feature_payload["domain"]["min"] == 31.0
+    assert feature_payload["domain"]["max"] == 100.0
+    assert len(feature_payload["rows"]) == 70
+    assert len(feature_payload["chart_points"]) <= 60
+    assert len(feature_payload["chart_points"]) < 70
+
+    spread_resp = client.get("/filter-detail?candidate_id=core:spread_range&side=away")
+    assert spread_resp.status_code == 200
+    spread_payload = spread_resp.get_json()
+    assert spread_payload["control"] == "numeric"
+    # Away side: side-relative spread = -home_spread; home spreads were -1..-70 → away +1..+70
+    assert spread_payload["domain"]["min"] == 1.0
+    assert spread_payload["domain"]["max"] == 70.0
+    assert len(spread_payload["rows"]) == 70
+    assert len(spread_payload["chart_points"]) <= 60
+
+    total_resp = client.get("/filter-detail?candidate_id=core:total_range&side=home")
+    assert total_resp.status_code == 200
+    total_payload = total_resp.get_json()
+    assert total_payload["domain"]["min"] == 41.0
+    assert total_payload["domain"]["max"] == 110.0
+
+
+def test_serialize_numeric_draft_rejects_reversed_or_nonfinite():
+    from cfb_system_maker.web import StrictParseError, serialize_numeric_draft
+
+    try:
+        serialize_numeric_draft("core:spread_range", -3.0, -14.0)
+        assert False, "expected StrictParseError"
+    except StrictParseError as exc:
+        assert exc.error == "reversed_bounds"
+
+    try:
+        serialize_numeric_draft("core:total_range", float("nan"), 50.0)
+        assert False, "expected StrictParseError"
+    except StrictParseError as exc:
+        assert exc.error == "invalid_bounds"
