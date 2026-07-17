@@ -161,9 +161,13 @@
                   {% endif %}
                 </legend>
                 {% for feature in group.features %}
-                  {% set active = namespace(filt=none) %}
+                  {% set active = namespace(filt=none, gte=none, lte=none) %}
                   {% for filt in form.feature_filters %}
-                    {% if filt.key == feature.key %}{% set active.filt = filt %}{% endif %}
+                    {% if filt.key == feature.key %}
+                      {% set active.filt = filt %}
+                      {% if filt.op == 'gte' %}{% set active.gte = filt %}{% endif %}
+                      {% if filt.op == 'lte' %}{% set active.lte = filt %}{% endif %}
+                    {% endif %}
                   {% endfor %}
                   <div class="filter-launch-row">
                     <button
@@ -185,6 +189,42 @@
                             {{ feature.label }}
                           </label>
                         </summary>
+                        {% if feature.control == "numeric" %}
+                          {% set perspective = (active.gte or active.lte or active.filt).perspective if (active.gte or active.lte or active.filt) else 'single' %}
+                          <div class="feature-row" data-numeric-bound="min">
+                            {% if feature.team_scoped %}
+                              <select name="ff_perspective">
+                                <option value="home" {% if perspective == 'home' %}selected{% endif %}>Home</option>
+                                <option value="away" {% if perspective == 'away' %}selected{% endif %}>Away</option>
+                                {% if form.bet_type == "spread" %}
+                                  <option value="bet_side" {% if perspective == 'bet_side' %}selected{% endif %}>Bet-side</option>
+                                  <option value="opponent" {% if perspective == 'opponent' %}selected{% endif %}>Opponent</option>
+                                {% else %}
+                                  <option value="either" {% if perspective == 'either' %}selected{% endif %}>Either</option>
+                                {% endif %}
+                              </select>
+                            {% else %}
+                              <input type="hidden" name="ff_perspective" value="single">
+                            {% endif %}
+                            <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                            <input type="hidden" name="ff_op" value="gte">
+                            <label>Min <input name="ff_value" type="number" step="any" data-bound="min"
+                              value="{% if active.gte %}{{ active.gte.value }}{% endif %}"
+                              placeholder="{% if feature.min_value is not none %}{{ feature.min_value }}{% endif %}"></label>
+                          </div>
+                          <div class="feature-row" data-numeric-bound="max">
+                            {% if feature.team_scoped %}
+                              <input type="hidden" name="ff_perspective" value="{{ perspective }}">
+                            {% else %}
+                              <input type="hidden" name="ff_perspective" value="single">
+                            {% endif %}
+                            <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                            <input type="hidden" name="ff_op" value="lte">
+                            <label>Max <input name="ff_value" type="number" step="any" data-bound="max"
+                              value="{% if active.lte %}{{ active.lte.value }}{% endif %}"
+                              placeholder="{% if feature.max_value is not none %}{{ feature.max_value }}{% endif %}"></label>
+                          </div>
+                        {% else %}
                         <div class="feature-row">
                           {% if feature.team_scoped %}
                             <select name="ff_perspective">
@@ -204,12 +244,9 @@
                           <select name="ff_op">
                             {% if feature.control == "bool" %}
                               <option value="eq" {% if active.filt and active.filt.op == 'eq' %}selected{% endif %}>is</option>
-                            {% elif feature.control == "categorical" %}
+                            {% else %}
                               <option value="eq" {% if active.filt and active.filt.op == 'eq' %}selected{% endif %}>equals</option>
                               <option value="in" {% if active.filt and active.filt.op == 'in' %}selected{% endif %}>in list</option>
-                            {% else %}
-                              <option value="gte" {% if active.filt and active.filt.op == 'gte' %}selected{% endif %}>≥</option>
-                              <option value="lte" {% if active.filt and active.filt.op == 'lte' %}selected{% endif %}>≤</option>
                             {% endif %}
                           </select>
                           {% if feature.control == "bool" %}
@@ -217,15 +254,12 @@
                               <option value="true" {% if active.filt and active.filt.value == true %}selected{% endif %}>Yes</option>
                               <option value="false" {% if active.filt and active.filt.value == false %}selected{% endif %}>No</option>
                             </select>
-                          {% elif feature.control == "categorical" %}
+                          {% else %}
                             <input name="ff_value" placeholder="value or comma list"
                               value="{% if active.filt %}{{ active.filt.value if active.filt.value is string else active.filt.value|join(',') }}{% endif %}">
-                          {% else %}
-                            <input name="ff_value" type="number" step="any"
-                              value="{% if active.filt %}{{ active.filt.value }}{% endif %}"
-                              placeholder="{% if feature.min_value is not none %}{{ feature.min_value }}–{{ feature.max_value }}{% endif %}">
                           {% endif %}
                         </div>
+                        {% endif %}
                       </details>
                     </div>
                   </div>
@@ -445,12 +479,17 @@
               <strong id="filter-modal-roi">0%</strong>
             </article>
           </div>
+          <div id="filter-modal-view-toggle" class="filter-modal__view-toggle" hidden role="group" aria-label="Chart or List">
+            <button type="button" id="filter-modal-view-chart" data-view="chart" aria-pressed="true">Chart</button>
+            <button type="button" id="filter-modal-view-list" data-view="list" aria-pressed="false">List</button>
+          </div>
           <p id="filter-modal-status" class="filter-modal__status" aria-live="polite"></p>
           <button type="button" class="filter-modal__close" id="filter-modal-close" aria-label="Close filter dialog">✕</button>
         </header>
         <div class="filter-modal__body">
           <div class="filter-modal__main">
             <div id="filter-modal-controls" class="filter-modal__controls"></div>
+            <div id="filter-modal-explore" class="filter-modal__explore"></div>
             <p id="filter-modal-empty" class="filter-modal__hint" hidden>No bets match this draft.</p>
           </div>
           <aside class="filter-modal__about" aria-label="About Filter">

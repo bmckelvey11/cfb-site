@@ -10,6 +10,7 @@
   const titleEl = document.getElementById("filter-modal-title");
   const aboutEl = document.getElementById("filter-modal-about");
   const controlsEl = document.getElementById("filter-modal-controls");
+  const exploreEl = document.getElementById("filter-modal-explore");
   const emptyEl = document.getElementById("filter-modal-empty");
   const statusEl = document.getElementById("filter-modal-status");
   const recordEl = document.getElementById("filter-modal-record");
@@ -18,6 +19,9 @@
   const saveBtn = document.getElementById("filter-modal-save");
   const cancelBtn = document.getElementById("filter-modal-cancel");
   const closeBtn = document.getElementById("filter-modal-close");
+  const viewToggle = document.getElementById("filter-modal-view-toggle");
+  const viewChartBtn = document.getElementById("filter-modal-view-chart");
+  const viewListBtn = document.getElementById("filter-modal-view-list");
 
   const CORE_PARAM = {
     "core:season": "filter_seasons",
@@ -25,6 +29,11 @@
     "core:team": "filter_teams",
     "core:conference": "filter_conferences",
     "core:provider": "filter_providers",
+  };
+
+  const CORE_RANGE_FIELDS = {
+    "core:spread_range": { min: "min_spread", max: "max_spread" },
+    "core:total_range": { min: "min_total", max: "max_total" },
   };
 
   let launcher = null;
@@ -128,6 +137,60 @@
     };
   }
 
+  function committedNumericBounds(candidateId) {
+    const fields = CORE_RANGE_FIELDS[candidateId];
+    if (fields) {
+      const minEl = filtersForm.querySelector('[name="' + fields.min + '"]');
+      const maxEl = filtersForm.querySelector('[name="' + fields.max + '"]');
+      const minRaw = minEl ? String(minEl.value || "").trim() : "";
+      const maxRaw = maxEl ? String(maxEl.value || "").trim() : "";
+      if (minRaw === "" && maxRaw === "") {
+        return null;
+      }
+      return {
+        min: minRaw === "" ? null : Number(minRaw),
+        max: maxRaw === "" ? null : Number(maxRaw),
+        perspective: "single",
+      };
+    }
+    if (candidateId.indexOf("feature:") !== 0) {
+      return null;
+    }
+    const fallback = document.querySelector('[data-fallback-for="' + candidateId + '"]');
+    if (!fallback) {
+      return null;
+    }
+    const enable = fallback.querySelector('input[name="ff_enable"]');
+    if (!enable || !enable.checked) {
+      return null;
+    }
+    const minInput = fallback.querySelector('[data-bound="min"]');
+    const maxInput = fallback.querySelector('[data-bound="max"]');
+    const perspectiveEl = fallback.querySelector('[name="ff_perspective"]');
+    const minRaw = minInput ? String(minInput.value || "").trim() : "";
+    const maxRaw = maxInput ? String(maxInput.value || "").trim() : "";
+    if (minRaw === "" && maxRaw === "") {
+      return null;
+    }
+    return {
+      min: minRaw === "" ? null : Number(minRaw),
+      max: maxRaw === "" ? null : Number(maxRaw),
+      perspective: perspectiveEl ? perspectiveEl.value : "single",
+    };
+  }
+
+  function boundsAreValid() {
+    if (!state || state.kind !== "numeric") {
+      return false;
+    }
+    const min = Number(state.min);
+    const max = Number(state.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return false;
+    }
+    return min <= max;
+  }
+
   function draftQuery() {
     const params = new URLSearchParams(new FormData(filtersForm));
     if (!state) {
@@ -174,6 +237,44 @@
         params.append("ff_value", state.selected.map(String).join(","));
         params.append("ff_perspective", state.perspective || "single");
       }
+    } else if (state.kind === "numeric" && boundsAreValid()) {
+      const fields = CORE_RANGE_FIELDS[state.candidateId];
+      if (fields) {
+        params.set(fields.min, String(state.min));
+        params.set(fields.max, String(state.max));
+      } else if (state.featureKey) {
+        const key = state.featureKey;
+        const enables = params.getAll("ff_enable").filter((item) => item !== key);
+        const keys = params.getAll("ff_key");
+        const ops = params.getAll("ff_op");
+        const values = params.getAll("ff_value");
+        const perspectives = params.getAll("ff_perspective");
+        params.delete("ff_enable");
+        params.delete("ff_key");
+        params.delete("ff_op");
+        params.delete("ff_value");
+        params.delete("ff_perspective");
+        enables.forEach((item) => params.append("ff_enable", item));
+        keys.forEach((item, index) => {
+          if (item === key) {
+            return;
+          }
+          params.append("ff_key", item);
+          params.append("ff_op", ops[index] || "eq");
+          params.append("ff_value", values[index] || "");
+          params.append("ff_perspective", perspectives[index] || "single");
+        });
+        params.append("ff_enable", key);
+        params.append("ff_key", key);
+        params.append("ff_op", "gte");
+        params.append("ff_value", String(state.min));
+        params.append("ff_perspective", state.perspective || "single");
+        params.append("ff_enable", key);
+        params.append("ff_key", key);
+        params.append("ff_op", "lte");
+        params.append("ff_value", String(state.max));
+        params.append("ff_perspective", state.perspective || "single");
+      }
     }
     return params;
   }
@@ -187,6 +288,12 @@
       liveOk = false;
       setUpdating(false);
       statusEl.textContent = "Choose Yes or No.";
+      return;
+    }
+    if (state.kind === "numeric" && !boundsAreValid()) {
+      saveBtn.disabled = true;
+      liveOk = false;
+      setUpdating(false);
       return;
     }
     setUpdating(true);
@@ -228,10 +335,29 @@
       return;
     }
     if (state.kind === "numeric") {
-      saveBtn.disabled = !liveOk;
+      saveBtn.disabled = !(liveOk && boundsAreValid());
       return;
     }
     saveBtn.disabled = !liveOk;
+  }
+
+  function setViewToggleVisible(visible) {
+    if (!viewToggle) {
+      return;
+    }
+    viewToggle.hidden = !visible;
+    if (!visible || !state) {
+      return;
+    }
+    const isChart = state.view !== "list";
+    if (viewChartBtn) {
+      viewChartBtn.setAttribute("aria-pressed", isChart ? "true" : "false");
+      viewChartBtn.classList.toggle("is-active", isChart);
+    }
+    if (viewListBtn) {
+      viewListBtn.setAttribute("aria-pressed", isChart ? "false" : "true");
+      viewListBtn.classList.toggle("is-active", !isChart);
+    }
   }
 
   function sortedVisibleRows() {
@@ -299,6 +425,9 @@
 
   function renderValueTable() {
     controlsEl.innerHTML = "";
+    if (exploreEl) {
+      exploreEl.innerHTML = "";
+    }
     if (!state) {
       return;
     }
@@ -308,6 +437,10 @@
       empty.className = "filter-modal__hint";
       empty.textContent = "No values in range";
       controlsEl.appendChild(empty);
+      const body = document.createElement("p");
+      body.className = "filter-modal__hint";
+      body.textContent = "No observed values remain after the rest of this system. Adjust other filters, or cancel.";
+      controlsEl.appendChild(body);
       return;
     }
 
@@ -426,12 +559,292 @@
     controlsEl.appendChild(wrap);
   }
 
-  function renderNumericPlaceholder() {
+  function syncBoundInputs(source) {
+    if (!state || state.kind !== "numeric") {
+      return;
+    }
+    let min = Number(state.min);
+    let max = Number(state.max);
+    if (source === "minRange" || source === "minNumber") {
+      if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
+        max = min;
+        state.max = max;
+      }
+    } else if (source === "maxRange" || source === "maxNumber") {
+      if (Number.isFinite(min) && Number.isFinite(max) && max < min) {
+        min = max;
+        state.min = min;
+      }
+    }
+    const minRange = controlsEl.querySelector('[data-role="min-range"]');
+    const maxRange = controlsEl.querySelector('[data-role="max-range"]');
+    const minNumber = controlsEl.querySelector('[data-role="min-number"]');
+    const maxNumber = controlsEl.querySelector('[data-role="max-number"]');
+    const hint = controlsEl.querySelector('[data-role="bound-hint"]');
+    if (minRange) {
+      minRange.value = String(state.min);
+    }
+    if (maxRange) {
+      maxRange.value = String(state.max);
+    }
+    if (minNumber) {
+      minNumber.value = String(state.min);
+    }
+    if (maxNumber) {
+      maxNumber.value = String(state.max);
+    }
+    const valid = boundsAreValid();
+    if (hint) {
+      hint.hidden = valid;
+    }
+    updateSelectedSpan();
+    updateSaveEnabled();
+  }
+
+  function updateSelectedSpan() {
+    const fill = controlsEl.querySelector(".filter-modal__dual-range-fill");
+    if (!fill || !state || state.domainMin == null || state.domainMax == null) {
+      return;
+    }
+    const span = Number(state.domainMax) - Number(state.domainMin) || 1;
+    const left = ((Number(state.min) - Number(state.domainMin)) / span) * 100;
+    const right = ((Number(state.max) - Number(state.domainMin)) / span) * 100;
+    fill.style.left = Math.max(0, Math.min(100, left)) + "%";
+    fill.style.width = Math.max(0, Math.min(100, right - left)) + "%";
+  }
+
+  function renderMoneyChart() {
+    if (!exploreEl || !state) {
+      return;
+    }
+    exploreEl.innerHTML = "";
+    const points = state.chartPoints || [];
+    if (!points.length) {
+      const empty = document.createElement("p");
+      empty.className = "filter-modal__hint";
+      empty.textContent = "No values in range";
+      exploreEl.appendChild(empty);
+      return;
+    }
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 520 150");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Money by value");
+    svg.classList.add("filter-modal__chart");
+
+    const moneys = points.map((point) => Number(point.money));
+    const minMoney = Math.min(0, ...moneys);
+    const maxMoney = Math.max(0, ...moneys);
+    const span = maxMoney - minMoney || 1;
+    const zeroY = 150 - 18 - ((0 - minMoney) / span) * (150 - 36);
+
+    const zero = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    zero.setAttribute("x1", "28");
+    zero.setAttribute("x2", "492");
+    zero.setAttribute("y1", String(zeroY));
+    zero.setAttribute("y2", String(zeroY));
+    zero.setAttribute("class", "zero-line");
+    svg.appendChild(zero);
+
+    points.forEach((point) => {
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      const x = point.x != null ? point.x : 28;
+      const y = point.y != null ? point.y : zeroY;
+      circle.setAttribute("cx", String(x));
+      circle.setAttribute("cy", String(y));
+      circle.setAttribute("r", "3.5");
+      circle.setAttribute("class", Number(point.money) >= 0 ? "positive" : "negative");
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      title.textContent = String(point.value) + ": " + formatRowMoney(point.money);
+      circle.appendChild(title);
+      svg.appendChild(circle);
+    });
+    exploreEl.appendChild(svg);
+  }
+
+  function renderNumericList() {
+    if (!exploreEl || !state) {
+      return;
+    }
+    exploreEl.innerHTML = "";
+    if (!state.rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "filter-modal__hint";
+      empty.textContent = "No values in range";
+      exploreEl.appendChild(empty);
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "filter-modal__table-wrap";
+    const table = document.createElement("table");
+    table.className = "filter-modal__table";
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    ["Description", "Record", "ROI", "Money"].forEach((label) => {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = label;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    state.rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      const cells = [
+        String(row.description),
+        String(row.record),
+        formatRowRoi(row.roi),
+        formatRowMoney(row.money),
+      ];
+      cells.forEach((text, index) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        if (index === 2) {
+          if (row.roi > 0) {
+            td.className = "positive";
+          } else if (row.roi < 0) {
+            td.className = "negative";
+          }
+        }
+        if (index === 3) {
+          if (row.money > 0) {
+            td.className = "positive";
+          } else if (row.money < 0) {
+            td.className = "negative";
+          }
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    exploreEl.appendChild(wrap);
+  }
+
+  function renderNumericExplore() {
+    if (!state || state.kind !== "numeric") {
+      return;
+    }
+    if (state.view === "list") {
+      renderNumericList();
+    } else {
+      renderMoneyChart();
+    }
+    setViewToggleVisible(true);
+  }
+
+  function renderNumericControls() {
     controlsEl.innerHTML = "";
+    if (!state || state.kind !== "numeric") {
+      return;
+    }
+
+    if (state.domainMin == null || state.domainMax == null || !state.rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "filter-modal__hint";
+      empty.textContent = "No values in range";
+      controlsEl.appendChild(empty);
+      const body = document.createElement("p");
+      body.className = "filter-modal__hint";
+      body.textContent = "No observed values remain after the rest of this system. Adjust other filters, or cancel.";
+      controlsEl.appendChild(body);
+      if (exploreEl) {
+        exploreEl.innerHTML = "";
+      }
+      setViewToggleVisible(false);
+      saveBtn.disabled = true;
+      return;
+    }
+
+    const dual = document.createElement("div");
+    dual.className = "filter-modal__dual-range";
+    const track = document.createElement("div");
+    track.className = "filter-modal__dual-range-track";
+    const fill = document.createElement("div");
+    fill.className = "filter-modal__dual-range-fill";
+    track.appendChild(fill);
+
+    const minRange = document.createElement("input");
+    minRange.type = "range";
+    minRange.className = "filter-modal__range filter-modal__range--min";
+    minRange.dataset.role = "min-range";
+    minRange.min = String(state.domainMin);
+    minRange.max = String(state.domainMax);
+    minRange.step = "any";
+    minRange.value = String(state.min);
+    minRange.setAttribute("aria-label", "Minimum");
+
+    const maxRange = document.createElement("input");
+    maxRange.type = "range";
+    maxRange.className = "filter-modal__range filter-modal__range--max";
+    maxRange.dataset.role = "max-range";
+    maxRange.min = String(state.domainMin);
+    maxRange.max = String(state.domainMax);
+    maxRange.step = "any";
+    maxRange.value = String(state.max);
+    maxRange.setAttribute("aria-label", "Maximum");
+
+    minRange.addEventListener("input", () => {
+      state.min = Number(minRange.value);
+      syncBoundInputs("minRange");
+      refreshLive();
+    });
+    maxRange.addEventListener("input", () => {
+      state.max = Number(maxRange.value);
+      syncBoundInputs("maxRange");
+      refreshLive();
+    });
+
+    dual.appendChild(track);
+    dual.appendChild(minRange);
+    dual.appendChild(maxRange);
+    controlsEl.appendChild(dual);
+
+    const between = document.createElement("div");
+    between.className = "filter-modal__between";
+    const betweenLabel = document.createElement("span");
+    betweenLabel.textContent = "BETWEEN";
+    const minNumber = document.createElement("input");
+    minNumber.type = "number";
+    minNumber.dataset.role = "min-number";
+    minNumber.step = "any";
+    minNumber.value = String(state.min);
+    minNumber.setAttribute("aria-label", "Minimum");
+    const andLabel = document.createElement("span");
+    andLabel.textContent = "AND";
+    const maxNumber = document.createElement("input");
+    maxNumber.type = "number";
+    maxNumber.dataset.role = "max-number";
+    maxNumber.step = "any";
+    maxNumber.value = String(state.max);
+    maxNumber.setAttribute("aria-label", "Maximum");
+    minNumber.addEventListener("input", () => {
+      state.min = Number(minNumber.value);
+      syncBoundInputs("minNumber");
+      refreshLive();
+    });
+    maxNumber.addEventListener("input", () => {
+      state.max = Number(maxNumber.value);
+      syncBoundInputs("maxNumber");
+      refreshLive();
+    });
+    between.appendChild(betweenLabel);
+    between.appendChild(minNumber);
+    between.appendChild(andLabel);
+    between.appendChild(maxNumber);
+    controlsEl.appendChild(between);
+
     const hint = document.createElement("p");
     hint.className = "filter-modal__hint";
-    hint.textContent = "Numeric range controls open here. Save keeps the current committed range.";
+    hint.dataset.role = "bound-hint";
+    hint.textContent = "Max must be greater than or equal to min.";
+    hint.hidden = boundsAreValid();
     controlsEl.appendChild(hint);
+
+    updateSelectedSpan();
+    renderNumericExplore();
   }
 
   function writeCoreListToForm() {
@@ -506,8 +919,49 @@
     }
   }
 
+  function writeNumericToForm() {
+    if (!state || state.kind !== "numeric" || !boundsAreValid()) {
+      return;
+    }
+    const fields = CORE_RANGE_FIELDS[state.candidateId];
+    if (fields) {
+      const minEl = filtersForm.querySelector('[name="' + fields.min + '"]');
+      const maxEl = filtersForm.querySelector('[name="' + fields.max + '"]');
+      if (minEl) {
+        minEl.value = String(state.min);
+      }
+      if (maxEl) {
+        maxEl.value = String(state.max);
+      }
+      return;
+    }
+    const fallback = document.querySelector('[data-fallback-for="' + state.candidateId + '"]');
+    if (!fallback) {
+      return;
+    }
+    const enable = fallback.querySelector('input[name="ff_enable"]');
+    if (enable) {
+      enable.checked = true;
+    }
+    const minInput = fallback.querySelector('[data-bound="min"]');
+    const maxInput = fallback.querySelector('[data-bound="max"]');
+    if (minInput) {
+      minInput.value = String(state.min);
+    }
+    if (maxInput) {
+      maxInput.value = String(state.max);
+    }
+    fallback.querySelectorAll('[name="ff_perspective"]').forEach((el) => {
+      el.value = state.perspective || "single";
+    });
+  }
+
   function discardAndClose() {
     state = null;
+    setViewToggleVisible(false);
+    if (exploreEl) {
+      exploreEl.innerHTML = "";
+    }
     dialog.close();
     if (launcher) {
       launcher.focus();
@@ -521,10 +975,15 @@
     if (state.kind === "feature" && state.control === "bool" && state.selected.length !== 1) {
       return;
     }
+    if (state.kind === "numeric" && !boundsAreValid()) {
+      return;
+    }
     if (state.kind === "core-list") {
       writeCoreListToForm();
     } else if (state.kind === "feature") {
       writeFeatureToForm();
+    } else if (state.kind === "numeric") {
+      writeNumericToForm();
     }
     dialog.close();
     if (filtersForm.requestSubmit) {
@@ -532,6 +991,80 @@
     } else {
       filtersForm.submit();
     }
+  }
+
+  function openNumericCandidate(candidateId, description, lookahead) {
+    state = {
+      kind: "numeric",
+      candidateId: candidateId,
+      featureKey: candidateId.indexOf("feature:") === 0 ? candidateId.split(":").slice(1).join(":") : null,
+      control: "numeric",
+      perspective: "single",
+      min: null,
+      max: null,
+      domainMin: null,
+      domainMax: null,
+      rows: [],
+      chartPoints: [],
+      view: "chart",
+    };
+    setViewToggleVisible(false);
+    statusEl.textContent = "Loading values…";
+    const detailParams = new URLSearchParams(new FormData(filtersForm));
+    detailParams.set("candidate_id", candidateId);
+    const committed = committedNumericBounds(candidateId);
+    if (committed && committed.perspective && committed.perspective !== "single") {
+      detailParams.set("perspective", committed.perspective);
+      state.perspective = committed.perspective;
+    }
+    fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("detail_failed");
+        }
+        return response.json();
+      })
+      .then((payload) => {
+        if (payload.lookahead_warning) {
+          const warning = typeof payload.lookahead_warning === "string"
+            ? payload.lookahead_warning
+            : "lookahead — analysis only";
+          aboutEl.textContent = (payload.description || description) + "\n\n" + warning;
+        } else if (payload.description) {
+          aboutEl.textContent = payload.description;
+        } else if (lookahead) {
+          aboutEl.textContent = description + (description ? "\n\n" : "") + lookahead;
+        }
+        state.rows = payload.rows || [];
+        state.chartPoints = payload.chart_points || [];
+        state.domainMin = payload.domain && payload.domain.min != null ? Number(payload.domain.min) : null;
+        state.domainMax = payload.domain && payload.domain.max != null ? Number(payload.domain.max) : null;
+        if (payload.perspective) {
+          state.perspective = payload.perspective;
+        }
+        if (committed && committed.min != null && committed.max != null
+            && Number.isFinite(committed.min) && Number.isFinite(committed.max)) {
+          state.min = committed.min;
+          state.max = committed.max;
+        } else if (state.domainMin != null && state.domainMax != null) {
+          state.min = state.domainMin;
+          state.max = state.domainMax;
+        }
+        renderNumericControls();
+        const first = controlsEl.querySelector("input");
+        if (first) {
+          first.focus();
+        }
+        refreshLive();
+      })
+      .catch(() => {
+        statusEl.textContent = "Couldn’t load filter values.";
+        const empty = document.createElement("p");
+        empty.className = "filter-modal__hint";
+        empty.textContent = "No values in range";
+        controlsEl.appendChild(empty);
+        saveBtn.disabled = true;
+      });
   }
 
   function openCandidate(button) {
@@ -548,17 +1081,18 @@
     lastSummary = null;
     liveOk = false;
     controlsEl.innerHTML = "";
+    if (exploreEl) {
+      exploreEl.innerHTML = "";
+    }
     renderChips({ wins: 0, losses: 0, pushes: 0, money_won: 0, roi: 0 });
     dialog.showModal();
 
     if (control === "numeric") {
-      state = { kind: "numeric", candidateId: candidateId, control: control };
-      renderNumericPlaceholder();
-      refreshLive();
-      saveBtn.focus();
+      openNumericCandidate(candidateId, description, lookahead);
       return;
     }
 
+    setViewToggleVisible(false);
     const param = CORE_PARAM[candidateId] || button.getAttribute("data-param") || "";
     if (candidateId.indexOf("core:") === 0) {
       state = {
@@ -647,6 +1181,25 @@
   cancelBtn.addEventListener("click", discardAndClose);
   closeBtn.addEventListener("click", discardAndClose);
   saveBtn.addEventListener("click", saveAndSubmit);
+
+  if (viewChartBtn) {
+    viewChartBtn.addEventListener("click", () => {
+      if (!state || state.kind !== "numeric") {
+        return;
+      }
+      state.view = "chart";
+      renderNumericExplore();
+    });
+  }
+  if (viewListBtn) {
+    viewListBtn.addEventListener("click", () => {
+      if (!state || state.kind !== "numeric") {
+        return;
+      }
+      state.view = "list";
+      renderNumericExplore();
+    });
+  }
 
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();

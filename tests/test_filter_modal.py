@@ -501,3 +501,70 @@ def test_serialize_numeric_draft_rejects_reversed_or_nonfinite():
         assert False, "expected StrictParseError"
     except StrictParseError as exc:
         assert exc.error == "invalid_bounds"
+
+
+def test_filter_modal_js_numeric_range_chart_between_and_save():
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert source.count('type = "range"') >= 2
+    assert "BETWEEN" in source
+    assert "AND" in source
+    assert 'data-view="chart"' in Path("cfb_system_maker/templates/index.html").read_text(encoding="utf-8")
+    html = Path("cfb_system_maker/templates/index.html").read_text(encoding="utf-8")
+    assert ">Chart<" in html and ">List<" in html
+    assert 'view = "chart"' in source and 'view = "list"' in source
+    assert "writeNumericToForm" in source
+    assert "boundsAreValid" in source
+    assert "Max must be greater than or equal to min." in source
+    assert "filter-modal__chart" in source or "createElementNS" in source
+    save_block = source.split("function saveAndSubmit")[1].split("function ")[0]
+    assert "writeNumericToForm" in save_block
+    discard_block = source.split("function discardAndClose")[1].split("function ")[0]
+    assert "writeNumericToForm" not in discard_block
+    assert "filtersForm.submit" not in discard_block
+
+
+def test_index_has_chart_list_toggle_markup(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    html = create_app(data_dir=tmp_path).test_client().get("/").get_data(as_text=True)
+    assert 'id="filter-modal-view-toggle"' in html
+    assert ">Chart<" in html
+    assert ">List<" in html
+    assert 'name="min_spread"' in html
+    assert 'name="max_spread"' in html
+
+
+def test_numeric_save_commit_serialization_contract():
+    """Numeric Save writes paired/canonical bounds into filters-form; Cancel does not."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "function writeNumericToForm" in source
+    write_block = source.split("function writeNumericToForm")[1].split("function ")[0]
+    assert "min_spread" in write_block or "CORE_RANGE_FIELDS" in source
+    assert 'data-bound="min"' in source or "data-bound" in write_block
+    assert 'op", "gte"' in source or 'op\', \'gte\'' in source or '"gte"' in write_block
+    save_block = source.split("function saveAndSubmit")[1].split("function ")[0]
+    assert "writeNumericToForm" in save_block
+    assert "requestSubmit" in save_block or "filtersForm.submit" in save_block
+    discard_block = source.split("function discardAndClose")[1].split("function ")[0]
+    assert "writeNumericToForm" not in discard_block
+    assert "writeCoreListToForm" not in discard_block
+    assert "writeFeatureToForm" not in discard_block
+
+
+def test_numeric_feature_fallback_has_paired_gte_lte_slots(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {str(game.game_id): {"weather_temperature": 55.0} for game in games},
+    )
+    html = create_app(data_dir=tmp_path).test_client().get("/").get_data(as_text=True)
+    assert 'data-fallback-for="feature:weather_temperature"' in html
+    assert 'data-bound="min"' in html
+    assert 'data-bound="max"' in html
+    assert 'name="ff_op" value="gte"' in html or 'value="gte"' in html
+    assert 'name="ff_op" value="lte"' in html or 'value="lte"' in html
