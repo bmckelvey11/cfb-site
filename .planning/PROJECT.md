@@ -23,12 +23,12 @@ A saved system's main page reads like a Bet Labs system editor (stat chips, cumu
 - ✓ Plain-English active-filter sentences (`describe(system)`) with per-row remove links — Phase 1
 - ✓ Tabbed workspace split: Results Graph | Past Matches (Current Matches tab remains future work, see Active) — Phase 1
 - ✓ `theory` free-text field on `SavedSystem` — Phase 1
+- ✓ Fade System toggle (`fade: bool` on `SystemFilter`, flips graded side in grading only, matching untouched) — Phase 2
+- ✓ System Grade letter (composite: Wilson-margin sample size vs significance, ROI z-score, season sign-consistency, permutation p, filter-count / in-list-value-count overfitting penalties) — Phase 2
 
 ### Active
 
 - [ ] Current Matches tab: evaluate upcoming (unplayed, lines-only) games against saved systems; show matched-filter details per game
-- [ ] Fade System toggle (`fade: bool` on `SystemFilter`, flips graded side)
-- [ ] System Grade letter (composite: sample size vs significance curve, ROI z-score, season sign-consistency, permutation p, filter-count / in-list-value-count overfitting penalties)
 - [ ] Filter popup modal: replaces inline sidebar `<details>` editing. Title bar with live Record/Money Won/ROI chips that recompute as controls move. Numeric filters: dual-handle slider + BETWEEN inputs + per-value money-won dot chart. Categorical/list filters: searchable sortable table (value | Record | ROI | Money). About Filter panel with `FeatureDef.description` text. Save Filter commits.
 - [ ] `GET /filter-detail` endpoint: per-value Record/ROI/Money for a candidate feature key, current system's other filters applied, candidate excluded
 - [ ] `GET /api/backtest` JSON endpoint for live chip recalculation without full page reload
@@ -91,4 +91,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-17 after Phase 1*
+*Last updated: 2026-07-17 after Phase 2*
