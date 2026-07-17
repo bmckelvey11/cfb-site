@@ -1,7 +1,7 @@
 ---
 phase: 1
 slug: system-editor-main-page
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-07-16
@@ -22,6 +22,8 @@ created: 2026-07-16
 | Component library | none — semantic HTML rendered server-side via Jinja (`cfb_system_maker/templates/index.html`) |
 | Icon library | none — text glyphs only (e.g. "✕" for remove) plus hand-rolled inline SVG for charts, following the existing `_range_chart()` pattern (`web.py:447`). Do not introduce an icon font/library this phase. |
 | Font | `Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif` — already declared on `:root` in `cfb_system_maker/static/styles.css:15`. No new font this phase. |
+
+**Visual hierarchy:** The stat-chip header (Record/Margin/Money Won/ROI/Grade) is the primary focal point on the loaded-system view — it sits first, uses the largest new type size (22px Display), and is the first thing a returning user checks. The cumulative Money Won Over Time chart is the secondary anchor (the "is this system good" visual). The active-filter sentence list and theory panel are tertiary — supporting context, not the first thing the eye should land on.
 
 ---
 
@@ -117,11 +119,11 @@ Applicable state considerations resolved: 4 covered, 2 backstop, 0 unresolved.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS (flag resolved — visual hierarchy line added above)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** 2026-07-16
