@@ -57,6 +57,13 @@ def test_season_to_date_fields_match_running_stats_output():
     assert fields == expected
 
 
+def test_prior_off_wepa_is_team_preseason_player_agg():
+    feature = FEATURE_BY_KEY["prior_off_wepa"]
+    assert feature.group == "team_preseason"
+    assert feature.source_kind == "raw_player_agg"
+    assert feature.team_scoped is True
+
+
 def test_registry_version_changed_from_phase3_baseline():
     assert registry_version() != "69084ed55504"
 

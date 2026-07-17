@@ -79,6 +79,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         "raw_venues": {},
         "raw_conferences": {},
         "raw_pregame_wp": {},
+        "raw_player_agg": {},
         "graphql_game": {},
         "graphql_weather": {},
         "graphql_lines": {},
@@ -97,6 +98,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         _index_coaches(indexes["raw_coaches"], data_dir / "raw" / f"coaches_{season}.json", season)
         _index_havoc(indexes["raw_havoc"], data_dir / "raw" / f"game_havoc_stats_{season}.json")
         _index_raw_file(indexes["raw_pregame_wp"], data_dir / "raw" / f"pregame_win_prob_{season}.json", "gameId")
+        _index_prior_player_agg(indexes["raw_player_agg"], data_dir / "raw" / f"adjusted_player_passing_{season - 1}.json", season)
 
     _index_raw_file(indexes["raw_venues"], data_dir / "raw" / "venues.json", "id")
     _index_conferences(indexes["raw_conferences"], data_dir / "raw" / "conferences.json")
@@ -272,6 +274,10 @@ def _lookup_team_scoped(feature: FeatureDef, team: str, season: int, indexes: di
         record = bucket.get((team, season)) if bucket else None
         return _field_value(record, feature.field) if record else None
 
+    if feature.source_kind == "raw_player_agg":
+        record = indexes["raw_player_agg"].get((team, season))
+        return record.get(feature.field) if record else None
+
     if feature.source_kind == "raw_teams":
         record = indexes["raw_teams"].get((team, season))
         return _field_value(record, feature.field) if record else None
@@ -326,6 +332,26 @@ def _index_team_season_file(bucket: dict[str, dict[tuple[str, int], dict[str, An
         season = row.get("season") or row.get("year")
         if team is not None and season is not None:
             store[(str(team), int(season))] = row
+
+
+def _index_prior_player_agg(bucket: dict[tuple[str, int], dict[str, Any]], path: Path, season: int) -> None:
+    """Aggregate a prior-season player wEPA file into (team, season) team totals.
+
+    `path` is the season S-1 file; results are keyed under the current season S, so a
+    season-S game reads S-1 players only (no-lookahead). Only teams with >=1 numeric
+    wepa are stored, so an absent/empty file or a missing team yields None (fails closed).
+    """
+    if not path.exists():
+        return
+    sums: dict[str, float] = {}
+    for row in json.loads(path.read_text(encoding="utf-8")):
+        team = row.get("team")
+        wepa = row.get("wepa")
+        if team is None or isinstance(wepa, bool) or not isinstance(wepa, (int, float)):
+            continue
+        sums[str(team)] = sums.get(str(team), 0.0) + float(wepa)
+    for team, total in sums.items():
+        bucket[(team, season)] = {"prior_off_wepa": total}
 
 
 def _index_team_name_file(bucket: dict[tuple[str, int], dict[str, Any]], path: Path) -> None:
