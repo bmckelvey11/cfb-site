@@ -230,6 +230,13 @@
             <article><span>Grade</span><strong>&mdash;</strong></article>
           </section>
 
+          <nav class="tabs">
+            <a href="{{ query_href(tab='graph') }}" {% if tab == 'graph' %}aria-current="page"{% endif %}>Results Graph</a>
+            <a href="{{ query_href(tab='matches') }}" {% if tab == 'matches' %}aria-current="page"{% endif %}>Past Matches</a>
+          </nav>
+
+          {% if tab == 'graph' %}
+
           {% if result.stats %}
           <section class="metrics stats-panel" aria-label="System quality statistics">
             <article><span>Break-even</span><strong>{{ "%.2f%%"|format(result.stats.break_even_rate * 100) }}</strong></article>
@@ -287,6 +294,22 @@
             </div>
           </section>
 
+          <section class="cumulative-chart" aria-label="Money Won Over Time">
+            <h3>Money Won Over Time</h3>
+            <svg viewBox="0 0 520 150" role="img">
+              <line x1="28" x2="492" y1="{{ cumulative_chart.zero_y }}" y2="{{ cumulative_chart.zero_y }}" class="zero-line" />
+              {% if cumulative_chart.polyline %}<polyline points="{{ cumulative_chart.polyline }}" />{% endif %}
+              {% for point in cumulative_chart.points %}
+                <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4">
+                  <title>Bet {{ point.order + 1 }}: {% if point.profit >= 0 %}+{% endif %}${{ "%.2f"|format(point.profit * 100) }}</title>
+                </circle>
+              {% endfor %}
+            </svg>
+            <div class="chart-axis"><span>Bet {{ (cumulative_chart.min_x + 1) if cumulative_chart.min_x is not none else "-" }}</span><span>Bet {{ (cumulative_chart.max_x + 1) if cumulative_chart.max_x is not none else "-" }}</span></div>
+          </section>
+
+          {% else %}
+
           <section class="table-wrap">
             <table>
               <thead>
@@ -321,6 +344,8 @@
               </tbody>
             </table>
           </section>
+
+          {% endif %}
         {% endif %}
       </section>
     </main>

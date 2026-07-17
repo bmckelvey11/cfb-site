@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import asdict, replace
 from pathlib import Path
+from urllib.parse import urlencode
 
 from flask import Flask, redirect, render_template, request, url_for
+from werkzeug.datastructures import MultiDict
 
 from cfb_system_maker.backtest import matches_system, run_backtest, sign_consistency, split_holdout
 from cfb_system_maker.enrich import load_features, load_features_meta
@@ -21,6 +23,7 @@ from cfb_system_maker.storage import list_systems, load_processed_games, load_sy
 def create_app(data_dir: str | Path = "data") -> Flask:
     app = Flask(__name__)
     app.config["DATA_DIR"] = Path(data_dir)
+    app.jinja_env.globals["query_href"] = _query_href
 
     @app.get("/")
     def index():
@@ -60,6 +63,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
 
         result = run_backtest(games, system, feature_map=feature_map)
         coverage = _feature_coverage(games, system, feature_map)
+        tab = "matches" if request.args.get("tab") == "matches" else "graph"
         return render_template(
             "index.html",
             error=None,
@@ -76,8 +80,10 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             result_dict=asdict(result),
             bets=result.bet_details[:250],
             chart=_range_chart(result),
+            cumulative_chart=_cumulative_chart(result),
             coverage=coverage,
             season_sign_consistency=sign_consistency(result.season_breakdown),
+            tab=tab,
         )
 
     @app.post("/save")
@@ -180,6 +186,13 @@ def _feature_coverage(
                 non_null += 1
         output.append({"key": filt.key, "label": feature.label, "pct": round(100 * non_null / len(matched), 1)})
     return output
+
+
+def _query_href(**overrides: str) -> str:
+    copy = MultiDict(request.args.items(multi=True))
+    for key, value in overrides.items():
+        copy.setlist(key, [value])
+    return "?" + urlencode(list(copy.items(multi=True)))
 
 
 def _try_load_features(data_dir: Path) -> dict[int, dict] | None:

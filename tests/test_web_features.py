@@ -30,7 +30,7 @@ def test_unenabled_feature_filters_do_not_zero_out_matches(tmp_path):
 
     # Enabled filter with impossible value should drop matches
     response = app.test_client().get(
-        "/?side=home&ff_enable=weather_temperature&ff_key=weather_temperature&ff_op=gte&ff_value=999&ff_perspective=single"
+        "/?side=home&ff_enable=weather_temperature&ff_key=weather_temperature&ff_op=gte&ff_value=999&ff_perspective=single&tab=matches"
     )
     html = response.get_data(as_text=True)
     assert "No bets matched these filters" in html

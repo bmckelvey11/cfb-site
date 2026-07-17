@@ -138,7 +138,7 @@ def test_web_filters_apply_to_results(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?side=away&underdog=on&min_spread=3")
+    response = app.test_client().get("/?side=away&underdog=on&min_spread=3&tab=matches")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -262,3 +262,80 @@ def test_web_index_shows_per_season_breakdown_and_permutation_p(tmp_path):
     assert "Per-Season Breakdown" in html
     assert "Permutation p" in html
     assert "Profitable in" in html
+
+
+def test_web_default_tab_shows_results_graph_view(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Money Won Over Time" in html
+    assert 'class="range-chart"' in html
+    assert '<section class="table-wrap">' not in html
+
+
+def test_web_invalid_tab_value_normalizes_to_results_graph(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/?tab=garbage")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'aria-current="page">Results Graph</a>' in html
+    assert '<section class="table-wrap">' not in html
+
+
+def test_web_cumulative_chart_svg_title_shows_dollar_scaled_value(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Bet 1: +$90.91" in html
+
+
+def test_web_tab_switch_preserves_load_system_and_round_trips(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/save",
+        data={
+            "save_name": "away-dogs",
+            "bet_type": "spread",
+            "side": "away",
+            "total_side": "over",
+            "underdog": "on",
+            "min_spread": "3",
+        },
+    )
+
+    response = client.get("/?load_system=away-dogs&tab=matches")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+
+    match = re.search(r'<a href="([^"]*)"[^>]*>Results Graph</a>', html)
+    assert match is not None
+    graph_href = match.group(1).replace("&amp;", "&")
+    assert "tab=graph" in graph_href
+    assert "load_system=away-dogs" in graph_href
+
+    assert "Money Won Over Time" not in html
+    assert '<section class="table-wrap">' in html
+
+    second_response = client.get("/" + graph_href)
+    assert second_response.status_code == 200
+    second_html = second_response.get_data(as_text=True)
+    assert "load_system=away-dogs" in second_html
+    assert "Money Won Over Time" in second_html
