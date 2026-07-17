@@ -481,3 +481,41 @@ def _range_chart(result: BacktestResult) -> dict[str, object]:
         "min_x": items[0][0],
         "max_x": items[-1][0],
     }
+
+
+def _cumulative_chart(result: BacktestResult) -> dict[str, object]:
+    if not result.bet_details:
+        return {"points": [], "polyline": "", "zero_y": 75, "min_x": None, "max_x": None}
+
+    ordered = sorted(result.bet_details, key=lambda bet: (bet.season, bet.week, bet.game_id))
+
+    width = 520
+    height = 150
+    pad_x = 28
+    pad_y = 18
+
+    running = 0.0
+    running_values = []
+    for bet in ordered:
+        running = round(running + bet.profit, 4)
+        running_values.append(running)
+
+    values = running_values + [0]
+    min_profit = min(values)
+    max_profit = max(values)
+    span = max_profit - min_profit or 1
+
+    points = []
+    for index, profit in enumerate(running_values):
+        x = pad_x if len(ordered) == 1 else pad_x + (width - pad_x * 2) * index / (len(ordered) - 1)
+        y = height - pad_y - ((profit - min_profit) / span) * (height - pad_y * 2)
+        points.append({"x": round(x, 2), "y": round(y, 2), "order": index, "profit": profit})
+
+    zero_y = height - pad_y - ((0 - min_profit) / span) * (height - pad_y * 2)
+    return {
+        "points": points,
+        "polyline": " ".join(f"{point['x']},{point['y']}" for point in points),
+        "zero_y": round(zero_y, 2),
+        "min_x": 0,
+        "max_x": len(ordered) - 1,
+    }
