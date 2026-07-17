@@ -73,7 +73,7 @@ Each task was committed atomically:
 1. **Task 1: Active-filter Edit prefill + perspective defaults** - `92395bf` (test RED) + `ff8d4e5` (feat GREEN)
 2. **Task 2: Live debounce/stale/retry, a11y focus, responsive layout** - `49c97b5` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `25d0577` (docs: complete plan)
 
 ## Files Created/Modified
 
