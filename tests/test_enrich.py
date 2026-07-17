@@ -180,6 +180,46 @@ def test_enrich_success_off_fails_closed_on_dict_shaped_field(tmp_path):
     assert features["2"]["home_running_success_off"] is None
 
 
+def test_enrich_prior_off_wepa_uses_prior_season_only(tmp_path):
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+
+    # Prior season (2022): Alpha players sum to 5.0 (3.0 + 2.0).
+    (raw_dir / "adjusted_player_passing_2022.json").write_text(
+        json.dumps(
+            [
+                {"athleteId": 10, "team": "Alpha", "wepa": 3.0, "year": 2022},
+                {"athleteId": 11, "team": "Alpha", "wepa": 2.0, "year": 2022},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    # Same season (2023): sentinel that must NEVER leak into the 2023 game feature.
+    (raw_dir / "adjusted_player_passing_2023.json").write_text(
+        json.dumps([{"athleteId": 10, "team": "Alpha", "wepa": 99.0, "year": 2023}]),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, 2023, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    features = enrich_games(tmp_path, games)
+    row = features["1"]
+
+    assert row["home_prior_off_wepa"] == 5.0   # 2022 aggregation only
+    assert row["home_prior_off_wepa"] != 99.0  # 2023's own season never leaks
+    assert row["away_prior_off_wepa"] is None   # Beta absent from 2022 file -> None
+
+
+def test_enrich_prior_off_wepa_none_when_prior_file_absent(tmp_path):
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    # No adjusted_player_passing_2020.json on disk -> fails closed to None.
+
+    games = [GameRecord(1, 2021, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    features = enrich_games(tmp_path, games)
+    assert features["1"]["home_prior_off_wepa"] is None
+    assert features["1"]["away_prior_off_wepa"] is None
+
+
 def test_save_features_writes_meta_and_load_reads_both_shapes(tmp_path):
     from cfb_system_maker.enrich import load_features, load_features_meta
     from cfb_system_maker.features import registry_version
