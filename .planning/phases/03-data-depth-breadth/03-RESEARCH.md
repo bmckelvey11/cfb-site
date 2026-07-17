@@ -389,14 +389,14 @@ for season in seasons:
 | A2 | Game-average (not play-weighted) accumulation for D-03 advanced stats | DATA-02 D-03 | Wrong choice = slightly less accurate features; both are valid. Named for planner decision. |
 | A3 | D-05 prior-season player aggregation is redundant with existing `returning_production` | DATA-02 D-05 | If distinct enough, D-05 adds value; if redundant, wasted work. Flag for planner to decide/defer. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **SC-1 vs the 2013 floor (BLOCKING — needs user resolution).**
+1. **SC-1 vs the 2013 floor — ✅ RESOLVED 2026-07-17 (user: "Reframe to confirmed floor").** Accepted 2013 as the CFBD line floor; SC-1 reframed in ROADMAP.md and CONTEXT D-01 amended; DATA-01 planned as probe + guard + doc + 2012-zero-rows test (plans 03-02, 03-03). Original escalation retained below for the record.
    - What we know: CFBD betting lines start 2013 (on-disk evidence; live probe will confirm). Built data already 2013–2025.
    - What's unclear: Success Criterion 1 requires "a season filter earlier than 2013 yields non-empty results" — unsatisfiable if 2013 is the floor.
    - Recommendation: escalate to user. Options: (a) reinterpret SC-1 as "the tool correctly handles the earliest line-covered season and 2012 cleanly contributes 0 rows"; (b) accept DATA-01 as verification-only and mark SC-1 as met-by-documentation; (c) source pre-2013 lines from a non-CFBD provider (out of scope — Action Network deferred). Do not build toward SC-1 as literally worded until resolved.
 
-2. **D-05 scope.**
+2. **D-05 scope — ✅ RESOLVED (planned as minimal distinct signal in 03-04).** D-05 is a locked CONTEXT decision, so "overlaps `returning_production`" is not a sanctioned defer reason; implemented as the minimal *distinct* prior-season team signal (raw prior-season team offensive wEPA, `prior_off_wepa`), no-lookahead via prior-season aggregation only.
    - What we know: overlaps `returning_production`; only no-lookahead via prior season.
    - Recommendation: minimize or defer unless a distinct prior-season *team* signal is wanted.
 
