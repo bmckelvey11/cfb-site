@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: system-editor-main-page
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-07-17T05:44:40.537Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-07-17T05:58:23.508Z"
 last_activity: 2026-07-17
 last_activity_desc: Phase 01 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-07-16)
 ## Current Position
 
 Phase: 01 (system-editor-main-page) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-07-17 — Phase 01 execution started
 
-Progress: [██████░░░░] 60%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [██████░░░░] 60%
 | Phase 01 P01 | 8min | 2 tasks | 6 files |
 | Phase 01 P03 | 4min | 2 tasks | 2 files |
 | Phase 01 P02 | 11min | 2 tasks | 5 files |
+| Phase 01 P04 | 10min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Unknown feature_filters keys render a visible 'Unknown filter ... is unavailable' sentence in describe() instead of being silently dropped (01-REVIEWS.md finding #2, blocker).
 - [Phase ?]: Team-scoped feature sentences in describe() get a perspective-word prefix (Home/Away/Bet-side/Opponent/Either team's) matching features._perspective_to_side's vocabulary (01-REVIEWS.md finding #3).
 - [Phase ?]: [Phase 1, Plan 2]: Bets table moved behind ?tab=matches; two pre-existing tests updated to request tab=matches since they asserted on default-view bets-table HTML.
+- [Phase ?]: 01-04: _query_href_removing() index-aligns ff_key/ff_op/ff_value/ff_perspective by position but removes ff_enable by value match (subset list, never index-parallel to the other four).
+- [Phase ?]: 01-04: _query_args_from_form() materializes a loaded SavedSystem's canonical query state so ?load_system=name remove-links are real, followable filter removals instead of no-ops.
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-17T05:44:40.525Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-07-17T05:58:23.496Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
