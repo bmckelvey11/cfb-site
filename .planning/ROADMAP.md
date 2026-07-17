@@ -92,7 +92,19 @@ Plans:
   2. User sees new filter categories or features available when configuring a system (e.g. weather, player/coach, advanced stats) sourced from newly wired CFBD/GraphQL endpoints that were not present before this phase.
   3. Newly added registry features follow the existing no-lookahead convention — computable pre-game (entering-game state) or explicitly tagged into the `result_lookahead` group, verified by the existing `tests/` construct-and-assert pattern.
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — To-date advanced team stats (success rate + explosiveness, off/def) as no-lookahead computed_running features — DATA-02 (D-03, D-06, D-07)
+- [ ] 03-02-PLAN.md — Line-floor guard: empty-lines-yields-0-rows test + confirmed 2013 floor documentation — DATA-01 (D-01, D-02)
+
+**Wave 2** *(blocked on 03-01 completion)*
+
+- [ ] 03-03-PLAN.md — Live CFBD line-coverage probe (restore cfbd-python clone) + conditional pre-2013 backfill — DATA-01 (D-01)
+- [ ] 03-04-PLAN.md — Prior-season team offensive wEPA (distinct, no-lookahead team_preseason feature) — DATA-02 (D-05, D-06)
+
+**UI hint**: no
 
 ### Phase 4: Filter Popup Modal
 
@@ -136,6 +148,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. System Editor Main Page | 5/5 | Complete    | 2026-07-17 |
 | 2. Integrity — Fade & Grade | 2/2 | Complete    | 2026-07-17 |
-| 3. Data Depth & Breadth | 0/TBD | Not started | - |
+| 3. Data Depth & Breadth | 0/4 | Not started | - |
 | 4. Filter Popup Modal | 0/TBD | Not started | - |
 | 5. Dashboard & Current Matches | 0/TBD | Not started | - |
