@@ -333,7 +333,28 @@
             {% if sentences %}
             <ul class="active-filters">
               {% for row in sentences %}
-                <li>{{ row.text }} <a class="remove-filter" href="{{ row.remove_href }}" aria-label="Remove filter: {{ row.text }}">&times;</a></li>
+                <li>
+                  {{ row.text }}
+                  {% if row.edit %}
+                  <button
+                    type="button"
+                    class="edit-filter"
+                    data-candidate-id="{{ row.edit.candidate_id }}"
+                    data-control="{{ row.edit.control }}"
+                    data-param="{{ row.edit.param }}"
+                    data-description="{{ row.edit.description }}"
+                    data-label="{{ row.edit.label }}"
+                    data-team-scoped="{{ '1' if row.edit.team_scoped else '0' }}"
+                    {% if row.edit.lookahead_warning %}data-lookahead-warning="{{ row.edit.lookahead_warning }}"{% endif %}
+                    {% if row.edit.perspective is defined and row.edit.perspective %}data-perspective="{{ row.edit.perspective }}"{% endif %}
+                    {% if row.edit.min is defined and row.edit.min is not none %}data-min="{{ row.edit.min }}"{% endif %}
+                    {% if row.edit.max is defined and row.edit.max is not none %}data-max="{{ row.edit.max }}"{% endif %}
+                    aria-haspopup="dialog"
+                    aria-label="Edit filter: {{ row.text }}"
+                  >Edit</button>
+                  {% endif %}
+                  <a class="remove-filter" href="{{ row.remove_href }}" aria-label="Remove filter: {{ row.text }}">&times;</a>
+                </li>
               {% endfor %}
             </ul>
             {% else %}

@@ -41,7 +41,34 @@
   let lastSummary = null;
   let liveOk = false;
 
+  const PERSPECTIVE_OPTIONS = [
+    { value: "bet_side", label: "Bet-side" },
+    { value: "opponent", label: "Opponent" },
+    { value: "either", label: "Either" },
+  ];
+
   document.documentElement.classList.add("js");
+
+  function defaultPerspective() {
+    const betTypeEl = filtersForm.querySelector('[name="bet_type"]');
+    const betType = betTypeEl ? String(betTypeEl.value || "spread") : "spread";
+    return betType === "total" ? "either" : "bet_side";
+  }
+
+  function resolveInitialPerspective(button, committed) {
+    const teamScoped = button.getAttribute("data-team-scoped") === "1";
+    if (!teamScoped) {
+      return "single";
+    }
+    const fromEdit = button.getAttribute("data-perspective");
+    if (fromEdit) {
+      return fromEdit;
+    }
+    if (committed && committed.perspective && committed.perspective !== "single") {
+      return committed.perspective;
+    }
+    return defaultPerspective();
+  }
 
   function formatMoney(moneyWon) {
     if (moneyWon > 0) {
@@ -423,6 +450,90 @@
     }
   }
 
+  function renderPerspectiveControl(onChange) {
+    if (!state || !state.teamScoped) {
+      return;
+    }
+    const group = document.createElement("div");
+    group.className = "filter-modal__perspective";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Perspective");
+    const options = PERSPECTIVE_OPTIONS.slice();
+    if (state.perspective && !options.some((opt) => opt.value === state.perspective)) {
+      const label = state.perspective.charAt(0).toUpperCase() + state.perspective.slice(1);
+      options.unshift({ value: state.perspective, label: label });
+    }
+    options.forEach((opt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = opt.label;
+      btn.setAttribute("aria-pressed", state.perspective === opt.value ? "true" : "false");
+      if (state.perspective === opt.value) {
+        btn.classList.add("is-active");
+      }
+      btn.addEventListener("click", () => {
+        if (state.perspective === opt.value) {
+          return;
+        }
+        state.perspective = opt.value;
+        onChange();
+      });
+      group.appendChild(btn);
+    });
+    controlsEl.appendChild(group);
+  }
+
+  function reloadFeatureDetail() {
+    if (!state || (state.kind !== "feature" && !(state.kind === "numeric" && state.featureKey))) {
+      return;
+    }
+    statusEl.textContent = "Loading values…";
+    saveBtn.disabled = true;
+    liveOk = false;
+    const detailParams = new URLSearchParams(new FormData(filtersForm));
+    detailParams.set("candidate_id", state.candidateId);
+    if (state.perspective && state.perspective !== "single") {
+      detailParams.set("perspective", state.perspective);
+    }
+    fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("detail_failed");
+        }
+        return response.json();
+      })
+      .then((payload) => {
+        if (payload.description) {
+          aboutEl.textContent = payload.description;
+          if (payload.lookahead_warning) {
+            const warning = typeof payload.lookahead_warning === "string"
+              ? payload.lookahead_warning
+              : "lookahead — analysis only";
+            aboutEl.textContent = payload.description + "\n\n" + warning;
+          }
+        }
+        state.rows = payload.rows || [];
+        state.chartPoints = payload.chart_points || [];
+        if (payload.domain) {
+          state.domainMin = payload.domain.min != null ? Number(payload.domain.min) : state.domainMin;
+          state.domainMax = payload.domain.max != null ? Number(payload.domain.max) : state.domainMax;
+        }
+        if (payload.perspective) {
+          state.perspective = payload.perspective;
+        }
+        if (state.kind === "numeric") {
+          renderNumericControls();
+        } else {
+          renderValueTable();
+        }
+        refreshLive();
+      })
+      .catch(() => {
+        statusEl.textContent = "Couldn’t load filter values.";
+        saveBtn.disabled = true;
+      });
+  }
+
   function renderValueTable() {
     controlsEl.innerHTML = "";
     if (exploreEl) {
@@ -431,6 +542,8 @@
     if (!state) {
       return;
     }
+
+    renderPerspectiveControl(() => reloadFeatureDetail());
 
     if (!state.rows.length) {
       const empty = document.createElement("p");
@@ -741,6 +854,8 @@
       return;
     }
 
+    renderPerspectiveControl(() => reloadFeatureDetail());
+
     if (state.domainMin == null || state.domainMax == null || !state.rows.length) {
       const empty = document.createElement("p");
       empty.className = "filter-modal__hint";
@@ -993,13 +1108,21 @@
     }
   }
 
-  function openNumericCandidate(candidateId, description, lookahead) {
+  function openNumericCandidate(candidateId, description, lookahead, button) {
+    const committed = committedNumericBounds(candidateId);
+    const teamScoped = button ? button.getAttribute("data-team-scoped") === "1" : false;
+    const perspective = button
+      ? resolveInitialPerspective(button, committed)
+      : (committed && committed.perspective && committed.perspective !== "single"
+        ? committed.perspective
+        : "single");
     state = {
       kind: "numeric",
       candidateId: candidateId,
       featureKey: candidateId.indexOf("feature:") === 0 ? candidateId.split(":").slice(1).join(":") : null,
       control: "numeric",
-      perspective: "single",
+      teamScoped: teamScoped,
+      perspective: perspective,
       min: null,
       max: null,
       domainMin: null,
@@ -1012,10 +1135,8 @@
     statusEl.textContent = "Loading values…";
     const detailParams = new URLSearchParams(new FormData(filtersForm));
     detailParams.set("candidate_id", candidateId);
-    const committed = committedNumericBounds(candidateId);
-    if (committed && committed.perspective && committed.perspective !== "single") {
-      detailParams.set("perspective", committed.perspective);
-      state.perspective = committed.perspective;
+    if (state.perspective && state.perspective !== "single") {
+      detailParams.set("perspective", state.perspective);
     }
     fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
       .then((response) => {
@@ -1073,7 +1194,8 @@
     const control = button.getAttribute("data-control") || "categorical";
     const description = button.getAttribute("data-description") || "";
     const lookahead = button.getAttribute("data-lookahead-warning") || "";
-    titleEl.textContent = button.textContent.trim() || "Filter";
+    const label = button.getAttribute("data-label") || button.textContent.trim() || "Filter";
+    titleEl.textContent = label;
     aboutEl.textContent = description;
     if (lookahead) {
       aboutEl.textContent = description + (description ? "\n\n" : "") + lookahead;
@@ -1088,7 +1210,7 @@
     dialog.showModal();
 
     if (control === "numeric") {
-      openNumericCandidate(candidateId, description, lookahead);
+      openNumericCandidate(candidateId, description, lookahead, button);
       return;
     }
 
@@ -1099,6 +1221,7 @@
         kind: "core-list",
         candidateId: candidateId,
         control: "categorical",
+        teamScoped: false,
         param: param,
         selected: committedCoreList(param),
         rows: [],
@@ -1117,12 +1240,14 @@
       } else if (committed) {
         selected = committed.values.slice();
       }
+      const teamScoped = button.getAttribute("data-team-scoped") === "1";
       state = {
         kind: "feature",
         candidateId: candidateId,
         featureKey: featureKey,
         control: control,
-        perspective: committed ? committed.perspective : "single",
+        teamScoped: teamScoped,
+        perspective: resolveInitialPerspective(button, committed),
         selected: selected,
         rows: [],
         search: "",

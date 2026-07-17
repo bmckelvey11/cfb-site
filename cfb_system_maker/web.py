@@ -423,6 +423,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         sentences = describe(system)
         for row in sentences:
             row["remove_href"] = _query_href_removing(str(row["key"]), base_query)
+            row["edit"] = edit_metadata_for_sentence(system, row)
         return render_template(
             "index.html",
             error=None,
@@ -599,14 +600,100 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     return app
 
 
-def _default_perspective(system: SystemFilter) -> str:
+def default_perspective(system: SystemFilter) -> str:
+    """New team-scoped filters: spread → bet_side, total → either (D-14)."""
     return "bet_side" if system.bet_type == "spread" else "either"
 
 
+# Back-compat alias for call sites that still use the private name.
+_default_perspective = default_perspective
+
+_SENTENCE_TO_CANDIDATE: dict[str, str] = {
+    "seasons": "core:season",
+    "weeks": "core:week",
+    "teams": "core:team",
+    "conferences": "core:conference",
+    "providers": "core:provider",
+    "spread_range": "core:spread_range",
+    "total_range": "core:total_range",
+}
+
+
+def edit_metadata_for_sentence(
+    system: SystemFilter, row: dict[str, object]
+) -> dict[str, object] | None:
+    """Build Edit-launcher metadata for D-01 modal candidates; None for global toggles."""
+    key = str(row.get("key", ""))
+    if key in ("favorite", "underdog", "home", "away"):
+        return None
+
+    candidate_id: str | None = None
+    if key in _SENTENCE_TO_CANDIDATE:
+        candidate_id = _SENTENCE_TO_CANDIDATE[key]
+    elif key.startswith("ff:"):
+        candidate_id = f"feature:{key[len('ff:'):]}"
+    if candidate_id is None:
+        return None
+
+    descriptor = filter_descriptor(candidate_id)
+    if descriptor is None:
+        return None
+
+    meta: dict[str, object] = {
+        "candidate_id": candidate_id,
+        "control": descriptor["control"],
+        "description": descriptor["description"],
+        "label": descriptor["label"],
+        "team_scoped": bool(descriptor.get("team_scoped")),
+        "lookahead_warning": descriptor.get("lookahead_warning") or "",
+        "param": descriptor.get("param") or "",
+    }
+
+    if candidate_id == "core:season":
+        meta["values"] = sorted(system.seasons)
+    elif candidate_id == "core:week":
+        meta["values"] = sorted(system.weeks)
+    elif candidate_id == "core:team":
+        meta["values"] = sorted(system.teams)
+    elif candidate_id == "core:conference":
+        meta["values"] = sorted(system.conferences)
+    elif candidate_id == "core:provider":
+        meta["values"] = sorted(system.providers)
+    elif candidate_id == "core:spread_range":
+        meta["min"] = system.min_spread
+        meta["max"] = system.max_spread
+    elif candidate_id == "core:total_range":
+        meta["min"] = system.min_total
+        meta["max"] = system.max_total
+    elif candidate_id.startswith("feature:"):
+        feature_key = candidate_id.split(":", 1)[1]
+        filts = [filt for filt in system.feature_filters if filt.key == feature_key]
+        if not filts:
+            return None
+        perspective = filts[0].perspective
+        meta["perspective"] = perspective
+        control = str(descriptor["control"])
+        if control == "numeric":
+            meta["min"] = next((float(filt.value) for filt in filts if filt.op == "gte"), None)
+            meta["max"] = next((float(filt.value) for filt in filts if filt.op == "lte"), None)
+        elif control == "bool":
+            eq = next((filt for filt in filts if filt.op == "eq"), None)
+            meta["values"] = [bool(eq.value)] if eq is not None else []
+        else:
+            values: list[object] = []
+            for filt in filts:
+                if filt.op == "in" and isinstance(filt.value, (list, tuple)):
+                    values.extend(filt.value)
+                elif filt.op == "eq":
+                    values.append(filt.value)
+            meta["values"] = values
+    return meta
+
+
 def _allowed_perspectives_for_system(system: SystemFilter) -> list[str]:
-    if system.bet_type == "spread":
-        return ["home", "away", "bet_side", "opponent"]
-    return ["home", "away", "either"]
+    # Modal primary set is Bet-side / Opponent / Either (D-14 / UI-SPEC).
+    # home/away remain valid for committed edits and progressive-enhancement fallbacks.
+    return ["bet_side", "opponent", "either", "home", "away"]
 
 
 def _feature_coverage(
