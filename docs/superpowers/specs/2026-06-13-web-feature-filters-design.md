@@ -165,7 +165,7 @@ all(_feature_ok(features, f) for f in system.feature_filters)
 ## Out of scope (phase 2+)
 
 - Running / as-of-week computed stats (running W-L, running ATS, running PPA) to make
-  season-final snapshots point-in-time.
+  season-final snapshots point-in-time. — **implemented 2026-07-16** (see docs/superpowers/plans/2026-07-16-web-app-phase-2.md)
 - Kelly staking, CLV.
 - CLI exposure of the full dynamic filter set (web is the rich surface; CLI keeps
   spread/total + save/load).

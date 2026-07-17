@@ -84,6 +84,7 @@ python -m cfb_system_maker scrape --season 2023 --only games lines sp   # subset
 python -m cfb_system_maker scrape --season 2023 --include-per-game --fbs-only   # per-game endpoints, FBS only
 python -m cfb_system_maker graphql --season 2023 --data-dir data   # bulk-pull GraphQL tables to data/graphql/ (Tier 3)
 python -m cfb_system_maker build --season 2023 --provider consensus --data-dir data
+python -m cfb_system_maker enrich --data-dir data   # join registry features -> data/processed/features.json (run after build)
 python -m cfb_system_maker backtest --data-dir data --side home --favorite --min-spread -14
 python -m cfb_system_maker web --data-dir data --port 5000   # Flask UI at 127.0.0.1:5000
 ```
@@ -122,6 +123,9 @@ Data flows through three stages, each a separate CLI command, persisted to disk 
 - **CFBD field names are inconsistent** (camelCase vs snake_case across API versions). `normalize._first(row, *keys, fallback=...)` tries multiple key spellings — extend the key list rather than assuming one casing.
 - **All domain types are frozen dataclasses** (`models.py`). `GameRecord` field order is the CSV schema — changing it changes `storage` read/write. `storage._row_to_game` parses CSV strings back, treating `""` as `None`.
 - **API token resolution** (`cfbd_client.find_cfbd_token`): env vars `CFBD_API_KEY`, `CFBD-API`, `BEARER_TOKEN`, then `env.env` file. `env.env` holds the real key (gitignored-style secret) — never commit or echo its value.
+- **Running season-to-date stats** (`running_stats.py`, source kind `computed_running`): values are entering-game — computed from that team's strictly-prior games in the same season, ordered by raw `startDate` (fallback: week). First game of a season → `games_played=0`, percentages/averages `None` (which fail closed as filters). Never fold a game's own result into its own features.
+- **Sidecar `_meta`**: `features.json` is `{"_meta": {registry_version, game_count, generated_at}, "games": {...}}`. `features.registry_version()` hashes sorted registry keys; the web UI warns when the sidecar was built by an older registry. Legacy flat sidecars still load.
+- Web has `/compare` — pick saved systems, one `run_backtest` column each.
 
 ## Tests
 
