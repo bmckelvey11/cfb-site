@@ -8,6 +8,7 @@ from flask import Flask, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from cfb_system_maker.backtest import matches_system, run_backtest, sign_consistency, split_holdout
+from cfb_system_maker.describe import describe
 from cfb_system_maker.enrich import load_features, load_features_meta
 from cfb_system_maker.features import (
     FEATURE_BY_KEY,
@@ -18,6 +19,20 @@ from cfb_system_maker.features import (
 )
 from cfb_system_maker.models import BacktestResult, FeatureFilter, GameRecord, SystemFilter
 from cfb_system_maker.storage import list_systems, load_processed_games, load_system, save_system
+
+_REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
+    "favorite": ("favorite",),
+    "underdog": ("underdog",),
+    "home": ("home",),
+    "away": ("away",),
+    "spread_range": ("min_spread", "max_spread"),
+    "total_range": ("min_total", "max_total"),
+    "seasons": ("filter_seasons",),
+    "weeks": ("filter_weeks",),
+    "teams": ("filter_teams",),
+    "conferences": ("filter_conferences",),
+    "providers": ("filter_providers",),
+}
 
 
 def create_app(data_dir: str | Path = "data") -> Flask:
@@ -64,6 +79,10 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         result = run_backtest(games, system, feature_map=feature_map)
         coverage = _feature_coverage(games, system, feature_map)
         tab = "matches" if request.args.get("tab") == "matches" else "graph"
+        base_query = _query_args_from_form(form) if loaded_name else MultiDict(request.args.items(multi=True))
+        sentences = describe(system)
+        for row in sentences:
+            row["remove_href"] = _query_href_removing(str(row["key"]), base_query)
         return render_template(
             "index.html",
             error=None,
@@ -84,6 +103,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             coverage=coverage,
             season_sign_consistency=sign_consistency(result.season_breakdown),
             tab=tab,
+            sentences=sentences,
         )
 
     @app.post("/save")
@@ -192,6 +212,77 @@ def _query_href(**overrides: str) -> str:
     copy = MultiDict(request.args.items(multi=True))
     for key, value in overrides.items():
         copy.setlist(key, [value])
+    return "?" + urlencode(list(copy.items(multi=True)))
+
+
+def _query_args_from_form(form: dict[str, object]) -> MultiDict:
+    args: list[tuple[str, str]] = [
+        ("bet_type", str(form.get("bet_type", "spread"))),
+        ("side", str(form.get("side", "home"))),
+        ("total_side", str(form.get("total_side", "over"))),
+    ]
+    for key in ("favorite", "underdog", "home", "away"):
+        if form.get(key):
+            args.append((key, "on"))
+    for form_key, query_key in (
+        ("season", "filter_seasons"),
+        ("week", "filter_weeks"),
+        ("team", "filter_teams"),
+        ("conference", "filter_conferences"),
+        ("provider", "filter_providers"),
+    ):
+        value = str(form.get(form_key, "")).strip()
+        if value:
+            args.append((query_key, value))
+    for key in ("min_spread", "max_spread", "min_total", "max_total"):
+        value = str(form.get(key, "")).strip()
+        if value:
+            args.append((key, value))
+    save_name = str(form.get("save_name", "")).strip()
+    if save_name:
+        args.append(("save_name", save_name))
+    for row in form.get("feature_filters", []):
+        key = str(row.get("key", ""))
+        if not key:
+            continue
+        value = row.get("value")
+        if isinstance(value, list):
+            value_text = ",".join(str(item) for item in value)
+        elif isinstance(value, bool):
+            value_text = "true" if value else "false"
+        else:
+            value_text = str(value)
+        args.append(("ff_enable", key))
+        args.append(("ff_key", key))
+        args.append(("ff_op", str(row.get("op", "eq"))))
+        args.append(("ff_value", value_text))
+        args.append(("ff_perspective", str(row.get("perspective", "single"))))
+    theory = form.get("theory")
+    if theory:
+        args.append(("theory", str(theory)))
+    return MultiDict(args)
+
+
+def _query_href_removing(key: str, base: MultiDict) -> str:
+    copy = MultiDict(base.items(multi=True))
+    if request.args.get("tab") == "matches":
+        copy.setlist("tab", ["matches"])
+    if key.startswith("ff:"):
+        feature_key = key[len("ff:"):]
+        keys = copy.getlist("ff_key")
+        ops = copy.getlist("ff_op")
+        values = copy.getlist("ff_value")
+        perspectives = copy.getlist("ff_perspective")
+        keep = [index for index, item in enumerate(keys) if item != feature_key]
+        copy.setlist("ff_key", [keys[index] for index in keep])
+        copy.setlist("ff_op", [ops[index] for index in keep if index < len(ops)])
+        copy.setlist("ff_value", [values[index] for index in keep if index < len(values)])
+        copy.setlist("ff_perspective", [perspectives[index] for index in keep if index < len(perspectives)])
+        copy.setlist("ff_enable", [value for value in copy.getlist("ff_enable") if value != feature_key])
+    else:
+        for param in _REMOVE_PARAM_MAP.get(key, ()):
+            copy.poplist(param)
+    copy.poplist("load_system")
     return "?" + urlencode(list(copy.items(multi=True)))
 
 
