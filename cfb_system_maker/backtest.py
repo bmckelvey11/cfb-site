@@ -4,7 +4,7 @@ import math
 from typing import Any
 
 from cfb_system_maker.features import feature_ok
-from cfb_system_maker.models import BacktestResult, BetDetail, GameRecord, SystemFilter, SystemStats
+from cfb_system_maker.models import BacktestResult, BetDetail, GameRecord, SeasonRecord, SystemFilter, SystemStats
 
 
 def run_backtest(
@@ -44,7 +44,36 @@ def run_backtest(
         average_stake=stake,
         bet_details=details,
         stats=compute_system_stats(details, hit_rate=hit_rate, roi=roi, american_odds=american_odds, stake=stake),
+        season_breakdown=tuple(compute_season_breakdown(details, stake=stake)),
     )
+
+
+def compute_season_breakdown(details: list[BetDetail], *, stake: float = 1.0) -> list[SeasonRecord]:
+    by_season: dict[int, list[BetDetail]] = {}
+    for bet in details:
+        by_season.setdefault(bet.season, []).append(bet)
+
+    records = []
+    for season in sorted(by_season):
+        bets = by_season[season]
+        wins = sum(1 for bet in bets if bet.result == "win")
+        losses = sum(1 for bet in bets if bet.result == "loss")
+        pushes = sum(1 for bet in bets if bet.result == "push")
+        profit = round(sum(bet.profit for bet in bets), 4)
+        risked = len(bets) * stake
+        roi = round(profit / risked, 4) if risked else 0.0
+        records.append(
+            SeasonRecord(
+                season=season, bets=len(bets), wins=wins, losses=losses,
+                pushes=pushes, profit=profit, roi=roi,
+            )
+        )
+    return records
+
+
+def sign_consistency(records: list[SeasonRecord]) -> tuple[int, int]:
+    profitable = sum(1 for record in records if record.roi > 0)
+    return profitable, len(records)
 
 
 def matches_system(
