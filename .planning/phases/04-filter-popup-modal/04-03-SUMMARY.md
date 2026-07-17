@@ -75,7 +75,7 @@ Each task was committed atomically:
 1. **Task 1: Paired numeric filters, describe coalesce, numeric detail/chart payload** - `7af7e52` (test RED) + `9bd09e7` (feat GREEN)
 2. **Task 2: Dual-range UI, Chart/List toggle, SVG money chart** - `5a2d374` (feat)
 
-**Plan metadata:** see docs commit below
+**Plan metadata:** `75e109f` (docs: complete plan)
 
 ## Files Created/Modified
 
