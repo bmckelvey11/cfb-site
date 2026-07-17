@@ -22,6 +22,7 @@ Restyle `cfb_system_maker`'s existing system editor page (`templates/index.html`
 ### Claude's Discretion
 - **Money-graph x-axis:** `bet-labs-parity-plan.md` describes the reference graph's x-axis as real calendar dates, but `GameRecord` has no per-game date field (only `season`/`week` ints — see `docs/PROJECT_MAP.md` and `models.py`). Claude will use chronological bet order — sorted by `(season, week)` — as the x-axis, one point per graded bet, cumulative profit sum at $100-flat-stake. This is the closest achievable analog given the current data model; revisit if Phase 3 (Data Depth) adds a real per-game date field.
 - **Grade chip placeholder:** EDIT-02 ships the Grade chip *slot* now; the composite grade computation lands in Phase 2 (INTG-02). Claude will render a neutral placeholder (e.g. an em dash "—") in the Grade chip position until Phase 2 wires the real value — not blank/hidden, so the header layout is stable across both phases.
+- **Margin chip for total-bet systems:** `docs/bet-labs-parity-plan.md`'s Margin formula (mean of `team_points + side_spread - opp_points`) is spread-bet-specific — `side_spread` has no analog in the total-bet grading path (`_grade_total_bet`). Per `01-RESEARCH.md` Open Question 1, Claude will scope Margin computation to `bet_type == "spread"` systems only and render the same "—" placeholder for `bet_type == "total"` systems, mirroring the Grade-chip precedent above rather than inventing an undocumented totals formula.
 
 </decisions>
 
