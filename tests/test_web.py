@@ -1346,6 +1346,19 @@ def test_current_matches_details_reuse_describe_undecorated(tmp_path):
     assert "remove_href" not in panel
 
 
+def test_current_matches_bare_system_omits_the_matched_on_label(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    # A default side=home system produces no describe() sentences.
+    save_system("bare", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Play Georgia -7" in panel  # row still renders
+    assert "Matched on" not in panel  # but no dangling empty label
+
+
 def test_current_matches_sorts_by_kickoff_ascending(tmp_path):
     app, _ = _dashboard_app(tmp_path)
     early = _upcoming_game(9001, "Georgia", "Clemson")

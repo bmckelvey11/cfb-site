@@ -120,10 +120,12 @@
                     <div class="cm-play">{{ row.play }}</div>
                     <div class="cm-matchup">{{ row.matchup }}</div>
                     <div class="cm-system"><a class="system-link" href="{{ url_for('index') }}?load_system={{ row.system_name|urlencode }}">{{ row.system_name }}</a> <span class="cm-type">{{ row.type_label }}</span></div>
+                    {% if row.details %}
                     <div class="cm-details">
                       <span class="cm-details-label">Matched on</span>
                       <ul>{% for detail in row.details %}<li>{{ detail }}</li>{% endfor %}</ul>
                     </div>
+                    {% endif %}
                   </li>
                 {% endfor %}
               </ul>
