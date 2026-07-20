@@ -15,9 +15,11 @@ from pathlib import Path
 from typing import Any
 
 from cfb_system_maker.cfbd_client import _load_cfbd_module, _to_dict, find_cfbd_token
+from cfb_system_maker.enrich import enrich_games, save_features_to, upcoming_features_path
 from cfb_system_maker.models import GameRecord
 from cfb_system_maker.normalize import _first, normalize_games
 from cfb_system_maker.storage import (
+    load_raw_json,
     save_raw_json,
     save_upcoming_games,
     save_upcoming_meta,
@@ -78,6 +80,7 @@ def build_upcoming(
 
         resolution, games_by_season = _resolve(games_api, now)
         if resolution.season is None:
+            enrich_upcoming(data_dir, None, [])
             return _persist(data_dir, [], {}, resolution, now)
 
         season = resolution.season
@@ -95,7 +98,69 @@ def build_upcoming(
     records = normalize_games(target, lines, provider="consensus")
     kickoffs = _kickoffs(target)
 
+    enrich_upcoming(data_dir, season, records)
     return _persist(data_dir, records, kickoffs, resolution, now)
+
+
+def enrich_upcoming(
+    data_dir: str | Path,
+    season: int | None,
+    records: list[GameRecord],
+) -> dict[str, dict[str, Any]]:
+    """Enrich the target week, accumulating over that season's completed games (D-05).
+
+    ``compute_running_stats`` only yields entering-game values for games whose
+    season-mates are in the same input list. ``games.csv`` carries none of the
+    current season, so the accumulation base is rebuilt from the full-season raw
+    dumps on disk -- the ones ``build_upcoming`` wrote. A target-week-only lines
+    dump empties that base and every season-to-date value silently comes back
+    null, which fails closed and makes a working system match nothing.
+
+    Feature rows are emitted for the target week only; the completed games are
+    accumulation input, not output.
+    """
+    target_ids = {str(record.game_id) for record in records}
+    union = _accumulation_base(data_dir, season, {record.game_id for record in records}) + list(records)
+
+    # ``enrich_games`` falls back to loading games.csv when handed an empty list,
+    # which would write 13k historical rows into the upcoming sidecar.
+    features = enrich_games(data_dir, union) if union else {}
+    features = {game_id: row for game_id, row in features.items() if game_id in target_ids}
+
+    save_features_to(upcoming_features_path(data_dir), features)
+    return features
+
+
+def _accumulation_base(
+    data_dir: str | Path,
+    season: int | None,
+    exclude_ids: set[int],
+) -> list[GameRecord]:
+    """The season's completed games, normalized against the full-season line dump.
+
+    ``normalize_games`` drops any game whose line selection yields nothing, so a
+    completed game missing from the line dump never reaches the base.
+    """
+    if season is None:
+        return []
+    try:
+        games = load_raw_json(data_dir, "games", season)
+        lines = load_raw_json(data_dir, "lines", season)
+    except FileNotFoundError:
+        return []
+
+    completed = []
+    for row in games:
+        if not _first(row, "completed"):
+            continue
+        game_id = _first(row, "id", "gameId", "game_id")
+        # In the offseason fallback the target week is itself completed; it enters
+        # the union as a target record, so folding it in twice would double-count.
+        if game_id is None or int(game_id) in exclude_ids:
+            continue
+        completed.append(row)
+
+    return normalize_games(completed, lines, provider="consensus")
 
 
 def _resolve(games_api: Any, now: datetime) -> tuple[WeekResolution, dict[int, list[dict[str, Any]]]]:

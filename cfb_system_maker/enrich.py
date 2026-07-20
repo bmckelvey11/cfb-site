@@ -26,7 +26,16 @@ def enrich_games(data_dir: str | Path, games: list[GameRecord] | None = None) ->
 
 
 def save_features(data_dir: str | Path, features: dict[str, dict[str, Any]]) -> Path:
-    path = Path(data_dir) / "processed" / "features.json"
+    return save_features_to(_features_path(data_dir), features)
+
+
+def save_features_to(path: str | Path, features: dict[str, dict[str, Any]]) -> Path:
+    """Write a features sidecar to an explicit path.
+
+    The upcoming-games path needs its own file; reusing ``save_features``' fixed
+    path would silently clobber the historical sidecar.
+    """
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"_meta": _build_meta(features), "games": features}
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -42,7 +51,11 @@ def _build_meta(features: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
 
 def load_features(data_dir: str | Path) -> dict[int, dict[str, Any]]:
-    raw = json.loads(_features_path(data_dir).read_text(encoding="utf-8"))
+    return load_features_from(_features_path(data_dir))
+
+
+def load_features_from(path: str | Path) -> dict[int, dict[str, Any]]:
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
     rows = raw["games"] if "_meta" in raw and "games" in raw else raw
     return {int(game_id): values for game_id, values in rows.items()}
 
@@ -58,6 +71,10 @@ def load_features_meta(data_dir: str | Path) -> dict[str, Any] | None:
 
 def _features_path(data_dir: str | Path) -> Path:
     return Path(data_dir) / "processed" / "features.json"
+
+
+def upcoming_features_path(data_dir: str | Path) -> Path:
+    return Path(data_dir) / "processed" / "upcoming_features.json"
 
 
 def run_enrich(data_dir: str | Path) -> Path:
