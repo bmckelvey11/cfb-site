@@ -242,8 +242,13 @@ def matches_system(
     game: GameRecord,
     system: SystemFilter,
     feature_map: dict[int, dict[str, Any]] | None = None,
+    *,
+    require_played: bool = True,
 ) -> bool:
-    if game.home_points is None or game.away_points is None:
+    # require_played=False lets Current Matches evaluate unplayed games (D-18).
+    # Matching only — nothing below reads scores, and grade_bet still refuses
+    # a game with no result.
+    if require_played and (game.home_points is None or game.away_points is None):
         return False
     if system.bet_type == "spread" and game.spread is None:
         return False
