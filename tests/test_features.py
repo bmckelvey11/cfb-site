@@ -30,7 +30,16 @@ def test_registry_descriptions_are_nonempty():
 
 
 def test_registry_groups_are_valid():
-    allowed = {"pregame", "season_to_date", "team_preseason", "metadata", "result_lookahead"}
+    allowed = {
+        "matchup",
+        "ratings",
+        "betting_lines",
+        "weather",
+        "season_to_date",
+        "team_preseason",
+        "metadata",
+        "result_lookahead",
+    }
     for feature in FEATURE_REGISTRY:
         assert feature.group in allowed
         assert feature.key in FEATURE_BY_KEY

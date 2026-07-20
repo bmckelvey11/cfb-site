@@ -124,6 +124,7 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 | Date | Slug | What | Status |
 |------|------|------|--------|
 | 2026-07-20 | numeric-filter-step-intervals | Filter popup numeric controls snap to a span-scaled step (0.5 for spread/total) instead of continuous `step="any"` | complete |
+| 2026-07-20 | filter-group-taxonomy | Split the `pregame` feature group into Matchup / Ratings / Betting Lines / Weather (restored user work quarantined during phase 03) | complete |
 
 ## Deferred Items
 

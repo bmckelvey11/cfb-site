@@ -4,7 +4,16 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Literal
 
-Group = Literal["pregame", "season_to_date", "team_preseason", "metadata", "result_lookahead"]
+Group = Literal[
+    "matchup",
+    "ratings",
+    "betting_lines",
+    "weather",
+    "season_to_date",
+    "team_preseason",
+    "metadata",
+    "result_lookahead",
+]
 Control = Literal["bool", "categorical", "numeric"]
 Join = Literal["game_id", "team_season", "team_name", "conference_name"]
 SourceKind = Literal[
@@ -44,35 +53,40 @@ class FeatureDef:
 
 
 FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
-    # --- pregame (game_id) ---
+    # --- matchup (game_id) ---
     FeatureDef(
-        "neutralSite", "Neutral Site", "pregame", "raw_game", "neutralSite", "game_id", "bool",
+        "neutralSite", "Neutral Site", "matchup", "raw_game", "neutralSite", "game_id", "bool",
         description="Whether the game is at a neutral site (true/false). Pregame schedule flag.",
     ),
     FeatureDef(
-        "conferenceGame", "Conference Game", "pregame", "raw_game", "conferenceGame", "game_id", "bool",
+        "conferenceGame", "Conference Game", "matchup", "raw_game", "conferenceGame", "game_id", "bool",
         description="Whether both teams are in the same conference (true/false). Pregame schedule flag.",
     ),
     FeatureDef(
-        "venue", "Venue", "pregame", "raw_game", "venue", "game_id", "categorical",
+        "venue", "Venue", "matchup", "raw_game", "venue", "game_id", "categorical",
         description="Stadium or site name for the game. Categorical pregame location label.",
     ),
     FeatureDef(
-        "seasonType", "Season Type", "pregame", "raw_game", "seasonType", "game_id", "categorical",
+        "seasonType", "Season Type", "matchup", "raw_game", "seasonType", "game_id", "categorical",
         description="Season segment label (for example regular or postseason). Pregame schedule category.",
     ),
     FeatureDef(
-        "homePregameElo", "Home Pregame Elo", "pregame", "raw_game", "homePregameElo", "game_id", "numeric",
+        "media_outlet", "TV Network", "matchup", "raw_media", "outlet", "game_id", "categorical",
+        description="Broadcast outlet or TV network name for the game. Pregame media label.",
+    ),
+    # --- ratings (game_id) ---
+    FeatureDef(
+        "homePregameElo", "Home Pregame Elo", "ratings", "raw_game", "homePregameElo", "game_id", "numeric",
         description="Home team's Elo rating entering the game. Higher means stronger; pregame value.",
     ),
     FeatureDef(
-        "awayPregameElo", "Away Pregame Elo", "pregame", "raw_game", "awayPregameElo", "game_id", "numeric",
+        "awayPregameElo", "Away Pregame Elo", "ratings", "raw_game", "awayPregameElo", "game_id", "numeric",
         description="Away team's Elo rating entering the game. Higher means stronger; pregame value.",
     ),
     FeatureDef(
         "pregame_win_prob",
         "Pregame Win Prob",
-        "pregame",
+        "ratings",
         "graphql_game_team",
         "winProb",
         "game_id",
@@ -84,72 +98,70 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         ),
     ),
     FeatureDef(
-        "spreadOpen", "Spread Open", "pregame", "raw_lines", "spreadOpen", "game_id", "numeric",
+        "pregame_home_win_prob", "Home Win Prob (pregame)", "ratings", "raw_pregame_wp", "homeWinProbability", "game_id", "numeric",
+        description="Home win probability entering the game (0–1). Higher favors home; pregame model output.",
+    ),
+    # --- betting lines (game_id) ---
+    FeatureDef(
+        "spreadOpen", "Spread Open", "betting_lines", "raw_lines", "spreadOpen", "game_id", "numeric",
         lines_field="spreadOpen",
         description="Opening home spread from the lines feed. Negative favors home; pregame market open.",
     ),
     FeatureDef(
-        "overUnderOpen", "Over/Under Open", "pregame", "raw_lines", "overUnderOpen", "game_id", "numeric",
+        "overUnderOpen", "Over/Under Open", "betting_lines", "raw_lines", "overUnderOpen", "game_id", "numeric",
         lines_field="overUnderOpen",
         description="Opening total (over/under) points from the lines feed. Pregame market open.",
     ),
     FeatureDef(
-        "moneylineHome", "Home Moneyline", "pregame", "raw_lines", "homeMoneyline", "game_id", "numeric",
+        "moneylineHome", "Home Moneyline", "betting_lines", "raw_lines", "homeMoneyline", "game_id", "numeric",
         lines_field="homeMoneyline",
         description="Home moneyline in American odds. Negative is favored; pregame market number.",
     ),
     FeatureDef(
-        "moneylineAway", "Away Moneyline", "pregame", "raw_lines", "awayMoneyline", "game_id", "numeric",
+        "moneylineAway", "Away Moneyline", "betting_lines", "raw_lines", "awayMoneyline", "game_id", "numeric",
         lines_field="awayMoneyline",
         description="Away moneyline in American odds. Negative is favored; pregame market number.",
     ),
+    # --- weather (game_id) ---
     FeatureDef(
-        "weather_temperature", "Temperature (F)", "pregame", "raw_weather", "temperature", "game_id", "numeric",
+        "weather_temperature", "Temperature (F)", "weather", "raw_weather", "temperature", "game_id", "numeric",
         description="Forecast or reported game temperature in degrees Fahrenheit. Pregame weather.",
     ),
     FeatureDef(
-        "weather_windSpeed", "Wind Speed", "pregame", "raw_weather", "windSpeed", "game_id", "numeric",
+        "weather_windSpeed", "Wind Speed", "weather", "raw_weather", "windSpeed", "game_id", "numeric",
         description="Wind speed for the game site (mph). Higher is windier; pregame weather.",
     ),
     FeatureDef(
-        "weather_precipitation", "Precipitation", "pregame", "raw_weather", "precipitation", "game_id", "numeric",
+        "weather_precipitation", "Precipitation", "weather", "raw_weather", "precipitation", "game_id", "numeric",
         description="Precipitation amount for the game site. Higher means wetter; pregame weather.",
     ),
     FeatureDef(
-        "weather_humidity", "Humidity", "pregame", "raw_weather", "humidity", "game_id", "numeric",
+        "weather_humidity", "Humidity", "weather", "raw_weather", "humidity", "game_id", "numeric",
         description="Relative humidity percentage for the game site. Pregame weather.",
     ),
     FeatureDef(
-        "weather_dewPoint", "Dew Point", "pregame", "raw_weather", "dewPoint", "game_id", "numeric",
+        "weather_dewPoint", "Dew Point", "weather", "raw_weather", "dewPoint", "game_id", "numeric",
         description="Dew point temperature (F) for the game site. Pregame weather.",
     ),
     FeatureDef(
-        "weather_pressure", "Pressure", "pregame", "raw_weather", "pressure", "game_id", "numeric",
+        "weather_pressure", "Pressure", "weather", "raw_weather", "pressure", "game_id", "numeric",
         description="Barometric pressure for the game site. Pregame weather.",
     ),
     FeatureDef(
-        "weather_snowfall", "Snowfall", "pregame", "raw_weather", "snowfall", "game_id", "numeric",
+        "weather_snowfall", "Snowfall", "weather", "raw_weather", "snowfall", "game_id", "numeric",
         description="Snowfall amount for the game site. Higher means more snow; pregame weather.",
     ),
     FeatureDef(
-        "gameIndoors", "Game Indoors", "pregame", "raw_weather", "gameIndoors", "game_id", "bool",
+        "gameIndoors", "Game Indoors", "weather", "raw_weather", "gameIndoors", "game_id", "bool",
         description="Whether the game is played indoors (true/false). Pregame venue/weather flag.",
     ),
     FeatureDef(
-        "weather_condition", "Weather Condition", "pregame", "raw_weather", "weatherCondition", "game_id", "categorical",
+        "weather_condition", "Weather Condition", "weather", "raw_weather", "weatherCondition", "game_id", "categorical",
         description="Categorical weather condition label (for example Clear or Rain). Pregame weather.",
     ),
     FeatureDef(
-        "weather_windDirection", "Wind Direction (deg)", "pregame", "raw_weather", "windDirection", "game_id", "numeric",
+        "weather_windDirection", "Wind Direction (deg)", "weather", "raw_weather", "windDirection", "game_id", "numeric",
         description="Wind direction in degrees. Pregame weather compass heading.",
-    ),
-    FeatureDef(
-        "pregame_home_win_prob", "Home Win Prob (pregame)", "pregame", "raw_pregame_wp", "homeWinProbability", "game_id", "numeric",
-        description="Home win probability entering the game (0–1). Higher favors home; pregame model output.",
-    ),
-    FeatureDef(
-        "media_outlet", "TV Network", "pregame", "raw_media", "outlet", "game_id", "categorical",
-        description="Broadcast outlet or TV network name for the game. Pregame media label.",
     ),
     # --- team preseason ---
     FeatureDef(
