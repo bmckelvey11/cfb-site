@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Dashboard & Current Matches
 status: planning
-stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-07-20T20:57:56.538Z"
+stopped_at: Phase 5 planned (6 plans, 3 waves, plan-checker APPROVED)
+last_updated: "2026-07-20T22:02:33.772Z"
 last_activity: 2026-07-20
 last_activity_desc: "Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it"
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 15
+  total_plans: 21
   completed_plans: 15
 ---
 
@@ -136,6 +136,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-20T20:57:56.516Z
-Stopped at: Phase 5 UI-SPEC approved
-Resume file: .planning/phases/05-dashboard-current-matches/05-UI-SPEC.md
+Last session: 2026-07-20T22:02:33.754Z
+Stopped at: Phase 5 planned (6 plans, 3 waves, plan-checker APPROVED)
+Resume file: .planning/phases/05-dashboard-current-matches/05-01-PLAN.md
