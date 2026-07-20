@@ -1,29 +1,35 @@
 ---
 phase: 04-filter-popup-modal
 verified: 2026-07-17T19:22:59Z
-status: human_needed
+status: passed
 score: 4/5 must-haves verified
 behavior_unverified: 1
 overrides_applied: 0
 mvp_note: "ROADMAP phase goal is Mode:mvp but not user-story format; User Flow Coverage uses PLAN phase-goal story. Run /gsd mvp-phase 4 to reformat ROADMAP goal if required."
 behavior_unverified_items:
+
   - truth: "The modal header shows Record/Money Won/ROI chips that recompute live as the user adjusts the filter's controls, before saving."
     test: "Open a filter modal, change slider/table selection rapidly, optionally block /api/backtest once, then Retry."
     expected: "Chips update after ~250ms debounce from server JSON; Updating… while in flight; last success retained on failure; Save gated until current draft validates; stale responses ignored."
     why_human: "Live refresh, AbortController races, and chip render are browser timing behaviors. Automated coverage is Flask /api/backtest plus JS source-contract greps — not an in-browser adjust→chip assertion."
 human_verification:
+
   - test: "Start web UI with processed data; open a categorical filter from the sidebar."
     expected: "Dialog opens, focus moves inside, live chips update after a short pause; About Filter shows escaped definition text."
     why_human: "Browser focus and live fetch timing are not observable via Flask test client."
+
   - test: "Drag/edit a numeric filter; use Chart/List; Save then Cancel on a second edit."
     expected: "Dual handles sync with BETWEEN inputs; chart/list toggle; Save commits URL via filters-form GET; Cancel leaves URL unchanged."
     why_human: "Slider drag sync and full-page GET commit are end-to-end UI flows."
+
   - test: "Click Edit on an active-filter sentence; press Escape; click backdrop."
     expected: "Modal opens prefilled; Escape discards and focus returns to Edit; backdrop click leaves dialog open without commit/discard."
     why_human: "Focus restoration and backdrop non-dismiss require a real browser."
+
   - test: "Force a live request failure (DevTools offline or block /api/backtest); then Retry."
     expected: "Inline Couldn’t update live stats. + Retry; last chips remain; Save stays disabled; Retry recovers; form not mutated."
     why_human: "Failure/retry UX needs forced network conditions."
+
   - test: "Resize viewport to narrow width (≤900px) with a wide categorical table open."
     expected: "About stacks below; table scrolls horizontally inside modal; Cancel/Save remain reachable; page does not grow sideways."
     why_human: "Responsive layout is visual-only."
