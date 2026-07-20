@@ -91,7 +91,46 @@
         </section>
 
         <aside class="dash-side" aria-label="Current Matches">
-          <!-- Current Matches panel — filled by Plan 05-06 (DASH-03). -->
+          <h2 class="cm-heading">Current Matches</h2>
+          {% if panel.state == 'missing' %}
+            <div class="empty-state cm-empty">
+              <h3>No upcoming games data</h3>
+              <p>Run <code>python -m cfb_system_maker upcoming --data-dir data</code> to fetch this week's games and lines.</p>
+            </div>
+          {% elif panel.state == 'no_systems' %}
+            <div class="empty-state cm-empty">
+              <h3>No saved systems yet</h3>
+              <p>Build a system in the editor, or open one from Example Systems to see its matches.</p>
+            </div>
+          {% else %}
+            <p class="cm-timestamp">Lines as of {{ panel.fetched_at }}</p>
+            <p class="cm-caveat">Matches change as lines move.</p>
+            {% if panel.is_fallback %}
+              <div class="stale-warning cm-fallback">
+                <strong>No games this week</strong>
+                <p>There are no upcoming games with posted lines. Showing the most recent week that does.</p>
+              </div>
+              <p class="cm-fallback-label">{{ panel.fallback_label }}</p>
+            {% endif %}
+            {% if panel.rows %}
+              <ul class="matches-list">
+                {% for row in panel.rows %}
+                  <li class="match-row">
+                    <div class="cm-kickoff">{{ row.kickoff }}</div>
+                    <div class="cm-play">{{ row.play }}</div>
+                    <div class="cm-matchup">{{ row.matchup }}</div>
+                    <div class="cm-system"><a class="system-link" href="{{ url_for('index') }}?load_system={{ row.system_name|urlencode }}">{{ row.system_name }}</a> <span class="cm-type">{{ row.type_label }}</span></div>
+                    <div class="cm-details">
+                      <span class="cm-details-label">Matched on</span>
+                      <ul>{% for detail in row.details %}<li>{{ detail }}</li>{% endfor %}</ul>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="cm-none">No saved system matches a game this week.</p>
+            {% endif %}
+          {% endif %}
         </aside>
       </div>
       {% endif %}

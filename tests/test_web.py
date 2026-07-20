@@ -1079,7 +1079,11 @@ def test_example_systems_tab_shows_figures_and_trend_column(tmp_path):
     assert "Money Won" in html
     assert "Trend" in html
     assert html.count("Copy to My Systems") == len(list_examples())
-    assert "No saved systems yet" not in html
+    # The left column must not fall back to its empty state (examples render).
+    # The Current Matches panel legitimately shows its own no-systems copy
+    # (UI-SPEC: both columns show the no-systems state), so scope to dash-main.
+    main = html[html.index('class="dash-main"'):html.index('aria-label="Current Matches"')]
+    assert "No saved systems yet" not in main
 
 
 def test_example_systems_tab_shows_each_written_theory(tmp_path):
