@@ -8,16 +8,27 @@ week resolution is deterministic.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from cfb_system_maker.upcoming import build_upcoming, resolve_target_week
 
 UTC = timezone.utc
 
+# Anchor for the multi-week accumulation fixture: week N runs [_week_start(N), _week_start(N+1)).
+_SEASON_ANCHOR = datetime(2026, 8, 31, tzinfo=UTC)
+
 
 def _dt(year, month, day, hour=19):
     return datetime(year, month, day, hour, tzinfo=UTC)
+
+
+def _week_start(week):
+    return _SEASON_ANCHOR + timedelta(days=7 * (week - 1))
+
+
+def _kickoff(week):
+    return _week_start(week) + timedelta(days=5, hours=19)
 
 
 def _game(game_id, season, week, season_type, start, *, completed, tbd=False, home="Alpha", away="Beta"):
@@ -102,6 +113,39 @@ def default_data():
             _lined(2004),
         ],
     }
+    return calendars, games, lines
+
+
+def accumulating_season_data():
+    """A 2026 season whose weeks 1-4 are played and whose week 5 is not.
+
+    Alpha plays (and wins) all four completed weeks, so entering week 5 it must
+    carry games_played=4 -- the assertion that catches an accumulation base built
+    from the target week alone.
+
+    Gamma's only completed game is unlined, so it is dropped by ``normalize_games``
+    and Gamma legitimately enters week 5 with nothing accumulated.
+    """
+    calendars = {
+        2026: [
+            _calendar_week(2026, week, "regular", _week_start(week), _week_start(week + 1))
+            for week in range(1, 6)
+        ]
+    }
+    games = {
+        2026: [
+            _game(3000 + week, 2026, week, "regular", _kickoff(week), completed=True, home="Alpha", away="Beta")
+            for week in range(1, 5)
+        ]
+        + [
+            # Completed but unlined -> dropped from the accumulation base.
+            _game(3010, 2026, 2, "regular", _kickoff(2), completed=True, home="Gamma", away="Delta"),
+            # The target week: two unplayed games, both involving Alpha.
+            _game(3005, 2026, 5, "regular", _kickoff(5), completed=False, home="Alpha", away="Gamma"),
+            _game(3006, 2026, 5, "regular", _kickoff(5), completed=False, home="Echo", away="Alpha"),
+        ]
+    }
+    lines = {2026: [_lined(3001), _lined(3002), _lined(3003), _lined(3004), _lined(3005), _lined(3006)]}
     return calendars, games, lines
 
 
@@ -327,6 +371,80 @@ def test_saved_upcoming_round_trips_with_null_scores(tmp_path):
         assert record.home_points is None
         assert record.away_points is None
     assert kickoffs[2002]["start_time_tbd"] is True
+
+
+# --- running-stats accumulation over the union (D-05) ----------------------
+
+
+def _upcoming_features(tmp_path):
+    path = tmp_path / "processed" / "upcoming_features.json"
+    return json.loads(path.read_text(encoding="utf-8"))["games"]
+
+
+def _build_accumulating(tmp_path):
+    module, _ = make_module(*accumulating_season_data())
+    # Inside the week-5 calendar window: week 5 is the target, weeks 1-4 are played.
+    build_upcoming(tmp_path, now=_week_start(5) + timedelta(days=1), cfbd_module=module, token="test")
+    return _upcoming_features(tmp_path)
+
+
+def test_unplayed_game_carries_entering_game_values_from_its_prior_weeks(tmp_path):
+    features = _build_accumulating(tmp_path)
+
+    row = features["3005"]
+    # Alpha played and won weeks 1-4, all lined. Zero here would mean the completed
+    # weeks never reached compute_running_stats -- the silent D-05 failure.
+    assert row["home_running_games_played"] == 4
+    assert row["home_running_win_pct"] == 1.0
+
+
+def test_unlined_completed_game_is_dropped_from_the_accumulation_base(tmp_path):
+    features = _build_accumulating(tmp_path)
+
+    # Gamma's only completed game (3010) carries no line, so normalize_games drops it.
+    assert features["3005"]["away_running_games_played"] == 0
+    assert features["3005"]["away_running_win_pct"] is None
+
+
+def test_unplayed_games_do_not_contaminate_each_other(tmp_path):
+    features = _build_accumulating(tmp_path)
+
+    # Alpha appears in both unplayed week-5 games; neither folds into the other.
+    assert features["3005"]["home_running_games_played"] == 4
+    assert features["3006"]["away_running_games_played"] == 4
+    assert features["3006"]["away_running_win_pct"] == 1.0
+
+
+def test_only_target_week_games_are_emitted(tmp_path):
+    features = _build_accumulating(tmp_path)
+
+    # Weeks 1-4 are accumulation input, not output.
+    assert set(features) == {"3005", "3006"}
+
+
+def test_week_one_unplayed_game_legitimately_has_no_prior_state(tmp_path):
+    _build(tmp_path, _dt(2026, 9, 1))
+
+    row = _upcoming_features(tmp_path)["2001"]
+    # Correct behavior, not a bug: a season-to-date filter should not fire in week 1.
+    assert row["home_running_games_played"] == 0
+    assert row["home_running_win_pct"] is None
+
+
+def test_post_game_sourced_features_are_null_for_an_unplayed_game(tmp_path):
+    features = _build_accumulating(tmp_path)
+
+    row = features["3005"]
+    assert row["attendance"] is None       # post-game
+    assert row["weather_temperature"] is None  # near-game, never fetched here
+
+
+def test_no_resolution_still_writes_a_valid_empty_sidecar(tmp_path):
+    module, _ = make_module({}, {}, {})
+
+    build_upcoming(tmp_path, now=_dt(2026, 7, 20), cfbd_module=module, token="test")
+
+    assert _upcoming_features(tmp_path) == {}
 
 
 def test_season_type_enum_is_normalized_to_its_value(tmp_path):

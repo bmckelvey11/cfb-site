@@ -282,6 +282,108 @@ def test_enrich_resolves_conference_classification_per_side(tmp_path):
     assert features["2"]["home_conference_classification"] is None
 
 
+def _accumulation_raw(tmp_path, *, lines_cover_full_season):
+    """Weeks 1-4 played, week 5 unplayed. ``lines_cover_full_season`` toggles the broken shape."""
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    games = [
+        {
+            "id": 3000 + week,
+            "season": 2026,
+            "week": week,
+            "seasonType": "regular",
+            "startDate": f"2026-09-{week:02d} 19:00:00+00:00",
+            "completed": True,
+            "homeTeam": "Alpha",
+            "awayTeam": "Beta",
+            "homePoints": 28,
+            "awayPoints": 21,
+        }
+        for week in range(1, 5)
+    ] + [
+        {
+            "id": 3005,
+            "season": 2026,
+            "week": 5,
+            "seasonType": "regular",
+            "startDate": "2026-09-30 19:00:00+00:00",
+            "completed": False,
+            "homeTeam": "Alpha",
+            "awayTeam": "Gamma",
+            "homePoints": None,
+            "awayPoints": None,
+        }
+    ]
+    lined_ids = [3001, 3002, 3003, 3004, 3005] if lines_cover_full_season else [3005]
+    lines = [
+        {"id": game_id, "lines": [{"provider": "DraftKings", "spread": -7.0, "overUnder": 52.5}]}
+        for game_id in lined_ids
+    ]
+
+    (raw_dir / "games_2026.json").write_text(json.dumps(games), encoding="utf-8")
+    (raw_dir / "lines_2026.json").write_text(json.dumps(lines), encoding="utf-8")
+
+
+def _target_record():
+    return GameRecord(3005, 2026, 5, "Alpha", "Gamma", None, None, None, None, "consensus", -7.0, 52.5)
+
+
+def test_enrich_upcoming_accumulates_the_seasons_completed_weeks(tmp_path):
+    from cfb_system_maker.upcoming import enrich_upcoming
+
+    _accumulation_raw(tmp_path, lines_cover_full_season=True)
+
+    features = enrich_upcoming(tmp_path, 2026, [_target_record()])
+
+    assert features["3005"]["home_running_games_played"] == 4
+    assert features["3005"]["home_running_win_pct"] == 1.0
+
+
+def test_enrich_upcoming_is_null_when_the_lines_dump_covers_only_the_target_week(tmp_path):
+    """The failure this plan exists to prevent, made expressible.
+
+    With a target-week-only lines dump the completed weeks normalize to nothing and
+    every entering-game value comes back null -- with no error anywhere. The paired
+    non-null assertion above is only meaningful because this shape is reachable.
+    """
+    from cfb_system_maker.upcoming import enrich_upcoming
+
+    _accumulation_raw(tmp_path, lines_cover_full_season=False)
+
+    features = enrich_upcoming(tmp_path, 2026, [_target_record()])
+
+    assert features["3005"]["home_running_games_played"] == 0
+    assert features["3005"]["home_running_win_pct"] is None
+
+
+def test_enrich_upcoming_never_overwrites_the_historical_features_sidecar(tmp_path):
+    from cfb_system_maker.upcoming import enrich_upcoming
+
+    _accumulation_raw(tmp_path, lines_cover_full_season=True)
+    historical = save_features(tmp_path, {"1": {"neutralSite": True}})
+    before = historical.read_bytes()
+
+    enrich_upcoming(tmp_path, 2026, [_target_record()])
+
+    assert historical.read_bytes() == before
+    assert (tmp_path / "processed" / "upcoming_features.json").exists()
+
+
+def test_upcoming_sidecar_loads_through_the_existing_features_reader(tmp_path):
+    from cfb_system_maker.enrich import load_features_from, upcoming_features_path
+    from cfb_system_maker.features import registry_version
+    from cfb_system_maker.upcoming import enrich_upcoming
+
+    _accumulation_raw(tmp_path, lines_cover_full_season=True)
+    enrich_upcoming(tmp_path, 2026, [_target_record()])
+
+    payload = json.loads(upcoming_features_path(tmp_path).read_text(encoding="utf-8"))
+    assert payload["_meta"]["registry_version"] == registry_version()
+    assert payload["_meta"]["game_count"] == 1
+    assert set(load_features_from(upcoming_features_path(tmp_path))) == {3005}
+
+
 def test_enrich_wind_direction_and_rest_pregame_win_prob(tmp_path):
     season = 2023
     raw_dir = tmp_path / "raw"
