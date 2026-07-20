@@ -1040,3 +1040,84 @@ code {
     padding: 16px;
   }
 }
+
+/* --- Dashboard (Phase 5) --- */
+
+.dash-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.dash-cta {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--panel);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dash-cta:hover {
+  background: var(--accent-dark);
+}
+
+.dash-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 32px;
+  align-items: start;
+}
+
+.dash-side {
+  position: sticky;
+  top: 24px;
+}
+
+.systems-table .system-cell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 320px;
+}
+
+.system-link {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.system-link:hover {
+  text-decoration: underline;
+}
+
+.system-theory {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.dash-shell a:focus-visible,
+.dash-shell button:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+@media (max-width: 900px) {
+  .dash-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dash-side {
+    position: static;
+  }
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -26,7 +27,7 @@ from cfb_system_maker.features import (
     registry_version,
     resolve_feature_value,
 )
-from cfb_system_maker.models import BacktestResult, FeatureFilter, GameRecord, SystemFilter
+from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SavedSystem, SystemFilter
 from cfb_system_maker.storage import list_systems, load_processed_games, load_saved_system, load_system, save_system
 
 _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
@@ -378,6 +379,42 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     app.jinja_env.globals["query_href"] = _query_href
 
     @app.get("/")
+    def dashboard():
+        if _wants_editor(request.args):
+            query = request.query_string.decode()
+            return redirect(f"/system?{query}" if query else "/system")
+
+        tab = "examples" if request.args.get("tab") == "examples" else "mine"
+        try:
+            games = load_processed_games(app.config["DATA_DIR"])
+        except FileNotFoundError:
+            return render_template(
+                "dashboard.html",
+                error="missing_data",
+                tab=tab,
+                timeframe="all",
+                seasons=[],
+                systems=[],
+            )
+
+        feature_map = _try_load_features(app.config["DATA_DIR"])
+        seasons = sorted({game.season for game in games}, reverse=True)
+        timeframe = _normalize_timeframe(request.args.get("timeframe", ""), seasons)
+
+        systems = [
+            _dashboard_row(saved, games, feature_map, timeframe, app.config["DATA_DIR"])
+            for saved in _saved_systems_newest_first(app.config["DATA_DIR"])
+        ]
+        return render_template(
+            "dashboard.html",
+            error=None,
+            tab=tab,
+            timeframe=timeframe,
+            seasons=seasons,
+            systems=systems,
+        )
+
+    @app.get("/system")
     def index():
         try:
             games = load_processed_games(app.config["DATA_DIR"])
@@ -1222,4 +1259,145 @@ def _cumulative_chart(result: BacktestResult) -> dict[str, object]:
         "zero_y": round(zero_y, 2),
         "min_x": 0,
         "max_x": len(ordered) - 1,
+    }
+
+
+# --- Dashboard support --------------------------------------------------------
+
+_EDITOR_PARAMS = frozenset({
+    "side", "bet_type", "total_side",
+    "favorite", "underdog", "home", "away", "fade",
+    "min_spread", "max_spread", "min_total", "max_total",
+    "filter_seasons", "filter_weeks", "filter_teams",
+    "filter_conferences", "filter_providers",
+    "season", "week", "team", "conference", "provider",
+    "save_name", "theory", "load_system",
+})
+
+_FIGURE_CACHE: dict[tuple, BacktestResult] = {}
+
+
+def _wants_editor(args: MultiDict) -> bool:
+    """True when a request to / carries editor state and belongs at /system (D-09)."""
+    return any(key in _EDITOR_PARAMS or key.startswith("ff_") for key in args.keys())
+
+
+def _normalize_timeframe(raw: str, seasons: list[int]) -> str:
+    """Normalize ?timeframe to the literal 'all' or a season present in the data."""
+    if raw and raw != "all":
+        try:
+            candidate = int(raw)
+        except ValueError:
+            return "all"
+        if candidate in seasons:
+            return str(candidate)
+    return "all"
+
+
+def _saved_systems_newest_first(data_dir: Path) -> list[SavedSystem]:
+    saved = []
+    for name in list_systems(data_dir):
+        try:
+            saved.append(load_saved_system(name, data_dir))
+        except (FileNotFoundError, ValueError, json.JSONDecodeError):
+            continue
+    return sorted(saved, key=lambda item: item.saved_at, reverse=True)
+
+
+def _data_fingerprint(data_dir: Path) -> tuple:
+    """Size+mtime of the files the figures derive from, so a rebuild invalidates."""
+    parts = []
+    for name in ("games.csv", "features.json"):
+        path = Path(data_dir) / "processed" / name
+        try:
+            stat = path.stat()
+            parts.append((name, stat.st_size, stat.st_mtime))
+        except OSError:
+            parts.append((name, None, None))
+    return tuple(parts)
+
+
+def _system_key(system: SystemFilter) -> str:
+    """Deterministic identity for a SystemFilter (sets have unstable iteration order)."""
+    def normalize(value: object) -> object:
+        if isinstance(value, (set, frozenset)):
+            return sorted(value, key=str)
+        if isinstance(value, (list, tuple)):
+            return [normalize(item) for item in value]
+        if isinstance(value, dict):
+            return {key: normalize(val) for key, val in value.items()}
+        return value
+
+    return json.dumps(normalize(asdict(system)), sort_keys=True, default=str)
+
+
+def _cached_backtest(
+    system: SystemFilter,
+    games: list[GameRecord],
+    feature_map: dict[int, dict] | None,
+    data_dir: Path,
+) -> BacktestResult:
+    """One all-time run_backtest per system, memoized on system + data identity (D-11)."""
+    key = (_system_key(system), _data_fingerprint(data_dir))
+    cached = _FIGURE_CACHE.get(key)
+    if cached is None:
+        cached = run_backtest(games, system, feature_map=feature_map)
+        _FIGURE_CACHE[key] = cached
+    return cached
+
+
+def _timeframe_figures(result: BacktestResult, timeframe: str) -> dict[str, object]:
+    """Per-season figures derived from the single all-time result, never a second backtest."""
+    if timeframe == "all":
+        return {
+            "bets": result.bets,
+            "wins": result.wins,
+            "losses": result.losses,
+            "pushes": result.pushes,
+            "hit_rate": result.hit_rate,
+            "profit": result.profit,
+            "roi": result.roi,
+            "bet_details": result.bet_details,
+        }
+
+    season = int(timeframe)
+    record = next((row for row in result.season_breakdown if row.season == season), None)
+    details = [bet for bet in result.bet_details if bet.season == season]
+    if record is None:
+        return {
+            "bets": 0, "wins": 0, "losses": 0, "pushes": 0,
+            "hit_rate": 0.0, "profit": 0.0, "roi": 0.0, "bet_details": [],
+        }
+    decided = record.wins + record.losses
+    return {
+        "bets": record.bets,
+        "wins": record.wins,
+        "losses": record.losses,
+        "pushes": record.pushes,
+        "hit_rate": round(record.wins / decided, 4) if decided else 0.0,
+        "profit": record.profit,
+        "roi": record.roi,
+        "bet_details": details,
+    }
+
+
+def _system_type_label(system: SystemFilter) -> str:
+    label = "Over/Under" if system.bet_type == "total" else "Spread"
+    return f"{label} · Fade" if system.fade else label
+
+
+def _dashboard_row(
+    saved: SavedSystem,
+    games: list[GameRecord],
+    feature_map: dict[int, dict] | None,
+    timeframe: str,
+    data_dir: Path,
+) -> dict[str, object]:
+    result = _cached_backtest(saved.system, games, feature_map, data_dir)
+    figures = _timeframe_figures(result, timeframe)
+    return {
+        "name": saved.name,
+        "theory_line": saved.theory.strip().splitlines()[0] if saved.theory.strip() else "",
+        "type_label": _system_type_label(saved.system),
+        "figures": figures,
     }

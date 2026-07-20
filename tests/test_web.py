@@ -490,7 +490,7 @@ def test_web_feature_filter_remove_href_keeps_five_arrays_aligned(tmp_path):
     app = create_app(data_dir=tmp_path)
 
     response = app.test_client().get(
-        "/?side=home"
+        "/system?side=home"
         "&ff_enable=weather_temperature&ff_enable=weather_windSpeed"
         "&ff_key=weather_temperature&ff_key=weather_windSpeed"
         "&ff_op=gte&ff_op=lte"
@@ -838,7 +838,7 @@ def test_dashboard_missing_games_file_renders_missing_data_state(tmp_path):
     response = app.test_client().get("/")
 
     assert response.status_code == 200
-    assert "missing" in response.get_data(as_text=True).lower()
+    assert "No processed data found" in response.get_data(as_text=True)
 
 
 def test_save_redirects_to_editor_with_system_loaded(tmp_path):

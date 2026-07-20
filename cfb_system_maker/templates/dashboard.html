@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Systems &middot; CFB System Maker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <div class="dash-shell">
+      <header class="dash-header">
+        <div class="brand">
+          <span class="brand-mark">CFB</span>
+          <div>
+            <h1>My Systems</h1>
+          </div>
+        </div>
+        <a class="dash-cta" href="{{ url_for('index') }}">New System</a>
+      </header>
+
+      {% if error == "missing_data" %}
+        <div class="empty-state">
+          <h2>No processed data found</h2>
+          <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025 --data-dir data</code>, then refresh.</p>
+        </div>
+      {% else %}
+      <div class="dash-columns">
+        <section class="dash-main" aria-label="Saved systems">
+          <nav class="tabs" aria-label="System scope">
+            <a href="?tab=mine{% if timeframe != 'all' %}&amp;timeframe={{ timeframe }}{% endif %}" {% if tab == 'mine' %}aria-current="page"{% endif %}>My Systems</a>
+            <a href="?tab=examples{% if timeframe != 'all' %}&amp;timeframe={{ timeframe }}{% endif %}" {% if tab == 'examples' %}aria-current="page"{% endif %}>Example Systems</a>
+          </nav>
+
+          {% if not systems %}
+            <div class="empty-state">
+              <h2>No saved systems yet</h2>
+              <p>Build a system in the editor, or open one from Example Systems to see how it works.</p>
+            </div>
+          {% else %}
+            <div class="table-wrap">
+              <table class="systems-table">
+                <thead>
+                  <tr>
+                    <th>System</th>
+                    <th>Type</th>
+                    <th>Record</th>
+                    <th>Money Won</th>
+                    <th>ROI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in systems %}
+                    {% set fig = row.figures %}
+                    <tr>
+                      <td class="system-cell">
+                        <a class="system-link" href="{{ url_for('index') }}?load_system={{ row.name|urlencode }}">{{ row.name }}</a>
+                        {% if row.theory_line %}<p class="system-theory">{{ row.theory_line }}</p>{% endif %}
+                      </td>
+                      <td>{{ row.type_label }}</td>
+                      <td>{{ fig.wins }}-{{ fig.losses }}-{{ fig.pushes }}, {{ "%.1f%%"|format(fig.hit_rate * 100) }}</td>
+                      <td class="{{ 'positive' if fig.profit > 0 else 'negative' if fig.profit < 0 else '' }}">{% if fig.profit > 0 %}+${{ "{:,.0f}".format(fig.profit * 100) }}{% elif fig.profit < 0 %}-${{ "{:,.0f}".format(-fig.profit * 100) }}{% else %}$0{% endif %}</td>
+                      <td class="{{ 'positive' if fig.roi > 0 else 'negative' if fig.roi < 0 else '' }}">{{ "%.2f%%"|format(fig.roi * 100) }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        </section>
+
+        <aside class="dash-side" aria-label="Current Matches">
+          <!-- Current Matches panel — filled by Plan 05-06 (DASH-03). -->
+        </aside>
+      </div>
+      {% endif %}
+    </div>
+  </body>
+</html>

@@ -14,6 +14,7 @@
           <div>
             <h1>CFB System Maker</h1>
             <p>{{ options.seasons|length and (options.seasons[0] ~ "-" ~ options.seasons[-1]) or "No data" }}</p>
+            <p><a href="{{ url_for('dashboard') }}">&larr; My Systems</a></p>
           </div>
         </div>
 

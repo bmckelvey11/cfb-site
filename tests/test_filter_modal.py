@@ -630,7 +630,7 @@ def test_index_active_filters_have_edit_beside_remove(tmp_path):
     )
     app = create_app(data_dir=tmp_path)
     html = app.test_client().get(
-        "/?side=home&filter_seasons=2023"
+        "/system?side=home&filter_seasons=2023"
         "&ff_enable=neutralSite&ff_key=neutralSite&ff_op=eq&ff_value=true&ff_perspective=single"
     ).get_data(as_text=True)
 
