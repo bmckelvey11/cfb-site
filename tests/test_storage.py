@@ -1,8 +1,19 @@
 import json
 from datetime import datetime
 
+import pytest
+
+from cfb_system_maker.features import FEATURE_REGISTRY
 from cfb_system_maker.models import GameRecord
-from cfb_system_maker.storage import load_processed_games, load_raw_json, save_processed_games, save_raw_json
+from cfb_system_maker.storage import (
+    _safe_system_name,
+    list_examples,
+    load_example_system,
+    load_processed_games,
+    load_raw_json,
+    save_processed_games,
+    save_raw_json,
+)
 
 
 def test_raw_json_round_trip(tmp_path):
@@ -46,3 +57,70 @@ def test_processed_games_csv_round_trip(tmp_path):
 
     assert path.name == "games.csv"
     assert loaded == games
+
+
+# --- Bundled example systems (Phase 5, Plan 05) -------------------------------
+
+EXPECTED_EXAMPLE_NAMES = [
+    "neutral-site-dogs",
+    "spread-home-favorites",
+    "total-unders-high-lines",
+]
+
+SEASON_TO_DATE_KEYS = {
+    feature.key for feature in FEATURE_REGISTRY if feature.group == "season_to_date"
+}
+WEATHER_KEYS = {feature.key for feature in FEATURE_REGISTRY if feature.group == "weather"}
+
+
+def test_list_examples_returns_the_three_bundled_names(tmp_path):
+    # Independent of any data directory: examples live in the package (D-14).
+    assert list_examples() == EXPECTED_EXAMPLE_NAMES
+
+
+def test_every_example_name_passes_the_safe_name_gate():
+    for name in list_examples():
+        assert _safe_system_name(name) == name
+
+
+def test_every_example_round_trips_with_a_written_theory():
+    for name in list_examples():
+        saved = load_example_system(name)
+        assert saved.name == name
+        assert saved.theory.strip(), f"{name} has no theory (D-17)"
+        assert saved.system.bet_type in {"spread", "total"}
+
+
+def test_no_example_filters_on_provider_weather_or_season_to_date():
+    # D-21: these would guarantee zero matches on upcoming games. Written as a
+    # loop so a fourth example added later cannot quietly violate it.
+    for name in list_examples():
+        system = load_example_system(name).system
+        assert not system.providers, f"{name} declares a provider filter"
+        for filt in system.feature_filters:
+            assert filt.key not in WEATHER_KEYS, f"{name} filters on weather {filt.key}"
+            assert filt.key not in SEASON_TO_DATE_KEYS, (
+                f"{name} filters on season-to-date {filt.key}"
+            )
+
+
+def test_at_least_one_example_exercises_a_registry_feature():
+    # D-16: one example per capability — spread, total, and a registry feature.
+    kinds = {load_example_system(name).system.bet_type for name in list_examples()}
+    assert {"spread", "total"} <= kinds
+    assert any(load_example_system(name).system.feature_filters for name in list_examples())
+
+
+def test_load_example_system_rejects_path_traversal_name():
+    with pytest.raises(ValueError):
+        load_example_system("../../outside_secret")
+
+
+def test_load_example_system_reads_from_an_override_directory(tmp_path):
+    (tmp_path / "custom-example.json").write_text(
+        json.dumps({"name": "custom-example", "theory": "why", "system": {"bet_type": "total"}}),
+        encoding="utf-8",
+    )
+
+    assert list_examples(tmp_path) == ["custom-example"]
+    assert load_example_system("custom-example", tmp_path).theory == "why"

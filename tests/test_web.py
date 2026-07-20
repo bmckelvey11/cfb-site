@@ -1,11 +1,22 @@
+import json
 import re
 from urllib.parse import parse_qs
 
+from markupsafe import escape
+
+from cfb_system_maker import web
 from cfb_system_maker.backtest import compute_grade, run_backtest
 from cfb_system_maker.models import BacktestResult, BetDetail, SystemFilter
 from cfb_system_maker.sample_data import SAMPLE_GAMES_2023, SAMPLE_LINES_2023
 from cfb_system_maker.normalize import normalize_games
-from cfb_system_maker.storage import save_processed_games
+from cfb_system_maker.storage import (
+    EXAMPLES_DIR,
+    list_examples,
+    list_systems,
+    load_example_system,
+    load_saved_system,
+    save_processed_games,
+)
 from cfb_system_maker.web import _cumulative_chart, _sparkline, create_app
 
 
@@ -1038,3 +1049,131 @@ def test_dashboard_timeframe_not_in_data_falls_back_to_all_time(tmp_path):
 
     expected = run_backtest(games, SystemFilter(side="home"))
     assert _money_won_text(expected.profit) in html
+
+
+# --- Example Systems tab (Phase 5, Plan 05) -----------------------------------
+
+
+def test_example_systems_tab_lists_all_three_examples(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/?tab=examples")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    for name in list_examples():
+        assert name in html
+    assert "not betting recommendations" in html
+
+
+def test_example_systems_tab_shows_figures_and_trend_column(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    html = app.test_client().get("/?tab=examples").get_data(as_text=True)
+
+    # Same table shape as My Systems, from the same backtest path.
+    assert "Money Won" in html
+    assert "Trend" in html
+    assert html.count("Copy to My Systems") == len(list_examples())
+    assert "No saved systems yet" not in html
+
+
+def test_example_systems_tab_shows_each_written_theory(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    html = app.test_client().get("/?tab=examples").get_data(as_text=True)
+
+    for name in list_examples():
+        theory = load_example_system(name).theory
+        assert theory.strip()
+        assert escape(theory.strip()) in html
+
+
+def test_my_systems_tab_never_lists_an_example(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "my-own-system")
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert "my-own-system" in html
+    for name in list_examples():
+        assert name not in html
+
+
+def test_example_systems_tab_never_lists_a_user_system(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "my-own-system")
+
+    html = client.get("/?tab=examples").get_data(as_text=True)
+
+    assert "my-own-system" not in html
+
+
+def test_copy_example_creates_an_ordinary_saved_system(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+
+    response = client.post("/copy-example", data={"name": "neutral-site-dogs"})
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/?tab=examples")
+    assert "neutral-site-dogs" in list_systems(tmp_path)
+    copied = load_saved_system("neutral-site-dogs", tmp_path)
+    original = load_example_system("neutral-site-dogs")
+    assert copied.system == original.system
+    assert copied.theory == original.theory
+
+
+def test_copy_example_leaves_the_bundled_file_untouched(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    bundled = EXAMPLES_DIR / "neutral-site-dogs.json"
+    before = bundled.read_bytes()
+
+    app.test_client().post("/copy-example", data={"name": "neutral-site-dogs"})
+
+    assert bundled.read_bytes() == before
+
+
+def test_copy_example_rejects_a_traversal_name(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().post("/copy-example", data={"name": "../../outside_secret"})
+
+    assert response.status_code == 302
+    assert not (tmp_path.parent.parent / "outside_secret.json").exists()
+    assert list_systems(tmp_path) == []
+
+
+def test_copy_example_rejects_an_unknown_name(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().post("/copy-example", data={"name": "not-an-example"})
+
+    assert response.status_code == 302
+    assert list_systems(tmp_path) == []
+
+
+def test_example_systems_tab_escapes_name_and_theory(tmp_path, monkeypatch):
+    app, _ = _dashboard_app(tmp_path)
+    hostile = tmp_path / "hostile-examples"
+    hostile.mkdir()
+    (hostile / "xss-example.json").write_text(
+        json.dumps(
+            {
+                "name": "<script>alert(1)</script>",
+                "theory": '<img src=x onerror=alert(2)> "quoted"',
+                "system": {"bet_type": "spread", "side": "home"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(web, "EXAMPLES_DIR", hostile)
+
+    html = app.test_client().get("/?tab=examples").get_data(as_text=True)
+
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "<img src=x onerror=alert(2)>" not in html
+    assert "&lt;img src=x onerror=alert(2)&gt;" in html
