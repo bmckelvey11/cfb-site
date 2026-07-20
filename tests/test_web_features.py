@@ -24,7 +24,7 @@ def test_unenabled_feature_filters_do_not_zero_out_matches(tmp_path):
     app = create_app(tmp_path)
 
     # Submit all ff_key fields but none enabled — should match default home system bets
-    response = app.test_client().get("/?side=home")
+    response = app.test_client().get("/system?side=home")
     html = response.get_data(as_text=True)
     assert "No bets matched" not in html or "Bets" in html
 
@@ -45,11 +45,11 @@ def test_stale_registry_warning_shows_only_for_old_sidecar(tmp_path):
 
     path = tmp_path / "processed" / "features.json"
     path.write_text(json.dumps({"_meta": {"registry_version": "outdated"}, "games": rows}), encoding="utf-8")
-    html = create_app(tmp_path).test_client().get("/").get_data(as_text=True)
+    html = create_app(tmp_path).test_client().get("/system").get_data(as_text=True)
     assert "older field registry" in html
 
     save_features(tmp_path, rows)
-    html = create_app(tmp_path).test_client().get("/").get_data(as_text=True)
+    html = create_app(tmp_path).test_client().get("/system").get_data(as_text=True)
     assert "older field registry" not in html
 
 
@@ -71,5 +71,5 @@ def test_coverage_panel_reports_non_null_share(tmp_path):
     assert "Temperature (F)" in html
 
     # No enabled filters: panel absent
-    html = app.test_client().get("/?side=home").get_data(as_text=True)
+    html = app.test_client().get("/system?side=home").get_data(as_text=True)
     assert "Filter Coverage" not in html

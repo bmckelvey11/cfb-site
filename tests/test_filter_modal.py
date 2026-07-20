@@ -128,7 +128,7 @@ def test_index_has_season_dialog_launcher_markup(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
-    html = app.test_client().get("/").get_data(as_text=True)
+    html = app.test_client().get("/system").get_data(as_text=True)
     assert 'id="filter-modal"' in html
     assert 'data-candidate-id="core:season"' in html
     assert "Save Filter" in html
@@ -337,7 +337,7 @@ def test_index_has_grouped_launchers_and_fallback(tmp_path):
         tmp_path,
         {str(game.game_id): {"neutralSite": False, "venue": "Dome"} for game in games},
     )
-    html = create_app(data_dir=tmp_path).test_client().get("/").get_data(as_text=True)
+    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
     for candidate in (
         "core:season",
         "core:week",
@@ -528,7 +528,7 @@ def test_filter_modal_js_numeric_range_chart_between_and_save():
 def test_index_has_chart_list_toggle_markup(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
-    html = create_app(data_dir=tmp_path).test_client().get("/").get_data(as_text=True)
+    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
     assert 'id="filter-modal-view-toggle"' in html
     assert ">Chart<" in html
     assert ">List<" in html
@@ -562,7 +562,7 @@ def test_numeric_feature_fallback_has_paired_gte_lte_slots(tmp_path):
         tmp_path,
         {str(game.game_id): {"weather_temperature": 55.0} for game in games},
     )
-    html = create_app(data_dir=tmp_path).test_client().get("/").get_data(as_text=True)
+    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
     assert 'data-fallback-for="feature:weather_temperature"' in html
     assert 'data-bound="min"' in html
     assert 'data-bound="max"' in html
@@ -644,7 +644,7 @@ def test_index_active_filters_have_edit_beside_remove(tmp_path):
     # Feature sentence also editable
     assert "data-candidate-id=\"feature:neutralSite\"" in html
     # Global toggles are not Edit-modal filters
-    fav_html = app.test_client().get("/?side=home&favorite=on").get_data(as_text=True)
+    fav_html = app.test_client().get("/system?side=home&favorite=on").get_data(as_text=True)
     assert "the team is a favorite" in fav_html
     assert 'aria-label="Edit filter: the team is a favorite"' not in fav_html
     assert 'aria-label="Remove filter: the team is a favorite"' in fav_html

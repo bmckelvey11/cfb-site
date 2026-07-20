@@ -117,7 +117,7 @@ def test_web_index_loads_filters_and_default_results(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/")
+    response = app.test_client().get("/system")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -140,7 +140,7 @@ def test_web_filters_apply_to_results(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?side=away&underdog=on&min_spread=3&tab=matches")
+    response = app.test_client().get("/system?side=away&underdog=on&min_spread=3&tab=matches")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -161,7 +161,7 @@ def test_web_malformed_choice_params_fall_back_to_defaults_instead_of_500(tmp_pa
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?bet_type=nonsense&side=sideways&total_side=whenever")
+    response = app.test_client().get("/system?bet_type=nonsense&side=sideways&total_side=whenever")
 
     assert response.status_code == 200
     expected = run_backtest(games, SystemFilter(side="home"))
@@ -174,7 +174,7 @@ def test_web_margin_chip_shows_em_dash_for_total_bet_systems(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?bet_type=total&total_side=over")
+    response = app.test_client().get("/system?bet_type=total&total_side=over")
 
     assert response.status_code == 200
     metrics_html = _metrics_section(response.get_data(as_text=True))
@@ -186,7 +186,7 @@ def test_web_money_won_chip_renders_unsigned_zero_for_no_matched_bets(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?season=2099")
+    response = app.test_client().get("/system?season=2099")
 
     assert response.status_code == 200
     metrics_html = _metrics_section(response.get_data(as_text=True))
@@ -200,7 +200,7 @@ def test_web_grade_chip_renders_computed_letter_for_default_system(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/")
+    response = app.test_client().get("/system")
 
     assert response.status_code == 200
     metrics_html = _metrics_section(response.get_data(as_text=True))
@@ -214,11 +214,11 @@ def test_web_grade_chip_renders_em_dash_for_zero_matched_bets(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?season=2099")
+    response = app.test_client().get("/system?season=2099")
     metrics_html = _metrics_section(response.get_data(as_text=True))
     assert "<span>Grade</span><strong>&mdash;</strong>" in metrics_html
 
-    faded_response = app.test_client().get("/?season=2099&fade=on")
+    faded_response = app.test_client().get("/system?season=2099&fade=on")
     faded_metrics_html = _metrics_section(faded_response.get_data(as_text=True))
     assert "<span>Grade</span><strong>&mdash;</strong>" in faded_metrics_html
 
@@ -228,7 +228,7 @@ def test_web_has_all_dropdowns_market_choice_and_range_chart(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?bet_type=total&total_side=over&min_total=45&max_total=55")
+    response = app.test_client().get("/system?bet_type=total&total_side=over&min_total=45&max_total=55")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -245,7 +245,7 @@ def test_web_has_all_dropdowns_market_choice_and_range_chart(tmp_path):
 def test_web_missing_data_shows_setup_message(tmp_path):
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/")
+    response = app.test_client().get("/system")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -258,7 +258,7 @@ def test_web_graceful_without_features_json(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/")
+    response = app.test_client().get("/system")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -285,7 +285,7 @@ def test_web_save_and_load_system(tmp_path):
     )
     assert save_response.status_code == 302
 
-    load_response = client.get("/?load_system=away-dogs")
+    load_response = client.get("/system?load_system=away-dogs")
     html = load_response.get_data(as_text=True)
     assert "Loaded:" in html
     assert "away-dogs" in html
@@ -312,7 +312,7 @@ def test_web_load_system_path_traversal_name_treated_as_not_found(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?load_system=../../secret_system")
+    response = app.test_client().get("/system?load_system=../../secret_system")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -335,7 +335,7 @@ def test_web_index_shows_per_season_breakdown_and_permutation_p(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?side=home&favorite=on")
+    response = app.test_client().get("/system?side=home&favorite=on")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -349,7 +349,7 @@ def test_web_default_tab_shows_results_graph_view(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/")
+    response = app.test_client().get("/system")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -363,7 +363,7 @@ def test_web_invalid_tab_value_normalizes_to_results_graph(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?tab=garbage")
+    response = app.test_client().get("/system?tab=garbage")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -376,7 +376,7 @@ def test_web_cumulative_chart_svg_title_shows_dollar_scaled_value(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/")
+    response = app.test_client().get("/system")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -401,7 +401,7 @@ def test_web_tab_switch_preserves_load_system_and_round_trips(tmp_path):
         },
     )
 
-    response = client.get("/?load_system=away-dogs&tab=matches")
+    response = client.get("/system?load_system=away-dogs&tab=matches")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
 
@@ -414,7 +414,7 @@ def test_web_tab_switch_preserves_load_system_and_round_trips(tmp_path):
     assert "Money Won Over Time" not in html
     assert '<section class="table-wrap">' in html
 
-    second_response = client.get("/" + graph_href)
+    second_response = client.get("/system" + graph_href)
     assert second_response.status_code == 200
     second_html = second_response.get_data(as_text=True)
     assert "load_system=away-dogs" in second_html
@@ -440,7 +440,7 @@ def test_web_tab_switch_preserves_load_system_and_round_trips_fade(tmp_path):
         },
     )
 
-    response = client.get("/?load_system=away-dogs-fade&tab=matches")
+    response = client.get("/system?load_system=away-dogs-fade&tab=matches")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert 'name="fade" form="filters-form" checked' in html
@@ -451,7 +451,7 @@ def test_web_tab_switch_preserves_load_system_and_round_trips_fade(tmp_path):
     assert "tab=graph" in graph_href
     assert "load_system=away-dogs-fade" in graph_href
 
-    second_response = client.get("/" + graph_href)
+    second_response = client.get("/system" + graph_href)
     assert second_response.status_code == 200
     second_html = second_response.get_data(as_text=True)
     assert "load_system=away-dogs-fade" in second_html
@@ -472,7 +472,7 @@ def test_web_spread_range_remove_href_omits_both_bounds_and_preserves_other_para
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?side=away&underdog=on&min_spread=3")
+    response = app.test_client().get("/system?side=away&underdog=on&min_spread=3")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -529,7 +529,7 @@ def test_web_loaded_system_remove_link_materializes_and_drops_load_system(tmp_pa
         },
     )
 
-    response = client.get("/?load_system=two-filters&tab=matches")
+    response = client.get("/system?load_system=two-filters&tab=matches")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "the team is an underdog" in html
@@ -542,7 +542,7 @@ def test_web_loaded_system_remove_link_materializes_and_drops_load_system(tmp_pa
     assert "tab=matches" in href
     assert "theory=" in href
 
-    second_response = client.get("/" + href)
+    second_response = client.get("/system" + href)
     assert second_response.status_code == 200
     second_html = second_response.get_data(as_text=True)
 
@@ -576,7 +576,7 @@ def test_web_loaded_system_remove_link_preserves_fade(tmp_path):
         },
     )
 
-    response = client.get("/?load_system=two-filters-fade&tab=matches")
+    response = client.get("/system?load_system=two-filters-fade&tab=matches")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert 'name="fade" form="filters-form" checked' in html
@@ -584,7 +584,7 @@ def test_web_loaded_system_remove_link_preserves_fade(tmp_path):
     href = _remove_href_for(html, "Remove filter: the team is an underdog")
     assert "fade=on" in href
 
-    second_response = client.get("/" + href)
+    second_response = client.get("/system" + href)
     assert second_response.status_code == 200
     second_html = second_response.get_data(as_text=True)
     assert 'name="fade" form="filters-form" checked' in second_html
@@ -595,7 +595,7 @@ def test_web_no_active_filters_shows_empty_state_copy(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/")
+    response = app.test_client().get("/system")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -607,7 +607,7 @@ def test_web_active_filter_sentence_renders_with_remove_control(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?side=home&favorite=on")
+    response = app.test_client().get("/system?side=home&favorite=on")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -633,7 +633,7 @@ def test_web_save_and_load_system_preserves_theory(tmp_path):
     )
     assert save_response.status_code == 302
 
-    load_response = client.get("/?load_system=theory-system")
+    load_response = client.get("/system?load_system=theory-system")
     html = load_response.get_data(as_text=True)
     assert 'name="theory"' in html
     assert "Fade the public." in html
@@ -657,7 +657,7 @@ def test_web_save_and_load_system_preserves_fade(tmp_path):
     )
     assert save_response.status_code == 302
 
-    load_response = client.get("/?load_system=faded-system")
+    load_response = client.get("/system?load_system=faded-system")
     html = load_response.get_data(as_text=True)
     assert 'name="fade" form="filters-form" checked' in html
 
@@ -667,7 +667,7 @@ def test_web_fresh_index_does_not_render_theory_panel(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/")
+    response = app.test_client().get("/system")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -679,7 +679,7 @@ def test_web_theory_round_trips_through_get_form_submission(tmp_path):
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
 
-    response = app.test_client().get("/?theory=Unsaved+hypothesis&save_name=draft")
+    response = app.test_client().get("/system?theory=Unsaved+hypothesis&save_name=draft")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -706,7 +706,192 @@ def test_web_theory_is_escaped_and_never_rendered_via_safe_filter(tmp_path):
         },
     )
 
-    response = client.get("/?load_system=xss-theory")
+    response = client.get("/system?load_system=xss-theory")
     html = response.get_data(as_text=True)
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+# --- Dashboard (Phase 5, Plan 03) ---------------------------------------------
+
+
+def _dashboard_app(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    return create_app(data_dir=tmp_path), games
+
+
+def _save_a_system(client, name, **extra):
+    data = {
+        "save_name": name,
+        "bet_type": "spread",
+        "side": "home",
+        "total_side": "over",
+    }
+    data.update(extra)
+    return client.post("/save", data=data)
+
+
+def test_dashboard_is_served_at_root(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "My Systems" in html
+    # The editor's filter form must not be on the dashboard.
+    assert 'id="filters-form"' not in html
+
+
+def test_editor_is_served_at_system(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/system")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'id="filters-form"' in html
+    assert "Run System" in html
+
+
+def test_dashboard_loads_no_javascript(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    html = app.test_client().get("/").get_data(as_text=True)
+
+    assert "<script" not in html
+    assert "filter_modal.js" not in html
+
+
+def test_root_with_editor_filter_params_redirects_to_system_preserving_query(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/?side=home&favorite=on")
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert location.startswith("/system?")
+    assert "side=home" in location
+    assert "favorite=on" in location
+
+
+def test_root_redirect_preserves_repeated_multi_value_params(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/?filter_seasons=2022&filter_seasons=2023")
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert location.count("filter_seasons=") == 2
+
+
+def test_root_with_load_system_redirects_to_editor(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/?load_system=away-dogs")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith("/system?")
+    assert "load_system=away-dogs" in response.headers["Location"]
+
+
+def test_root_with_feature_filter_param_redirects_to_editor(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/?ff_enabled=core%3Aseason")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith("/system?")
+
+
+def test_root_with_dashboard_tab_param_does_not_redirect(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/?tab=examples")
+
+    assert response.status_code == 200
+
+
+def test_root_with_timeframe_param_does_not_redirect(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/?timeframe=2023")
+
+    assert response.status_code == 200
+
+
+def test_dashboard_unknown_tab_falls_back_to_default_scope(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().get("/?tab=garbage")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'aria-current="page"' in html
+    assert "My Systems" in html
+
+
+def test_dashboard_missing_games_file_renders_missing_data_state(tmp_path):
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    assert "missing" in response.get_data(as_text=True).lower()
+
+
+def test_save_redirects_to_editor_with_system_loaded(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+
+    response = _save_a_system(client, "dash-save")
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert location.startswith("/system")
+    assert "load_system=dash-save" in location
+
+
+def test_save_without_name_redirects_to_editor_not_dashboard(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().post("/save", data={"save_name": "  "})
+
+    assert response.status_code == 302
+    assert response.headers["Location"].rstrip("?") == "/system"
+
+
+def test_dashboard_lists_saved_system_with_record_money_and_roi(tmp_path):
+    app, games = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "dash-home")
+
+    html = client.get("/").get_data(as_text=True)
+
+    expected = run_backtest(games, SystemFilter(side="home"))
+    assert "dash-home" in html
+    assert _money_won_text(expected.profit) in html
+    assert "{:.2f}%".format(expected.roi * 100) in html
+    assert "{}-{}-{}".format(expected.wins, expected.losses, expected.pushes) in html
+
+
+def test_dashboard_escapes_system_name_and_theory(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "xss-dash", theory='<script>alert(1)</script> "quoted"')
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+def test_dashboard_shows_fade_suffix_on_type_column(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "faded-dash", fade="on")
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert "Fade" in html
