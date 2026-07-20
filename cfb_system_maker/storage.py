@@ -12,6 +12,8 @@ from cfb_system_maker.models import FeatureFilter, GameRecord, SavedSystem, Syst
 
 _SYSTEM_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
+UPCOMING_FIELDS = [field.name for field in fields(GameRecord)] + ["start_date", "start_time_tbd"]
+
 
 def _safe_system_name(name: str) -> str:
     if not _SYSTEM_NAME_RE.match(name):
@@ -54,6 +56,58 @@ def load_processed_games(data_dir: str | Path) -> list[GameRecord]:
     path = Path(data_dir) / "processed" / "games.csv"
     with path.open(newline="", encoding="utf-8") as file:
         return [_row_to_game(row) for row in csv.DictReader(file)]
+
+
+def save_upcoming_games(
+    data_dir: str | Path,
+    games: list[GameRecord],
+    kickoffs: dict[int, dict[str, Any]],
+) -> Path:
+    """Write the upcoming-games table.
+
+    Deliberately a separate file from ``games.csv``: it is not bound by the
+    ``GameRecord`` field-order contract and carries two extra kickoff columns.
+    """
+    path = Path(data_dir) / "processed" / "upcoming.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=UPCOMING_FIELDS)
+        writer.writeheader()
+        for game in games:
+            kickoff = kickoffs.get(game.game_id, {})
+            row = asdict(game)
+            start_date = kickoff.get("start_date")
+            row["start_date"] = "" if start_date is None else str(start_date)
+            row["start_time_tbd"] = "true" if kickoff.get("start_time_tbd") else "false"
+            writer.writerow(row)
+    return path
+
+
+def load_upcoming_games(data_dir: str | Path) -> tuple[list[GameRecord], dict[int, dict[str, Any]]]:
+    path = Path(data_dir) / "processed" / "upcoming.csv"
+    games: list[GameRecord] = []
+    kickoffs: dict[int, dict[str, Any]] = {}
+    with path.open(newline="", encoding="utf-8") as file:
+        for row in csv.DictReader(file):
+            game = _row_to_game(row)
+            games.append(game)
+            kickoffs[game.game_id] = {
+                "start_date": _none_if_blank(row["start_date"]),
+                "start_time_tbd": row["start_time_tbd"] == "true",
+            }
+    return games, kickoffs
+
+
+def save_upcoming_meta(data_dir: str | Path, meta: dict[str, Any]) -> Path:
+    path = Path(data_dir) / "processed" / "upcoming_meta.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(meta, default=str, indent=2, sort_keys=True), encoding="utf-8")
+    return path
+
+
+def load_upcoming_meta(data_dir: str | Path) -> dict[str, Any]:
+    path = Path(data_dir) / "processed" / "upcoming_meta.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _row_to_game(row: dict[str, str]) -> GameRecord:
