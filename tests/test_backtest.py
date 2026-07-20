@@ -11,6 +11,7 @@ from cfb_system_maker.backtest import (
     compute_system_stats,
     count_overfit_filters,
     grade_bet,
+    matches_system,
     run_backtest,
     sign_consistency,
     split_holdout,
@@ -593,3 +594,127 @@ def test_run_backtest_populates_grade_field():
     assert len(result.grade) == 1
     assert [r.season for r in result.season_breakdown] == [2022, 2023]
     assert all(r.bets == 1 for r in result.season_breakdown)
+
+
+# --- Unplayed-game matching (D-18) -------------------------------------------
+# Current Matches must evaluate games with no result yet. No placeholder scores
+# are used anywhere below: an unplayed game carries null points, full stop.
+
+
+def _unplayed_game(*, spread=-7.0, total=52.5, game_id=9100):
+    return GameRecord(
+        game_id=game_id,
+        season=2026,
+        week=3,
+        home_team="Georgia",
+        away_team="Clemson",
+        home_conference="SEC",
+        away_conference="ACC",
+        home_points=None,
+        away_points=None,
+        provider="consensus",
+        spread=spread,
+        total=total,
+    )
+
+
+def test_unplayed_game_is_rejected_by_default_and_matched_when_played_not_required():
+    game = _unplayed_game()
+    system = SystemFilter(side="home", favorite=True)
+
+    assert matches_system(game, system) is False
+    assert matches_system(game, system, require_played=False) is True
+
+
+def test_require_played_false_still_applies_every_other_filter():
+    game = _unplayed_game()  # home is a 7-point favorite
+
+    # underdog on the home side contradicts a -7.0 home spread
+    assert matches_system(game, SystemFilter(side="home", underdog=True), require_played=False) is False
+    # season / week / team filters are likewise untouched by the flag
+    assert matches_system(game, SystemFilter(side="home", seasons={2025}), require_played=False) is False
+    assert matches_system(game, SystemFilter(side="home", weeks={9}), require_played=False) is False
+    assert matches_system(game, SystemFilter(side="home", teams={"Alabama"}), require_played=False) is False
+
+
+def test_require_played_false_does_not_relax_the_missing_spread_guard():
+    game = _unplayed_game(spread=None)
+
+    assert matches_system(game, SystemFilter(side="home"), require_played=False) is False
+
+
+def test_require_played_false_still_evaluates_feature_filters_and_fails_closed_on_null():
+    game = _unplayed_game()
+    system = SystemFilter(
+        side="home",
+        feature_filters=(FeatureFilter("weather_temperature", "gte", 50.0),),
+    )
+
+    passing_map = {game.game_id: {"weather_temperature": 55.0}}
+    failing_map = {game.game_id: {"weather_temperature": 30.0}}
+    null_map = {game.game_id: {"weather_temperature": None}}
+
+    assert matches_system(game, system, passing_map, require_played=False) is True
+    assert matches_system(game, system, failing_map, require_played=False) is False
+    assert matches_system(game, system, null_map, require_played=False) is False
+    assert matches_system(game, system, {}, require_played=False) is False
+
+
+# --- Per-season derivation from an all-time result (D-11) ---------------------
+# The dashboard's timeframe tabs read per-season figures off ONE all-time
+# run_backtest rather than re-running (and re-permuting) per season. That is
+# only sound if the derived bet set is identical to a season-restricted run.
+
+_SEASON_SPECS = {
+    2021: [(1, 28, 21, -6.5), (2, 17, 20, -3.0), (3, 30, 14, -14.5), (4, 24, 21, -3.0), (5, 35, 10, -20.5)],
+    2022: [(1, 21, 24, -2.5), (2, 42, 7, -10.0), (3, 14, 13, -7.5), (4, 27, 20, -7.0), (5, 31, 28, -1.5)],
+    2023: [(1, 20, 17, -9.5), (2, 38, 21, -13.0), (3, 10, 24, -4.5), (4, 45, 24, -21.0), (5, 26, 23, -3.0)],
+}
+
+
+def _multi_season_games():
+    games = []
+    for season, specs in _SEASON_SPECS.items():
+        for week, home_points, away_points, spread in specs:
+            games.append(
+                GameRecord(
+                    game_id=season * 100 + week,
+                    season=season,
+                    week=week,
+                    home_team=f"Home{week}",
+                    away_team=f"Away{week}",
+                    home_conference="ACC",
+                    away_conference="SEC",
+                    home_points=home_points,
+                    away_points=away_points,
+                    provider="consensus",
+                    spread=spread,
+                    total=49.5,
+                )
+            )
+    return games
+
+
+def test_season_slice_of_all_time_backtest_equals_season_restricted_backtest():
+    games = _multi_season_games()
+    system = SystemFilter(side="home")
+    all_time = run_backtest(games, system)
+
+    assert all_time.bets == len(games)
+
+    for season in _SEASON_SPECS:
+        restricted = run_backtest(games, replace(system, seasons={season}))
+        derived = [bet for bet in all_time.bet_details if bet.season == season]
+
+        assert len(derived) >= 3  # each season carries a meaningful sample
+        assert sorted((bet.game_id, bet.profit) for bet in derived) == sorted(
+            (bet.game_id, bet.profit) for bet in restricted.bet_details
+        )
+
+        season_record = next(r for r in all_time.season_breakdown if r.season == season)
+        assert season_record.bets == restricted.bets
+        assert season_record.wins == restricted.wins
+        assert season_record.losses == restricted.losses
+        assert season_record.pushes == restricted.pushes
+        assert season_record.profit == restricted.profit
+        assert season_record.roi == restricted.roi
