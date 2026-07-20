@@ -154,14 +154,14 @@ Plans:
 
 *Alternate-line ("teaser") records from the Record chip (DASH-04) were descoped during phase discussion on 2026-07-20. Partial decisions and the two open questions are preserved in `05-CONTEXT.md` under Deferred Ideas.*
 
-**Plans**: 6 plans
+**Plans**: 1/6 plans executed
 
 Plans:
 
 **Wave 1** *(parallel — disjoint file sets)*
 
 - [ ] 05-01-PLAN.md — `upcoming` CLI: week resolution (incl. postseason + backward offseason fallback), fetch, normalize, kickoff capture, persist — DASH-03
-- [ ] 05-02-PLAN.md — `matches_system(require_played=False)` + per-season derivation equivalence — DASH-01, DASH-03
+- [x] 05-02-PLAN.md — `matches_system(require_played=False)` + per-season derivation equivalence — DASH-01, DASH-03
 - [ ] 05-03-PLAN.md — Route move `/` → `/system`, dashboard shell, My Systems table, sparkline, timeframe tabs, figure cache — DASH-01
 
 **Wave 2** *(05-04 blocked on 05-01; 05-05 blocked on 05-03)*
@@ -186,4 +186,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Integrity — Fade & Grade | 2/2 | Complete    | 2026-07-17 |
 | 3. Data Depth & Breadth | 4/4 | Complete    | 2026-07-17 |
 | 4. Filter Popup Modal | 4/4 | Complete    | 2026-07-17 |
-| 5. Dashboard & Current Matches | 0/TBD | Not started | - |
+| 5. Dashboard & Current Matches | 1/6 | In Progress|  |

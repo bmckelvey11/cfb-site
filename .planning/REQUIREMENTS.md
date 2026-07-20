@@ -29,9 +29,9 @@
 
 ### Dashboard & Current Matches
 
-- [ ] **DASH-01**: User lands on a My Systems dashboard listing saved systems with record/money-won/ROI and a sparkline, separate from the system editor page
+- [x] **DASH-01**: User lands on a My Systems dashboard listing saved systems with record/money-won/ROI and a sparkline, separate from the system editor page
 - [ ] **DASH-02**: Dashboard ships with 2-3 bundled example systems for a new/empty install
-- [ ] **DASH-03**: User sees a Current Matches view: upcoming (unplayed) games each saved system matches, with the matched-filter details shown per game
+- [x] **DASH-03**: User sees a Current Matches view: upcoming (unplayed) games each saved system matches, with the matched-filter details shown per game
 - [ ] **DASH-04**: User can view alternate-line ("teaser") records for a system's matched bets from the Record chip — *deferred out of Phase 5 on 2026-07-20; unscheduled. Partial decisions in `.planning/phases/05-dashboard-current-matches/05-CONTEXT.md` Deferred Ideas.*
 
 ### Data
@@ -72,9 +72,9 @@ None currently deferred — see Out of Scope for explicit exclusions instead.
 | MODAL-04 | Phase 4 | Complete |
 | MODAL-05 | Phase 4 | Complete |
 | MODAL-06 | Phase 4 | Complete |
-| DASH-01 | Phase 5 | Pending |
+| DASH-01 | Phase 5 | Complete |
 | DASH-02 | Phase 5 | Pending |
-| DASH-03 | Phase 5 | Pending |
+| DASH-03 | Phase 5 | Complete |
 | DASH-04 | Deferred (was Phase 5) | Deferred 2026-07-20 |
 
 **Coverage:**
