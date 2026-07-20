@@ -8,3 +8,7 @@ __pycache__/
 *.pyc
 cfbd-python/
 .claude/worktrees/
+.claude-flow/
+.claude/.proven-config-version
+.claude/proven-config.json
+.cursor/
