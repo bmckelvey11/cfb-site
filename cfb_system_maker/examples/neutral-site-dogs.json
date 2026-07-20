@@ -1,0 +1,32 @@
+{
+  "name": "neutral-site-dogs",
+  "saved_at": "2026-07-20T00:00:00+00:00",
+  "system": {
+    "away": false,
+    "bet_type": "spread",
+    "conferences": [],
+    "fade": false,
+    "favorite": false,
+    "feature_filters": [
+      {
+        "key": "neutralSite",
+        "op": "eq",
+        "perspective": "single",
+        "value": true
+      }
+    ],
+    "home": false,
+    "max_spread": null,
+    "max_total": null,
+    "min_spread": null,
+    "min_total": null,
+    "providers": [],
+    "seasons": [],
+    "side": "home",
+    "teams": [],
+    "total_side": "over",
+    "underdog": true,
+    "weeks": []
+  },
+  "theory": "At a neutral site nobody actually has a home field, yet the line still has to be set as if one team does. This example asks whether the underdog in that situation is getting points for a crowd advantage the favourite never receives."
+}

@@ -38,7 +38,11 @@
             {% endfor %}
           </nav>
 
-          {% if not systems %}
+          {% if tab == 'examples' %}
+            <p class="examples-note">Bundled examples that demonstrate what the tool can filter on. They are not betting recommendations.</p>
+          {% endif %}
+
+          {% if not systems and tab != 'examples' %}
             <div class="empty-state">
               <h2>No saved systems yet</h2>
               <p>Build a system in the editor, or open one from Example Systems to see how it works.</p>
@@ -61,8 +65,17 @@
                     {% set fig = row.figures %}
                     <tr>
                       <td class="system-cell">
-                        <a class="system-link" href="{{ url_for('index') }}?load_system={{ row.name|urlencode }}">{{ row.name }}</a>
-                        {% if row.theory_line %}<p class="system-theory">{{ row.theory_line }}</p>{% endif %}
+                        {% if tab == 'examples' %}
+                          <span class="system-name">{{ row.name }}</span>
+                          {% if row.theory %}<p class="example-theory">{{ row.theory }}</p>{% endif %}
+                          <form class="example-copy" method="post" action="{{ url_for('copy_example') }}">
+                            <input type="hidden" name="name" value="{{ row.example_name }}">
+                            <button type="submit" class="example-copy__button">Copy to My Systems</button>
+                          </form>
+                        {% else %}
+                          <a class="system-link" href="{{ url_for('index') }}?load_system={{ row.name|urlencode }}">{{ row.name }}</a>
+                          {% if row.theory_line %}<p class="system-theory">{{ row.theory_line }}</p>{% endif %}
+                        {% endif %}
                       </td>
                       <td>{{ row.type_label }}</td>
                       <td>{{ fig.wins }}-{{ fig.losses }}-{{ fig.pushes }}, {{ "%.1f%%"|format(fig.hit_rate * 100) }}</td>

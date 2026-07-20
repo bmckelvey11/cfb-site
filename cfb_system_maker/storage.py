@@ -12,6 +12,11 @@ from cfb_system_maker.models import FeatureFilter, GameRecord, SavedSystem, Syst
 
 _SYSTEM_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
+# Bundled read-only example systems ship inside the package (D-14). The package
+# runs from the repo root and is never installed, so a plain path relative to
+# this module is enough — no package-resources API needed.
+EXAMPLES_DIR = Path(__file__).resolve().parent / "examples"
+
 UPCOMING_FIELDS = [field.name for field in fields(GameRecord)] + ["start_date", "start_time_tbd"]
 
 
@@ -177,6 +182,27 @@ def list_systems(data_dir: str | Path) -> list[str]:
     if not systems_dir.exists():
         return []
     return sorted(path.stem for path in systems_dir.glob("*.json"))
+
+
+def list_examples(examples_dir: str | Path | None = None) -> list[str]:
+    """Enumerate the bundled examples. Sibling of list_systems, but package-rooted."""
+    directory = Path(examples_dir) if examples_dir is not None else EXAMPLES_DIR
+    if not directory.exists():
+        return []
+    return sorted(path.stem for path in directory.glob("*.json"))
+
+
+def load_example_system(name: str, examples_dir: str | Path | None = None) -> SavedSystem:
+    """Load one bundled example read-only, through the same name gate and parser."""
+    name = _safe_system_name(name)
+    directory = Path(examples_dir) if examples_dir is not None else EXAMPLES_DIR
+    payload = json.loads((directory / f"{name}.json").read_text(encoding="utf-8"))
+    return SavedSystem(
+        name=str(payload.get("name", name)),
+        saved_at=str(payload.get("saved_at", "")),
+        system=_system_from_dict(payload),
+        theory=str(payload.get("theory", "")),
+    )
 
 
 def _system_to_dict(saved: SavedSystem) -> dict[str, Any]:

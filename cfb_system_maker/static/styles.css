@@ -1107,6 +1107,51 @@ code {
   font-weight: 400;
 }
 
+.examples-note {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.system-name {
+  font-weight: 600;
+}
+
+.example-theory {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.example-copy {
+  margin: 8px 0 0;
+}
+
+.example-copy__button {
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.example-copy__button:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 .dash-shell a:focus-visible,
 .dash-shell button:focus-visible {
   outline: 2px solid var(--accent);

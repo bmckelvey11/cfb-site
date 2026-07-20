@@ -28,7 +28,16 @@ from cfb_system_maker.features import (
     resolve_feature_value,
 )
 from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SavedSystem, SystemFilter
-from cfb_system_maker.storage import list_systems, load_processed_games, load_saved_system, load_system, save_system
+from cfb_system_maker.storage import (
+    EXAMPLES_DIR,
+    list_examples,
+    list_systems,
+    load_example_system,
+    load_processed_games,
+    load_saved_system,
+    load_system,
+    save_system,
+)
 
 _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
     "favorite": ("favorite",),
@@ -401,10 +410,13 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         seasons = sorted({game.season for game in games}, reverse=True)
         timeframe = _normalize_timeframe(request.args.get("timeframe", ""), seasons)
 
-        systems = [
-            _dashboard_row(saved, games, feature_map, timeframe, app.config["DATA_DIR"])
-            for saved in _saved_systems_newest_first(app.config["DATA_DIR"])
-        ]
+        if tab == "examples":
+            systems = _example_rows(games, feature_map, timeframe, app.config["DATA_DIR"])
+        else:
+            systems = [
+                _dashboard_row(saved, games, feature_map, timeframe, app.config["DATA_DIR"])
+                for saved in _saved_systems_newest_first(app.config["DATA_DIR"])
+            ]
         return render_template(
             "dashboard.html",
             error=None,
@@ -413,6 +425,21 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             seasons=seasons,
             systems=systems,
         )
+
+    @app.post("/copy-example")
+    def copy_example():
+        """Copy a read-only bundled example into the user's data directory (D-14).
+
+        The bundled file is only ever read; the write lands in DATA_DIR/systems
+        and is name-gated on both the read and the write side (T-05-18).
+        """
+        name = str(request.form.get("name", "")).strip()
+        try:
+            example = load_example_system(name, EXAMPLES_DIR)
+            save_system(name, example.system, app.config["DATA_DIR"], theory=example.theory)
+        except (ValueError, OSError, json.JSONDecodeError):
+            pass
+        return redirect("/?tab=examples")
 
     @app.get("/system")
     def index():
@@ -1461,8 +1488,29 @@ def _dashboard_row(
     figures = _timeframe_figures(result, timeframe)
     return {
         "name": saved.name,
+        "theory": saved.theory.strip(),
         "theory_line": saved.theory.strip().splitlines()[0] if saved.theory.strip() else "",
         "type_label": _system_type_label(saved.system),
         "figures": figures,
         "sparkline": _sparkline(figures["bet_details"]),
     }
+
+
+def _example_rows(
+    games: list[GameRecord],
+    feature_map: dict[int, dict] | None,
+    timeframe: str,
+    data_dir: Path,
+) -> list[dict[str, object]]:
+    """Rows for the Example Systems tab — same backtest path as My Systems (D-11)."""
+    rows = []
+    for name in list_examples(EXAMPLES_DIR):
+        try:
+            saved = load_example_system(name, EXAMPLES_DIR)
+        except (ValueError, OSError, json.JSONDecodeError):
+            continue
+        row = _dashboard_row(saved, games, feature_map, timeframe, data_dir)
+        # The file stem, not the display name, is what the copy action writes.
+        row["example_name"] = name
+        rows.append(row)
+    return rows
