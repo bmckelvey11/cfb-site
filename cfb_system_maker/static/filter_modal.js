@@ -102,6 +102,28 @@
     return (Number(roi) * 100).toFixed(2) + "%";
   }
 
+  // Snap numeric controls to a sensible interval instead of continuous input.
+  // Scaled off the feature's domain span so betting lines (spread ~120, total
+  // ~70) land on the half-point convention the sidebar inputs already use,
+  // while 0-1 rate features keep enough granularity to stay usable — a flat
+  // 0.5 would collapse those sliders to three positions.
+  function stepForDomain(domainMin, domainMax) {
+    const span = Math.abs(Number(domainMax) - Number(domainMin));
+    if (!isFinite(span) || span === 0) {
+      return "any";
+    }
+    if (span <= 2) {
+      return "0.01";
+    }
+    if (span <= 20) {
+      return "0.1";
+    }
+    if (span <= 1000) {
+      return "0.5";
+    }
+    return "1";
+  }
+
   function applyChipTone(el, value) {
     el.classList.remove("positive", "negative");
     if (value > 0) {
@@ -951,13 +973,15 @@
     fill.className = "filter-modal__dual-range-fill";
     track.appendChild(fill);
 
+    const rangeStep = stepForDomain(state.domainMin, state.domainMax);
+
     const minRange = document.createElement("input");
     minRange.type = "range";
     minRange.className = "filter-modal__range filter-modal__range--min";
     minRange.dataset.role = "min-range";
     minRange.min = String(state.domainMin);
     minRange.max = String(state.domainMax);
-    minRange.step = "any";
+    minRange.step = rangeStep;
     minRange.value = String(state.min);
     minRange.setAttribute("aria-label", "Minimum");
 
@@ -967,7 +991,7 @@
     maxRange.dataset.role = "max-range";
     maxRange.min = String(state.domainMin);
     maxRange.max = String(state.domainMax);
-    maxRange.step = "any";
+    maxRange.step = rangeStep;
     maxRange.value = String(state.max);
     maxRange.setAttribute("aria-label", "Maximum");
 
@@ -994,7 +1018,7 @@
     const minNumber = document.createElement("input");
     minNumber.type = "number";
     minNumber.dataset.role = "min-number";
-    minNumber.step = "any";
+    minNumber.step = rangeStep;
     minNumber.value = String(state.min);
     minNumber.setAttribute("aria-label", "Minimum");
     const andLabel = document.createElement("span");
@@ -1002,7 +1026,7 @@
     const maxNumber = document.createElement("input");
     maxNumber.type = "number";
     maxNumber.dataset.role = "max-number";
-    maxNumber.step = "any";
+    maxNumber.step = rangeStep;
     maxNumber.value = String(state.max);
     maxNumber.setAttribute("aria-label", "Maximum");
     minNumber.addEventListener("input", () => {
