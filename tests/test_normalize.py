@@ -121,3 +121,36 @@ def test_normalize_uses_first_usable_line_when_provider_missing():
     assert record.provider == "Book"
     assert record.spread == -2.5
     assert record.total is None
+
+
+def test_total_falls_back_to_sibling_provider_when_preferred_line_lacks_it():
+    # 2013-2016 pattern: consensus has spread but no overUnder; a sibling
+    # provider on the same game does. Total should fall back to the first
+    # sibling (list order) that has one, without changing the spread source.
+    games = [
+        {
+            "id": 45,
+            "season": 2013,
+            "week": 1,
+            "homeTeam": "Alabama",
+            "awayTeam": "Michigan",
+            "homePoints": 41,
+            "awayPoints": 14,
+        }
+    ]
+    lines = [
+        {
+            "id": 45,
+            "lines": [
+                {"provider": "consensus", "spread": -11.5, "overUnder": None},
+                {"provider": "teamrankings", "spread": -11, "overUnder": 56},
+                {"provider": "numberfire", "spread": -11, "overUnder": 58},
+            ],
+        }
+    ]
+
+    [record] = normalize_games(games, lines, provider="consensus")
+
+    assert record.provider == "consensus"
+    assert record.spread == -11.5
+    assert record.total == 56
