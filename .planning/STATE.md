@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Dashboard & Current Matches
 status: planning
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-07-20T22:11:36.950Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-07-20T22:21:41.725Z"
 last_activity: 2026-07-20
 last_activity_desc: "Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 21
-  completed_plans: 16
+  completed_plans: 18
 ---
 
 # Project State
@@ -32,7 +32,7 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-07-20 - Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it
 
-Progress: [████████░░] 76%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [████████░░] 76%
 | Phase 04 P03 | 7min | 2 tasks | 7 files |
 | Phase 04 P04 | 7min | 2 tasks | 5 files |
 | Phase 05 P02 | 15m | 2 tasks | 2 files |
+| Phase 05 P01 | 35m | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 04]: LIVE_DEBOUNCE_MS=250 with AbortController + liveGeneration before chips/Save
 - [Phase ?]: 05-02: matches_system gains keyword-only require_played=True; unplayed games matchable but never gradable (D-18)
 - [Phase ?]: 05-02: per-season dashboard figures proven derivable from one all-time run_backtest via season_breakdown (D-11); stats/grade are not derivable
+- [Phase ?]: Upcoming fetch uses season_type='both'; resolved type still threads into slicing and meta (D-19)
+- [Phase ?]: Offseason fallback ranks completed weeks by latest start date, never week number (postseason renumbers)
 
 ### Pending Todos
 
@@ -139,6 +142,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-20T22:11:17.399Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-07-20T22:21:27.329Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
