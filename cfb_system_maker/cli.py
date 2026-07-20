@@ -13,6 +13,7 @@ from cfb_system_maker.scrapers import scrape
 from cfb_system_maker.graphql_client import graphql_scrape, pull_game_player_stats
 from cfb_system_maker.actionnetwork_client import actionnetwork_scrape
 from cfb_system_maker.storage import load_processed_games, load_raw_json, load_system, save_processed_games, save_raw_json, save_system
+from cfb_system_maker.upcoming import build_upcoming
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,6 +27,8 @@ def main(argv: list[str] | None = None) -> int:
         return _build(args)
     if args.command == "enrich":
         return _enrich(args)
+    if args.command == "upcoming":
+        return _upcoming(args)
     if args.command == "scrape":
         return _scrape(args)
     if args.command == "graphql":
@@ -76,6 +79,21 @@ def _build(args: argparse.Namespace) -> int:
 def _enrich(args: argparse.Namespace) -> int:
     path = run_enrich(args.data_dir)
     print(f"Wrote enriched features to {path}")
+    return 0
+
+
+def _upcoming(args: argparse.Namespace) -> int:
+    result = build_upcoming(args.data_dir)
+    meta = result.meta
+    if meta["season"] is None:
+        print("No upcoming data available: no week with games could be resolved.")
+        return 0
+    print(f"Resolved {meta['season']} {meta['season_type']} week {meta['week']} ({meta['row_count']} game(s)).")
+    if meta["is_fallback"]:
+        print(
+            "No current week had data; fell back to the most recent week with games "
+            f"({meta['season']} {meta['season_type']} week {meta['week']})."
+        )
     return 0
 
 
@@ -261,6 +279,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     enrich = subparsers.add_parser("enrich")
     enrich.add_argument("--data-dir", default="data")
+
+    upcoming = subparsers.add_parser("upcoming")
+    upcoming.add_argument("--data-dir", default="data")
 
     scrape_parser = subparsers.add_parser("scrape")
     scrape_parser.add_argument("--data-dir", default="data")
