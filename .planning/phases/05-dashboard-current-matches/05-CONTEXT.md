@@ -41,6 +41,11 @@ This phase does not add teaser/alternate-line records (DASH-04, descoped 2026-07
 - **D-16:** Ship **one example per capability** — a spread system, a total system, and one exercising a registry feature (e.g. weather or a season-to-date stat). The goal is to demonstrate the tool's range, not to present profitable angles as recommendations.
 - **D-17:** Each example carries a **short written `theory`** (the free-text field from Phase 1), one or two sentences on why the angle might exist — modelling the habit of recording reasoning before trusting a backtest.
 
+### Added 2026-07-20 after research (05-RESEARCH.md findings)
+
+- **D-18:** `matches_system` currently returns `False` for every unplayed game (`backtest.py` guards on non-null scores). Resolve this with a **`require_played=False` flag on the existing matching path**, not a parallel matcher. Current Matches *matches but never grades* — there is no result to grade — so this preserves the single-authoritative-path rule (Phase 4 D-15) rather than forking it. Research verified no code after the guard reads score fields. Placeholder/fake scores are explicitly rejected: a placeholder in a grading path is how a fake result eventually gets counted as real.
+- **D-19:** **Postseason is in scope.** "Current CFB week" (D-03) includes bowls and the playoff, so `season_type` must be threaded through rather than left hardcoded to `"regular"`. Rationale: the tool would otherwise go silent through December–January, the part of the season with the most betting interest. Note that postseason weeks are numbered differently — the calendar lookup must handle this.
+
 ### Claude's Discretion
 
 - Sparkline rendering approach, dashboard table column order and widths, tab styling, cache invalidation mechanics, and the exact name/flags of the upcoming CLI command are planner/implementation choices, provided the decisions above hold.

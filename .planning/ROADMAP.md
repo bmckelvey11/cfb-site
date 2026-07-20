@@ -142,7 +142,7 @@ Plans:
 
 ### Phase 5: Dashboard & Current Matches
 
-**Goal**: The tool becomes something checked weekly — a My Systems dashboard is the new landing page, and each saved system is evaluated live against upcoming games with matched-filter details and teaser records.
+**Goal**: The tool becomes something checked weekly — a My Systems dashboard is the new landing page, and each saved system is evaluated live against upcoming games with matched-filter details.
 **Mode:** mvp
 **Depends on**: Phase 1, Phase 4
 **Requirements**: DASH-01, DASH-02, DASH-03 *(DASH-04 deferred 2026-07-20)*
