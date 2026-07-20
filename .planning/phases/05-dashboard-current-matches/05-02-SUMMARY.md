@@ -107,6 +107,14 @@ No new security-relevant surface (no endpoints, auth paths, file access, or sche
 
 None.
 
+## Note for the Orchestrator: Wave 1 Shared Working Tree
+
+The three Wave 1 executors ran in **one shared working tree**, not isolated worktrees (`.git` is a directory; branch `master`). This is not a problem for file ownership — the file sets were disjoint and my two files are committed clean — but it does mean a full-suite run is not a reliable signal for any one executor while siblings are mid-flight.
+
+At the moment both of my commits landed, the full suite was **219 passed**. A later full-suite run showed 34 failures, all in `tests/test_web.py`, `tests/test_filter_modal.py`, and `tests/test_web_features.py` — three files with **uncommitted working-tree modifications from plan 05-03**, whose corresponding `web.py` changes had not yet been written. `git status` showed no modifications under `cfb_system_maker/` at that point, confirming the failures are sibling WIP and not a regression from this plan.
+
+`tests/test_backtest.py` passes 42/42 in isolation. The wave-level suite should be re-run after all three plans have committed.
+
 ## Self-Check: PASSED
 
 - `cfb_system_maker/backtest.py` — FOUND
