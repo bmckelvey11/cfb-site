@@ -197,7 +197,11 @@ def _week_key(row: dict[str, Any]) -> tuple[str | None, int | None]:
 
 def _season_type(row: dict[str, Any]) -> str | None:
     value = _first(row, "seasonType", "season_type")
-    return str(value) if value is not None else None
+    if value is None:
+        return None
+    # Real CFBD rows carry a ``SeasonType`` enum, whose ``str()`` is
+    # "SeasonType.POSTSEASON"; the fakes and the API both mean "postseason".
+    return str(getattr(value, "value", value))
 
 
 def _season_for(now: datetime) -> int:

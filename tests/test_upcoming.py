@@ -327,3 +327,26 @@ def test_saved_upcoming_round_trips_with_null_scores(tmp_path):
         assert record.home_points is None
         assert record.away_points is None
     assert kickoffs[2002]["start_time_tbd"] is True
+
+
+def test_season_type_enum_is_normalized_to_its_value(tmp_path):
+    """Real CFBD rows carry a SeasonType enum, not a plain string."""
+
+    class _SeasonType(str):
+        def __str__(self):
+            return "SeasonType.POSTSEASON"
+
+        @property
+        def value(self):
+            return "postseason"
+
+    def enumify(games):
+        for row in games[2025]:
+            if row["seasonType"] == "postseason":
+                row["seasonType"] = _SeasonType("postseason")
+
+    module, _ = _fake(games=enumify)
+    result = build_upcoming(tmp_path, now=_dt(2026, 7, 20), cfbd_module=module, token="test")
+
+    assert result.meta["season_type"] == "postseason"
+    assert {record.game_id for record in result.records} == {1003}
