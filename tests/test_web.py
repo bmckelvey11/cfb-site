@@ -1115,23 +1115,23 @@ def test_copy_example_creates_an_ordinary_saved_system(tmp_path):
     app, _ = _dashboard_app(tmp_path)
     client = app.test_client()
 
-    response = client.post("/copy-example", data={"name": "neutral-site-dogs"})
+    response = client.post("/copy-example", data={"name": "nonconference-away-dogs"})
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/?tab=examples")
-    assert "neutral-site-dogs" in list_systems(tmp_path)
-    copied = load_saved_system("neutral-site-dogs", tmp_path)
-    original = load_example_system("neutral-site-dogs")
+    assert "nonconference-away-dogs" in list_systems(tmp_path)
+    copied = load_saved_system("nonconference-away-dogs", tmp_path)
+    original = load_example_system("nonconference-away-dogs")
     assert copied.system == original.system
     assert copied.theory == original.theory
 
 
 def test_copy_example_leaves_the_bundled_file_untouched(tmp_path):
     app, _ = _dashboard_app(tmp_path)
-    bundled = EXAMPLES_DIR / "neutral-site-dogs.json"
+    bundled = EXAMPLES_DIR / "nonconference-away-dogs.json"
     before = bundled.read_bytes()
 
-    app.test_client().post("/copy-example", data={"name": "neutral-site-dogs"})
+    app.test_client().post("/copy-example", data={"name": "nonconference-away-dogs"})
 
     assert bundled.read_bytes() == before
 

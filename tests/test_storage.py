@@ -62,7 +62,7 @@ def test_processed_games_csv_round_trip(tmp_path):
 # --- Bundled example systems (Phase 5, Plan 05) -------------------------------
 
 EXPECTED_EXAMPLE_NAMES = [
-    "neutral-site-dogs",
+    "nonconference-away-dogs",
     "spread-home-favorites",
     "total-unders-high-lines",
 ]

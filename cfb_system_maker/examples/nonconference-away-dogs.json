@@ -1,5 +1,5 @@
 {
-  "name": "neutral-site-dogs",
+  "name": "nonconference-away-dogs",
   "saved_at": "2026-07-20T00:00:00+00:00",
   "system": {
     "away": false,
@@ -9,10 +9,10 @@
     "favorite": false,
     "feature_filters": [
       {
-        "key": "neutralSite",
+        "key": "conferenceGame",
         "op": "eq",
         "perspective": "single",
-        "value": true
+        "value": false
       }
     ],
     "home": false,
@@ -22,11 +22,11 @@
     "min_total": null,
     "providers": [],
     "seasons": [],
-    "side": "home",
+    "side": "away",
     "teams": [],
     "total_side": "over",
     "underdog": true,
     "weeks": []
   },
-  "theory": "At a neutral site nobody actually has a home field, yet the line still has to be set as if one team does. This example asks whether the underdog in that situation is getting points for a crowd advantage the favourite never receives."
+  "theory": "Non-conference games often pair a marquee program hosting a smaller opponent for a guaranteed payday, and the home crowd plus name recognition can push the line past where the game itself plays. This example asks whether the visiting underdog in that spot is getting more points than the matchup really warrants."
 }
