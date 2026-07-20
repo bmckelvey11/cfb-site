@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Dashboard & Current Matches
 status: planning
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-07-20T22:26:10.314Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-07-20T22:44:43.907Z"
 last_activity: 2026-07-20
 last_activity_desc: "Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 21
-  completed_plans: 18
+  completed_plans: 20
 ---
 
 # Project State
@@ -32,7 +32,7 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-07-20 - Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it
 
-Progress: [█████████░] 86%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Progress: [█████████░] 86%
 | Phase 05 P02 | 15m | 2 tasks | 2 files |
 | Phase 05 P01 | 35m | 3 tasks | 5 files |
 | Phase 05 P03 | 45m | 3 tasks | 6 files |
+| Phase 05 P04 | 25m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Dashboard at /, editor relocated to /system; editor view keeps the name index so all url_for('index') call sites repoint automatically (05-03, D-09)
 - [Phase ?]: Root-to-editor redirect preserves request.query_string verbatim, not url_for(**request.args), so repeated multi-value filter params survive (05-03)
 - [Phase ?]: Dashboard figures come from one cached all-time run_backtest per system; per-season derived from season_breakdown/bet_details, never persisted (05-03, D-11)
+- [Phase ?]: 05-04: pass the union (season's completed games + target week) to enrich_games and post-filter output to target-week ids, rather than adding an only_ids param
+- [Phase ?]: 05-04: exclude target-week ids from the accumulation base — in the offseason fallback the target games are themselves completed and would be double-counted
 
 ### Pending Todos
 
@@ -146,6 +149,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-20T22:26:10.300Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-07-20T22:44:43.893Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
