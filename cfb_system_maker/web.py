@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import asdict, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -19,7 +20,12 @@ from cfb_system_maker.backtest import (
     split_holdout,
 )
 from cfb_system_maker.describe import describe
-from cfb_system_maker.enrich import load_features, load_features_meta
+from cfb_system_maker.enrich import (
+    load_features,
+    load_features_from,
+    load_features_meta,
+    upcoming_features_path,
+)
 from cfb_system_maker.features import (
     FEATURE_BY_KEY,
     FEATURE_REGISTRY,
@@ -36,6 +42,8 @@ from cfb_system_maker.storage import (
     load_processed_games,
     load_saved_system,
     load_system,
+    load_upcoming_games,
+    load_upcoming_meta,
     save_system,
 )
 
@@ -410,13 +418,15 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         seasons = sorted({game.season for game in games}, reverse=True)
         timeframe = _normalize_timeframe(request.args.get("timeframe", ""), seasons)
 
+        saved_systems = _saved_systems_newest_first(app.config["DATA_DIR"])
         if tab == "examples":
             systems = _example_rows(games, feature_map, timeframe, app.config["DATA_DIR"])
         else:
             systems = [
                 _dashboard_row(saved, games, feature_map, timeframe, app.config["DATA_DIR"])
-                for saved in _saved_systems_newest_first(app.config["DATA_DIR"])
+                for saved in saved_systems
             ]
+        panel = _current_matches_panel(saved_systems, app.config["DATA_DIR"])
         return render_template(
             "dashboard.html",
             error=None,
@@ -424,6 +434,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             timeframe=timeframe,
             seasons=seasons,
             systems=systems,
+            panel=panel,
         )
 
     @app.post("/copy-example")
@@ -1514,3 +1525,142 @@ def _example_rows(
         row["example_name"] = name
         rows.append(row)
     return rows
+
+
+# --- Current Matches panel (DASH-03) -----------------------------------------
+
+_KICKOFF_SORT_SENTINEL = datetime.max.replace(tzinfo=timezone.utc)
+
+
+def _fmt_number(value: float) -> str:
+    numeric = float(value)
+    if numeric.is_integer():
+        return str(int(numeric))
+    return str(numeric)
+
+
+def _fmt_signed_spread(line: float) -> str:
+    return ("-" if line < 0 else "+") + _fmt_number(abs(line))
+
+
+def _play_text(system: SystemFilter, game: GameRecord) -> str:
+    """Play text derived from the SAME normalization grade_bet applies (D-08).
+
+    A fade inverts the graded side, so the displayed play must invert too — the
+    declared ``side`` / ``total_side`` alone is not sufficient input.
+    """
+    if system.bet_type == "total":
+        side = system.total_side
+        if system.fade:
+            side = "under" if side == "over" else "over"
+        return f"Play {side.title()} {_fmt_number(game.total)}"
+
+    normalized_side = system.side.lower()
+    if system.fade:
+        normalized_side = "away" if normalized_side == "home" else "home"
+    team = game.home_team if normalized_side == "home" else game.away_team
+    line = _side_spread(game.spread, normalized_side)  # spread is always the home spread
+    return f"Play {team} {_fmt_signed_spread(line)}"
+
+
+def _parse_kickoff(raw: object) -> datetime | None:
+    if not raw:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _format_kickoff_local(dt: datetime, *, date_only: bool = False) -> str:
+    local = dt.astimezone()
+    date_part = f"{local.strftime('%a')} {local.strftime('%b')} {local.day}"
+    if date_only:
+        return date_part
+    hour = local.hour % 12 or 12
+    meridiem = "AM" if local.hour < 12 else "PM"
+    return f"{date_part}, {hour}:{local.minute:02d} {meridiem}"
+
+
+def _kickoff_label(kickoff: dict) -> str:
+    dt = _parse_kickoff(kickoff.get("start_date"))
+    if dt is None:
+        return "TBD"
+    # A to-be-determined kickoff has no real clock time — show the date alone
+    # rather than fabricating one on a page that tells the user what to bet.
+    return _format_kickoff_local(dt, date_only=bool(kickoff.get("start_time_tbd")))
+
+
+def _try_load_upcoming_features(data_dir: Path) -> dict[int, dict]:
+    try:
+        return load_features_from(upcoming_features_path(data_dir))
+    except (FileNotFoundError, OSError, ValueError, KeyError, json.JSONDecodeError):
+        return {}
+
+
+def _current_matches_panel(saved_systems: list[SavedSystem], data_dir: Path) -> dict[str, object]:
+    """Every saved system's currently matched upcoming games, in one panel (D-12).
+
+    Reads only pre-built local files (D-02). Matching is the single authoritative
+    path with the played requirement relaxed (D-18); grading is never called here
+    because an upcoming game has no result to grade.
+    """
+    if not saved_systems:
+        return {"state": "no_systems"}
+
+    try:
+        games, kickoffs = load_upcoming_games(data_dir)
+        meta = load_upcoming_meta(data_dir)
+    except (FileNotFoundError, OSError, ValueError, KeyError, json.JSONDecodeError):
+        return {"state": "missing"}
+
+    feature_map = _try_load_upcoming_features(data_dir)
+
+    rows: list[dict[str, object]] = []
+    for record in games:
+        kickoff = kickoffs.get(record.game_id, {})
+        dt = _parse_kickoff(kickoff.get("start_date"))
+        label = _kickoff_label(kickoff)
+        matchup = f"{record.away_team} @ {record.home_team}"
+        for saved in saved_systems:
+            if not matches_system(record, saved.system, feature_map, require_played=False):
+                continue
+            rows.append(
+                {
+                    "_sort": (dt or _KICKOFF_SORT_SENTINEL, saved.name.lower()),
+                    "kickoff": label,
+                    "matchup": matchup,
+                    "play": _play_text(saved.system, record),
+                    "system_name": saved.name,
+                    "type_label": _system_type_label(saved.system),
+                    "details": [str(row["text"]) for row in describe(saved.system)],
+                }
+            )
+
+    rows.sort(key=lambda row: row["_sort"])
+    for row in rows:
+        del row["_sort"]
+
+    is_fallback = bool(meta.get("is_fallback"))
+    fallback_label = ""
+    if is_fallback:
+        fallback_label = (
+            f"Most recent week with data: Week {meta.get('week')}, {meta.get('season')}"
+        )
+
+    dt = _parse_kickoff(meta.get("fetched_at"))
+    return {
+        "state": "populated",
+        "fetched_at": _format_kickoff_local(dt) if dt is not None else "",
+        "is_fallback": is_fallback,
+        "fallback_label": fallback_label,
+        "rows": rows,
+    }
