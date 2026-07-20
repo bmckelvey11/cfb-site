@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: System Editor Main Page** - The main page reads like a Bet Labs system editor: stat chips, cumulative money-won graph, plain-English filter sentences, tabs, and a theory field. (completed 2026-07-17)
 - [x] **Phase 2: Integrity — Fade & Grade** - Users can fade a system to grade the opposite side and see a composite letter grade in the stat-chip header. (completed 2026-07-17)
-- [ ] **Phase 3: Data Depth & Breadth** - Historical coverage extends further back than 2013 and more CFBD/GraphQL endpoints are wired into the feature registry as filterable features.
+- [x] **Phase 3: Data Depth & Breadth** - Historical coverage confirmed against the live CFBD API (2013 is the betting-line floor; no earlier lines exist to backfill) and more CFBD endpoints are wired into the feature registry as filterable features. (completed 2026-07-20)
 - [x] **Phase 4: Filter Popup Modal** - Clicking any filter opens a live-recalculating popup (slider or value table, live Record/Money/ROI, About Filter) instead of static inline fields. (completed 2026-07-17)
 - [ ] **Phase 5: Dashboard & Current Matches** - A My Systems dashboard replaces the editor as the landing page, and saved systems are evaluated live against upcoming games.
 
