@@ -6,7 +6,7 @@ current_phase: 4
 current_phase_name: Filter Popup Modal
 status: verifying
 stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-07-17T19:16:01.884Z"
+last_updated: "2026-07-17T19:24:42.621Z"
 last_activity: 2026-07-17
 last_activity_desc: Completed 04-02-PLAN.md
 progress:
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-07-17)
 
 Phase: 4 (Filter Popup Modal) — EXECUTING
 Plan: 4 of 4
-Status: Phase complete — ready for verification
+Status: human_verification
 Last activity: 2026-07-17 — Completed 04-02-PLAN.md
 
 Progress: [█████████░] 87%
@@ -115,6 +115,14 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 1] T-01-03 accepted risk (`01-SECURITY.md`): describe()'s four hardcoded (op,control) render branches don't cover every combo `feature_ok()` will actually evaluate — a mismatch is reachable via crafted query params, not the normal form UI. Not a blocker for Phase 2, but worth closing before registry op/control combos multiply further.
+
+## Quick Tasks Completed
+
+Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
+
+| Date | Slug | What | Status |
+|------|------|------|--------|
+| 2026-07-20 | numeric-filter-step-intervals | Filter popup numeric controls snap to a span-scaled step (0.5 for spread/total) instead of continuous `step="any"` | complete |
 
 ## Deferred Items
 
