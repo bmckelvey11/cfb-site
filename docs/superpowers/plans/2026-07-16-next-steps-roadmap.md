@@ -32,8 +32,9 @@ Nothing below reopens these. The summary's "still open (phase 2+)" list maps 1:1
 - **Done when:** For each 2020–2024 season, key pregame features (weather temp, ppa running, pregame win prob) show **≥80% coverage** in the UI, and `features.json` `_meta.game_count` matches `games.csv` row count. Any season/feature below the 80% floor is excluded from downstream items (2, 6, 8) rather than silently included — record the exclusion in this doc before moving on.
 - **Deps/blockers:** CFBD rate limits (delay + resume make this a long-running but hands-off pull). API tier for any Patreon-gated endpoints (already handled as recorded errors). Unblocks item 2's holdout mode and items 6/7/8. After the build/enrich rerun, run the full test suite before calling this item done.
 
-### 2. System validation: signal vs. noise
+### 2. System validation: signal vs. noise — ✅ code complete (2026-07-16)
 
+- **Status:** All three parts shipped and merged to master (per-season breakdown/sign-consistency, permutation p-value, holdout `split_holdout` + CLI `--holdout-season` + web toggle), plan: `docs/superpowers/plans/2026-07-16-system-validation-signal-vs-noise.md`. Synthetic-data done-when criteria verified. **Reconciliation checkpoint below still open** — not closeable until item 1 lands.
 - **Goal:** Answer "is this system a real edge or a data-mining artifact?" — out-of-sample and noise-robustness checks layered on the existing in-sample `SystemStats` (Wilson CI and z/p vs break-even already shipped; they can't detect overfitting).
 - **Why #2:** The tool's core failure mode is manufacturing overfit systems that look significant in-sample. This gives every system a trust verdict. Two of three parts are buildable before item 1 finishes.
 - **Scope (three parts, one plan):**

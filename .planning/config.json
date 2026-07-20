@@ -22,7 +22,7 @@
     "plan_check": true,
     "verifier": true,
     "nyquist_validation": true,
-    "auto_advance": false,
+    "auto_advance": true,
     "node_repair": true,
     "node_repair_budget": 2,
     "ui_phase": true,
@@ -46,7 +46,8 @@
     "post_planning_gaps": true,
     "security_enforcement": true,
     "security_asvs_level": 1,
-    "security_block_on": "high"
+    "security_block_on": "high",
+    "_auto_chain_active": false
   },
   "ship": {
     "pr_body_sections": [
@@ -88,5 +89,20 @@
   },
   "resolve_model_ids": "omit",
   "mode": "yolo",
-  "granularity": "standard"
+  "granularity": "standard",
+  "context_window": 1000000,
+  "model_overrides": {
+    "gsd-code-reviewer": "opus",
+    "gsd-verifier": "opus",
+    "gsd-plan-checker": "opus",
+    "gsd-planner": "opus",
+    "gsd-roadmapper": "opus",
+    "gsd-debugger": "opus",
+    "gsd-debug-session-manager": "opus",
+    "gsd-assumptions-analyzer": "opus",
+    "gsd-eval-planner": "opus",
+    "gsd-framework-selector": "opus",
+    "gsd-security-auditor": "opus",
+    "gsd-user-profiler": "opus"
+  }
 }
