@@ -154,7 +154,25 @@ Plans:
 
 *Alternate-line ("teaser") records from the Record chip (DASH-04) were descoped during phase discussion on 2026-07-20. Partial decisions and the two open questions are preserved in `05-CONTEXT.md` under Deferred Ideas.*
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+
+**Wave 1** *(parallel — disjoint file sets)*
+
+- [ ] 05-01-PLAN.md — `upcoming` CLI: week resolution (incl. postseason + backward offseason fallback), fetch, normalize, kickoff capture, persist — DASH-03
+- [ ] 05-02-PLAN.md — `matches_system(require_played=False)` + per-season derivation equivalence — DASH-01, DASH-03
+- [ ] 05-03-PLAN.md — Route move `/` → `/system`, dashboard shell, My Systems table, sparkline, timeframe tabs, figure cache — DASH-01
+
+**Wave 2** *(05-04 blocked on 05-01; 05-05 blocked on 05-03)*
+
+- [ ] 05-04-PLAN.md — Upcoming enrichment: running-stats union + features sidecar on its own path — DASH-03
+- [ ] 05-05-PLAN.md — Three bundled example systems, Example Systems tab, Copy to My Systems — DASH-02
+
+**Wave 3** *(blocked on 05-02, 05-04, 05-05)*
+
+- [ ] 05-06-PLAN.md — Current Matches panel: matching, play text, matched-filter details, all five states — DASH-03
+
 **UI hint**: yes
 
 ## Progress
