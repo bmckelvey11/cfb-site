@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-07-17)
 Phase: 5 — Dashboard & Current Matches
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-07-20 — Phase 04 complete, transitioned to Phase 5
+Last activity: 2026-07-20 - Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it
 
 Progress: [█████████░] 87%
 
@@ -125,6 +125,7 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 |------|------|------|--------|
 | 2026-07-20 | numeric-filter-step-intervals | Filter popup numeric controls snap to a span-scaled step (0.5 for spread/total) instead of continuous `step="any"` | complete |
 | 2026-07-20 | filter-group-taxonomy | Split the `pregame` feature group into Matchup / Ratings / Betting Lines / Weather (restored user work quarantined during phase 03) | complete |
+| 2026-07-20 | fix-normalize-select-line-total-drop-fal | `normalize._select_line` picked one line per game; total (over/under) is now backfilled from the first sibling provider that has it when the selected line's total is null — fixes ~93-97% total-null rate in 2013-2016 seasons | complete |
 
 ## Deferred Items
 
