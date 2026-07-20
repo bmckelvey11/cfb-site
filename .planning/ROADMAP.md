@@ -154,7 +154,7 @@ Plans:
 
 *Alternate-line ("teaser") records from the Record chip (DASH-04) were descoped during phase discussion on 2026-07-20. Partial decisions and the two open questions are preserved in `05-CONTEXT.md` under Deferred Ideas.*
 
-**Plans**: 5/6 plans executed
+**Plans**: 6/6 plans executed
 
 Plans:
 
@@ -171,7 +171,7 @@ Plans:
 
 **Wave 3** *(blocked on 05-02, 05-04, 05-05)*
 
-- [ ] 05-06-PLAN.md — Current Matches panel: matching, play text, matched-filter details, all five states — DASH-03
+- [x] 05-06-PLAN.md — Current Matches panel: matching, play text, matched-filter details, all five states — DASH-03
 
 **UI hint**: yes
 
@@ -186,4 +186,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Integrity — Fade & Grade | 2/2 | Complete    | 2026-07-17 |
 | 3. Data Depth & Breadth | 4/4 | Complete    | 2026-07-17 |
 | 4. Filter Popup Modal | 4/4 | Complete    | 2026-07-17 |
-| 5. Dashboard & Current Matches | 5/6 | In Progress|  |
+| 5. Dashboard & Current Matches | 6/6 | In Progress|  |
