@@ -195,7 +195,13 @@ button:hover {
   background: var(--accent-dark);
 }
 
+.theory-field {
+  display: grid;
+  gap: 6px;
+}
+
 .theory-field textarea {
+  width: 100%;
   min-height: 80px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -204,6 +210,23 @@ button:hover {
   font: inherit;
   font-size: 14px;
   resize: vertical;
+}
+
+.form-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.form-actions button {
+  width: 100%;
+}
+
+.save-inline {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .range-filter {
