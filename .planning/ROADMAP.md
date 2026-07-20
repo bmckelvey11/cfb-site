@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Integrity — Fade & Grade** - Users can fade a system to grade the opposite side and see a composite letter grade in the stat-chip header. (completed 2026-07-17)
 - [x] **Phase 3: Data Depth & Breadth** - Historical coverage confirmed against the live CFBD API (2013 is the betting-line floor; no earlier lines exist to backfill) and more CFBD endpoints are wired into the feature registry as filterable features. (completed 2026-07-20)
 - [x] **Phase 4: Filter Popup Modal** - Clicking any filter opens a live-recalculating popup (slider or value table, live Record/Money/ROI, About Filter) instead of static inline fields. (completed 2026-07-17)
-- [ ] **Phase 5: Dashboard & Current Matches** - A My Systems dashboard replaces the editor as the landing page, and saved systems are evaluated live against upcoming games.
+- [ ] **Phase 5: Dashboard & Current Matches** - A My Systems dashboard replaces the editor as the landing page, and saved systems are evaluated live against upcoming games. *(Teaser records descoped 2026-07-20 — see Deferred.)*
 
 ## Phase Details
 
@@ -145,13 +145,14 @@ Plans:
 **Goal**: The tool becomes something checked weekly — a My Systems dashboard is the new landing page, and each saved system is evaluated live against upcoming games with matched-filter details and teaser records.
 **Mode:** mvp
 **Depends on**: Phase 1, Phase 4
-**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04
+**Requirements**: DASH-01, DASH-02, DASH-03 *(DASH-04 deferred 2026-07-20)*
 **Success Criteria** (what must be TRUE):
 
   1. User lands on a My Systems dashboard (`/`) listing saved systems with Record/Money Won/ROI and a sparkline, with the system editor moved to `/system`.
   2. A new/empty install ships with 2-3 bundled example systems visible on the dashboard.
   3. User sees a Current Matches view listing upcoming (unplayed) games each saved system currently matches, with the matched-filter details shown per game.
-  4. User can view a system's alternate-line ("teaser") records from the Record chip.
+
+*Alternate-line ("teaser") records from the Record chip (DASH-04) were descoped during phase discussion on 2026-07-20. Partial decisions and the two open questions are preserved in `05-CONTEXT.md` under Deferred Ideas.*
 
 **Plans**: TBD
 **UI hint**: yes
