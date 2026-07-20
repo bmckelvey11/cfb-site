@@ -36,7 +36,7 @@ def normalize_games(
                 away_points=_optional_int(_first(game, "awayPoints", "away_points", "awayScore", "away_score", fallback=_first(betting_game, "awayScore", "away_score"))),
                 provider=_first(selected_line, "provider"),
                 spread=_optional_float(_first(selected_line, "spread")),
-                total=_optional_float(_first(selected_line, "overUnder", "over_under", "total")),
+                total=_optional_float(_first(_select_total(betting_game.get("lines", []), selected_line), "overUnder", "over_under", "total")),
             )
         )
 
@@ -54,6 +54,20 @@ def _select_line(lines: list[dict[str, Any]], provider: str | None) -> dict[str,
             if line_provider == provider_lower:
                 return line
     return usable[0]
+
+
+def _select_total(lines: list[dict[str, Any]], selected_line: dict[str, Any]) -> dict[str, Any]:
+    # If the spread-selected line has no total, fall back to the FIRST sibling
+    # line (original order) that has one. This picks the first available total
+    # across providers, not necessarily the spread's provider — provider
+    # precedence for totals may be revisited later (e.g. preferring a specific
+    # provider's total the way spread does).
+    if _first(selected_line, "overUnder", "over_under", "total") is not None:
+        return selected_line
+    for line in lines:
+        if _first(line, "overUnder", "over_under", "total") is not None:
+            return line
+    return selected_line
 
 
 def _game_id(row: dict[str, Any]) -> int | None:
