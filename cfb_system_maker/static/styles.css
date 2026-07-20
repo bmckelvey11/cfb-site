@@ -1121,3 +1121,35 @@ code {
     position: static;
   }
 }
+
+.timeframe-tabs {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+
+.timeframe-tabs a {
+  white-space: nowrap;
+}
+
+.sparkline {
+  display: block;
+}
+
+.sparkline polyline {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.sparkline polyline.positive {
+  stroke: var(--accent);
+}
+
+.sparkline polyline.negative {
+  stroke: var(--loss);
+}
+
+.trend-empty {
+  color: var(--muted);
+}

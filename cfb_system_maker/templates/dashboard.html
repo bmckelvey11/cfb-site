@@ -31,6 +31,13 @@
             <a href="?tab=examples{% if timeframe != 'all' %}&amp;timeframe={{ timeframe }}{% endif %}" {% if tab == 'examples' %}aria-current="page"{% endif %}>Example Systems</a>
           </nav>
 
+          <nav class="tabs timeframe-tabs" aria-label="Timeframe">
+            <a href="?tab={{ tab }}&amp;timeframe=all" {% if timeframe == 'all' %}aria-current="page"{% endif %}>All Time</a>
+            {% for season in seasons %}
+              <a href="?tab={{ tab }}&amp;timeframe={{ season }}" {% if timeframe == season|string %}aria-current="page"{% endif %}>{{ season }}</a>
+            {% endfor %}
+          </nav>
+
           {% if not systems %}
             <div class="empty-state">
               <h2>No saved systems yet</h2>
@@ -46,6 +53,7 @@
                     <th>Record</th>
                     <th>Money Won</th>
                     <th>ROI</th>
+                    <th>Trend</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -60,6 +68,7 @@
                       <td>{{ fig.wins }}-{{ fig.losses }}-{{ fig.pushes }}, {{ "%.1f%%"|format(fig.hit_rate * 100) }}</td>
                       <td class="{{ 'positive' if fig.profit > 0 else 'negative' if fig.profit < 0 else '' }}">{% if fig.profit > 0 %}+${{ "{:,.0f}".format(fig.profit * 100) }}{% elif fig.profit < 0 %}-${{ "{:,.0f}".format(-fig.profit * 100) }}{% else %}$0{% endif %}</td>
                       <td class="{{ 'positive' if fig.roi > 0 else 'negative' if fig.roi < 0 else '' }}">{{ "%.2f%%"|format(fig.roi * 100) }}</td>
+                      <td class="trend-cell">{% if row.sparkline.empty %}<span class="trend-empty">&mdash;</span>{% else %}<svg class="sparkline" viewBox="0 0 96 24" width="96" height="24" preserveAspectRatio="none" role="img" aria-label="{{ row.sparkline.label }}"><polyline class="{{ row.sparkline.sign_class }}" points="{{ row.sparkline.polyline }}" /></svg>{% endif %}</td>
                     </tr>
                   {% endfor %}
                 </tbody>

@@ -6,7 +6,7 @@ from cfb_system_maker.models import BacktestResult, BetDetail, SystemFilter
 from cfb_system_maker.sample_data import SAMPLE_GAMES_2023, SAMPLE_LINES_2023
 from cfb_system_maker.normalize import normalize_games
 from cfb_system_maker.storage import save_processed_games
-from cfb_system_maker.web import _cumulative_chart, create_app
+from cfb_system_maker.web import _cumulative_chart, _sparkline, create_app
 
 
 def _bet_detail(game_id, season, week, profit, result="win"):
@@ -895,3 +895,146 @@ def test_dashboard_shows_fade_suffix_on_type_column(tmp_path):
     html = client.get("/").get_data(as_text=True)
 
     assert "Fade" in html
+
+
+# --- Sparkline & timeframe tabs (Phase 5, Plan 03) ----------------------------
+
+
+def test_sparkline_empty_series_reports_empty_and_emits_no_polyline():
+    spark = _sparkline([])
+
+    assert spark["empty"] is True
+    assert spark["polyline"] == ""
+
+
+def test_sparkline_single_bet_is_horizontal_segment_at_mid_height():
+    spark = _sparkline([_bet_detail(game_id=1, season=2023, week=1, profit=0.9091)])
+
+    coords = [pair.split(",") for pair in spark["polyline"].split()]
+    assert len(coords) == 2
+    ys = {float(y) for _x, y in coords}
+    assert ys == {12.0}
+    assert spark["empty"] is False
+
+
+def test_sparkline_sign_class_follows_final_cumulative_value():
+    up = _sparkline([
+        _bet_detail(game_id=1, season=2023, week=1, profit=-1.0),
+        _bet_detail(game_id=2, season=2023, week=2, profit=2.0),
+    ])
+    down = _sparkline([
+        _bet_detail(game_id=1, season=2023, week=1, profit=1.0),
+        _bet_detail(game_id=2, season=2023, week=2, profit=-2.0),
+    ])
+
+    assert up["sign_class"] == "positive"
+    assert down["sign_class"] == "negative"
+
+
+def test_sparkline_zero_final_value_is_positive_class():
+    spark = _sparkline([
+        _bet_detail(game_id=1, season=2023, week=1, profit=1.0),
+        _bet_detail(game_id=2, season=2023, week=2, profit=-1.0),
+    ])
+
+    assert spark["sign_class"] == "positive"
+
+
+def test_sparkline_downsamples_to_at_most_48_points():
+    bets = [_bet_detail(game_id=i, season=2023, week=i, profit=1.0) for i in range(200)]
+
+    spark = _sparkline(bets)
+
+    assert len(spark["polyline"].split()) == 48
+
+
+def test_sparkline_flat_series_renders_centered_horizontal_line():
+    bets = [_bet_detail(game_id=i, season=2023, week=i, profit=0.0) for i in range(5)]
+
+    spark = _sparkline(bets)
+
+    ys = {float(pair.split(",")[1]) for pair in spark["polyline"].split()}
+    assert ys == {12.0}
+
+
+def test_sparkline_sorts_chronologically_regardless_of_input_order():
+    early = _bet_detail(game_id=1, season=2023, week=1, profit=5.0)
+    late = _bet_detail(game_id=2, season=2023, week=9, profit=-5.0)
+
+    shuffled = _sparkline([late, early])
+    ordered = _sparkline([early, late])
+
+    assert shuffled["polyline"] == ordered["polyline"]
+
+
+def test_dashboard_zero_bet_system_shows_em_dash_not_a_flat_line(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "no-bets", filter_seasons="1999")
+
+    html = client.get("/").get_data(as_text=True)
+
+    row = html[html.index("no-bets"):]
+    row = row[: row.index("</tr>")]
+    assert "&mdash;" in row
+    assert "<polyline" not in row
+
+
+def test_dashboard_renders_sparkline_for_system_with_bets(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "has-bets")
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert "<polyline" in html
+    assert 'class="sparkline"' in html
+    assert "Cumulative profit trend" in html
+
+
+def test_dashboard_timeframe_tabs_list_all_time_plus_each_season_newest_first(tmp_path):
+    app, games = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "tf-system")
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert "All Time" in html
+    seasons = sorted({game.season for game in games}, reverse=True)
+    positions = [html.index("timeframe={}".format(season)) for season in seasons]
+    assert positions == sorted(positions)
+
+
+def test_dashboard_timeframe_selection_changes_table_figures(tmp_path):
+    app, games = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "tf-figures")
+    season = sorted({game.season for game in games})[0]
+
+    html = client.get("/?timeframe={}".format(season)).get_data(as_text=True)
+
+    result = run_backtest(games, SystemFilter(side="home"))
+    record = next(row for row in result.season_breakdown if row.season == season)
+    assert _money_won_text(record.profit) in html
+
+
+def test_dashboard_unknown_timeframe_falls_back_to_all_time(tmp_path):
+    app, games = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "tf-fallback")
+
+    html = client.get("/?timeframe=../../etc/passwd").get_data(as_text=True)
+
+    expected = run_backtest(games, SystemFilter(side="home"))
+    assert _money_won_text(expected.profit) in html
+
+
+def test_dashboard_timeframe_not_in_data_falls_back_to_all_time(tmp_path):
+    app, games = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "tf-absent")
+
+    html = client.get("/?timeframe=1999").get_data(as_text=True)
+
+    expected = run_backtest(games, SystemFilter(side="home"))
+    assert _money_won_text(expected.profit) in html

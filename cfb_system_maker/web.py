@@ -1381,6 +1381,70 @@ def _timeframe_figures(result: BacktestResult, timeframe: str) -> dict[str, obje
     }
 
 
+_SPARK_WIDTH = 96
+_SPARK_HEIGHT = 24
+_SPARK_INSET = 3
+_SPARK_MAX_POINTS = 48
+
+
+def _sparkline(bet_details: list[BetDetail]) -> dict[str, object]:
+    """Cumulative-profit shape for one systems-table row.
+
+    Sibling of _cumulative_chart, not a parameterization of it: no axes, no zero
+    line, no points, y-scaled to the series' own min/max so a flat run centers.
+    """
+    if not bet_details:
+        return {"empty": True, "polyline": "", "sign_class": "", "label": ""}
+
+    ordered = sorted(bet_details, key=lambda bet: (bet.season, bet.week, bet.game_id))
+    running = 0.0
+    values = []
+    for bet in ordered:
+        running = round(running + bet.profit, 4)
+        values.append(running)
+
+    final = values[-1]
+    sign_class = "positive" if final >= 0 else "negative"
+    label = "Cumulative profit trend: {}".format(_money_text(final))
+
+    if len(values) > _SPARK_MAX_POINTS:
+        step = (len(values) - 1) / (_SPARK_MAX_POINTS - 1)
+        values = [values[min(len(values) - 1, round(index * step))] for index in range(_SPARK_MAX_POINTS)]
+
+    low = min(values)
+    high = max(values)
+    span = high - low
+    usable = _SPARK_HEIGHT - _SPARK_INSET * 2
+
+    def y_for(value: float) -> float:
+        if span == 0:
+            return _SPARK_HEIGHT / 2
+        return _SPARK_HEIGHT - _SPARK_INSET - ((value - low) / span) * usable
+
+    if len(values) == 1:
+        coords = [(0.0, _SPARK_HEIGHT / 2), (float(_SPARK_WIDTH), _SPARK_HEIGHT / 2)]
+    else:
+        coords = [
+            (_SPARK_WIDTH * index / (len(values) - 1), y_for(value))
+            for index, value in enumerate(values)
+        ]
+
+    return {
+        "empty": False,
+        "polyline": " ".join(f"{round(x, 2)},{round(y, 2)}" for x, y in coords),
+        "sign_class": sign_class,
+        "label": label,
+    }
+
+
+def _money_text(profit: float) -> str:
+    if profit > 0:
+        return "+${:,.0f}".format(profit * 100)
+    if profit < 0:
+        return "-${:,.0f}".format(-profit * 100)
+    return "$0"
+
+
 def _system_type_label(system: SystemFilter) -> str:
     label = "Over/Under" if system.bet_type == "total" else "Spread"
     return f"{label} · Fade" if system.fade else label
@@ -1400,4 +1464,5 @@ def _dashboard_row(
         "theory_line": saved.theory.strip().splitlines()[0] if saved.theory.strip() else "",
         "type_label": _system_type_label(saved.system),
         "figures": figures,
+        "sparkline": _sparkline(figures["bet_details"]),
     }
