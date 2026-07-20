@@ -6,7 +6,8 @@ from markupsafe import escape
 
 from cfb_system_maker import web
 from cfb_system_maker.backtest import compute_grade, run_backtest
-from cfb_system_maker.models import BacktestResult, BetDetail, SystemFilter
+from cfb_system_maker.enrich import save_features_to, upcoming_features_path
+from cfb_system_maker.models import BacktestResult, BetDetail, GameRecord, SystemFilter
 from cfb_system_maker.sample_data import SAMPLE_GAMES_2023, SAMPLE_LINES_2023
 from cfb_system_maker.normalize import normalize_games
 from cfb_system_maker.storage import (
@@ -16,6 +17,9 @@ from cfb_system_maker.storage import (
     load_example_system,
     load_saved_system,
     save_processed_games,
+    save_system,
+    save_upcoming_games,
+    save_upcoming_meta,
 )
 from cfb_system_maker.web import _cumulative_chart, _sparkline, create_app
 
@@ -1177,3 +1181,296 @@ def test_example_systems_tab_escapes_name_and_theory(tmp_path, monkeypatch):
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
     assert "<img src=x onerror=alert(2)>" not in html
     assert "&lt;img src=x onerror=alert(2)&gt;" in html
+
+
+# --- Current Matches panel (Phase 5, Plan 06) --------------------------------
+
+
+def _upcoming_game(
+    game_id,
+    home,
+    away,
+    *,
+    spread=-7.0,
+    total=52.5,
+    season=2025,
+    week=1,
+    provider="DraftKings",
+    home_conf="SEC",
+    away_conf="ACC",
+):
+    return GameRecord(
+        game_id=game_id,
+        season=season,
+        week=week,
+        home_team=home,
+        away_team=away,
+        home_conference=home_conf,
+        away_conference=away_conf,
+        home_points=None,
+        away_points=None,
+        provider=provider,
+        spread=spread,
+        total=total,
+    )
+
+
+def _write_upcoming(
+    tmp_path,
+    games,
+    kickoffs,
+    *,
+    is_fallback=False,
+    season=2025,
+    week=1,
+    fetched_at="2025-09-05T13:14:00+00:00",
+    features=None,
+):
+    save_upcoming_games(tmp_path, games, kickoffs)
+    save_upcoming_meta(
+        tmp_path,
+        {
+            "fetched_at": fetched_at,
+            "season": season,
+            "week": week,
+            "season_type": "regular",
+            "is_fallback": is_fallback,
+            "row_count": len(games),
+        },
+    )
+    save_features_to(upcoming_features_path(tmp_path), features or {})
+
+
+def _panel(html: str) -> str:
+    """Slice the Current Matches panel out of the rendered dashboard."""
+    start = html.index('aria-label="Current Matches"')
+    return html[start:]
+
+
+def _kick(game_id, start_date, *, tbd=False):
+    return {game_id: {"start_date": start_date, "start_time_tbd": tbd}}
+
+
+def test_current_matches_lists_a_row_for_a_matched_system(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    save_system("home-spreads", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    html = app.test_client().get("/").get_data(as_text=True)
+    panel = _panel(html)
+
+    assert "Play Georgia -7" in panel
+    assert "Clemson @ Georgia" in panel
+    assert "home-spreads" in panel
+
+
+def test_current_matches_omits_a_system_that_does_not_match(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    save_system(
+        "nowhere",
+        SystemFilter(bet_type="spread", side="home", teams={"Nowhere State"}),
+        tmp_path,
+    )
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Play" not in panel
+    assert "No saved system matches a game this week." in panel
+
+
+def test_current_matches_spread_play_text_home_and_away(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson", spread=-7.0)
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    save_system("home-side", SystemFilter(bet_type="spread", side="home"), tmp_path)
+    save_system("away-side", SystemFilter(bet_type="spread", side="away"), tmp_path)
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Play Georgia -7" in panel
+    assert "Play Clemson +7" in panel
+
+
+def test_current_matches_fade_home_side_names_the_away_team(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson", spread=-7.0)
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    save_system(
+        "fade-home", SystemFilter(bet_type="spread", side="home", fade=True), tmp_path
+    )
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    # A fade of a home-favorite is a bet on the away team; the play must say so.
+    assert "Play Clemson +7" in panel
+    assert "Play Georgia" not in panel
+
+
+def test_current_matches_total_play_text_and_fade(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson", total=52.5)
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    save_system("overs", SystemFilter(bet_type="total", total_side="over"), tmp_path)
+    save_system(
+        "fade-overs",
+        SystemFilter(bet_type="total", total_side="over", fade=True),
+        tmp_path,
+    )
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Play Over 52.5" in panel
+    assert "Play Under 52.5" in panel
+
+
+def test_current_matches_details_reuse_describe_undecorated(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson", spread=-7.0)
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    save_system(
+        "fav", SystemFilter(bet_type="spread", side="home", favorite=True), tmp_path
+    )
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "the team is a favorite" in panel
+    # No editor remove/edit affordances on the dashboard details.
+    assert "Remove" not in panel
+    assert "remove_href" not in panel
+
+
+def test_current_matches_sorts_by_kickoff_ascending(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    early = _upcoming_game(9001, "Georgia", "Clemson")
+    late = _upcoming_game(9002, "Oregon", "Washington")
+    kicks = {}
+    kicks.update(_kick(9001, "2025-09-06T16:00:00+00:00"))
+    kicks.update(_kick(9002, "2025-09-06T23:30:00+00:00"))
+    _write_upcoming(tmp_path, [late, early], kicks)
+    save_system("home-spreads", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert panel.index("Clemson @ Georgia") < panel.index("Washington @ Oregon")
+
+
+def test_current_matches_sorts_by_system_name_within_a_kickoff(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    save_system("zzz-system", SystemFilter(bet_type="spread", side="home"), tmp_path)
+    save_system("aaa-system", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert panel.index("aaa-system") < panel.index("zzz-system")
+
+
+def test_current_matches_tbd_kickoff_renders_date_without_a_clock_time(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(
+        tmp_path, [game], _kick(9001, "2025-09-06T15:45:00+00:00", tbd=True)
+    )
+    save_system("home-spreads", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    cells = re.findall(r'class="cm-kickoff"[^>]*>([^<]*)<', panel)
+    assert cells, "expected a kickoff cell in the panel"
+    kickoff = cells[0]
+    assert kickoff.strip(), "kickoff date should still render"
+    # A TBD kickoff must not fabricate a clock time.
+    assert ":" not in kickoff
+
+
+def test_current_matches_offseason_shows_notice_and_labelled_fallback_rows(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson", season=2025, week=16)
+    _write_upcoming(
+        tmp_path,
+        [game],
+        _kick(9001, "2025-12-06T19:30:00+00:00"),
+        is_fallback=True,
+        season=2025,
+        week=16,
+    )
+    save_system("home-spreads", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    # All three parts, not one instead of another.
+    assert "stale-warning" in panel
+    assert "Most recent week with data: Week 16, 2025" in panel
+    assert "Play Georgia -7" in panel
+
+
+def test_current_matches_week_present_but_no_match_is_neutral_not_amber(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    save_system(
+        "nowhere",
+        SystemFilter(bet_type="spread", side="home", teams={"Nowhere State"}),
+        tmp_path,
+    )
+
+    response = app.test_client().get("/")
+    panel = _panel(response.get_data(as_text=True))
+
+    assert response.status_code == 200
+    assert "No saved system matches a game this week." in panel
+    assert "stale-warning" not in panel
+
+
+def test_current_matches_missing_upcoming_file_names_the_cli_command(tmp_path):
+    app, _ = _dashboard_app(tmp_path)  # games.csv present, no upcoming.csv
+    save_system("home-spreads", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    panel = _panel(response.get_data(as_text=True))
+    assert "python -m cfb_system_maker upcoming --data-dir data" in panel
+
+
+def test_current_matches_no_saved_systems_points_at_examples(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    # No saved systems.
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Example Systems" in panel
+    assert "Play Georgia" not in panel
+
+
+def test_current_matches_escapes_team_and_system_names(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "<script>Georgia</script>", "Clemson")
+    _write_upcoming(tmp_path, [game], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    # Hand-written system JSON: safe stem, metacharacter display name.
+    (tmp_path / "systems").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "systems" / "evil.json").write_text(
+        json.dumps(
+            {
+                "name": "<b>evil</b>",
+                "saved_at": "2025-01-01T00:00:00+00:00",
+                "theory": "",
+                "system": {"bet_type": "spread", "side": "home"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    html = app.test_client().get("/").get_data(as_text=True)
+    panel = _panel(html)
+
+    assert "<script>Georgia</script>" not in panel
+    assert "&lt;script&gt;Georgia&lt;/script&gt;" in panel
+    assert "<b>evil</b>" not in panel
+    assert "&lt;b&gt;evil&lt;/b&gt;" in panel
