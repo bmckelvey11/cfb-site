@@ -5,8 +5,8 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Dashboard & Current Matches
 status: planning
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-07-20T22:44:43.907Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-07-20T22:50:25.125Z"
 last_activity: 2026-07-20
 last_activity_desc: "Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it"
 progress:
@@ -79,6 +79,7 @@ Progress: [██████████] 95%
 | Phase 05 P01 | 35m | 3 tasks | 5 files |
 | Phase 05 P03 | 45m | 3 tasks | 6 files |
 | Phase 05 P04 | 25m | 2 tasks | 4 files |
+| Phase 05 P05 | ~50m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Dashboard figures come from one cached all-time run_backtest per system; per-season derived from season_breakdown/bet_details, never persisted (05-03, D-11)
 - [Phase ?]: 05-04: pass the union (season's completed games + target week) to enrich_games and post-filter output to target-week ids, rather than adding an only_ids param
 - [Phase ?]: 05-04: exclude target-week ids from the accumulation base — in the offseason fallback the target games are themselves completed and would be double-counted
+- [Phase ?]: Example Systems tab ships three read-only bundled systems (05-05); registry-feature example uses matchup conferenceGame so it matches non-zero games in the resolved week (D-21, must-have #5)
 
 ### Pending Todos
 
@@ -149,6 +151,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-20T22:44:43.893Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-07-20T22:50:24.624Z
+Stopped at: Completed 05-05-PLAN.md
 Resume file: None
