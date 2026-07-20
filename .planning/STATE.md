@@ -5,8 +5,8 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Dashboard & Current Matches
 status: planning
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-07-20T22:21:41.725Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-07-20T22:26:10.314Z"
 last_activity: 2026-07-20
 last_activity_desc: "Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it"
 progress:
@@ -32,7 +32,7 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-07-20 - Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it
 
-Progress: [████████░░] 81%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Progress: [████████░░] 81%
 | Phase 04 P04 | 7min | 2 tasks | 5 files |
 | Phase 05 P02 | 15m | 2 tasks | 2 files |
 | Phase 05 P01 | 35m | 3 tasks | 5 files |
+| Phase 05 P03 | 45m | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 05-02: per-season dashboard figures proven derivable from one all-time run_backtest via season_breakdown (D-11); stats/grade are not derivable
 - [Phase ?]: Upcoming fetch uses season_type='both'; resolved type still threads into slicing and meta (D-19)
 - [Phase ?]: Offseason fallback ranks completed weeks by latest start date, never week number (postseason renumbers)
+- [Phase ?]: Dashboard at /, editor relocated to /system; editor view keeps the name index so all url_for('index') call sites repoint automatically (05-03, D-09)
+- [Phase ?]: Root-to-editor redirect preserves request.query_string verbatim, not url_for(**request.args), so repeated multi-value filter params survive (05-03)
+- [Phase ?]: Dashboard figures come from one cached all-time run_backtest per system; per-season derived from season_breakdown/bet_details, never persisted (05-03, D-11)
 
 ### Pending Todos
 
@@ -142,6 +146,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-20T22:21:27.329Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-07-20T22:26:10.300Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
