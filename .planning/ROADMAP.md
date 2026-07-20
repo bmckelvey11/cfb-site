@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Integrity — Fade & Grade** - Users can fade a system to grade the opposite side and see a composite letter grade in the stat-chip header. (completed 2026-07-17)
 - [x] **Phase 3: Data Depth & Breadth** - Historical coverage confirmed against the live CFBD API (2013 is the betting-line floor; no earlier lines exist to backfill) and more CFBD endpoints are wired into the feature registry as filterable features. (completed 2026-07-20)
 - [x] **Phase 4: Filter Popup Modal** - Clicking any filter opens a live-recalculating popup (slider or value table, live Record/Money/ROI, About Filter) instead of static inline fields. (completed 2026-07-17)
-- [ ] **Phase 5: Dashboard & Current Matches** - A My Systems dashboard replaces the editor as the landing page, and saved systems are evaluated live against upcoming games. *(Teaser records descoped 2026-07-20 — see Deferred.)*
+- [x] **Phase 5: Dashboard & Current Matches** - A My Systems dashboard replaces the editor as the landing page, and saved systems are evaluated live against upcoming games. *(Teaser records descoped 2026-07-20 — see Deferred.)* (completed 2026-07-20)
 
 ## Phase Details
 
@@ -186,4 +186,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Integrity — Fade & Grade | 2/2 | Complete    | 2026-07-17 |
 | 3. Data Depth & Breadth | 4/4 | Complete    | 2026-07-17 |
 | 4. Filter Popup Modal | 4/4 | Complete    | 2026-07-17 |
-| 5. Dashboard & Current Matches | 6/6 | In Progress|  |
+| 5. Dashboard & Current Matches | 6/6 | Complete    | 2026-07-20 |

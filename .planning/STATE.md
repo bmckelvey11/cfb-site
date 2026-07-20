@@ -4,11 +4,11 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 5
 current_phase_name: Dashboard & Current Matches
-status: planning
-stopped_at: Completed 05-06-PLAN.md (Current Matches panel)
-last_updated: "2026-07-20T23:33:38.135Z"
+status: complete
+stopped_at: Phase 5 complete — verification passed (3/3), security SECURED (0 threats open); milestone v1.0 delivered
+last_updated: "2026-07-20T23:59:00.000Z"
 last_activity: 2026-07-20
-last_activity_desc: "Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it"
+last_activity_desc: "Phase 5 (Dashboard & Current Matches) executed, verified, and secured; all 5 phases of milestone v1.0 complete"
 progress:
   total_phases: 5
   completed_phases: 5
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-17)
 
 **Core value:** A saved system's main page reads like a Bet Labs system editor (stat chips, cumulative money-won graph, plain-English active filters) and configuring any filter opens a live popup — slider or value table, per-value Record/ROI/Money, before you commit — instead of static inline form fields.
-**Current focus:** Phase 5 — Dashboard & Current Matches
+**Current focus:** Milestone v1.0 complete — all 5 phases delivered
 
 ## Current Position
 
-Phase: 5 — Dashboard & Current Matches
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-20 - Completed quick task 260720-igf: Fix normalize._select_line total drop: fall back to first available overUnder across providers when preferred line lacks it
+Phase: 5 — Dashboard & Current Matches (complete)
+Plan: 6/6 executed, verified, secured
+Status: Milestone v1.0 complete
+Last activity: 2026-07-20 - Phase 5 executed (6 plans, 3 waves), verified 3/3, security SECURED (0 threats open)
 
 Progress: [██████████] 100%
 
