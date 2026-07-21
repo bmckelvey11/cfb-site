@@ -2,7 +2,11 @@
 
 ## What This Is
 
-`cfb_system_maker` is a Python CLI + Flask tool that backtests college football betting systems against 2013-2025 CFBD data (13k games, enriched with running-stats features). It already has the backtest engine, feature registry, stats validation (Wilson CI, permutation p, holdout split), and a save/load/compare web UI. This project reshapes the web UI to function like Sports Insights Bet Labs — the product this whole feature set is modeled on — and grows the underlying data/feature registry to support it.
+`cfb_system_maker` is a Python CLI + Flask tool that backtests college football betting systems against 2013-2025 CFBD data (13k games, enriched with running-stats features). As of **v1.0 (shipped 2026-07-20)** its web UI reads and behaves like Sports Insights Bet Labs: a stat-chip system editor with a money-won graph and plain-English filters, a live filter-popup exploration flow, and a My Systems dashboard that evaluates saved systems against upcoming games with matched-filter details. The backtest engine, feature registry, and statistical validation (Wilson CI, permutation p, holdout split) underneath it all predate this work.
+
+## Current State
+
+**Shipped v1.0 — Bet Labs Parity** (2026-07-20): 5 phases, 21 plans, ~11k Python LOC, 307 tests passing. All requirements code-verified; two live-in-season checks deferred to season start. Teaser records (DASH-04) descoped. Next milestone not yet defined.
 
 ## Core Value
 
@@ -25,17 +29,21 @@ A saved system's main page reads like a Bet Labs system editor (stat chips, cumu
 - ✓ `theory` free-text field on `SavedSystem` — Phase 1
 - ✓ Fade System toggle (`fade: bool` on `SystemFilter`, flips graded side in grading only, matching untouched) — Phase 2
 - ✓ System Grade letter (composite: Wilson-margin sample size vs significance, ROI z-score, season sign-consistency, permutation p, filter-count / in-list-value-count overfitting penalties) — Phase 2
+- ✓ To-date advanced features (Off/Def Success Rate, Off/Def Explosiveness) + prior-season offensive wEPA, all entering-game / no-lookahead — Phase 3
+- ✓ 2013 CFBD betting-line floor confirmed against the live API (no usable pre-2013 lines to backfill) — Phase 3
+- ✓ Filter popup modal: live Record/Money Won/ROI chips, numeric dual-handle + BETWEEN + money chart, categorical searchable/sortable value table, About Filter, Edit-from-sentence, 250ms debounced live path — Phase 4
+- ✓ `GET /filter-detail` per-value table endpoint and `GET /api/backtest` live-chip endpoint — Phase 4
+- ✓ My Systems dashboard (`/` = dashboard, editor at `/system`) with per-season figures from one cached backtest and sparklines — Phase 5
+- ✓ Three bundled read-only example systems on their own Example Systems tab, with Copy to My Systems — Phase 5
+- ✓ `upcoming` CLI pipeline + Current Matches panel: upcoming (unplayed, lines-only) games matched against saved systems, fade-correct play text, reused `describe()` filter details — Phase 5
 
 ### Active
 
-- [ ] Current Matches tab: evaluate upcoming (unplayed, lines-only) games against saved systems; show matched-filter details per game
-- [ ] Filter popup modal: replaces inline sidebar `<details>` editing. Title bar with live Record/Money Won/ROI chips that recompute as controls move. Numeric filters: dual-handle slider + BETWEEN inputs + per-value money-won dot chart. Categorical/list filters: searchable sortable table (value | Record | ROI | Money). About Filter panel with `FeatureDef.description` text. Save Filter commits.
-- [ ] `GET /filter-detail` endpoint: per-value Record/ROI/Money for a candidate feature key, current system's other filters applied, candidate excluded
-- [ ] `GET /api/backtest` JSON endpoint for live chip recalculation without full page reload
-- [ ] My Systems dashboard (`/` becomes dashboard; editor moves to `/system`): saved-system table with sparkline, Create System panel, 2-3 bundled example systems
-- [ ] Alternate-line ("teaser") record popover off the Record chip
-- [ ] Data: backfill history further back than 2013 where CFBD coverage allows
-- [ ] Data: wire more CFBD REST/GraphQL endpoints (weather, player/coach, advanced stats, public-betting where available) into `FEATURE_REGISTRY` — grows the filter categories toward Bet Labs' Team Info / Line Info / Time Period / Matchup Info / Streaks / Stats / Player-Coach / Weather groups
+*(none — v1.0 shipped; next milestone requirements defined via `/gsd-new-milestone`)*
+
+**Deferred out of v1.0:**
+- [ ] Alternate-line ("teaser") record popover off the Record chip (DASH-04) — descoped 2026-07-20; partial decisions in the v1.0 Phase 5 context archive
+- [ ] Live in-season verification of Current Matches (real upcoming games) — cannot run until the season starts (~2026-08-29)
 
 ### Out of Scope
 
@@ -66,9 +74,12 @@ A saved system's main page reads like a Bet Labs system editor (stat chips, cumu
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Keep current main-page layout (sidebar + workspace); filter configuration moves into popup modals rather than replacing the whole page | User explicitly likes the current main-page GUI; the popup-modal interaction is the specific gap vs Bet Labs | ✓ Validated — Phase 1 shipped stat chips/graph/filter sentences/theory into the existing layout, no page restructure |
-| Whole bet-labs-parity-plan in scope (not just the popup modal) | User chose broad scope over narrow slice when asked | — Pending |
-| Data extension (backfill + more CFBD/GraphQL endpoints into registry) included in this project | User wants both deeper history and broader feature coverage, not just UI work | — Pending |
-| Hide Duplicates deferred | Only relevant once systems can match both sides of a single game; not true of side-fixed systems today | — Pending |
+| Whole bet-labs-parity-plan in scope (not just the popup modal) | User chose broad scope over narrow slice when asked | ✓ Delivered — v1.0 shipped all five phases (editor, integrity, data, modal, dashboard) |
+| Data extension (backfill + more CFBD/GraphQL endpoints into registry) included in this project | User wants both deeper history and broader feature coverage, not just UI work | ✓ Delivered — Phase 3 (2013 floor confirmed; success-rate/explosiveness/wEPA features added) |
+| Hide Duplicates deferred | Only relevant once systems can match both sides of a single game; not true of side-fixed systems today | — Pending (still out of scope) |
+| Teaser / alternate-line records (DASH-04) descoped from v1.0 during Phase 5 discussion | Two pricing questions unresolved (teasers don't price at -110; totals direction); shelved to avoid guessing | ✓ Deferred — 2026-07-20, partial decisions preserved in Phase 5 context archive |
+| Upcoming games get a separate `upcoming.csv`, not a `games.csv` column | `GameRecord` field order is the CSV contract; a separate file avoids a migration and makes it structurally impossible to grade an unplayed game | ✓ Implemented — Phase 5 (D-01) |
+| Current Matches matches but never grades (`require_played=False` flag) | Unplayed games have no result; extend the one authoritative matcher with a flag rather than fork a second one | ✓ Implemented — Phase 5 (D-18) |
 | Query-param `?tab=` full-page reload for Results Graph / Past Matches split (not client-side JS tabs) | Simpler, matches existing form-driven page-reload pattern; avoids introducing client-side state management | ✓ Implemented — Phase 1 |
 | `theory` field bundled into existing sidebar save form (not a separate save action) | Matches Bet Labs' single-form system editor; avoids a second persistence path | ✓ Implemented — Phase 1 |
 | `describe()`'s known-key-but-unrenderable-`(op,control)`-combo gap accepted as risk rather than fixed in Phase 1 | Low practical exploitability (requires hand-crafted query params), display/removal-affordance gap only, no data exposure — see `01-SECURITY.md` T-01-03 | ✓ Accepted — Phase 1, revisit if `FEATURE_REGISTRY` op/control combos grow |
@@ -91,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-17 after Phase 2*
+*Last updated: 2026-07-20 after v1.0 milestone*

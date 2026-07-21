@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 5
-current_phase_name: Dashboard & Current Matches
-status: complete
-stopped_at: Phase 5 complete — verification passed (3/3), security SECURED (0 threats open); milestone v1.0 delivered
-last_updated: "2026-07-20T23:59:00.000Z"
+status: Awaiting next milestone
+stopped_at: Completed 05-06-PLAN.md (Current Matches panel)
+last_updated: "2026-07-21T00:41:58.608Z"
 last_activity: 2026-07-20
-last_activity_desc: "Phase 5 (Dashboard & Current Matches) executed, verified, and secured; all 5 phases of milestone v1.0 complete"
+last_activity_desc: Milestone v1.0 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 21
   completed_plans: 21
+current_phase: 5
+current_phase_name: Dashboard & Current Matches
 ---
 
 # Project State
@@ -27,12 +27,10 @@ See: .planning/PROJECT.md (updated 2026-07-17)
 
 ## Current Position
 
-Phase: 5 — Dashboard & Current Matches (complete)
-Plan: 6/6 executed, verified, secured
-Status: Milestone v1.0 complete
-Last activity: 2026-07-20 - Phase 5 executed (6 plans, 3 waves), verified 3/3, security SECURED (0 threats open)
-
-Progress: [██████████] 100%
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-20 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -147,14 +145,22 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone close:
+Items acknowledged and deferred at v1.0 milestone close on 2026-07-20:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| verification | Phase 05 — live in-season confirmation that Current Matches shows real upcoming (unplayed) games with posted lines (05-VALIDATION.md Manual-Only) | deferred until season start (~2026-08-29) | 2026-07-20 |
+| verification | Phase 05 — live in-season confirmation that a feature-filtered saved system correctly matches upcoming games via computed season-to-date stats | deferred until season start (~2026-08-29) | 2026-07-20 |
+| requirement | DASH-04 (teaser/alternate-line records) — descoped from Phase 5 on 2026-07-20; unscheduled; partial decisions in 05-CONTEXT.md Deferred Ideas | deferred (out of v1.0) | 2026-07-20 |
+
+**Note:** Phase 05 verification is `human_needed`, not `gaps_found` — all three DASH requirements are code-verified and the full suite (307 tests) passes. The two verification items above are live-in-season confirmations that cannot execute in the offseason; the visual-layout confirmation was satisfied during this session (editor sidebar layout fix, commit 428f85d). Milestone closed as override_closeout on this basis.
 
 ## Session Continuity
 
 Last session: 2026-07-20T23:33:38.114Z
 Stopped at: Completed 05-06-PLAN.md (Current Matches panel)
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
