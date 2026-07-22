@@ -1,11 +1,13 @@
 from dataclasses import replace
 
 from cfb_system_maker.backtest import (
+    _analytic_p_value,
     _consistency_score,
     _overfit_score,
     _permutation_score,
     _roi_significance_score,
     _sample_size_score,
+    bh_correct,
     compute_grade,
     compute_season_breakdown,
     compute_system_stats,
@@ -173,6 +175,20 @@ def test_system_stats_include_edge_and_wilson_bounds():
     assert result.stats.wilson_low <= result.hit_rate <= result.stats.wilson_high
     assert 0.0 <= result.stats.p_value <= 1.0
     assert result.stats.low_sample is True
+
+
+def test_analytic_p_value_agrees_with_system_stats_p_value_for_same_counts():
+    # 130 wins / 200 decided = exactly 0.65 -- avoids rounding ambiguity in the oracle.
+    details = _bets(130, 70)
+    stats = compute_system_stats(details, hit_rate=0.65, roi=0.1815, american_odds=-110, stake=1.0)
+
+    direct = _analytic_p_value(wins=130, decided=200, break_even_rate=stats.break_even_rate)
+
+    assert direct == stats.p_value
+
+
+def test_analytic_p_value_returns_one_when_no_decided_bets():
+    assert _analytic_p_value(wins=0, decided=0, break_even_rate=0.5238) == 1.0
 
 
 def _bet(game_id, week, result):
@@ -594,6 +610,112 @@ def test_run_backtest_populates_grade_field():
     assert len(result.grade) == 1
     assert [r.season for r in result.season_breakdown] == [2022, 2023]
     assert all(r.bets == 1 for r in result.season_breakdown)
+
+
+# --- Benjamini-Hochberg correction (MVP-001) ----------------------------------
+# bh_correct is a standalone stats primitive with NO call site in compute_grade
+# or any letter-grade path -- it exists only for MVP-004's holdout finalist
+# batch correction, not for per-system grading.
+
+
+def test_bh_correct_known_value_vector():
+    # Hand-verified oracle: p=[0.001, 0.01, 0.5, 0.8], K=4, alpha=0.05
+    # rank 1: 0.001 * 4/1 = 0.004
+    # rank 2: 0.01  * 4/2 = 0.02
+    # rank 3: 0.5   * 4/3 = 0.6667 -> rounds to 0.667
+    # rank 4: 0.8   * 4/4 = 0.8
+    # reverse-cummin leaves all four unchanged here (already increasing)
+    p_values = [0.001, 0.01, 0.5, 0.8]
+
+    results = bh_correct(p_values, alpha=0.05)
+
+    corrected = [round(r["corrected_p"], 4) for r in results]
+    assert corrected == [0.004, 0.02, 0.6667, 0.8]
+    assert [r["bh_significant"] for r in results] == [True, True, False, False]
+    assert [r["raw_p"] for r in results] == p_values
+
+
+def test_bh_correct_maps_back_to_original_input_order_when_shuffled():
+    # Same oracle vector as above, shuffled -- proves restoration to ORIGINAL
+    # identity/order, not sorted order.
+    shuffled = [0.8, 0.001, 0.5, 0.01]  # indices: 0=0.8, 1=0.001, 2=0.5, 3=0.01
+
+    results = bh_correct(shuffled, alpha=0.05)
+
+    assert [r["raw_p"] for r in results] == shuffled
+    corrected = [round(r["corrected_p"], 4) for r in results]
+    assert corrected == [0.8, 0.004, 0.6667, 0.02]
+    assert [r["bh_significant"] for r in results] == [False, True, False, True]
+
+
+def test_bh_correct_requires_reverse_cummin_not_just_per_rank_scaling():
+    # p=[0.04, 0.05], K=2: rank1 candidate = 0.04*2/1 = 0.08, rank2 candidate
+    # = 0.05*2/2 = 0.05. Without the reverse-cummin step, rank1's corrected_p
+    # (0.08) would exceed rank2's (0.05) -- violating monotonicity. A naive
+    # per-rank-scaling-only implementation (no running min) passes the other
+    # monotonicity test below by coincidence but fails this one.
+    results = bh_correct([0.04, 0.05], alpha=0.05)
+
+    corrected = [round(r["corrected_p"], 4) for r in results]
+    assert corrected == [0.05, 0.05]
+
+
+def test_bh_correct_adjusted_p_values_are_monotonic_after_restoration_when_sorted_by_raw_p():
+    # Standard BH step-up property: once results are re-sorted by raw_p
+    # ascending, corrected_p must be non-decreasing.
+    raw = [0.2, 0.001, 0.05, 0.9, 0.01, 0.5]
+
+    results = bh_correct(raw, alpha=0.05)
+
+    by_raw_p = sorted(results, key=lambda r: r["raw_p"])
+    corrected_in_rank_order = [r["corrected_p"] for r in by_raw_p]
+    assert corrected_in_rank_order == sorted(corrected_in_rank_order)
+
+
+def test_bh_correct_ties_receive_identical_corrected_p_and_significance():
+    # Three tied p-values at the same raw_p must get the identical corrected_p
+    # (and therefore identical bh_significant) under standard BH tie handling.
+    p_values = [0.3, 0.01, 0.01, 0.01, 0.9]
+
+    results = bh_correct(p_values, alpha=0.05)
+
+    tied_corrected = {round(results[i]["corrected_p"], 6) for i in (1, 2, 3)}
+    assert len(tied_corrected) == 1
+    tied_significant = {results[i]["bh_significant"] for i in (1, 2, 3)}
+    assert len(tied_significant) == 1
+
+
+def test_bh_correct_empty_input_returns_empty_list():
+    assert bh_correct([], alpha=0.05) == []
+
+
+def test_bh_correct_corrected_p_never_exceeds_one():
+    results = bh_correct([0.9, 0.95, 0.99, 1.0], alpha=0.05)
+
+    assert all(r["corrected_p"] <= 1.0 for r in results)
+
+
+def test_bh_correct_is_not_called_from_compute_grade_or_grading_source():
+    # Guards acceptance criterion 6 structurally: bh_correct must have no call
+    # site anywhere in backtest.py's grading path. This is a source-text check
+    # (import-based introspection can't distinguish "referenced" from "called
+    # by compute_grade" reliably), so it directly inspects the module source.
+    import inspect
+
+    from cfb_system_maker import backtest as backtest_module
+
+    grade_source = inspect.getsource(backtest_module.compute_grade)
+    assert "bh_correct" not in grade_source
+
+    for score_fn_name in (
+        "_sample_size_score",
+        "_roi_significance_score",
+        "_consistency_score",
+        "_permutation_score",
+        "_overfit_score",
+    ):
+        fn_source = inspect.getsource(getattr(backtest_module, score_fn_name))
+        assert "bh_correct" not in fn_source
 
 
 # --- Unplayed-game matching (D-18) -------------------------------------------
