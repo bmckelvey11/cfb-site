@@ -478,6 +478,88 @@ def _hit_rate_z_test(hit_rate: float, n: int, break_even_rate: float) -> tuple[f
     return round(z_score, 4), round(p_value, 4)
 
 
+def _analytic_p_value(wins: int, decided: int, break_even_rate: float) -> float:
+    """One-sided analytic p-value from summary counts alone (no BetDetail list required).
+
+    This is the SAME math as _hit_rate_z_test's p-value component, extracted so
+    it is callable from run_backtest_summary's dict output (wins/decided counts)
+    without constructing full BetDetail objects — needed by MVP-004's holdout
+    finalist grading. hit_rate is rounded identically to how run_backtest and
+    run_backtest_summary already round it (round(wins/decided, 4)) so results
+    agree with SystemStats.p_value bit-for-bit at the same decided-bet counts.
+
+    This is the multiple-testing-correction INPUT (paired with bh_correct below).
+    It is NOT the permutation p-value (_permutation_p_value) — that is a
+    separate descriptive stat computed from resampling BetDetail results and
+    must not be fed into bh_correct.
+    """
+    if decided == 0:
+        return 1.0
+    hit_rate = round(wins / decided, 4)
+    _, p_value = _hit_rate_z_test(hit_rate, decided, break_even_rate)
+    return p_value
+
+
+def bh_correct(p_values: list[float], alpha: float = 0.05) -> list[dict]:
+    """Benjamini-Hochberg step-up correction over a fixed batch of p-values.
+
+    K = len(p_values) is the number of finalists actually graded and passed
+    into THIS call (MVP-004's holdout finalist batch) -- NOT candidates_tested
+    (the much larger N of candidates the search considered, which is
+    provenance-only and never enters this function). Conflating those two
+    counts is an easy off-by-concept error; K here must always be the batch
+    size of p-values actually supplied.
+
+    Returns one dict per input p-value, in the ORIGINAL input order/identity,
+    each with:
+      - raw_p: the input p-value, unchanged
+      - corrected_p: the BH-adjusted p-value (q-value), clamped to [0, 1]
+      - bh_significant: True if corrected_p <= alpha
+
+    Algorithm (step-up / reverse-cumulative-min form):
+      1. Sort ascending, remembering original indices.
+      2. For rank i (1-indexed) of K, compute candidate_i = p_(i) * K / i.
+      3. Walk from the largest rank down to the smallest, taking a running
+         minimum of candidate values -- this both guarantees the adjusted
+         p-values are monotonic after the original order is restored, and
+         (as a side effect) assigns tied raw p-values the identical
+         corrected_p, satisfying the standard BH tie convention.
+      4. Clamp each result to [0, 1].
+      5. Restore original input order before returning.
+
+    This function must never be called from compute_grade or any path
+    feeding the letter-grade composite -- it is a standalone capability,
+    not a modification of grading.
+    """
+    k = len(p_values)
+    if k == 0:
+        return []
+
+    indexed = sorted(range(k), key=lambda i: p_values[i])  # ascending by p-value, stable for ties
+    corrected_sorted = [0.0] * k
+
+    running_min = 1.0
+    for rank in range(k, 0, -1):  # walk from largest rank down to 1
+        idx = indexed[rank - 1]
+        candidate = p_values[idx] * k / rank
+        running_min = min(running_min, candidate)
+        corrected_sorted[rank - 1] = min(1.0, max(0.0, running_min))
+
+    corrected_by_original_index = [0.0] * k
+    for rank in range(1, k + 1):
+        idx = indexed[rank - 1]
+        corrected_by_original_index[idx] = corrected_sorted[rank - 1]
+
+    return [
+        {
+            "raw_p": p_values[i],
+            "corrected_p": corrected_by_original_index[i],
+            "bh_significant": corrected_by_original_index[i] <= alpha,
+        }
+        for i in range(k)
+    ]
+
+
 def _permutation_p_value(
     details: list[BetDetail],
     *,
