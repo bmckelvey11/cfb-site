@@ -1,0 +1,360 @@
+"""Pure, side-effect-free candidate generation for auto-discovering betting systems.
+
+This module owns three things only: canonical candidate identity (for dedup and
+deterministic tie-breaking), the compatibility grammar for expanding a candidate by
+exactly one predicate dimension, and in-sample-only value derivation (quantiles for
+numeric features, capped sorted levels for boolean/categorical features). It does not
+evaluate candidates (no `run_backtest`/`run_backtest_summary` calls) and does not run a
+search loop — that is MVP-003.
+
+Scope cuts made deliberately for MVP (see .solopreneur/backlog/2026-07-22-auto-discover-
+systems/backlog.md cross-cutting risk #5):
+  - Team-scoped registry features are only generated from the `bet_side` perspective.
+    Home/away/either/opponent perspectives are not generated here.
+  - `seasons`, `weeks`, `teams`, `conferences`, `providers` are treated as external
+    search *scope*, not generated candidate dimensions (they are high-cardinality and
+    MVP-003 already treats season range as scope config, not a beam dimension). They
+    pass through from the seed `SystemFilter` unchanged and are still sorted explicitly
+    by `candidate_identity` per the ticket's requirement.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from typing import Any
+
+from cfb_system_maker.features import FEATURE_REGISTRY, resolve_feature_value
+from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
+
+# Non-lookahead registry features only, in fixed FEATURE_REGISTRY tuple order
+# (never dict/set order) so downstream iteration is deterministic.
+_CANDIDATE_FEATURES = tuple(f for f in FEATURE_REGISTRY if f.group != "result_lookahead")
+
+# Fixed quartile scheme for numeric feature/spread/total thresholds (MVP — no smart
+# binning). Interior cut points only; min/max are not useful thresholds on their own.
+_QUANTILES: tuple[float, ...] = (0.25, 0.5, 0.75)
+
+# Deterministic cap on distinct boolean/categorical levels considered per dimension:
+# top-N most frequent in-sample levels, ties broken by value ascending. Documented here
+# per the ticket's requirement for an explicit, stated limit.
+_CATEGORICAL_LIMIT = 8
+
+_HARD_DIMENSION_CAP = 6
+_DEFAULT_MAX_DIMENSIONS = 4
+
+# Dimension name constants.
+_DIM_FAVORITE_UNDERDOG = "favorite_underdog"
+_DIM_HOME_AWAY = "home_away"
+_DIM_SPREAD_RANGE = "spread_range"
+_DIM_TOTAL_RANGE = "total_range"
+
+
+def _feature_dimension(key: str) -> str:
+    return f"feature:{key}"
+
+
+def _sort_value(value: Any) -> Any:
+    """Normalize a FeatureFilter.value for canonical, order-independent comparison."""
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return tuple(sorted(value, key=lambda v: (str(type(v)), v)))
+    return value
+
+
+def _feature_filter_key(filt: FeatureFilter) -> tuple:
+    return (filt.key, filt.op, str(type(filt.value)), _sort_value(filt.value), filt.perspective)
+
+
+def _sortable_optional_float(value: float | None) -> tuple[bool, float]:
+    """Make an Optional[float] field totally orderable for tuple sort/comparison.
+
+    None sorts before any real value; a real 0.0 never collides with None since the
+    leading bool differs. Needed because candidate_identity tuples are used as sort
+    keys, and plain None/float comparison raises TypeError.
+    """
+    return (value is not None, value if value is not None else 0.0)
+
+
+def candidate_identity(system: SystemFilter) -> tuple:
+    """Canonical, fully sorted identity for a SystemFilter.
+
+    Used for both deduplication during expansion and as the deterministic tie-break
+    key when ranking (MVP-003). Set-typed fields are sorted explicitly — never relies
+    on Python's randomized set-iteration order. feature_filters is order-independent:
+    two SystemFilters with the same filters in different tuple order collapse to the
+    same identity.
+    """
+    return (
+        system.bet_type,
+        system.side,
+        system.total_side,
+        tuple(sorted(system.seasons)),
+        tuple(sorted(system.weeks)),
+        tuple(sorted(system.teams)),
+        tuple(sorted(system.conferences)),
+        system.favorite,
+        system.underdog,
+        system.home,
+        system.away,
+        system.fade,
+        tuple(sorted(system.providers)),
+        _sortable_optional_float(system.min_spread),
+        _sortable_optional_float(system.max_spread),
+        _sortable_optional_float(system.min_total),
+        _sortable_optional_float(system.max_total),
+        tuple(sorted((_feature_filter_key(f) for f in system.feature_filters))),
+    )
+
+
+def active_dimensions(system: SystemFilter) -> set[str]:
+    """Which candidate dimensions are already set on this SystemFilter."""
+    dims: set[str] = set()
+    if system.favorite or system.underdog:
+        dims.add(_DIM_FAVORITE_UNDERDOG)
+    if system.home or system.away:
+        dims.add(_DIM_HOME_AWAY)
+    if system.min_spread is not None or system.max_spread is not None:
+        dims.add(_DIM_SPREAD_RANGE)
+    if system.min_total is not None or system.max_total is not None:
+        dims.add(_DIM_TOTAL_RANGE)
+    for filt in system.feature_filters:
+        dims.add(_feature_dimension(filt.key))
+    return dims
+
+
+def count_dimensions(system: SystemFilter) -> int:
+    """Count of active candidate DIMENSIONS (not values).
+
+    Deliberately a different counting scheme from backtest.count_overfit_filters,
+    which counts individual values (e.g. each team/season/week/feature-in-value
+    counts separately for overfit scoring). This function counts one per dimension
+    regardless of how many candidate values were tried for it — used only to enforce
+    the filter-dimension cap during generation/expansion. Does not import or reuse
+    count_overfit_filters.
+    """
+    return len(active_dimensions(system))
+
+
+def _is_noop(system: SystemFilter) -> bool:
+    return count_dimensions(system) == 0
+
+
+def _feature_values(
+    games: list[GameRecord],
+    feature_map: dict[int, dict[str, Any]],
+    feature_key: str,
+    perspective: str,
+) -> list[Any]:
+    """Extract non-None in-sample values for one feature via the same resolver
+    matches_system/feature_ok use, so derived thresholds are read from the exact
+    storage columns the matcher later reads. games/feature_map must be the caller's
+    in-sample split only — this function has no access to storage/enrich and cannot
+    reach for holdout data itself.
+
+    For "bet_side" perspective, the eventual candidate's side (home or away) isn't
+    known yet at generation time, so values are pooled from both home_<key> and
+    away_<key> columns (resolved via perspective="either") rather than assuming a
+    fixed side. This avoids skewing thresholds toward one side's distribution for
+    features that aren't home/away symmetric (e.g. pregame win prob).
+    """
+    from cfb_system_maker import features as features_module
+
+    feature = features_module.FEATURE_BY_KEY[feature_key]
+    lookup_perspective = "either" if perspective == "bet_side" else perspective
+    filt = FeatureFilter(key=feature_key, op="eq", value=None, perspective=lookup_perspective)
+    system_like = SystemFilter(side="home")
+    values: list[Any] = []
+    for game in games:
+        row = feature_map.get(game.game_id, {})
+        value = resolve_feature_value(row, feature, filt, system_like)
+        if lookup_perspective == "either" and isinstance(value, tuple):
+            values.extend(v for v in value if v is not None)
+            continue
+        if value is None:
+            continue
+        values.append(value)
+    return values
+
+
+def numeric_quantile_values(
+    games: list[GameRecord],
+    feature_map: dict[int, dict[str, Any]],
+    feature_key: str,
+    perspective: str = "bet_side",
+    *,
+    quantiles: tuple[float, ...] = _QUANTILES,
+) -> list[float]:
+    """Fixed-quantile candidate thresholds for a numeric feature, in-sample only.
+
+    games/feature_map are required plain arguments (mirrors backtest.run_backtest's
+    signature) — there is no code path here that reaches into storage/enrich, so it is
+    structurally impossible to pass holdout rows in without the caller doing so
+    explicitly.
+    """
+    values = sorted(v for v in _feature_values(games, feature_map, feature_key, perspective) if isinstance(v, (int, float)))
+    if not values:
+        return []
+    n = len(values)
+    thresholds: list[float] = []
+    for q in quantiles:
+        idx = min(n - 1, max(0, int(round(q * (n - 1)))))
+        thresholds.append(float(values[idx]))
+    # dedup while preserving ascending order (collapsed bins produce repeats)
+    deduped: list[float] = []
+    for t in thresholds:
+        if not deduped or deduped[-1] != t:
+            deduped.append(t)
+    return deduped
+
+
+def categorical_or_bool_values(
+    games: list[GameRecord],
+    feature_map: dict[int, dict[str, Any]],
+    feature_key: str,
+    perspective: str = "bet_side",
+    *,
+    limit: int = _CATEGORICAL_LIMIT,
+) -> list[Any]:
+    """Sorted, frequency-capped in-sample levels for a boolean/categorical feature.
+
+    Levels are ranked by (-count, value) so ties break deterministically on the value
+    itself, then capped to `limit` (default 8) — the documented deterministic cap on
+    distinct levels considered per dimension. games/feature_map are required plain
+    in-sample arguments, same non-leak guarantee as numeric_quantile_values.
+    """
+    values = _feature_values(games, feature_map, feature_key, perspective)
+    counts: dict[Any, int] = {}
+    for v in values:
+        counts[v] = counts.get(v, 0) + 1
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], str(item[0])))
+    return [value for value, _ in ranked[:limit]]
+
+
+def _spread_range_children(parent: SystemFilter, games: list[GameRecord]) -> list[SystemFilter]:
+    # Note: thresholds are derived from the raw home spread (GameRecord.spread), while
+    # matches_system applies min_spread/max_spread to the side-adjusted spread
+    # (negated for away bets). Acceptable for MVP — candidates are evaluated
+    # empirically by MVP-003's beam search, which will simply score a poorly-placed
+    # threshold lower rather than silently misbehave.
+    spreads = sorted(g.spread for g in games if g.spread is not None)
+    if not spreads:
+        return []
+    n = len(spreads)
+    children = []
+    for q in _QUANTILES:
+        idx = min(n - 1, max(0, int(round(q * (n - 1)))))
+        threshold = float(spreads[idx])
+        children.append(replace(parent, min_spread=threshold))
+        children.append(replace(parent, max_spread=threshold))
+    return children
+
+
+def _total_range_children(parent: SystemFilter, games: list[GameRecord]) -> list[SystemFilter]:
+    totals = sorted(g.total for g in games if g.total is not None)
+    if not totals:
+        return []
+    n = len(totals)
+    children = []
+    for q in _QUANTILES:
+        idx = min(n - 1, max(0, int(round(q * (n - 1)))))
+        threshold = float(totals[idx])
+        children.append(replace(parent, min_total=threshold))
+        children.append(replace(parent, max_total=threshold))
+    return children
+
+
+def _feature_children(
+    parent: SystemFilter,
+    games: list[GameRecord],
+    feature_map: dict[int, dict[str, Any]],
+) -> list[SystemFilter]:
+    children: list[SystemFilter] = []
+    for feature in _CANDIDATE_FEATURES:
+        # Team-scoped features generated from bet_side perspective only (documented
+        # MVP scope cut). Non-team-scoped features use "single" perspective.
+        perspective = "bet_side" if feature.team_scoped else "single"
+
+        if feature.control == "numeric":
+            for threshold in numeric_quantile_values(games, feature_map, feature.key, perspective):
+                for op in ("gte", "lte"):
+                    filt = FeatureFilter(key=feature.key, op=op, value=threshold, perspective=perspective)
+                    children.append(replace(parent, feature_filters=parent.feature_filters + (filt,)))
+        else:  # bool or categorical
+            for level in categorical_or_bool_values(games, feature_map, feature.key, perspective):
+                filt = FeatureFilter(key=feature.key, op="eq", value=level, perspective=perspective)
+                children.append(replace(parent, feature_filters=parent.feature_filters + (filt,)))
+    return children
+
+
+def expand_candidates(
+    parent: SystemFilter,
+    games: list[GameRecord],
+    feature_map: dict[int, dict[str, Any]],
+    *,
+    max_dimensions: int = _DEFAULT_MAX_DIMENSIONS,
+    hard_cap: int = _HARD_DIMENSION_CAP,
+) -> list[SystemFilter]:
+    """Expand `parent` by exactly one legal, compatible predicate dimension.
+
+    games/feature_map must be the caller's in-sample split only (mirrors
+    backtest.run_backtest's signature) — no storage/enrich access happens here.
+
+    Grammar rules enforced:
+      - Never combines mutually exclusive choices (favorite+underdog, home+away,
+        incompatible spread/total bound pairs) in one candidate.
+      - Never sets a dimension already active on `parent`.
+      - Never emits a child identical to `parent`, and never emits the no-op/empty
+        SystemFilter (only relevant when `parent` itself has no active dimensions —
+        such a parent produces normal one-dimension children, but a child that ends
+        up no-op, i.e. impossible here by construction, would be rejected too).
+      - Children are deduplicated by candidate_identity and returned sorted by
+        candidate_identity for deterministic order.
+    """
+    if hard_cap > _HARD_DIMENSION_CAP:
+        raise ValueError(f"hard_cap may not exceed {_HARD_DIMENSION_CAP}")
+    if max_dimensions > hard_cap:
+        raise ValueError("max_dimensions may not exceed hard_cap")
+
+    active = active_dimensions(parent)
+    if len(active) >= max_dimensions:
+        return []
+
+    children: list[SystemFilter] = []
+
+    if _DIM_FAVORITE_UNDERDOG not in active:
+        children.append(replace(parent, favorite=True))
+        children.append(replace(parent, underdog=True))
+
+    if _DIM_HOME_AWAY not in active:
+        # home/away flags only restrict matches_system when paired with the matching
+        # `side` (verified against matches_system: side="away", home=True -> 0
+        # matches) — set both together as one candidate, never the bool alone.
+        children.append(replace(parent, home=True, side="home"))
+        children.append(replace(parent, away=True, side="away"))
+
+    if _DIM_SPREAD_RANGE not in active and parent.bet_type == "spread":
+        children.extend(_spread_range_children(parent, games))
+
+    if _DIM_TOTAL_RANGE not in active:
+        children.extend(_total_range_children(parent, games))
+
+    existing_feature_dims = {d for d in active if d.startswith("feature:")}
+    feature_children = _feature_children(parent, games, feature_map)
+    for child in feature_children:
+        new_filt = child.feature_filters[-1]
+        if _feature_dimension(new_filt.key) in existing_feature_dims:
+            continue
+        children.append(child)
+
+    seen: set[tuple] = set()
+    deduped: list[SystemFilter] = []
+    for child in children:
+        if child == parent or _is_noop(child):
+            continue
+        identity = candidate_identity(child)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        deduped.append(child)
+
+    deduped.sort(key=candidate_identity)
+    return deduped
