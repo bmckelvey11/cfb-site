@@ -1,14 +1,18 @@
 import random
 
 import cfb_system_maker.backtest as backtest_module
+import cfb_system_maker.search as search_module
 from cfb_system_maker.backtest import matches_system
 from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
 from cfb_system_maker.search import (
+    BeamCandidate,
+    BeamSearchResult,
     beam_search,
     candidate_identity,
     categorical_or_bool_values,
     count_dimensions,
     expand_candidates,
+    grade_finalists,
     numeric_quantile_values,
 )
 
@@ -392,3 +396,126 @@ def test_categorical_values_capped_at_documented_limit():
 
     levels = categorical_or_bool_values(games, feature_map, "venue", perspective="single", limit=8)
     assert len(levels) <= 8
+
+
+# --- MVP-004: holdout finalist grading + BH correction -----------------------------
+
+
+def _candidate(system: SystemFilter, *, wilson_low: float, roi: float, decided: int) -> BeamCandidate:
+    return BeamCandidate(
+        system=system, wins=decided, losses=0, decided=decided, roi=roi,
+        wilson_low=wilson_low, identity=candidate_identity(system),
+    )
+
+
+def test_holdout_cannot_alter_finalist_identity_or_order():
+    # Two "finalists" ranked A-before-B by MVP-003's in-sample beam search. On
+    # holdout, B dramatically outperforms A. Even so, grade_finalists must not
+    # reorder or re-select finalists based on holdout results.
+    system_a = SystemFilter(favorite=True, home=True, side="home")
+    system_b = SystemFilter(away=True, side="away")
+    candidate_a = _candidate(system_a, wilson_low=0.6, roi=0.2, decided=200)  # ranked first in-sample
+    candidate_b = _candidate(system_b, wilson_low=0.5, roi=0.1, decided=150)  # ranked second in-sample
+
+    beam_result = BeamSearchResult(
+        survivors=(candidate_a, candidate_b),
+        candidates_tested=500,
+        effective_params={"alpha": 0.05},
+    )
+
+    # Holdout games where home favorites (A) never cover but away underdogs (B)
+    # cover every game -- if holdout ever influenced ranking, B would be promoted
+    # ahead of A.
+    holdout_games = _biased_games(60, season=2024, home_cover_rate=0.0, seed=7, game_id_start=5000)
+    holdout_feature_map = _biased_feature_map(holdout_games)
+
+    result = grade_finalists(beam_result, holdout_games, holdout_feature_map)
+
+    assert [f.system for f in result.finalists] == [system_a, system_b]
+
+
+def test_zero_holdout_bet_finalist_omitted():
+    system_matches = SystemFilter()  # matches everything
+    system_never_matches = SystemFilter(teams={"NoSuchTeam"})
+    candidate_matches = _candidate(system_matches, wilson_low=0.6, roi=0.2, decided=200)
+    candidate_never = _candidate(system_never_matches, wilson_low=0.55, roi=0.15, decided=150)
+
+    beam_result = BeamSearchResult(
+        survivors=(candidate_matches, candidate_never),
+        candidates_tested=100,
+        effective_params={"alpha": 0.05},
+    )
+
+    holdout_games = _biased_games(60, season=2024, home_cover_rate=0.6, seed=11, game_id_start=9000)
+    holdout_feature_map = _biased_feature_map(holdout_games)
+
+    result = grade_finalists(beam_result, holdout_games, holdout_feature_map)
+
+    assert len(result.finalists) == 1
+    assert result.finalists[0].system == system_matches
+    assert result.finalists_graded == 1
+    assert result.candidates_tested == 100
+
+
+def test_full_run_backtest_call_count_equals_finalists_graded(monkeypatch):
+    # 4 survivors match holdout data, 1 never matches -- the zero-match survivor
+    # must be excluded WITHOUT ever triggering a full run_backtest call (only the
+    # cheap run_backtest_summary pre-check), so call count == finalists_graded
+    # exactly, strictly less than len(survivors).
+    matching_systems = [SystemFilter(seasons={2024}) for _ in range(4)]
+    never_matches = SystemFilter(teams={"NoSuchTeam"})
+    survivors = tuple(
+        _candidate(s, wilson_low=0.6 - i * 0.01, roi=0.1, decided=100)
+        for i, s in enumerate(matching_systems)
+    ) + (_candidate(never_matches, wilson_low=0.5, roi=0.05, decided=50),)
+    beam_result = BeamSearchResult(survivors=survivors, candidates_tested=1000, effective_params={"alpha": 0.05})
+
+    holdout_games = _biased_games(60, season=2024, home_cover_rate=0.6, seed=13, game_id_start=7000)
+    holdout_feature_map = _biased_feature_map(holdout_games)
+
+    calls = []
+    real_run_backtest = search_module.run_backtest
+
+    def spy(*args, **kwargs):
+        calls.append(1)
+        return real_run_backtest(*args, **kwargs)
+
+    monkeypatch.setattr(search_module, "run_backtest", spy)
+
+    result = grade_finalists(beam_result, holdout_games, holdout_feature_map)
+
+    assert result.finalists_graded == 4
+    assert len(calls) == result.finalists_graded
+    assert len(calls) < len(survivors)
+    assert len(calls) <= 20  # top_k default
+    assert len(calls) < beam_result.candidates_tested
+
+
+def test_bh_batch_size_is_k_not_n():
+    systems = [SystemFilter(seasons={2024}, min_spread=float(i)) for i in range(4)]
+    survivors = tuple(
+        _candidate(s, wilson_low=0.6 - i * 0.01, roi=0.1, decided=100) for i, s in enumerate(systems)
+    )
+    beam_result = BeamSearchResult(survivors=survivors, candidates_tested=5000, effective_params={"alpha": 0.05})
+
+    holdout_games = _biased_games(60, season=2024, home_cover_rate=0.6, seed=17, game_id_start=3000)
+    holdout_feature_map = _biased_feature_map(holdout_games)
+
+    captured_batches = []
+    real_bh_correct = search_module.bh_correct
+
+    def spy_bh(p_values, alpha=0.05):
+        captured_batches.append(list(p_values))
+        return real_bh_correct(p_values, alpha=alpha)
+
+    orig = search_module.bh_correct
+    search_module.bh_correct = spy_bh
+    try:
+        result = grade_finalists(beam_result, holdout_games, holdout_feature_map)
+    finally:
+        search_module.bh_correct = orig
+
+    assert len(captured_batches) == 1
+    assert len(captured_batches[0]) == result.finalists_graded
+    assert result.finalists_graded != beam_result.candidates_tested
+    assert result.candidates_tested == 5000

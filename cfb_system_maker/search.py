@@ -26,9 +26,16 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any
 
-from cfb_system_maker.backtest import _wilson_interval, run_backtest_summary
+from cfb_system_maker.backtest import (
+    _analytic_p_value,
+    _break_even_rate,
+    _wilson_interval,
+    bh_correct,
+    run_backtest,
+    run_backtest_summary,
+)
 from cfb_system_maker.features import FEATURE_REGISTRY, resolve_feature_value
-from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
+from cfb_system_maker.models import BacktestResult, FeatureFilter, GameRecord, SystemFilter
 
 # Non-lookahead registry features only, in fixed FEATURE_REGISTRY tuple order
 # (never dict/set order) so downstream iteration is deterministic.
@@ -509,4 +516,120 @@ def beam_search(
             "alpha": alpha,
             "max_dimensions": max_dimensions,
         },
+    )
+
+
+# --- MVP-004: holdout finalist grading + BH correction ----------------------------
+#
+# Final evaluation-only stage. Takes the fixed, already-ranked top-K survivors from
+# beam_search (MVP-003) and touches holdout data exactly once per survivor via a full
+# run_backtest call -- never split_holdout, never any code path back into candidate
+# selection/ranking. Finalist order/identity is entirely inherited from
+# beam_result.survivors; this stage only measures and annotates, it never re-sorts by
+# holdout performance (that would be exactly the leakage this ticket exists to avoid).
+
+_DEFAULT_AMERICAN_ODDS = -110
+
+
+@dataclass(frozen=True)
+class GradedFinalist:
+    """One beam-search survivor after a single holdout-only run_backtest call."""
+
+    system: SystemFilter
+    holdout_result: BacktestResult
+    raw_p: float
+    corrected_p: float
+    bh_significant: bool
+
+
+@dataclass(frozen=True)
+class FinalistGradingResult:
+    finalists: tuple[GradedFinalist, ...]
+    candidates_tested: int  # N, pass-through from BeamSearchResult, provenance only
+    finalists_graded: int  # K, count after zero-holdout-bet exclusion
+
+
+def grade_finalists(
+    beam_result: BeamSearchResult,
+    holdout_games: list[GameRecord],
+    holdout_feature_map: dict[int, dict[str, Any]],
+    *,
+    alpha: float = _DEFAULT_ALPHA,
+    american_odds: int = _DEFAULT_AMERICAN_ODDS,
+) -> FinalistGradingResult:
+    """Grade beam_result.survivors on holdout data and BH-correct across them.
+
+    holdout_games/holdout_feature_map must already be the caller's holdout-only split
+    (e.g. from backtest.split_holdout) -- this function never calls split_holdout or
+    reaches for "the full dataset" itself, and never partitions its inputs further.
+
+    Finalist identity and order are fixed by beam_result.survivors before this
+    function runs; holdout results are never used to re-rank or re-select finalists.
+    Output preserves beam_result.survivors order (minus any zero-holdout-bet
+    exclusions) -- do not sort by corrected_p, holdout ROI, or any holdout-derived
+    field.
+
+    At most one full run_backtest call per survivor (never once per candidate
+    evaluated during beam_search) -- this and a cheap run_backtest_summary pre-check
+    per survivor are the only places holdout data is touched, and neither ever feeds
+    back into candidate selection/ranking. A survivor whose holdout data yields zero
+    matched bets is excluded from the returned finalists entirely (not graded on a
+    near-zero/empty sample); the summary pre-check (match+grade, no permutation test)
+    detects this before the expensive full run_backtest call, so a zero-match
+    survivor never triggers a full call at all -- total full run_backtest calls equal
+    finalists_graded exactly, never len(beam_result.survivors).
+
+    BH correction (backtest.bh_correct) runs as a single batch over the analytic
+    p-value (backtest._analytic_p_value, NOT the permutation p-value) of every
+    surviving (non-excluded) finalist's holdout counts -- batch size K =
+    finalists_graded, explicitly not N = candidates_tested. The full run_backtest's
+    permutation p-value and letter grade are retained on holdout_result and reported
+    only as descriptive secondary statistics, uninvolved in the BH batch.
+
+    alpha is accepted as this function's own parameter (default matches
+    beam_search's _DEFAULT_ALPHA) rather than implicitly reused from
+    beam_result.effective_params["alpha"] -- callers who want beam_search's alpha
+    must pass it explicitly (e.g. grade_finalists(..., alpha=beam_result.
+    effective_params["alpha"])). Keeps this function's contract independent of
+    beam_result's internals, mirroring how MVP-003 documented alpha as pass-through.
+    """
+    break_even_rate = _break_even_rate(american_odds)
+
+    kept_systems: list[SystemFilter] = []
+    kept_results: list[BacktestResult] = []
+    raw_p_values: list[float] = []
+
+    for candidate in beam_result.survivors:
+        summary = run_backtest_summary(
+            holdout_games, candidate.system, feature_map=holdout_feature_map, american_odds=american_odds
+        )
+        if summary["wins"] + summary["losses"] + summary["pushes"] == 0:
+            continue
+        result = run_backtest(
+            holdout_games, candidate.system, feature_map=holdout_feature_map, american_odds=american_odds
+        )
+        decided = result.wins + result.losses
+        raw_p = _analytic_p_value(result.wins, decided, break_even_rate)
+
+        kept_systems.append(candidate.system)
+        kept_results.append(result)
+        raw_p_values.append(raw_p)
+
+    bh_rows = bh_correct(raw_p_values, alpha=alpha)
+
+    finalists = tuple(
+        GradedFinalist(
+            system=system,
+            holdout_result=result,
+            raw_p=row["raw_p"],
+            corrected_p=row["corrected_p"],
+            bh_significant=row["bh_significant"],
+        )
+        for system, result, row in zip(kept_systems, kept_results, bh_rows)
+    )
+
+    return FinalistGradingResult(
+        finalists=finalists,
+        candidates_tested=beam_result.candidates_tested,
+        finalists_graded=len(finalists),
     )
