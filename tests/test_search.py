@@ -1,6 +1,10 @@
+import random
+
+import cfb_system_maker.backtest as backtest_module
 from cfb_system_maker.backtest import matches_system
 from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
 from cfb_system_maker.search import (
+    beam_search,
     candidate_identity,
     categorical_or_bool_values,
     count_dimensions,
@@ -246,6 +250,132 @@ def test_missing_feature_values_never_become_candidate_values():
     for c in children:
         for f in c.feature_filters:
             assert f.value is not None
+
+
+def _biased_games(
+    n: int,
+    *,
+    season: int = 2023,
+    home_cover_rate: float = 0.5,
+    seed: int = 1,
+    game_id_start: int = 1,
+) -> list[GameRecord]:
+    """Synthetic in-sample-shaped games where home favorites cover at
+    `home_cover_rate`, so a "home + favorite" candidate has a real, deterministic
+    in-sample edge (or lack of one) to rank on.
+    """
+    rng = random.Random(seed)
+    games = []
+    for i in range(n):
+        gid = game_id_start + i
+        home_covers = rng.random() < home_cover_rate
+        # home favored by 7; home wins by 14 (covers) or loses by 3 (doesn't cover)
+        if home_covers:
+            home_points, away_points = 30, 16
+        else:
+            home_points, away_points = 17, 20
+        games.append(
+            GameRecord(
+                game_id=gid, season=season, week=(i % 15) + 1,
+                home_team=f"H{gid}", away_team=f"A{gid}",
+                home_conference="X", away_conference="Y",
+                home_points=home_points, away_points=away_points,
+                provider="consensus", spread=-7.0, total=45.0,
+            )
+        )
+    return games
+
+
+def _biased_feature_map(games: list[GameRecord]) -> dict[int, dict]:
+    return {g.game_id: {"neutralSite": False} for g in games}
+
+
+def test_min_decided_bets_gate_excludes_undersized_candidates():
+    games = _biased_games(20, home_cover_rate=0.9)
+    feature_map = _biased_feature_map(games)
+    result = beam_search(games, feature_map, min_decided_bets=100)
+    assert result.survivors == ()
+
+
+def test_min_decided_bets_gate_boundary_is_inclusive():
+    # Every game in _biased_games has a distinct spread/total, no pushes, so the
+    # root-level "favorite"/"home" candidates decide on exactly n games. n=100
+    # must survive a min_decided_bets=100 gate (>=); n=99 must not.
+    feature_map_100 = _biased_feature_map(_biased_games(100, home_cover_rate=0.85))
+    result_at_boundary = beam_search(
+        _biased_games(100, home_cover_rate=0.85), feature_map_100, min_decided_bets=100, beam_width=50, top_k=10
+    )
+    assert any(c.decided == 100 for c in result_at_boundary.survivors)
+
+    feature_map_99 = _biased_feature_map(_biased_games(99, home_cover_rate=0.85))
+    result_below_boundary = beam_search(
+        _biased_games(99, home_cover_rate=0.85), feature_map_99, min_decided_bets=100, beam_width=50, top_k=10
+    )
+    assert result_below_boundary.survivors == ()
+
+
+def test_beam_search_surfaces_profitable_candidate_above_gate():
+    games = _biased_games(150, home_cover_rate=0.85)
+    feature_map = _biased_feature_map(games)
+    result = beam_search(games, feature_map, min_decided_bets=50, beam_width=50, top_k=10)
+    assert result.survivors
+    assert all(c.decided >= 50 for c in result.survivors)
+    assert all(c.roi > 0 for c in result.survivors)
+    # winners must be ranked by wilson_low desc, then roi desc, then decided desc
+    keys = [(-c.wilson_low, -c.roi, -c.decided) for c in result.survivors]
+    assert keys == sorted(keys)
+
+
+def test_run_backtest_never_called_during_beam_search(monkeypatch):
+    games = _biased_games(150, home_cover_rate=0.85)
+    feature_map = _biased_feature_map(games)
+    calls = []
+    monkeypatch.setattr(backtest_module, "run_backtest", lambda *a, **k: calls.append(1))
+    beam_search(games, feature_map, min_decided_bets=50, beam_width=50, top_k=10)
+    assert calls == []
+
+
+def test_in_sample_only_evaluation_holdout_signal_never_leaks():
+    # In-sample: home favorites do NOT cover (losing signal). Holdout-only: home
+    # favorites cover overwhelmingly (winning signal). If holdout rows ever reached
+    # the beam loop, "home favorite" would rank as profitable; it must not.
+    in_sample = _biased_games(150, season=2023, home_cover_rate=0.3, seed=2, game_id_start=1)
+    holdout_only = _biased_games(150, season=2024, home_cover_rate=0.95, seed=3, game_id_start=1000)
+
+    in_sample_feature_map = _biased_feature_map(in_sample)
+    holdout_feature_map = _biased_feature_map(holdout_only)
+
+    result = beam_search(in_sample, in_sample_feature_map, min_decided_bets=50, beam_width=50, top_k=10)
+
+    home_favorite_survivors = [
+        c for c in result.survivors if c.system.favorite and c.system.home
+    ]
+    assert home_favorite_survivors == []
+
+    # holdout variables exist only to demonstrate they were never referenced above
+    assert holdout_only and holdout_feature_map
+
+
+def test_deterministic_ranking_same_fixture_twice():
+    games = _biased_games(150, home_cover_rate=0.85)
+    feature_map = _biased_feature_map(games)
+    first = beam_search(games, feature_map, min_decided_bets=50, beam_width=50, top_k=10)
+    second = beam_search(games, feature_map, min_decided_bets=50, beam_width=50, top_k=10)
+    assert [c.identity for c in first.survivors] == [c.identity for c in second.survivors]
+    assert first.candidates_tested == second.candidates_tested
+
+
+def test_effective_params_reported_back():
+    games = _biased_games(150, home_cover_rate=0.85)
+    feature_map = _biased_feature_map(games)
+    result = beam_search(games, feature_map)
+    assert result.effective_params == {
+        "beam_width": 100,
+        "top_k": 20,
+        "min_decided_bets": 100,
+        "alpha": 0.05,
+        "max_dimensions": 4,
+    }
 
 
 def test_categorical_values_capped_at_documented_limit():

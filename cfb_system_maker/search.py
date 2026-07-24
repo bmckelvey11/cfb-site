@@ -1,11 +1,14 @@
-"""Pure, side-effect-free candidate generation for auto-discovering betting systems.
+"""Candidate generation + in-sample beam search for auto-discovering betting systems.
 
-This module owns three things only: canonical candidate identity (for dedup and
+Candidate generation (MVP-002) owns canonical candidate identity (for dedup and
 deterministic tie-breaking), the compatibility grammar for expanding a candidate by
 exactly one predicate dimension, and in-sample-only value derivation (quantiles for
-numeric features, capped sorted levels for boolean/categorical features). It does not
-evaluate candidates (no `run_backtest`/`run_backtest_summary` calls) and does not run a
-search loop — that is MVP-003.
+numeric features, capped sorted levels for boolean/categorical features) — pure,
+side-effect-free, no evaluation.
+
+Beam search (MVP-003, see bottom of file) evaluates candidates using
+`run_backtest_summary` only — `run_backtest` (full, 1000-iteration permutation test)
+is never imported or called here; that stage is MVP-004's holdout finalist grading.
 
 Scope cuts made deliberately for MVP (see .solopreneur/backlog/2026-07-22-auto-discover-
 systems/backlog.md cross-cutting risk #5):
@@ -20,9 +23,10 @@ systems/backlog.md cross-cutting risk #5):
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any
 
+from cfb_system_maker.backtest import _wilson_interval, run_backtest_summary
 from cfb_system_maker.features import FEATURE_REGISTRY, resolve_feature_value
 from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
 
@@ -358,3 +362,151 @@ def expand_candidates(
 
     deduped.sort(key=candidate_identity)
     return deduped
+
+
+# --- MVP-003: in-sample beam search -----------------------------------------------
+#
+# Evaluation-only stage. Ranks/prunes candidates from expand_candidates using
+# run_backtest_summary exclusively (match+grade, no permutation test) — run_backtest
+# (full, 1000-iteration permutation) is never imported or called here. A test spy
+# asserts this at zero calls (see tests/test_search.py).
+
+_DEFAULT_BEAM_WIDTH = 100
+_DEFAULT_TOP_K = 20
+_DEFAULT_MIN_DECIDED_BETS = 100
+_DEFAULT_ALPHA = 0.05
+
+
+@dataclass(frozen=True)
+class BeamCandidate:
+    """One evaluated candidate: the SystemFilter plus its in-sample summary stats."""
+
+    system: SystemFilter
+    wins: int
+    losses: int
+    decided: int
+    roi: float
+    wilson_low: float
+    identity: tuple
+
+
+@dataclass(frozen=True)
+class BeamSearchResult:
+    survivors: tuple[BeamCandidate, ...]  # top-K, ranked, deterministic order
+    candidates_tested: int  # N distinct candidates evaluated across all rounds
+    effective_params: dict[str, int | float]
+
+
+def _rank_key(candidate: BeamCandidate) -> tuple:
+    return (-candidate.wilson_low, -candidate.roi, -candidate.decided, candidate.identity)
+
+
+def _evaluate(
+    system: SystemFilter,
+    games: list[GameRecord],
+    feature_map: dict[int, dict[str, Any]],
+) -> BeamCandidate:
+    summary = run_backtest_summary(games, system, feature_map=feature_map)
+    decided = summary["wins"] + summary["losses"]
+    wilson_low, _ = _wilson_interval(summary["hit_rate"], decided)
+    return BeamCandidate(
+        system=system,
+        wins=summary["wins"],
+        losses=summary["losses"],
+        decided=decided,
+        roi=summary["roi"],
+        wilson_low=wilson_low,
+        identity=candidate_identity(system),
+    )
+
+
+def beam_search(
+    games: list[GameRecord],
+    feature_map: dict[int, dict[str, Any]],
+    *,
+    seed: SystemFilter | None = None,
+    beam_width: int = _DEFAULT_BEAM_WIDTH,
+    top_k: int = _DEFAULT_TOP_K,
+    min_decided_bets: int = _DEFAULT_MIN_DECIDED_BETS,
+    alpha: float = _DEFAULT_ALPHA,
+    max_dimensions: int = _DEFAULT_MAX_DIMENSIONS,
+    hard_cap: int = _HARD_DIMENSION_CAP,
+) -> BeamSearchResult:
+    """Greedy/beam search over expand_candidates, in-sample evaluation only.
+
+    `games`/`feature_map` must already be the caller's in-sample split (e.g. games
+    filtered to split_holdout's in-sample seasons) — this function never partitions
+    or restricts them itself, and never calls split_holdout or run_backtest. Passing
+    the full unsplit dataset here is a caller bug, not something this function can
+    detect or guard against structurally beyond its signature taking exactly the
+    rows to evaluate on.
+
+    Rank/prune ordering (deterministic): in-sample Wilson lower bound (desc) ->
+    ROI (desc) -> decided-bet count (desc) -> candidate_identity (asc, tie-break).
+    Wilson bound uses the standard 95% z=1.96 regardless of `alpha` -- `alpha` is
+    accepted, defaulted, and reported in effective_params for provenance/pass-through
+    to MVP-004's BH correction only; it does not change beam-stage ranking.
+
+    Beam mechanics: start from `seed` (default: empty SystemFilter). Each round,
+    expand every surviving beam member by one more dimension via expand_candidates,
+    evaluate all newly-seen expansions (deduplicated globally by candidate_identity
+    so a candidate reachable via multiple expansion paths is evaluated once), drop
+    candidates below min_decided_bets or with non-positive ROI, keep the top
+    `beam_width` by rank for the next round's expansion. Stops when no round
+    produces any new legal expansion (max_dimensions reached or grammar exhausted).
+    Note: pruning is greedy, not recall-complete — a parent dropped for non-positive
+    ROI is never expanded, so a deeper candidate that would only become profitable
+    after one more dimension on an unprofitable parent is never explored. Sample-size
+    pruning has no such gap: every added dimension strictly narrows the matched game
+    set, so decided-bet count is monotonically non-increasing as dimensions
+    accumulate, and a parent pruned for low decided count can never hide a
+    higher-decided-count child.
+
+    top_k is drawn from the union of every surviving candidate across all rounds,
+    not just the final round's beam — a shallower candidate can outrank a deeper
+    one and must not be dropped just because expansion continued past it.
+    """
+    seed_system = seed if seed is not None else SystemFilter()
+
+    seen_identities: set[tuple] = {candidate_identity(seed_system)}
+    all_survivors: list[BeamCandidate] = []
+    beam: list[SystemFilter] = [seed_system]
+    tested = 0
+
+    while beam:
+        expansions: list[SystemFilter] = []
+        for parent in beam:
+            for child in expand_candidates(parent, games, feature_map, max_dimensions=max_dimensions, hard_cap=hard_cap):
+                identity = candidate_identity(child)
+                if identity in seen_identities:
+                    continue
+                seen_identities.add(identity)
+                expansions.append(child)
+
+        if not expansions:
+            break
+
+        expansions.sort(key=candidate_identity)
+        evaluated = [_evaluate(child, games, feature_map) for child in expansions]
+        tested += len(evaluated)
+
+        qualifying = [c for c in evaluated if c.decided >= min_decided_bets and c.roi > 0]
+        qualifying.sort(key=_rank_key)
+
+        all_survivors.extend(qualifying)
+        beam = [c.system for c in qualifying[:beam_width]]
+
+    all_survivors.sort(key=_rank_key)
+    top = tuple(all_survivors[:top_k])
+
+    return BeamSearchResult(
+        survivors=top,
+        candidates_tested=tested,
+        effective_params={
+            "beam_width": beam_width,
+            "top_k": top_k,
+            "min_decided_bets": min_decided_bets,
+            "alpha": alpha,
+            "max_dimensions": max_dimensions,
+        },
+    )
