@@ -6,10 +6,10 @@ Spec: `.solopreneur/specs/2026-07-22-auto-discover-systems.md`
 ## MVP
 | ID | Title | Status | Depends On | Type | Size |
 |----|-------|--------|------------|------|------|
-| MVP-001 | Stats primitives — analytic p-value helper + BH correction | pending | — | eng | S |
-| MVP-002 | Candidate generation — canonical identity, compat grammar, deterministic enumeration | pending | — | eng | L |
+| MVP-001 | Stats primitives — analytic p-value helper + BH correction | done | — | eng | S |
+| MVP-002 | Candidate generation — canonical identity, compat grammar, deterministic enumeration | done | — | eng | L |
 | MVP-003 | In-sample beam search — evaluation, pruning, ranking | done | MVP-002 | eng | L |
-| MVP-004 | Holdout finalist grading + BH correction + result assembly | pending | MVP-001, MVP-003 | eng | M |
+| MVP-004 | Holdout finalist grading + BH correction + result assembly | done | MVP-001, MVP-003 | eng | M |
 | MVP-005 | `search` CLI command + structured error paths | pending | MVP-004 | eng | M |
 | MVP-006 | Performance benchmark + reproducibility gate | pending | MVP-005 | eng | S |
 
