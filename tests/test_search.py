@@ -1,6 +1,5 @@
 import random
 
-import cfb_system_maker.backtest as backtest_module
 import cfb_system_maker.search as search_module
 from cfb_system_maker.backtest import matches_system
 from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
@@ -334,7 +333,10 @@ def test_run_backtest_never_called_during_beam_search(monkeypatch):
     games = _biased_games(150, home_cover_rate=0.85)
     feature_map = _biased_feature_map(games)
     calls = []
-    monkeypatch.setattr(backtest_module, "run_backtest", lambda *a, **k: calls.append(1))
+    # Patch search_module's own name binding (`from ... import run_backtest`), not
+    # backtest_module's attribute -- search.py holds its own reference, so patching
+    # the source module's attribute never intercepts calls made from search.py.
+    monkeypatch.setattr(search_module, "run_backtest", lambda *a, **k: calls.append(1))
     beam_search(games, feature_map, min_decided_bets=50, beam_width=50, top_k=10)
     assert calls == []
 

@@ -402,6 +402,7 @@ class BeamSearchResult:
     survivors: tuple[BeamCandidate, ...]  # top-K, ranked, deterministic order
     candidates_tested: int  # N distinct candidates evaluated across all rounds
     effective_params: dict[str, int | float]
+    peak_beam_size: int = 0  # largest beam carried into any expansion round (<= beam_width)
 
 
 def _rank_key(candidate: BeamCandidate) -> tuple:
@@ -472,6 +473,10 @@ def beam_search(
     top_k is drawn from the union of every surviving candidate across all rounds,
     not just the final round's beam — a shallower candidate can outrank a deeper
     one and must not be dropped just because expansion continued past it.
+
+    peak_beam_size on the result is the largest beam carried into any expansion
+    round (never exceeds beam_width) — recorded for MVP-006's benchmark, no effect
+    on ranking or pruning.
     """
     seed_system = seed if seed is not None else SystemFilter()
 
@@ -479,6 +484,7 @@ def beam_search(
     all_survivors: list[BeamCandidate] = []
     beam: list[SystemFilter] = [seed_system]
     tested = 0
+    peak_beam_size = len(beam)
 
     while beam:
         expansions: list[SystemFilter] = []
@@ -502,6 +508,7 @@ def beam_search(
 
         all_survivors.extend(qualifying)
         beam = [c.system for c in qualifying[:beam_width]]
+        peak_beam_size = max(peak_beam_size, len(beam))
 
     all_survivors.sort(key=_rank_key)
     top = tuple(all_survivors[:top_k])
@@ -516,6 +523,7 @@ def beam_search(
             "alpha": alpha,
             "max_dimensions": max_dimensions,
         },
+        peak_beam_size=peak_beam_size,
     )
 
 
