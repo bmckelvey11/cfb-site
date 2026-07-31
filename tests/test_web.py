@@ -1582,6 +1582,9 @@ def test_search_run_view_rejects_unsafe_name(tmp_path):
 
     app = create_app(str(tmp_path))
     client = app.test_client()
-    response = client.get("/search-runs/..%2F..%2Fescape")
+    # A dot reaches the view (no literal slash for Werkzeug's router to reject)
+    # but fails _safe_system_name's [A-Za-z0-9_-]+ allowlist, exercising the
+    # view's own ValueError -> abort(404) guard.
+    response = client.get("/search-runs/bad.name")
 
     assert response.status_code == 404
