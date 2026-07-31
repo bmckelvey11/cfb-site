@@ -1,4 +1,4 @@
 -r cfbd-python/requirements.txt
 pytest
 Flask
-anthropic
+anthropic==0.111.0

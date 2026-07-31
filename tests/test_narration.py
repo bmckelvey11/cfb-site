@@ -83,6 +83,11 @@ def test_narrate_run_raises_narration_error_on_client_failure():
         narrate_run(_sample_run(), client=_FakeClient(raise_exc=RuntimeError("boom")))
 
 
+def test_narrate_run_raises_narration_error_on_empty_text():
+    with pytest.raises(NarrationError):
+        narrate_run(_sample_run(), client=_FakeClient(text="   "))
+
+
 def test_narrate_run_raises_narration_error_when_no_key_and_no_client(monkeypatch, tmp_path):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.chdir(tmp_path)

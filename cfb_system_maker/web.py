@@ -638,6 +638,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         return render_template(
             "search_run.html",
             run=run,
+            name=name,
             finalist_rows=finalist_rows,
         )
 
@@ -650,8 +651,8 @@ def create_app(data_dir: str | Path = "data") -> Flask:
 
         try:
             text = narrate_run(run)
-        except NarrationError as exc:
-            return jsonify({"error": str(exc)}), 502
+        except NarrationError:
+            return jsonify({"error": "narration_unavailable"}), 502
 
         return jsonify({"text": text})
 

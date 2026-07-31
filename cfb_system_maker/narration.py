@@ -84,6 +84,10 @@ def narrate_run(
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}],
         )
-        return "".join(block.text for block in message.content if hasattr(block, "text"))
+        text = "".join(block.text for block in message.content if hasattr(block, "text"))
     except Exception as exc:
         raise NarrationError(f"narration call failed: {exc}") from exc
+
+    if not text.strip():
+        raise NarrationError("narration returned no text")
+    return text

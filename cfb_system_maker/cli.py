@@ -509,7 +509,9 @@ def _build_parser() -> argparse.ArgumentParser:
     search.add_argument("--min-decided-bets", type=int, default=100)
     search.add_argument("--alpha", type=float, default=0.05)
     search.add_argument("--save", help="save the top-ranked finalist under this name")
-    search.add_argument("--save-run", dest="save_run", default=None)
+    search.add_argument(
+        "--save-run", dest="save_run", default=None, help="save the full search run under this name"
+    )
 
     web = subparsers.add_parser("web")
     web.add_argument("--data-dir", default="data")
