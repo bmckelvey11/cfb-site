@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, abort, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from cfb_system_maker.backtest import (
@@ -41,6 +41,7 @@ from cfb_system_maker.storage import (
     load_example_system,
     load_processed_games,
     load_saved_system,
+    load_search_run,
     load_system,
     load_upcoming_games,
     load_upcoming_meta,
@@ -606,6 +607,37 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             saved_system_meta=saved_system_meta,
             options=_options_from_games(games),
             holdout_seasons=holdout_seasons,
+        )
+
+    @app.get("/search-runs/<name>")
+    def search_run_view(name: str):
+        try:
+            run = load_search_run(name, app.config["DATA_DIR"])
+        except (ValueError, FileNotFoundError):
+            abort(404)
+
+        finalist_rows = []
+        for i, finalist in enumerate(run.finalists, start=1):
+            sentences = describe(finalist.system)
+            filters_text = "; ".join(row["text"] for row in sentences) if sentences else "no filters (all games)"
+            finalist_rows.append(
+                {
+                    "index": i,
+                    "filters_text": filters_text,
+                    "wins": finalist.wins,
+                    "losses": finalist.losses,
+                    "pushes": finalist.pushes,
+                    "roi": finalist.roi,
+                    "raw_p": finalist.raw_p,
+                    "corrected_p": finalist.corrected_p,
+                    "bh_significant": finalist.bh_significant,
+                }
+            )
+
+        return render_template(
+            "search_run.html",
+            run=run,
+            finalist_rows=finalist_rows,
         )
 
     @app.get("/api/backtest")

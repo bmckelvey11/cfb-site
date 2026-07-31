@@ -318,6 +318,19 @@ button:hover {
   font-size: 14px;
 }
 
+.narration-panel summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.narration-panel #narrate-trigger {
+  font: inherit;
+}
+
+#narration-status.error {
+  color: var(--loss);
+}
+
 .active-filters-panel {
   padding: 24px;
   background: var(--panel);

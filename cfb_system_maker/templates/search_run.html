@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Search Run: {{ run.name }} &middot; CFB System Maker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <div class="dash-shell">
+      <header class="dash-header">
+        <div class="brand">
+          <span class="brand-mark">CFB</span>
+          <div>
+            <h1>Search Run: {{ run.name }}</h1>
+          </div>
+        </div>
+        <a class="dash-cta" href="{{ url_for('dashboard') }}">My Systems</a>
+      </header>
+
+      <section class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p>{{ run.candidates_tested }} candidates tested, {{ run.finalists_graded }} finalist(s) graded on holdout.</p>
+          </div>
+        </header>
+
+        <table class="finalist-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Filters</th>
+              <th>Holdout Record</th>
+              <th>ROI</th>
+              <th>Raw p</th>
+              <th>Corrected p</th>
+              <th>BH Significant</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in finalist_rows %}
+            <tr>
+              <td>{{ row.index }}</td>
+              <td>{{ row.filters_text }}</td>
+              <td>{{ row.wins }}-{{ row.losses }}-{{ row.pushes }}</td>
+              <td>{{ "%.2f%%"|format(row.roi * 100) }}</td>
+              <td>{{ "%.4f"|format(row.raw_p) }}</td>
+              <td>{{ "%.4f"|format(row.corrected_p) }}</td>
+              <td>{{ "Yes" if row.bh_significant else "No" }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No finalist survived holdout grading.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <section class="theory-panel narration-panel" id="narration-panel" data-run-name="{{ run.name }}">
+          <details>
+            <summary><button type="button" id="narrate-trigger">Narrate results</button></summary>
+            <div id="narration-body">
+              <p id="narration-status"></p>
+              <p id="narration-text"></p>
+            </div>
+          </details>
+        </section>
+      </section>
+    </div>
+    <script src="{{ url_for('static', filename='narrate.js') }}"></script>
+  </body>
+</html>

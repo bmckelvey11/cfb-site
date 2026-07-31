@@ -1536,3 +1536,52 @@ def test_current_matches_escapes_team_and_system_names(tmp_path):
     assert "&lt;script&gt;Georgia&lt;/script&gt;" in panel
     assert "<b>evil</b>" not in panel
     assert "&lt;b&gt;evil&lt;/b&gt;" in panel
+
+
+def test_search_run_view_renders_finalist_stats(tmp_path):
+    from cfb_system_maker.models import SearchRun, SearchRunFinalist, SystemFilter
+    from cfb_system_maker.storage import save_search_run
+    from cfb_system_maker.web import create_app
+
+    finalist = SearchRunFinalist(
+        system=SystemFilter(bet_type="spread", side="home", favorite=True),
+        wins=12, losses=8, pushes=1, roi=0.0524,
+        raw_p=0.031, corrected_p=0.062, bh_significant=False,
+    )
+    run = SearchRun(
+        name="my-run", saved_at="2026-07-31T00:00:00+00:00",
+        candidates_tested=482, finalists_graded=1,
+        effective_params={"beam_width": 100, "top_k": 20, "min_decided_bets": 100, "alpha": 0.05},
+        finalists=(finalist,),
+    )
+    save_search_run("my-run", run, tmp_path)
+
+    app = create_app(str(tmp_path))
+    client = app.test_client()
+    response = client.get("/search-runs/my-run")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "482" in body
+    assert "12-8-1" in body or ("12" in body and "8" in body)
+    assert "Narrate results" in body
+
+
+def test_search_run_view_missing_run_returns_404(tmp_path):
+    from cfb_system_maker.web import create_app
+
+    app = create_app(str(tmp_path))
+    client = app.test_client()
+    response = client.get("/search-runs/does-not-exist")
+
+    assert response.status_code == 404
+
+
+def test_search_run_view_rejects_unsafe_name(tmp_path):
+    from cfb_system_maker.web import create_app
+
+    app = create_app(str(tmp_path))
+    client = app.test_client()
+    response = client.get("/search-runs/..%2F..%2Fescape")
+
+    assert response.status_code == 404
