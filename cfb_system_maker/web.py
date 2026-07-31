@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from cfb_system_maker.backtest import (
@@ -34,6 +34,7 @@ from cfb_system_maker.features import (
     resolve_feature_value,
 )
 from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SavedSystem, SystemFilter
+from cfb_system_maker.narration import NarrationError, narrate_run
 from cfb_system_maker.storage import (
     EXAMPLES_DIR,
     list_examples,
@@ -639,6 +640,20 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             run=run,
             finalist_rows=finalist_rows,
         )
+
+    @app.post("/search-runs/<name>/narrate")
+    def narrate_search_run(name: str):
+        try:
+            run = load_search_run(name, app.config["DATA_DIR"])
+        except (ValueError, FileNotFoundError):
+            abort(404)
+
+        try:
+            text = narrate_run(run)
+        except NarrationError as exc:
+            return jsonify({"error": str(exc)}), 502
+
+        return jsonify({"text": text})
 
     @app.get("/api/backtest")
     def api_backtest():

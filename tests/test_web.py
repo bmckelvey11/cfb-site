@@ -1588,3 +1588,63 @@ def test_search_run_view_rejects_unsafe_name(tmp_path):
     response = client.get("/search-runs/bad.name")
 
     assert response.status_code == 404
+
+
+def test_narrate_route_returns_text_on_success(tmp_path, monkeypatch):
+    from cfb_system_maker.models import SearchRun, SearchRunFinalist, SystemFilter
+    from cfb_system_maker.storage import save_search_run
+    import cfb_system_maker.web as web_module
+
+    finalist = SearchRunFinalist(
+        system=SystemFilter(bet_type="spread"), wins=5, losses=3, pushes=0,
+        roi=0.02, raw_p=0.04, corrected_p=0.08, bh_significant=False,
+    )
+    run = SearchRun(
+        name="r1", saved_at="2026-07-31T00:00:00+00:00", candidates_tested=10,
+        finalists_graded=1, effective_params={"beam_width": 100}, finalists=(finalist,),
+    )
+    save_search_run("r1", run, tmp_path)
+
+    monkeypatch.setattr(web_module, "narrate_run", lambda run, **kwargs: "A short summary.")
+
+    app = web_module.create_app(str(tmp_path))
+    client = app.test_client()
+    response = client.post("/search-runs/r1/narrate")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"text": "A short summary."}
+
+
+def test_narrate_route_returns_502_on_narration_error(tmp_path, monkeypatch):
+    from cfb_system_maker.models import SearchRun
+    from cfb_system_maker.storage import save_search_run
+    from cfb_system_maker.narration import NarrationError
+    import cfb_system_maker.web as web_module
+
+    run = SearchRun(
+        name="r2", saved_at="2026-07-31T00:00:00+00:00", candidates_tested=10,
+        finalists_graded=0, effective_params={}, finalists=(),
+    )
+    save_search_run("r2", run, tmp_path)
+
+    def _raise(run, **kwargs):
+        raise NarrationError("boom")
+
+    monkeypatch.setattr(web_module, "narrate_run", _raise)
+
+    app = web_module.create_app(str(tmp_path))
+    client = app.test_client()
+    response = client.post("/search-runs/r2/narrate")
+
+    assert response.status_code == 502
+    assert "error" in response.get_json()
+
+
+def test_narrate_route_missing_run_returns_404(tmp_path):
+    from cfb_system_maker.web import create_app
+
+    app = create_app(str(tmp_path))
+    client = app.test_client()
+    response = client.post("/search-runs/does-not-exist/narrate")
+
+    assert response.status_code == 404
