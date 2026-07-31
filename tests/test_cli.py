@@ -367,3 +367,58 @@ def test_search_command_save_flag_errors_when_no_finalists(tmp_path, capsys):
     captured = capsys.readouterr()
     assert exit_code != 0
     assert "error=nothing_to_save" in captured.err
+
+
+def test_search_command_save_run_flag_persists_full_finalist_list(tmp_path, capsys):
+    save_processed_games(tmp_path, _search_fixture_games())
+    main(["enrich", "--data-dir", str(tmp_path)])
+    capsys.readouterr()
+
+    exit_code = main(
+        [
+            "search", "--data-dir", str(tmp_path),
+            "--holdout-season", "2024", "--min-decided-bets", "30",
+            "--save-run", "my-run",
+        ]
+    )
+    captured = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Saved run as my-run" in captured
+
+    from cfb_system_maker.storage import load_search_run
+
+    run = load_search_run("my-run", tmp_path)
+    assert run.candidates_tested > 0
+    assert run.finalists_graded == len(run.finalists)
+    assert run.effective_params["beam_width"] == 100
+    if run.finalists:
+        assert run.finalists[0].corrected_p >= 0.0
+
+
+def test_search_command_save_run_flag_persists_even_with_zero_finalists(tmp_path, capsys, monkeypatch):
+    save_processed_games(tmp_path, _search_fixture_games())
+    main(["enrich", "--data-dir", str(tmp_path)])
+    capsys.readouterr()
+
+    import cfb_system_maker.cli as cli_module
+
+    def _empty_grade_finalists(beam_result, holdout_games, holdout_feature_map, *, alpha=0.05, american_odds=-110):
+        from cfb_system_maker.search import FinalistGradingResult
+        return FinalistGradingResult(finalists=(), candidates_tested=beam_result.candidates_tested, finalists_graded=0)
+
+    monkeypatch.setattr(cli_module, "grade_finalists", _empty_grade_finalists)
+
+    exit_code = main(
+        [
+            "search", "--data-dir", str(tmp_path),
+            "--holdout-season", "2024", "--min-decided-bets", "30",
+            "--save-run", "empty-run",
+        ]
+    )
+    assert exit_code == 0
+
+    from cfb_system_maker.storage import load_search_run
+
+    run = load_search_run("empty-run", tmp_path)
+    assert run.finalists_graded == 0
+    assert run.finalists == ()

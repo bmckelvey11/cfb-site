@@ -351,6 +351,35 @@ def _search(args: argparse.Namespace) -> int:
             f"bh_significant={top_finalist.bh_significant})"
         )
 
+    if args.save_run:
+        from datetime import datetime, timezone
+
+        from cfb_system_maker.models import SearchRun, SearchRunFinalist
+        from cfb_system_maker.storage import save_search_run
+
+        run = SearchRun(
+            name=args.save_run,
+            saved_at=datetime.now(timezone.utc).isoformat(),
+            candidates_tested=beam_result.candidates_tested,
+            finalists_graded=grading.finalists_graded,
+            effective_params=dict(beam_result.effective_params),
+            finalists=tuple(
+                SearchRunFinalist(
+                    system=finalist.system,
+                    wins=finalist.holdout_result.wins,
+                    losses=finalist.holdout_result.losses,
+                    pushes=finalist.holdout_result.pushes,
+                    roi=finalist.holdout_result.roi,
+                    raw_p=finalist.raw_p,
+                    corrected_p=finalist.corrected_p,
+                    bh_significant=finalist.bh_significant,
+                )
+                for finalist in grading.finalists
+            ),
+        )
+        save_search_run(args.save_run, run, args.data_dir)
+        print(f"Saved run as {args.save_run} ({grading.finalists_graded} finalists)")
+
     return 0
 
 
@@ -479,6 +508,7 @@ def _build_parser() -> argparse.ArgumentParser:
     search.add_argument("--min-decided-bets", type=int, default=100)
     search.add_argument("--alpha", type=float, default=0.05)
     search.add_argument("--save", help="save the top-ranked finalist under this name")
+    search.add_argument("--save-run", dest="save_run", default=None)
 
     web = subparsers.add_parser("web")
     web.add_argument("--data-dir", default="data")
