@@ -379,6 +379,7 @@ def _search(args: argparse.Namespace) -> int:
         )
         save_search_run(args.save_run, run, args.data_dir)
         print(f"Saved run as {args.save_run} ({grading.finalists_graded} finalists)")
+        print(f"View at /search-runs/{args.save_run} (run `web` first)")
 
     return 0
 
