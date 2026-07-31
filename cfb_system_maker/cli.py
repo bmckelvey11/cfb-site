@@ -324,6 +324,33 @@ def _search(args: argparse.Namespace) -> int:
             f"raw_p={finalist.raw_p:.4f} corrected_p={finalist.corrected_p:.4f} "
             f"bh_significant={finalist.bh_significant}"
         )
+
+    if args.save:
+        if not grading.finalists:
+            print("error=nothing_to_save", file=sys.stderr)
+            print("--save requested but no finalists survived grading.", file=sys.stderr)
+            return 1
+        # Ranked order is preserved from beam_result.survivors -> grading.finalists,
+        # i.e. by IN-SAMPLE wilson_low/roi (grade_finalists never re-ranks by holdout
+        # results -- that would be leakage). The finalist saved here may not be the
+        # one with the best-looking holdout roi/corrected_p printed above; naming its
+        # index and holdout stats makes that explicit instead of silently implying
+        # "the best line above" was picked.
+        top_finalist = grading.finalists[0]
+        save_system(
+            args.save,
+            top_finalist.system,
+            args.data_dir,
+            source="search",
+            search_candidates_tested=beam_result.candidates_tested,
+        )
+        print(
+            f"Saved system as {args.save} (finalist #1 of {grading.finalists_graded}, "
+            f"holdout roi={top_finalist.holdout_result.roi:.4f} "
+            f"corrected_p={top_finalist.corrected_p:.4f} "
+            f"bh_significant={top_finalist.bh_significant})"
+        )
+
     return 0
 
 
@@ -451,6 +478,7 @@ def _build_parser() -> argparse.ArgumentParser:
     search.add_argument("--top-k", type=int, default=20)
     search.add_argument("--min-decided-bets", type=int, default=100)
     search.add_argument("--alpha", type=float, default=0.05)
+    search.add_argument("--save", help="save the top-ranked finalist under this name")
 
     web = subparsers.add_parser("web")
     web.add_argument("--data-dir", default="data")

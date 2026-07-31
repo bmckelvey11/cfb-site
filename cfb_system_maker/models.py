@@ -116,3 +116,5 @@ class SavedSystem:
     saved_at: str
     system: SystemFilter
     theory: str = ""
+    source: str = "manual"
+    search_candidates_tested: int | None = None

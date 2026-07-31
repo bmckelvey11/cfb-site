@@ -144,13 +144,23 @@ def _optional_float(value: str) -> float | None:
     return float(value) if value != "" else None
 
 
-def save_system(name: str, system: SystemFilter, data_dir: str | Path, theory: str = "") -> Path:
+def save_system(
+    name: str,
+    system: SystemFilter,
+    data_dir: str | Path,
+    theory: str = "",
+    *,
+    source: str = "manual",
+    search_candidates_tested: int | None = None,
+) -> Path:
     name = _safe_system_name(name)
     saved = SavedSystem(
         name=name,
         saved_at=datetime.now(timezone.utc).isoformat(),
         system=system,
         theory=theory,
+        source=source,
+        search_candidates_tested=search_candidates_tested,
     )
     path = Path(data_dir) / "systems" / f"{name}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,6 +184,8 @@ def load_saved_system(name: str, data_dir: str | Path) -> SavedSystem:
         saved_at=str(payload.get("saved_at", "")),
         system=_system_from_dict(payload),
         theory=str(payload.get("theory", "")),
+        source=str(payload.get("source", "manual")),
+        search_candidates_tested=payload.get("search_candidates_tested", None),
     )
 
 
@@ -202,6 +214,8 @@ def load_example_system(name: str, examples_dir: str | Path | None = None) -> Sa
         saved_at=str(payload.get("saved_at", "")),
         system=_system_from_dict(payload),
         theory=str(payload.get("theory", "")),
+        source=str(payload.get("source", "manual")),
+        search_candidates_tested=payload.get("search_candidates_tested", None),
     )
 
 
@@ -211,6 +225,8 @@ def _system_to_dict(saved: SavedSystem) -> dict[str, Any]:
         "name": saved.name,
         "saved_at": saved.saved_at,
         "theory": saved.theory,
+        "source": saved.source,
+        "search_candidates_tested": saved.search_candidates_tested,
         "system": {
             "bet_type": system.bet_type,
             "side": system.side,

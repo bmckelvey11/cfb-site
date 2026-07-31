@@ -127,3 +127,63 @@ def test_load_saved_system_backward_compatible_with_missing_fade_key(tmp_path):
 
     loaded = load_saved_system("legacy", tmp_path)
     assert loaded.system.fade is False
+
+
+# --- P1-001: provenance schema (source, search_candidates_tested) ------------------
+
+
+def test_load_saved_system_backward_compatible_with_missing_provenance_keys(tmp_path):
+    systems_dir = tmp_path / "systems"
+    systems_dir.mkdir(parents=True)
+    payload = {
+        "name": "legacy",
+        "saved_at": "2020-01-01T00:00:00+00:00",
+        "system": {
+            "bet_type": "spread",
+            "side": "home",
+            "total_side": "over",
+            "seasons": [],
+            "weeks": [],
+            "teams": [],
+            "conferences": [],
+            "favorite": False,
+            "underdog": False,
+            "home": False,
+            "away": False,
+            "providers": [],
+            "min_spread": None,
+            "max_spread": None,
+            "min_total": None,
+            "max_total": None,
+            "feature_filters": [],
+        },
+    }
+    (systems_dir / "legacy.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    loaded = load_saved_system("legacy", tmp_path)
+    assert loaded.source == "manual"
+    assert loaded.search_candidates_tested is None
+
+
+def test_save_load_system_round_trips_search_provenance(tmp_path):
+    save_system(
+        "found-by-search",
+        SystemFilter(side="home", favorite=True),
+        tmp_path,
+        source="search",
+        search_candidates_tested=1234,
+    )
+
+    loaded = load_saved_system("found-by-search", tmp_path)
+    assert loaded.source == "search"
+    assert loaded.search_candidates_tested == 1234
+
+
+def test_save_system_manual_flow_unaffected_by_new_provenance_kwargs(tmp_path):
+    # Existing callers (CLI backtest --save, web /system save flow) call save_system
+    # without the new kwargs at all -- must keep producing manual systems.
+    save_system("plain-manual", SystemFilter(side="home"), tmp_path)
+
+    loaded = load_saved_system("plain-manual", tmp_path)
+    assert loaded.source == "manual"
+    assert loaded.search_candidates_tested is None

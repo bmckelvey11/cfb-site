@@ -325,3 +325,45 @@ def test_search_command_byte_identical_repeat_run(tmp_path, capsys):
 
     assert first == second
     assert len(first) > 0
+
+
+def test_search_command_save_flag_persists_top_finalist_with_search_provenance(tmp_path, capsys):
+    save_processed_games(tmp_path, _search_fixture_games())
+    main(["enrich", "--data-dir", str(tmp_path)])
+    capsys.readouterr()
+
+    exit_code = main(
+        [
+            "search", "--data-dir", str(tmp_path),
+            "--holdout-season", "2024", "--min-decided-bets", "30",
+            "--save", "found-it",
+        ]
+    )
+    captured = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Saved system as found-it" in captured
+
+    from cfb_system_maker.storage import load_saved_system
+
+    loaded = load_saved_system("found-it", tmp_path)
+    assert loaded.source == "search"
+    assert loaded.search_candidates_tested is not None
+    assert loaded.search_candidates_tested > 0
+
+
+def test_search_command_save_flag_errors_when_no_finalists(tmp_path, capsys):
+    save_processed_games(tmp_path, _search_fixture_games())
+    main(["enrich", "--data-dir", str(tmp_path)])
+    capsys.readouterr()
+
+    # min_decided_bets set impossibly high -> zero finalists survive.
+    exit_code = main(
+        [
+            "search", "--data-dir", str(tmp_path),
+            "--holdout-season", "2024", "--min-decided-bets", "1000000",
+            "--save", "nothing-found",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code != 0
+    assert "error=nothing_to_save" in captured.err

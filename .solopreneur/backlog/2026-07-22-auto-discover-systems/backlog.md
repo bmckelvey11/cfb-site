@@ -16,7 +16,7 @@ Spec: `.solopreneur/specs/2026-07-22-auto-discover-systems.md`
 ## P1
 | ID | Title | Status | Depends On | Type | Size |
 |----|-------|--------|------------|------|------|
-| P1-001 | `SavedSystem` provenance schema + CLI `--save` | pending | MVP-004 | eng | S |
+| P1-001 | `SavedSystem` provenance schema + CLI `--save` | done | MVP-004 | eng | S |
 | P1-002 | Web disclosure — Search badge + candidate-count (dashboard + compare) | pending | P1-001 | eng+design | M |
 
 ## P2
