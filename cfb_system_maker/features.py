@@ -30,6 +30,7 @@ SourceKind = Literal[
     "raw_pregame_wp",
     "raw_player_agg",
     "computed_running",
+    "computed_v1",
     "graphql_game",
     "graphql_weather",
     "graphql_lines",
@@ -379,6 +380,22 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         description=(
             "Defensive explosiveness allowed from prior games this season. Lower is better. "
             "Entering-game value; team-scoped."
+        ),
+    ),
+    # --- v1 model (computed, fit-cached) ---
+    FeatureDef(
+        "v1_over_prob",
+        "V1 Over Probability",
+        "betting_lines",
+        "computed_v1",
+        "over_prob",
+        "game_id",
+        "numeric",
+        description=(
+            "P(over) from the over-zero v1 censoring-bias model (Arscott 2022 recreation), "
+            "fit on historical games.csv and applied to this game's spread/total (no scores "
+            "needed). Run `cfb-system-maker refit-v1` to (re)fit; null until a fit is cached. "
+            "Break-even at standard -110 pricing is 0.5238."
         ),
     ),
     # --- result lookahead ---

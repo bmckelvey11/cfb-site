@@ -16,6 +16,7 @@ from cfb_system_maker.graphql_client import graphql_scrape, pull_game_player_sta
 from cfb_system_maker.actionnetwork_client import actionnetwork_scrape
 from cfb_system_maker.storage import load_processed_games, load_raw_json, load_system, save_processed_games, save_raw_json, save_system
 from cfb_system_maker.upcoming import build_upcoming
+from cfb_system_maker.v1_model import fit_v1, save_v1_fit
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
         return _build(args)
     if args.command == "enrich":
         return _enrich(args)
+    if args.command == "refit-v1":
+        return _refit_v1(args)
     if args.command == "upcoming":
         return _upcoming(args)
     if args.command == "scrape":
@@ -83,6 +86,15 @@ def _build(args: argparse.Namespace) -> int:
 def _enrich(args: argparse.Namespace) -> int:
     path = run_enrich(args.data_dir)
     print(f"Wrote enriched features to {path}")
+    return 0
+
+
+def _refit_v1(args: argparse.Namespace) -> int:
+    games = load_processed_games(args.data_dir)
+    fit = fit_v1(games)
+    path = save_v1_fit(args.data_dir, fit)
+    print(f"Fit v1 model on {fit.n_games} game(s); wrote {path}")
+    print("Run `enrich` (and `upcoming`, if used) again to refresh v1_over_prob with the new fit.")
     return 0
 
 
@@ -441,6 +453,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     enrich = subparsers.add_parser("enrich")
     enrich.add_argument("--data-dir", default="data")
+
+    refit_v1 = subparsers.add_parser("refit-v1")
+    refit_v1.add_argument("--data-dir", default="data")
 
     upcoming = subparsers.add_parser("upcoming")
     upcoming.add_argument("--data-dir", default="data")

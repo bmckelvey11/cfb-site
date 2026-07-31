@@ -399,3 +399,26 @@ def test_enrich_wind_direction_and_rest_pregame_win_prob(tmp_path):
     features = enrich_games(tmp_path, games)
     assert features["1"]["weather_windDirection"] == 270
     assert features["1"]["pregame_home_win_prob"] == 0.731
+
+
+def test_v1_over_prob_null_when_no_fit_cached(tmp_path):
+    games = [GameRecord(1, 2023, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, 45.5)]
+    features = enrich_games(tmp_path, games)
+    assert features["1"]["v1_over_prob"] is None
+
+
+def test_v1_over_prob_populated_from_cached_fit(tmp_path):
+    from cfb_system_maker.v1_model import V1Fit, save_v1_fit
+
+    fit = V1Fit(tobit_dog_sigma=14.0, tobit_fav_sigma=14.0, probit_const=0.0, probit_slope=0.05, n_games=1000)
+    save_v1_fit(tmp_path, fit)
+
+    games = [
+        GameRecord(1, 2023, 1, "Alpha", "Beta", None, None, None, None, "consensus", -3.5, 45.5),
+        GameRecord(2, 2023, 1, "Gamma", "Delta", None, None, None, None, "consensus", 0, 50.0),
+    ]
+    features = enrich_games(tmp_path, games)
+    assert isinstance(features["1"]["v1_over_prob"], float)
+    assert 0.0 <= features["1"]["v1_over_prob"] <= 1.0
+    # pick'em (spread == 0) is skipped, same as the fit-time filter
+    assert features["2"]["v1_over_prob"] is None

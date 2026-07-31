@@ -9,6 +9,7 @@ from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, get_nested, 
 from cfb_system_maker.models import GameRecord
 from cfb_system_maker.running_stats import compute_running_stats
 from cfb_system_maker.storage import load_processed_games
+from cfb_system_maker.v1_model import load_v1_fit, score_v1
 
 
 def enrich_games(data_dir: str | Path, games: list[GameRecord] | None = None) -> dict[str, dict[str, Any]]:
@@ -126,6 +127,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
     _index_graphql_game_team(indexes["graphql_game_team"], data_dir / "graphql" / "gameTeam.json", games)
 
     indexes["computed_running"] = _build_running_index(data_dir, seasons, games, indexes["raw_game"])
+    indexes["computed_v1"] = _build_v1_index(data_dir, games)
 
     return indexes
 
@@ -176,6 +178,17 @@ def _build_running_index(
             start_dates[game_id] = str(start)
 
     return compute_running_stats(games, ppa=ppa, adv=adv, start_dates=start_dates)
+
+
+def _build_v1_index(data_dir: Path, games: list[GameRecord]) -> dict[int, float]:
+    """P(over) per game_id from the cached v1 fit (data/processed/v1_fit.json,
+    written by ``cfb-system-maker refit-v1``). Empty dict if no fit is cached
+    yet -- feature reads back None until a refit is run, same fail-closed
+    pattern as the other computed_* indexes."""
+    fit = load_v1_fit(data_dir)
+    if fit is None:
+        return {}
+    return score_v1(games, fit)
 
 
 def _coerce_numeric(value: Any) -> float | None:
@@ -263,6 +276,9 @@ def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> A
         home_stats = running.get((game.game_id, game.home_team)) or {}
         away_stats = running.get((game.game_id, game.away_team)) or {}
         return (home_stats.get(feature.field), away_stats.get(feature.field))
+
+    if feature.source_kind == "computed_v1":
+        return indexes["computed_v1"].get(game.game_id)
 
     if feature.source_kind == "graphql_game":
         record = indexes["graphql_game"].get(game.game_id)
