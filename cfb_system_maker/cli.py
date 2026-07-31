@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from cfb_system_maker.backtest import run_backtest, sign_consistency, split_holdout
 from cfb_system_maker.cfbd_client import fetch_games_and_lines
-from cfb_system_maker.enrich import run_enrich
+from cfb_system_maker.enrich import load_features, run_enrich
 from cfb_system_maker.models import BacktestResult, SystemFilter
 from cfb_system_maker.normalize import normalize_games
 from cfb_system_maker.sample_data import SAMPLE_GAMES_2023, SAMPLE_LINES_2023
 from cfb_system_maker.scrapers import scrape
+from cfb_system_maker.search import beam_search, grade_finalists
 from cfb_system_maker.graphql_client import graphql_scrape, pull_game_player_stats
 from cfb_system_maker.actionnetwork_client import actionnetwork_scrape
 from cfb_system_maker.storage import load_processed_games, load_raw_json, load_system, save_processed_games, save_raw_json, save_system
@@ -37,6 +39,8 @@ def main(argv: list[str] | None = None) -> int:
         return _actionnetwork(args)
     if args.command == "backtest":
         return _backtest(args)
+    if args.command == "search":
+        return _search(args)
     if args.command == "web":
         return _web(args)
     parser.print_help()
@@ -222,6 +226,107 @@ def _backtest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _search(args: argparse.Namespace) -> int:
+    try:
+        games = load_processed_games(args.data_dir)
+    except FileNotFoundError:
+        print("error=missing_data", file=sys.stderr)
+        print("No built games table found. Run `build` (after `fetch`) first.", file=sys.stderr)
+        return 1
+
+    # Deliberately stricter than _backtest, which silently falls back to an empty
+    # feature_map on FileNotFoundError. search has no core-filter-only fallback --
+    # a missing sidecar is a hard error, not a silent degrade (MVP-005 AC).
+    try:
+        feature_map = load_features(args.data_dir)
+    except FileNotFoundError:
+        print("error=missing_features", file=sys.stderr)
+        print("No enriched features found. Run `enrich` first.", file=sys.stderr)
+        return 1
+
+    available_seasons = {game.season for game in games}
+    if args.holdout_season not in available_seasons:
+        print("error=unknown_holdout_season", file=sys.stderr)
+        print(f"--holdout-season {args.holdout_season} is not present in the built data.", file=sys.stderr)
+        return 1
+    if args.season:
+        unknown = set(args.season) - available_seasons
+        if unknown:
+            print("error=unknown_season", file=sys.stderr)
+            print(f"--season value(s) not present in the built data: {sorted(unknown)}", file=sys.stderr)
+            return 1
+
+    # --season scope applied first, then the holdout split -- order matches spec.
+    scoped_seasons = set(args.season) if args.season else available_seasons
+    holdout_seasons = {args.holdout_season} & scoped_seasons
+    in_sample_seasons = scoped_seasons - holdout_seasons
+
+    in_sample_games = [g for g in games if g.season in in_sample_seasons]
+    holdout_games = [g for g in games if g.season in holdout_seasons]
+
+    # Guard on actual game membership, not just season-label sets -- a season label
+    # can be non-empty while matching zero real games (e.g. --season on a season
+    # with no built rows), which the label-only check would silently miss.
+    if not in_sample_games:
+        print("error=empty_in_sample", file=sys.stderr)
+        print("No in-sample games remain after applying --season scope and the holdout split.", file=sys.stderr)
+        return 1
+    if not holdout_games:
+        print("error=empty_holdout", file=sys.stderr)
+        print(f"--holdout-season {args.holdout_season} has no games after --season scope; nothing to grade on.", file=sys.stderr)
+        return 1
+
+    for name, value in (
+        ("--max-filters", args.max_filters),
+        ("--beam-width", args.beam_width),
+        ("--top-k", args.top_k),
+        ("--min-decided-bets", args.min_decided_bets),
+    ):
+        if value < 1:
+            print("error=invalid_search_params", file=sys.stderr)
+            print(f"{name} must be at least 1 (got {value}).", file=sys.stderr)
+            return 1
+
+    in_sample_game_ids = {g.game_id for g in in_sample_games}
+    holdout_game_ids = {g.game_id for g in holdout_games}
+    in_sample_feature_map = {gid: row for gid, row in feature_map.items() if gid in in_sample_game_ids}
+    holdout_feature_map = {gid: row for gid, row in feature_map.items() if gid in holdout_game_ids}
+
+    seed = SystemFilter(bet_type=args.bet_type)
+    try:
+        beam_result = beam_search(
+            in_sample_games,
+            in_sample_feature_map,
+            seed=seed,
+            beam_width=args.beam_width,
+            top_k=args.top_k,
+            min_decided_bets=args.min_decided_bets,
+            alpha=args.alpha,
+            max_dimensions=args.max_filters,
+        )
+    except ValueError as exc:
+        print("error=invalid_search_params", file=sys.stderr)
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    grading = grade_finalists(beam_result, holdout_games, holdout_feature_map, alpha=args.alpha)
+
+    print(f"beam_width={beam_result.effective_params['beam_width']}")
+    print(f"top_k={beam_result.effective_params['top_k']}")
+    print(f"min_decided_bets={beam_result.effective_params['min_decided_bets']}")
+    print(f"alpha={beam_result.effective_params['alpha']}")
+    print(f"search_candidates_tested={beam_result.candidates_tested}")
+    print(f"finalists_graded={grading.finalists_graded}")
+    for finalist in grading.finalists:
+        result = finalist.holdout_result
+        print(
+            f"  bets={result.bets} roi={result.roi:.4f} "
+            f"raw_p={finalist.raw_p:.4f} corrected_p={finalist.corrected_p:.4f} "
+            f"bh_significant={finalist.bh_significant}"
+        )
+    return 0
+
+
 def _web(args: argparse.Namespace) -> int:
     from cfb_system_maker.web import create_app
 
@@ -335,6 +440,17 @@ def _build_parser() -> argparse.ArgumentParser:
     backtest.add_argument("--save")
     backtest.add_argument("--load")
     backtest.add_argument("--holdout-season", dest="holdout_seasons", type=int, action="append")
+
+    search = subparsers.add_parser("search")
+    search.add_argument("--data-dir", default="data")
+    search.add_argument("--holdout-season", type=int, required=True)
+    search.add_argument("--season", type=int, action="append")
+    search.add_argument("--max-filters", type=int, default=4)
+    search.add_argument("--bet-type", choices=["spread", "total"], default="spread")
+    search.add_argument("--beam-width", type=int, default=100)
+    search.add_argument("--top-k", type=int, default=20)
+    search.add_argument("--min-decided-bets", type=int, default=100)
+    search.add_argument("--alpha", type=float, default=0.05)
 
     web = subparsers.add_parser("web")
     web.add_argument("--data-dir", default="data")

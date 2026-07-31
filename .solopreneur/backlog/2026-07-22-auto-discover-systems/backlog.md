@@ -10,7 +10,7 @@ Spec: `.solopreneur/specs/2026-07-22-auto-discover-systems.md`
 | MVP-002 | Candidate generation — canonical identity, compat grammar, deterministic enumeration | done | — | eng | L |
 | MVP-003 | In-sample beam search — evaluation, pruning, ranking | done | MVP-002 | eng | L |
 | MVP-004 | Holdout finalist grading + BH correction + result assembly | done | MVP-001, MVP-003 | eng | M |
-| MVP-005 | `search` CLI command + structured error paths | pending | MVP-004 | eng | M |
+| MVP-005 | `search` CLI command + structured error paths | done | MVP-004 | eng | M |
 | MVP-006 | Performance benchmark + reproducibility gate | pending | MVP-005 | eng | S |
 
 ## P1
