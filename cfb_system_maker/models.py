@@ -118,3 +118,25 @@ class SavedSystem:
     theory: str = ""
     source: str = "manual"
     search_candidates_tested: int | None = None
+
+
+@dataclass(frozen=True)
+class SearchRunFinalist:
+    system: SystemFilter
+    wins: int
+    losses: int
+    pushes: int
+    roi: float
+    raw_p: float
+    corrected_p: float
+    bh_significant: bool
+
+
+@dataclass(frozen=True)
+class SearchRun:
+    name: str
+    saved_at: str
+    candidates_tested: int
+    finalists_graded: int
+    effective_params: dict
+    finalists: tuple[SearchRunFinalist, ...] = ()

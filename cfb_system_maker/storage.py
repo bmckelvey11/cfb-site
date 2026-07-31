@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from cfb_system_maker.models import FeatureFilter, GameRecord, SavedSystem, SystemFilter
+from cfb_system_maker.models import FeatureFilter, GameRecord, SavedSystem, SearchRun, SearchRunFinalist, SystemFilter
 
 _SYSTEM_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -289,3 +289,116 @@ def _system_from_dict(payload: dict[str, Any]) -> SystemFilter:
         max_total=system.get("max_total"),
         feature_filters=feature_filters,
     )
+
+
+def _finalist_system_to_dict(system: SystemFilter) -> dict[str, Any]:
+    return {
+        "bet_type": system.bet_type,
+        "side": system.side,
+        "total_side": system.total_side,
+        "seasons": sorted(system.seasons),
+        "weeks": sorted(system.weeks),
+        "teams": sorted(system.teams),
+        "conferences": sorted(system.conferences),
+        "favorite": system.favorite,
+        "underdog": system.underdog,
+        "home": system.home,
+        "away": system.away,
+        "fade": system.fade,
+        "providers": sorted(system.providers),
+        "min_spread": system.min_spread,
+        "max_spread": system.max_spread,
+        "min_total": system.min_total,
+        "max_total": system.max_total,
+        "feature_filters": [
+            {"key": f.key, "op": f.op, "value": f.value, "perspective": f.perspective}
+            for f in system.feature_filters
+        ],
+    }
+
+
+def _finalist_system_from_dict(payload: dict[str, Any]) -> SystemFilter:
+    return SystemFilter(
+        bet_type=payload.get("bet_type", "spread"),
+        side=payload.get("side", "home"),
+        total_side=payload.get("total_side", "over"),
+        seasons=set(payload.get("seasons", [])),
+        weeks=set(payload.get("weeks", [])),
+        teams=set(payload.get("teams", [])),
+        conferences=set(payload.get("conferences", [])),
+        favorite=payload.get("favorite", False),
+        underdog=payload.get("underdog", False),
+        home=payload.get("home", False),
+        away=payload.get("away", False),
+        fade=payload.get("fade", False),
+        providers=set(payload.get("providers", [])),
+        min_spread=payload.get("min_spread"),
+        max_spread=payload.get("max_spread"),
+        min_total=payload.get("min_total"),
+        max_total=payload.get("max_total"),
+        feature_filters=tuple(
+            FeatureFilter(key=f["key"], op=f["op"], value=f["value"], perspective=f.get("perspective", "single"))
+            for f in payload.get("feature_filters", [])
+        ),
+    )
+
+
+def save_search_run(name: str, run: SearchRun, data_dir: str | Path) -> Path:
+    name = _safe_system_name(name)
+    payload = {
+        "name": run.name,
+        "saved_at": run.saved_at,
+        "candidates_tested": run.candidates_tested,
+        "finalists_graded": run.finalists_graded,
+        "effective_params": run.effective_params,
+        "finalists": [
+            {
+                "system": _finalist_system_to_dict(f.system),
+                "wins": f.wins,
+                "losses": f.losses,
+                "pushes": f.pushes,
+                "roi": f.roi,
+                "raw_p": f.raw_p,
+                "corrected_p": f.corrected_p,
+                "bh_significant": f.bh_significant,
+            }
+            for f in run.finalists
+        ],
+    }
+    path = Path(data_dir) / "search_runs" / f"{name}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return path
+
+
+def load_search_run(name: str, data_dir: str | Path) -> SearchRun:
+    name = _safe_system_name(name)
+    path = Path(data_dir) / "search_runs" / f"{name}.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return SearchRun(
+        name=str(payload.get("name", name)),
+        saved_at=str(payload.get("saved_at", "")),
+        candidates_tested=int(payload.get("candidates_tested", 0)),
+        finalists_graded=int(payload.get("finalists_graded", 0)),
+        effective_params=payload.get("effective_params", {}),
+        finalists=tuple(
+            SearchRunFinalist(
+                system=_finalist_system_from_dict(f["system"]),
+                wins=f["wins"],
+                losses=f["losses"],
+                pushes=f["pushes"],
+                roi=f["roi"],
+                raw_p=f["raw_p"],
+                corrected_p=f["corrected_p"],
+                bh_significant=f["bh_significant"],
+            )
+            for f in payload.get("finalists", [])
+        ),
+    )
+
+
+def list_search_runs(data_dir: str | Path) -> list[str]:
+    runs_dir = Path(data_dir) / "search_runs"
+    if not runs_dir.exists():
+        return []
+    return sorted(path.stem for path in runs_dir.glob("*.json"))

@@ -124,3 +124,60 @@ def test_load_example_system_reads_from_an_override_directory(tmp_path):
 
     assert list_examples(tmp_path) == ["custom-example"]
     assert load_example_system("custom-example", tmp_path).theory == "why"
+
+
+def test_save_and_load_search_run_round_trips(tmp_path):
+    from cfb_system_maker.models import SearchRun, SearchRunFinalist, SystemFilter
+    from cfb_system_maker.storage import save_search_run, load_search_run, list_search_runs
+
+    finalist = SearchRunFinalist(
+        system=SystemFilter(bet_type="spread", side="home", favorite=True),
+        wins=12,
+        losses=8,
+        pushes=1,
+        roi=0.0524,
+        raw_p=0.031,
+        corrected_p=0.062,
+        bh_significant=False,
+    )
+    run = SearchRun(
+        name="my-run",
+        saved_at="2026-07-31T00:00:00+00:00",
+        candidates_tested=482,
+        finalists_graded=1,
+        effective_params={"beam_width": 100, "top_k": 20, "min_decided_bets": 100, "alpha": 0.05},
+        finalists=(finalist,),
+    )
+
+    save_search_run("my-run", run, tmp_path)
+    loaded = load_search_run("my-run", tmp_path)
+
+    assert loaded.name == "my-run"
+    assert loaded.candidates_tested == 482
+    assert loaded.finalists_graded == 1
+    assert loaded.effective_params["beam_width"] == 100
+    assert len(loaded.finalists) == 1
+    assert loaded.finalists[0].wins == 12
+    assert loaded.finalists[0].corrected_p == 0.062
+    assert loaded.finalists[0].system.bet_type == "spread"
+    assert loaded.finalists[0].system.favorite is True
+    assert list_search_runs(tmp_path) == ["my-run"]
+
+
+def test_load_search_run_missing_file_raises(tmp_path):
+    from cfb_system_maker.storage import load_search_run
+
+    with pytest.raises(FileNotFoundError):
+        load_search_run("nope", tmp_path)
+
+
+def test_save_search_run_rejects_unsafe_name(tmp_path):
+    from cfb_system_maker.models import SearchRun
+    from cfb_system_maker.storage import save_search_run
+
+    run = SearchRun(
+        name="x", saved_at="2026-07-31T00:00:00+00:00", candidates_tested=1,
+        finalists_graded=0, effective_params={}, finalists=(),
+    )
+    with pytest.raises(ValueError):
+        save_search_run("../escape", run, tmp_path)
