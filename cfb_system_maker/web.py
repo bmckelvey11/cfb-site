@@ -547,6 +547,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 rows=[],
                 selected=[],
                 saved_systems=[],
+                saved_system_meta={},
                 options=_empty_options(),
                 holdout_seasons=set(),
             )
@@ -585,12 +586,24 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                     "result": result,
                     "sign_consistency": sign_consistency(result.season_breakdown),
                 })
+        system_names = list_systems(app.config["DATA_DIR"])
+        saved_system_meta = {}
+        for name in system_names:
+            try:
+                saved = load_saved_system(name, app.config["DATA_DIR"])
+            except (FileNotFoundError, ValueError):
+                continue
+            saved_system_meta[name] = {
+                "source": saved.source,
+                "search_candidates_tested": saved.search_candidates_tested,
+            }
         return render_template(
             "compare.html",
             error=None,
             rows=rows,
             selected=selected,
-            saved_systems=list_systems(app.config["DATA_DIR"]),
+            saved_systems=system_names,
+            saved_system_meta=saved_system_meta,
             options=_options_from_games(games),
             holdout_seasons=holdout_seasons,
         )
@@ -1504,6 +1517,8 @@ def _dashboard_row(
         "type_label": _system_type_label(saved.system),
         "figures": figures,
         "sparkline": _sparkline(figures["bet_details"]),
+        "source": saved.source,
+        "search_candidates_tested": saved.search_candidates_tested,
     }
 
 

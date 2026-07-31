@@ -67,3 +67,47 @@ def test_compare_shows_permutation_p_and_profitable_seasons_rows(tmp_path):
 
     assert "Permutation p" in html
     assert "Profitable seasons" in html
+
+
+# --- P1-002: search-provenance badge in the picker ----------------------------
+
+
+def test_compare_picker_shows_badge_for_search_sourced_system(tmp_path):
+    app = _setup(tmp_path)
+    save_system(
+        "found-it",
+        SystemFilter(side="home", favorite=True),
+        tmp_path,
+        source="search",
+        search_candidates_tested=500,
+    )
+
+    html = app.test_client().get("/compare").get_data(as_text=True)
+
+    assert 'class="badge-search"' in html
+
+
+def test_compare_picker_omits_badge_for_manual_systems(tmp_path):
+    app = _setup(tmp_path)
+
+    html = app.test_client().get("/compare").get_data(as_text=True)
+
+    assert 'class="badge-search"' not in html
+
+
+def test_compare_run_produces_same_shape_output_regardless_of_source(tmp_path):
+    app = _setup(tmp_path)
+    save_system(
+        "found-it",
+        SystemFilter(side="home", favorite=True),
+        tmp_path,
+        source="search",
+        search_candidates_tested=500,
+    )
+
+    manual_html = app.test_client().get("/compare?system=home-favs").get_data(as_text=True)
+    search_html = app.test_client().get("/compare?system=found-it").get_data(as_text=True)
+
+    for label in ("Bets", "Hit rate", "ROI", "Wilson CI", "Permutation p"):
+        assert label in manual_html
+        assert label in search_html

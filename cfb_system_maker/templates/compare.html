@@ -25,7 +25,7 @@
           <form method="get" class="compare-picker">
             {% for name in saved_systems %}
               <label class="check">
-                <input type="checkbox" name="system" value="{{ name }}" {% if name in selected %}checked{% endif %}> {{ name }}
+                <input type="checkbox" name="system" value="{{ name }}" {% if name in selected %}checked{% endif %}> {{ name }}{% if saved_system_meta.get(name, {}).source == 'search' %} <span class="badge-search">Search</span>{% endif %}
               </label>
             {% else %}
               <p class="no-saved-systems">No saved systems yet - save one from the backtester first.</p>

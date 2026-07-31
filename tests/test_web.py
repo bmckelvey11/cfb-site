@@ -1055,6 +1055,51 @@ def test_dashboard_timeframe_not_in_data_falls_back_to_all_time(tmp_path):
     assert _money_won_text(expected.profit) in html
 
 
+# --- P1-002: search-provenance badge + candidate count -------------------------
+
+
+def test_dashboard_shows_badge_and_candidate_count_for_search_sourced_system(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    save_system(
+        "found-it",
+        SystemFilter(side="home"),
+        tmp_path,
+        source="search",
+        search_candidates_tested=500,
+    )
+
+    html = app.test_client().get("/").get_data(as_text=True)
+
+    assert 'class="badge-search"' in html
+    assert "500 candidates tested" in html
+
+
+def test_dashboard_omits_badge_and_candidate_count_for_manual_system(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "manual-sys")
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert 'class="badge-search"' not in html
+    assert "candidates tested" not in html
+
+
+def test_dashboard_shows_badge_but_omits_count_when_search_candidates_tested_is_none(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    save_system(
+        "found-no-count",
+        SystemFilter(side="home"),
+        tmp_path,
+        source="search",
+    )
+
+    html = app.test_client().get("/").get_data(as_text=True)
+
+    assert 'class="badge-search"' in html
+    assert "candidates tested" not in html
+
+
 # --- Example Systems tab (Phase 5, Plan 05) -----------------------------------
 
 

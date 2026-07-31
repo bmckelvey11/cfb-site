@@ -74,7 +74,9 @@
                           </form>
                         {% else %}
                           <a class="system-link" href="{{ url_for('index') }}?load_system={{ row.name|urlencode }}">{{ row.name }}</a>
+                          {% if row.source == 'search' %}<span class="badge-search">Search</span>{% endif %}
                           {% if row.theory_line %}<p class="system-theory">{{ row.theory_line }}</p>{% endif %}
+                          {% if row.source == 'search' and row.search_candidates_tested is not none %}<p class="system-theory system-search-meta">{{ row.search_candidates_tested }} candidates tested</p>{% endif %}
                         {% endif %}
                       </td>
                       <td>{{ row.type_label }}</td>

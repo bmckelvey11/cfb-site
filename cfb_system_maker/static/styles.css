@@ -517,6 +517,18 @@ th {
   color: var(--loss);
 }
 
+.badge-search {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--panel-strong);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
 .pill.push {
   background: var(--push-bg);
   color: var(--muted);
@@ -1248,6 +1260,10 @@ code {
   color: var(--muted);
   font-size: 12px;
   font-weight: 400;
+}
+
+.system-search-meta {
+  font-style: italic;
 }
 
 .examples-note {
