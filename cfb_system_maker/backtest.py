@@ -84,7 +84,13 @@ def run_backtest(
         season_breakdown=tuple(compute_season_breakdown(details, stake=stake)),
         average_margin=(round(sum(bet.margin for bet in details) / bets, 4) if bets and system.bet_type == "spread" else None),
     )
-    return replace(result, grade=compute_grade(result, system))
+    result = replace(result, grade=compute_grade(result, system))
+    if result.stats is not None:
+        result = replace(
+            result,
+            verdict=stats_verdict(result.stats, result.wins + result.losses, count_overfit_filters(system)),
+        )
+    return result
 
 
 def split_holdout(
@@ -218,6 +224,74 @@ def count_overfit_filters(system: SystemFilter) -> int:
     return count
 
 
+def stats_verdict(stats: SystemStats, decided: int, overfit_filters: int = 0) -> str:
+    """Plain-English read of the significance panel, derived from the same
+    fields compute_grade scores — not a second opinion, just a translation.
+
+    overfit_filters (from count_overfit_filters) gates the "real signal" claim
+    only -- NOT routed into compute_grade's composite (that would double-count
+    the same signal _overfit_score already scores there). A system carved down
+    by many active constraints (manual typing, a loaded save, or the Max ROI
+    button all produce the same shape) is one candidate out of an unknown
+    number the user or the search implicitly tried; its p-value is uncorrected
+    for that search regardless of how the bounds were set, so significance
+    here can't be read at face value.
+    """
+    if decided == 0:
+        return "No decided bets yet."
+    edge_pct = stats.edge * 100
+    if stats.low_sample:
+        return (
+            f"Only {decided} decided bets — too few to say anything about edge. "
+            "Treat this as a hypothesis, not a result."
+        )
+    significant = stats.p_value < 0.05 and stats.permutation_p_value < 0.05
+    break_even_in_ci = stats.wilson_low <= stats.break_even_rate <= stats.wilson_high
+    mde_note = f" This sample could only reliably detect an edge of {stats.mde * 100:.2f} points or more." if stats.mde is not None else ""
+    cluster_note = ""
+    if stats.cluster_low is not None and stats.cluster_high is not None:
+        if stats.cluster_count < 40:
+            cluster_note = (
+                f" Bets cluster into only {stats.cluster_count} season/week groups (<40) — "
+                "the cluster-robust ROI interval below is anti-conservative and likely too narrow; "
+                "read it as directional, not exact."
+            )
+        else:
+            cluster_note = (
+                f" Accounting for {stats.cluster_count} season/week clusters (ICC={stats.icc:.3f}), "
+                f"the ROI 95% CI widens to [{stats.cluster_low * 100:+.2f}%, {stats.cluster_high * 100:+.2f}%]."
+            )
+    if significant and edge_pct > 0:
+        if overfit_filters > 7:
+            return (
+                f"Edge of {edge_pct:+.2f}% clears both significance tests (p={stats.p_value:.4f}, "
+                f"permutation p={stats.permutation_p_value:.4f}), but this system has {overfit_filters} "
+                "active narrowing constraints. A tight filter set is one candidate out of many that could "
+                "have been tried, and this p-value isn't corrected for that search — treat it as "
+                "hypothesis-generating, not confirmed, until it holds on a fresh season."
+                + cluster_note
+            )
+        return (
+            f"Edge of {edge_pct:+.2f}% clears both the normal-theory (p={stats.p_value:.4f}) "
+            f"and permutation (p={stats.permutation_p_value:.4f}) tests. "
+            "Break-even sits outside the Wilson interval — this looks like real signal, not noise."
+            + cluster_note
+        )
+    if break_even_in_ci or not significant:
+        return (
+            f"Edge of {edge_pct:+.2f}% is not statistically distinguishable from break-even "
+            f"(p={stats.p_value:.4f}, permutation p={stats.permutation_p_value:.4f}). "
+            "Consistent with random variation around zero edge."
+            + mde_note
+            + cluster_note
+        )
+    return (
+        f"Edge of {edge_pct:+.2f}% is negative and the tests don't support it as noise either "
+        f"(p={stats.p_value:.4f}). This system is losing money with some statistical weight behind it."
+        + cluster_note
+    )
+
+
 def compute_grade(result: BacktestResult, system: SystemFilter) -> str | None:
     if result.bets == 0:
         return None
@@ -325,6 +399,9 @@ def compute_system_stats(
     roi_std_error, roi_t_stat = _roi_stats(returns, roi)
     max_win_streak, max_loss_streak = _streaks(sorted(details, key=lambda bet: (bet.season, bet.week, bet.game_id)))
     permutation_p_value = _permutation_p_value(details, american_odds=american_odds, stake=stake, iterations=iterations, seed=seed)
+    cluster_stats = cluster_dependence_stats(details, stake=stake, iterations=iterations, seed=seed)
+    deff = decided / cluster_stats["effective_n"] if cluster_stats["effective_n"] else 1.0
+    mde = _mde(decided, break_even_rate, deff=deff)
 
     return SystemStats(
         break_even_rate=round(break_even_rate, 4),
@@ -339,6 +416,12 @@ def compute_system_stats(
         max_win_streak=max_win_streak,
         max_loss_streak=max_loss_streak,
         permutation_p_value=permutation_p_value,
+        mde=mde,
+        cluster_count=cluster_stats["cluster_count"],
+        cluster_low=cluster_stats["cluster_low"],
+        cluster_high=cluster_stats["cluster_high"],
+        effective_n=cluster_stats["effective_n"],
+        icc=cluster_stats["icc"],
     )
 
 
@@ -599,6 +682,155 @@ def _roi_stats(returns: list[float], roi: float) -> tuple[float, float]:
     std_error = math.sqrt(variance / n) if variance > 0 else 0.0
     t_stat = roi / std_error if std_error else 0.0
     return round(std_error, 4), round(t_stat, 4)
+
+
+def _mde(n: int, break_even_rate: float, *, alpha: float = 0.05, power: float = 0.80, deff: float = 1.0) -> float | None:
+    """Minimum detectable edge (hit-rate points above break-even) this sample
+    size could reliably distinguish from zero, two-sided at the given alpha/power.
+
+    MDE = (z_(1-alpha/2) + z_(1-power)) * SE, SE from break-even variance
+    (the null hypothesis variance, standard for a sample-size formula) inflated
+    by sqrt(deff) for cluster dependence. Not defined for n=0.
+    """
+    if n <= 0:
+        return None
+    z_alpha = _inverse_norm_cdf(1 - alpha / 2)
+    z_power = _inverse_norm_cdf(power)
+    se = math.sqrt(break_even_rate * (1 - break_even_rate) / n) * math.sqrt(deff)
+    return round((z_alpha + z_power) * se, 4)
+
+
+def _inverse_norm_cdf(p: float) -> float:
+    """Acklam's rational approximation to the standard normal quantile function.
+
+    Only ever called here with the fixed values 0.975 and 0.80 (alpha/power
+    are keyword defaults, not user input), so a compact closed-form beats
+    pulling in scipy for two constants.
+    """
+    a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+         1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00]
+    b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+         6.680131188771972e+01, -1.328068155288572e+01]
+    c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+         -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00]
+    d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+         3.754408661907416e+00]
+    p_low = 0.02425
+    p_high = 1 - p_low
+    if p < p_low:
+        q = math.sqrt(-2 * math.log(p))
+        return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / \
+            ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+    if p <= p_high:
+        q = p - 0.5
+        r = q * q
+        return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / \
+            (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1)
+    q = math.sqrt(-2 * math.log(1 - p))
+    return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / \
+        ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+
+
+def _cluster_key(bet: BetDetail) -> tuple[int, int]:
+    # (season, week) is the only dependence dimension populated for both bet
+    # types -- BetDetail.team is a real team for spread bets but "Over"/"Under"
+    # for total bets, so team-level clustering silently degenerates to 2
+    # clusters there. Season/week captures shared market and weather shocks
+    # instead and is always meaningful.
+    return (bet.season, bet.week)
+
+
+def cluster_dependence_stats(
+    details: list[BetDetail],
+    *,
+    stake: float,
+    iterations: int = 1000,
+    seed: int = 42,
+) -> dict[str, float | int | None]:
+    """Cluster (block) bootstrap ROI CI + effective sample size, clustered by
+    (season, week). Resamples whole clusters, never individual bets, per
+    dependence.md's block-bootstrap pattern for non-regression estimators.
+
+    Also reports the intraclass correlation of per-bet profit (ICC) and the
+    resulting design effect (DEFF = 1 + (m-1)*ICC), so effective_n reflects
+    measured dependence rather than an assumed value.
+    """
+    decided_bets = [bet for bet in details if bet.result in {"win", "loss"}]
+    n = len(decided_bets)
+    if n == 0:
+        return {"cluster_count": 0, "cluster_low": None, "cluster_high": None, "effective_n": None, "icc": None}
+
+    clusters: dict[tuple[int, int], list[float]] = {}
+    for bet in decided_bets:
+        clusters.setdefault(_cluster_key(bet), []).append(bet.profit)
+    cluster_profits = list(clusters.values())
+    cluster_sizes = [len(p) for p in cluster_profits]
+    g = len(cluster_profits)
+
+    icc = _icc_one_way(cluster_profits)
+    mean_cluster_size = n / g
+    deff = 1 + (mean_cluster_size - 1) * max(0.0, icc)
+    effective_n = round(n / deff, 2) if deff > 0 else float(n)
+
+    if g < 2:
+        return {"cluster_count": g, "cluster_low": None, "cluster_high": None, "effective_n": effective_n, "icc": round(icc, 4)}
+
+    rng = random.Random(seed)
+    risked = n * stake
+    roi_samples = []
+    for _ in range(iterations):
+        take = rng.choices(range(g), k=g)
+        profit = sum(sum(cluster_profits[idx]) for idx in take)
+        weight = sum(cluster_sizes[idx] for idx in take)
+        if weight == 0:
+            continue
+        roi_samples.append(profit / (weight * stake))
+    roi_samples.sort()
+    if not roi_samples:
+        return {"cluster_count": g, "cluster_low": None, "cluster_high": None, "effective_n": effective_n, "icc": round(icc, 4)}
+    lo_idx = max(0, round(0.025 * len(roi_samples)) - 1)
+    hi_idx = min(len(roi_samples) - 1, round(0.975 * len(roi_samples)) - 1)
+
+    return {
+        "cluster_count": g,
+        "cluster_low": round(roi_samples[lo_idx], 4),
+        "cluster_high": round(roi_samples[hi_idx], 4),
+        "effective_n": effective_n,
+        "icc": round(icc, 4),
+    }
+
+
+def _icc_one_way(cluster_profits: list[list[float]]) -> float:
+    """One-way random-effects intraclass correlation from a cluster-means ANOVA
+    decomposition: ICC = (MSB - MSW) / (MSB + (m0 - 1) * MSW), m0 the average
+    cluster size adjusted for unequal group sizes (standard ANOVA ICC formula).
+    Clamped to [0, 1] -- negative raw ICC means no detectable within-cluster
+    correlation, which is a valid (and common) result, not an error.
+    """
+    all_values = [v for group in cluster_profits for v in group]
+    n = len(all_values)
+    g = len(cluster_profits)
+    if g < 2 or n <= g:
+        return 0.0
+    grand_mean = sum(all_values) / n
+
+    ssb = sum(len(group) * (sum(group) / len(group) - grand_mean) ** 2 for group in cluster_profits)
+    ssw = sum((v - sum(group) / len(group)) ** 2 for group in cluster_profits for v in group)
+    msb = ssb / (g - 1)
+    msw = ssw / (n - g) if n > g else 0.0
+    if msw == 0.0 and msb == 0.0:
+        return 0.0
+
+    sum_sq_sizes = sum(len(group) ** 2 for group in cluster_profits)
+    m0 = (n - sum_sq_sizes / n) / (g - 1)
+    if m0 <= 0:
+        return 0.0
+
+    denom = msb + (m0 - 1) * msw
+    if denom == 0:
+        return 0.0
+    icc = (msb - msw) / denom
+    return max(0.0, min(1.0, icc))
 
 
 def _streaks(details: list[BetDetail]) -> tuple[int, int]:

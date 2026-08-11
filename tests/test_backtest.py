@@ -3,11 +3,14 @@ from dataclasses import replace
 from cfb_system_maker.backtest import (
     _analytic_p_value,
     _consistency_score,
+    _icc_one_way,
+    _mde,
     _overfit_score,
     _permutation_score,
     _roi_significance_score,
     _sample_size_score,
     bh_correct,
+    cluster_dependence_stats,
     compute_grade,
     compute_season_breakdown,
     compute_system_stats,
@@ -17,6 +20,7 @@ from cfb_system_maker.backtest import (
     run_backtest,
     sign_consistency,
     split_holdout,
+    stats_verdict,
 )
 from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SeasonRecord, SystemFilter, SystemStats
 
@@ -840,3 +844,206 @@ def test_season_slice_of_all_time_backtest_equals_season_restricted_backtest():
         assert season_record.pushes == restricted.pushes
         assert season_record.profit == restricted.profit
         assert season_record.roi == restricted.roi
+
+
+# --- stats_verdict / cluster_dependence_stats / MDE ------------------------------
+#
+# _icc_one_way expected values below are hand-derived from the standard one-way
+# random-effects ANOVA decomposition (Searle et al.), independent of the
+# implementation: SSB/SSW from group means vs. grand mean, m0 the unequal-size
+# harmonic correction (n - sum(n_i^2)/n) / (g-1), ICC = (MSB-MSW)/(MSB+(m0-1)*MSW).
+
+
+def test_icc_one_way_recovers_high_correlation_for_well_separated_clusters():
+    # Two clusters, far apart, tight within each -- textbook high-ICC case.
+    # Hand-computed: SSB=81, SSW=4, MSB=81, MSW=2, m0=2 -> ICC = (81-2)/(81+(2-1)*2) = 79/83.
+    icc = _icc_one_way([[1.0, 3.0], [10.0, 12.0]])
+
+    assert icc == 79 / 83
+
+
+def test_icc_one_way_is_zero_for_identical_cluster_means():
+    # No between-cluster separation at all -- ICC should be exactly 0, not
+    # negative-then-clamped (this case has genuinely zero, not negative, MSB).
+    icc = _icc_one_way([[1.0, 3.0], [1.0, 3.0], [1.0, 3.0]])
+
+    assert icc == 0.0
+
+
+def test_icc_one_way_clamps_negative_raw_icc_to_zero():
+    # Within-cluster variance exceeding between-cluster variance produces a
+    # negative raw ICC (a valid, common result -- see backtest.py's docstring),
+    # which must clamp to 0.0, not surface as a negative number.
+    icc = _icc_one_way([[0.0, 100.0], [1.0, 99.0], [2.0, 98.0]])
+
+    assert icc == 0.0
+
+
+def test_icc_one_way_returns_zero_for_fewer_than_two_clusters():
+    assert _icc_one_way([[1.0, 2.0, 3.0]]) == 0.0
+
+
+def test_cluster_dependence_stats_empty_details_returns_none_fields():
+    stats = cluster_dependence_stats([], stake=1.0)
+
+    assert stats == {
+        "cluster_count": 0,
+        "cluster_low": None,
+        "cluster_high": None,
+        "effective_n": None,
+        "icc": None,
+    }
+
+
+def test_cluster_dependence_stats_single_cluster_skips_bootstrap_but_reports_icc():
+    # Only one (season, week) group present -- block bootstrap needs >=2
+    # clusters to resample across, so CI stays None, but ICC/effective_n
+    # (both computable from a single group's residual spread) still report.
+    details = [
+        BetDetail(1, 2023, 1, "A", "B", "home", -3.0, 45.0, -110, "win", 0.91),
+        BetDetail(2, 2023, 1, "C", "D", "home", -3.0, 45.0, -110, "loss", -1.0),
+    ]
+
+    stats = cluster_dependence_stats(details, stake=1.0)
+
+    assert stats["cluster_count"] == 1
+    assert stats["cluster_low"] is None
+    assert stats["cluster_high"] is None
+    assert stats["icc"] == 0.0  # single group -> _icc_one_way's g<2 guard
+
+
+def test_cluster_dependence_stats_effective_n_shrinks_with_strong_clustering():
+    # Two clusters with a large, consistent within-cluster profit gap (cluster
+    # A always wins, cluster B always loses) -- strong dependence, high ICC,
+    # effective_n should shrink well below the raw decided-bet count of 8.
+    def _bet(game_id, season, week, result, profit):
+        return BetDetail(game_id, season, week, "A", "B", "home", -3.0, 45.0, -110, result, profit)
+
+    details = [
+        _bet(1, 2023, 1, "win", 0.91), _bet(2, 2023, 1, "win", 0.91),
+        _bet(3, 2023, 1, "win", 0.91), _bet(4, 2023, 1, "win", 0.91),
+        _bet(5, 2023, 2, "loss", -1.0), _bet(6, 2023, 2, "loss", -1.0),
+        _bet(7, 2023, 2, "loss", -1.0), _bet(8, 2023, 2, "loss", -1.0),
+    ]
+
+    stats = cluster_dependence_stats(details, stake=1.0)
+
+    assert stats["cluster_count"] == 2
+    assert stats["icc"] > 0.9  # near-perfect within-cluster homogeneity
+    assert stats["effective_n"] < 8
+    assert stats["effective_n"] == round(8 / (1 + (4 - 1) * stats["icc"]), 2)
+
+
+def test_mde_matches_reparametrized_toolkit_formula():
+    # toolkit/power.py's canonical mde() is z*sd*sqrt(d_eff/n) for a generic
+    # paired-difference sd. backtest._mde specializes to a hit-rate MDE using
+    # the null-hypothesis binomial sd = sqrt(p*(1-p)); the two must agree
+    # exactly once reparametrized this way.
+    from scipy.stats import norm
+
+    n, p, deff = 150, 0.5238, 2.5
+    sd = (p * (1 - p)) ** 0.5
+    z = norm.ppf(1 - 0.05 / 2) + norm.ppf(0.80)
+    expected = round(z * sd * (deff / n) ** 0.5, 4)
+
+    assert _mde(n, p, deff=deff) == expected
+
+
+def test_mde_returns_none_for_zero_decided_bets():
+    assert _mde(0, 0.5238) is None
+
+
+def test_stats_verdict_zero_decided_bets():
+    assert stats_verdict(_grade_stats(), 0) == "No decided bets yet."
+
+
+def test_stats_verdict_low_sample_short_circuits_before_significance_check():
+    stats = _grade_stats(low_sample=True, edge=0.5, p_value=0.001, permutation_p_value=0.001)
+
+    verdict = stats_verdict(stats, decided=2)
+
+    assert "too few to say anything about edge" in verdict
+    assert "clears" not in verdict  # never reaches the significance branches
+
+
+def test_stats_verdict_significant_positive_edge_reads_as_real_signal():
+    stats = _grade_stats(
+        low_sample=False, edge=0.05, p_value=0.01, permutation_p_value=0.01,
+        wilson_low=0.6, wilson_high=0.9, break_even_rate=0.524,
+    )
+
+    verdict = stats_verdict(stats, decided=100, overfit_filters=1)
+
+    assert "real signal, not noise" in verdict
+    assert "hypothesis-generating" not in verdict  # overfit_filters <= 7, no caveat
+
+
+def test_stats_verdict_significant_positive_edge_with_many_overfit_filters_caveats():
+    stats = _grade_stats(
+        low_sample=False, edge=0.05, p_value=0.01, permutation_p_value=0.01,
+        wilson_low=0.6, wilson_high=0.9, break_even_rate=0.524,
+    )
+
+    verdict = stats_verdict(stats, decided=100, overfit_filters=8)
+
+    assert "hypothesis-generating, not confirmed" in verdict
+    assert f"{8} active narrowing constraints" in verdict
+
+
+def test_stats_verdict_non_significant_edge_reads_as_noise():
+    stats = _grade_stats(
+        low_sample=False, edge=0.01, p_value=0.5, permutation_p_value=0.5,
+        wilson_low=0.4, wilson_high=0.6, break_even_rate=0.524,
+    )
+
+    verdict = stats_verdict(stats, decided=100)
+
+    assert "not statistically distinguishable from break-even" in verdict
+
+
+def test_stats_verdict_negative_and_significant_edge_reads_as_losing():
+    stats = _grade_stats(
+        low_sample=False, edge=-0.05, p_value=0.01, permutation_p_value=0.01,
+        wilson_low=0.2, wilson_high=0.45, break_even_rate=0.524,
+    )
+
+    verdict = stats_verdict(stats, decided=100)
+
+    assert "losing money with some statistical weight" in verdict
+
+
+def test_stats_verdict_includes_mde_note_only_on_non_significant_branch():
+    stats = _grade_stats(
+        low_sample=False, edge=0.01, p_value=0.5, permutation_p_value=0.5,
+        wilson_low=0.4, wilson_high=0.6, break_even_rate=0.524, mde=0.08,
+    )
+
+    verdict = stats_verdict(stats, decided=100)
+
+    assert "could only reliably detect an edge of 8.00 points" in verdict
+
+
+def test_stats_verdict_includes_cluster_note_with_few_clusters_caveat():
+    stats = _grade_stats(
+        low_sample=False, edge=0.05, p_value=0.01, permutation_p_value=0.01,
+        wilson_low=0.6, wilson_high=0.9, break_even_rate=0.524,
+        cluster_count=10, cluster_low=0.02, cluster_high=0.08, icc=0.1,
+    )
+
+    verdict = stats_verdict(stats, decided=100, overfit_filters=1)
+
+    assert "only 10 season/week groups (<40)" in verdict
+    assert "anti-conservative" in verdict
+
+
+def test_stats_verdict_includes_cluster_note_with_wide_ci_when_enough_clusters():
+    stats = _grade_stats(
+        low_sample=False, edge=0.05, p_value=0.01, permutation_p_value=0.01,
+        wilson_low=0.6, wilson_high=0.9, break_even_rate=0.524,
+        cluster_count=50, cluster_low=0.02, cluster_high=0.08, icc=0.1,
+    )
+
+    verdict = stats_verdict(stats, decided=100, overfit_filters=1)
+
+    assert "Accounting for 50 season/week clusters (ICC=0.100)" in verdict
+    assert "[+2.00%, +8.00%]" in verdict

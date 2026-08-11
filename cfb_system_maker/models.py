@@ -63,6 +63,12 @@ class SystemStats:
     max_win_streak: int = 0
     max_loss_streak: int = 0
     permutation_p_value: float = 1.0
+    mde: float | None = None
+    cluster_count: int = 0
+    cluster_low: float | None = None
+    cluster_high: float | None = None
+    effective_n: float | None = None
+    icc: float | None = None
 
 
 @dataclass(frozen=True)
@@ -108,6 +114,7 @@ class BacktestResult:
     season_breakdown: tuple[SeasonRecord, ...] = ()
     average_margin: float | None = None
     grade: str | None = None
+    verdict: str | None = None
 
 
 @dataclass(frozen=True)

@@ -379,8 +379,14 @@
             <article><span>Permutation p</span><strong>{{ "%.4f"|format(result.stats.permutation_p_value) }}</strong></article>
             <article><span>ROI t-stat</span><strong>{{ "%.2f"|format(result.stats.roi_t_stat) }}</strong></article>
             <article><span>Streaks</span><strong>W{{ result.stats.max_win_streak }} / L{{ result.stats.max_loss_streak }}</strong></article>
+            {% if result.stats.mde is not none %}<article><span>MDE</span><strong>{{ "%.2f%%"|format(result.stats.mde * 100) }}</strong></article>{% endif %}
+            <article><span>Clusters</span><strong>{{ result.stats.cluster_count }}{% if result.stats.cluster_count < 40 %} (few){% endif %}</strong></article>
+            {% if result.stats.effective_n is not none %}<article><span>Effective N</span><strong>{{ "%.0f"|format(result.stats.effective_n) }}</strong></article>{% endif %}
+            {% if result.stats.icc is not none %}<article><span>ICC</span><strong>{{ "%.3f"|format(result.stats.icc) }}</strong></article>{% endif %}
+            {% if result.stats.cluster_low is not none and result.stats.cluster_high is not none %}<article><span>Cluster ROI CI</span><strong>{{ "%.2f"|format(result.stats.cluster_low * 100) }}–{{ "%.2f"|format(result.stats.cluster_high * 100) }}%</strong></article>{% endif %}
             {% if result.stats.low_sample %}<article class="warning"><span>Sample</span><strong>Low n</strong></article>{% endif %}
           </section>
+          {% if result.verdict %}<p class="stats-verdict">{{ result.verdict }}</p>{% endif %}
           {% endif %}
 
           {% if result.season_breakdown %}

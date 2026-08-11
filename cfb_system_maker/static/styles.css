@@ -318,6 +318,17 @@ button:hover {
   font-size: 14px;
 }
 
+.stats-verdict {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  margin: -8px 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .narration-panel #narrate-trigger {
   font: inherit;
 }
