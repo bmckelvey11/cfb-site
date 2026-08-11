@@ -206,7 +206,8 @@ def _call(func: Callable[..., Any], kwargs: dict[str, Any], delay: float) -> lis
             return _rows(func(**kwargs))
         except Exception as exc:
             err = str(exc)
-            if "429" in err:
+            # 429 = rate limit; 5xx = transient CFBD/Cloudflare outage. Both are retryable.
+            if "429" in err or any(f"({code})" in err for code in (500, 502, 503, 504)):
                 wait = 5.0 * (2 ** attempt)
                 time.sleep(wait)
                 if attempt < 2:
