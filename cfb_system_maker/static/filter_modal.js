@@ -68,8 +68,12 @@
       return;
     }
     const isTotal = betTypeEl.value === "total";
-    spreadFieldset.disabled = isTotal;
-    totalFieldset.disabled = !isTotal;
+    // Grey out via a class, NOT the disabled attribute: disabled controls are
+    // omitted from FormData, so the server would fall back to its "home"/"over"
+    // default and silently overwrite the side the user actually picked -- which
+    // then gets persisted by Save System.
+    spreadFieldset.classList.toggle("fieldset-inactive", isTotal);
+    totalFieldset.classList.toggle("fieldset-inactive", !isTotal);
   }
 
   syncBetSideFieldsets();
@@ -505,14 +509,32 @@
     maxRoiBtn.hidden = !visible;
   }
 
+  // Minimum decided bets a window must hold before it can win. Without a floor,
+  // ranking by profit-per-bet always picks the smallest sample: one win at -110
+  // scores 0.91, while a genuine +5% ROI over a thousand bets scores 0.05. The
+  // floor is what keeps "Max ROI" from handing back a 1-bet window.
+  const MAX_ROI_MIN_DECISIONS = 30;
+
   // Best contiguous [min,max] window by ROI, not just the single best bucket.
   // ROI isn't additive, but stake is constant across buckets, so ranking
   // windows by profit / decisions is equivalent to ranking by ROI without
   // needing to know the stake value.
   function bestRoiWindow(rows) {
+    if (!rows || !rows.length) {
+      return { min: null, max: null };
+    }
     const sorted = rows.slice().sort((a, b) => Number(a.value) - Number(b.value));
+    const totalDecisions = sorted.reduce(
+      (sum, row) => sum + Number(row.wins) + Number(row.losses),
+      0
+    );
+    // On a filter too small to ever clear the floor, fall back to the whole
+    // range rather than silently returning an unqualified single bucket.
+    if (totalDecisions < MAX_ROI_MIN_DECISIONS) {
+      return { min: Number(sorted[0].value), max: Number(sorted[sorted.length - 1].value) };
+    }
     let bestStart = 0;
-    let bestEnd = 0;
+    let bestEnd = sorted.length - 1;
     let bestRatio = -Infinity;
     for (let i = 0; i < sorted.length; i++) {
       let money = 0;
@@ -520,7 +542,7 @@
       for (let j = i; j < sorted.length; j++) {
         money += Number(sorted[j].money);
         decisions += Number(sorted[j].wins) + Number(sorted[j].losses);
-        if (decisions === 0) {
+        if (decisions < MAX_ROI_MIN_DECISIONS) {
           continue;
         }
         const ratio = money / decisions;
@@ -545,13 +567,18 @@
       syncBoundInputs();
       refreshLive();
     } else {
-      let best = state.rows[0];
-      state.rows.forEach((row) => {
+      const decided = (row) => Number(row.wins) + Number(row.losses);
+      // Same sample floor as bestRoiWindow -- a lone winning bet otherwise
+      // outranks every real edge in the table.
+      const eligible = state.rows.filter((row) => decided(row) >= MAX_ROI_MIN_DECISIONS);
+      const pool = eligible.length ? eligible : state.rows;
+      let best = pool[0];
+      pool.forEach((row) => {
         if (Number(row.roi) > Number(best.roi)) {
           best = row;
         }
       });
-      state.selected = state.control === "bool" ? [best.value] : [best.value];
+      state.selected = [best.value];
       renderValueTable();
       refreshLive();
     }

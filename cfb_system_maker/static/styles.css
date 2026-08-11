@@ -95,7 +95,7 @@ fieldset {
   margin: 0;
 }
 
-fieldset:disabled {
+.fieldset-inactive {
   opacity: 0.4;
 }
 
