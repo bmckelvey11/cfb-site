@@ -953,97 +953,144 @@ def test_mde_returns_none_for_zero_decided_bets():
     assert _mde(0, 0.5238) is None
 
 
+def _real_stats(win_count, loss_count):
+    """Build SystemStats the way run_backtest does -- from actual BetDetail rows.
+
+    The verdict tests below MUST go through this rather than hand-picking
+    SystemStats fields. p_value/permutation_p_value are one-sided upper-tail
+    while wilson_low/wilson_high are two-sided, so hand-chosen combinations can
+    describe states the estimators never jointly produce. An earlier version of
+    these tests did exactly that and passed while the verdict asserted
+    "break-even sits outside the Wilson interval" in a case where it did not.
+    """
+    details = _bets(win_count, loss_count)
+    decided = win_count + loss_count
+    # Derived exactly as run_backtest derives them, so every field agrees.
+    hit_rate = round(win_count / decided, 4)
+    roi = round(sum(bet.profit for bet in details) / (len(details) * 1.0), 4)
+    return compute_system_stats(
+        details, american_odds=-110, stake=1.0, hit_rate=hit_rate, roi=roi
+    )
+
+
 def test_stats_verdict_zero_decided_bets():
     assert stats_verdict(_grade_stats(), 0) == "No decided bets yet."
 
 
 def test_stats_verdict_low_sample_short_circuits_before_significance_check():
-    stats = _grade_stats(low_sample=True, edge=0.5, p_value=0.001, permutation_p_value=0.001)
+    stats = _real_stats(win_count=2, loss_count=0)
 
     verdict = stats_verdict(stats, decided=2)
 
+    assert stats.low_sample
     assert "too few to say anything about edge" in verdict
     assert "clears" not in verdict  # never reaches the significance branches
 
 
 def test_stats_verdict_significant_positive_edge_reads_as_real_signal():
-    stats = _grade_stats(
-        low_sample=False, edge=0.05, p_value=0.01, permutation_p_value=0.01,
-        wilson_low=0.6, wilson_high=0.9, break_even_rate=0.524,
-    )
+    # 70% hit rate over 100 bets clears both one-sided tests decisively.
+    stats = _real_stats(win_count=70, loss_count=30)
 
     verdict = stats_verdict(stats, decided=100, overfit_filters=1)
 
-    assert "real signal, not noise" in verdict
+    assert stats.p_value < 0.05 and stats.permutation_p_value < 0.05
+    assert "clears both the normal-theory" in verdict
     assert "hypothesis-generating" not in verdict  # overfit_filters <= 7, no caveat
 
 
+def test_stats_verdict_wilson_claim_matches_the_actual_interval():
+    """The verdict may only claim break-even is outside Wilson when it is.
+
+    Regression test for the one-sided-vs-two-sided mismatch: the significance
+    tests can fire while the two-sided Wilson interval still spans break-even,
+    so the claim has to be checked rather than inferred from significance.
+    """
+    for win_count, loss_count in [(70, 30), (21, 9), (60, 40), (120, 80)]:
+        stats = _real_stats(win_count, loss_count)
+        if not (stats.p_value < 0.05 and stats.permutation_p_value < 0.05):
+            continue
+        verdict = stats_verdict(stats, decided=win_count + loss_count, overfit_filters=1)
+        break_even_inside = stats.wilson_low <= stats.break_even_rate <= stats.wilson_high
+        if break_even_inside:
+            assert "Break-even sits outside the Wilson interval" not in verdict
+            assert "the two views disagree" in verdict
+        else:
+            assert "Break-even sits outside the Wilson interval too" in verdict
+
+
 def test_stats_verdict_significant_positive_edge_with_many_overfit_filters_caveats():
-    stats = _grade_stats(
-        low_sample=False, edge=0.05, p_value=0.01, permutation_p_value=0.01,
-        wilson_low=0.6, wilson_high=0.9, break_even_rate=0.524,
-    )
+    stats = _real_stats(win_count=70, loss_count=30)
 
     verdict = stats_verdict(stats, decided=100, overfit_filters=8)
 
     assert "hypothesis-generating, not confirmed" in verdict
-    assert f"{8} active narrowing constraints" in verdict
+    assert "8 active narrowing constraints" in verdict
 
 
 def test_stats_verdict_non_significant_edge_reads_as_noise():
-    stats = _grade_stats(
-        low_sample=False, edge=0.01, p_value=0.5, permutation_p_value=0.5,
-        wilson_low=0.4, wilson_high=0.6, break_even_rate=0.524,
-    )
+    # 53% over 100 bets is above break-even but nowhere near significant.
+    stats = _real_stats(win_count=53, loss_count=47)
 
     verdict = stats_verdict(stats, decided=100)
 
+    assert stats.edge > 0
+    assert stats.p_value >= 0.05
     assert "not statistically distinguishable from break-even" in verdict
 
 
-def test_stats_verdict_negative_and_significant_edge_reads_as_losing():
-    stats = _grade_stats(
-        low_sample=False, edge=-0.05, p_value=0.01, permutation_p_value=0.01,
-        wilson_low=0.2, wilson_high=0.45, break_even_rate=0.524,
-    )
+def test_stats_verdict_negative_edge_says_tests_cannot_confirm_a_loss():
+    """A losing system can never be 'significant' -- the tests are one-sided.
+
+    The verdict must say so plainly instead of implying the absence of a signal
+    means the same thing it does for a break-even system.
+    """
+    stats = _real_stats(win_count=40, loss_count=60)
 
     verdict = stats_verdict(stats, decided=100)
 
-    assert "losing money with some statistical weight" in verdict
+    assert stats.edge < 0
+    assert stats.p_value >= 0.05  # one-sided: a loss can never clear it
+    assert "is negative — this system lost money" in verdict
+    assert "cannot confirm a losing one" in verdict
+
+
+def test_stats_verdict_never_calls_a_non_negative_edge_negative():
+    """Guards the branch order: only a genuinely negative edge gets the loss copy."""
+    for win_count, loss_count in [(53, 47), (70, 30), (5238, 4762)]:
+        stats = _real_stats(win_count, loss_count)
+        verdict = stats_verdict(stats, decided=win_count + loss_count)
+        if stats.edge >= 0:
+            assert "is negative" not in verdict
 
 
 def test_stats_verdict_includes_mde_note_only_on_non_significant_branch():
-    stats = _grade_stats(
-        low_sample=False, edge=0.01, p_value=0.5, permutation_p_value=0.5,
-        wilson_low=0.4, wilson_high=0.6, break_even_rate=0.524, mde=0.08,
-    )
+    stats = _real_stats(win_count=53, loss_count=47)
 
     verdict = stats_verdict(stats, decided=100)
 
-    assert "could only reliably detect an edge of 8.00 points" in verdict
+    assert stats.mde is not None
+    assert "could only reliably detect an edge of" in verdict
+    assert f"{stats.mde * 100:.2f} points" in verdict
 
 
 def test_stats_verdict_includes_cluster_note_with_few_clusters_caveat():
-    stats = _grade_stats(
-        low_sample=False, edge=0.05, p_value=0.01, permutation_p_value=0.01,
-        wilson_low=0.6, wilson_high=0.9, break_even_rate=0.524,
-        cluster_count=10, cluster_low=0.02, cluster_high=0.08, icc=0.1,
-    )
+    # _bets puts every bet in its own week, so 30 bets -> 30 clusters (<40).
+    stats = _real_stats(win_count=21, loss_count=9)
 
-    verdict = stats_verdict(stats, decided=100, overfit_filters=1)
+    verdict = stats_verdict(stats, decided=30, overfit_filters=1)
 
-    assert "only 10 season/week groups (<40)" in verdict
+    assert stats.cluster_count == 30
+    assert "only 30 season/week groups (<40)" in verdict
     assert "anti-conservative" in verdict
 
 
-def test_stats_verdict_includes_cluster_note_with_wide_ci_when_enough_clusters():
-    stats = _grade_stats(
-        low_sample=False, edge=0.05, p_value=0.01, permutation_p_value=0.01,
-        wilson_low=0.6, wilson_high=0.9, break_even_rate=0.524,
-        cluster_count=50, cluster_low=0.02, cluster_high=0.08, icc=0.1,
-    )
+def test_stats_verdict_includes_cluster_note_when_enough_clusters():
+    stats = _real_stats(win_count=70, loss_count=30)
 
     verdict = stats_verdict(stats, decided=100, overfit_filters=1)
 
-    assert "Accounting for 50 season/week clusters (ICC=0.100)" in verdict
-    assert "[+2.00%, +8.00%]" in verdict
+    assert stats.cluster_count == 100
+    assert f"Accounting for 100 season/week clusters (ICC={stats.icc:.3f})" in verdict
+    assert f"[{stats.cluster_low * 100:+.2f}%, {stats.cluster_high * 100:+.2f}%]" in verdict
+    # The old copy claimed the interval "widens to" a baseline the UI never shows.
+    assert "widens to" not in verdict

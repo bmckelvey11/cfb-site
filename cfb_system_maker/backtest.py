@@ -245,7 +245,14 @@ def stats_verdict(stats: SystemStats, decided: int, overfit_filters: int = 0) ->
             f"Only {decided} decided bets — too few to say anything about edge. "
             "Treat this as a hypothesis, not a result."
         )
+    # p_value and permutation_p_value are both ONE-SIDED upper-tail (see
+    # _hit_rate_z_test) -- they can only ever detect a winning system, never a
+    # losing one. That sidedness is load-bearing for bh_correct upstream, so it
+    # is reconciled here rather than changed at the source.
     significant = stats.p_value < 0.05 and stats.permutation_p_value < 0.05
+    # Wilson is two-sided (z=1.96), so it is NOT the dual of those tests and
+    # routinely still contains break-even when they fire. Report it as its own
+    # check instead of asserting it follows from significance.
     break_even_in_ci = stats.wilson_low <= stats.break_even_rate <= stats.wilson_high
     mde_note = f" This sample could only reliably detect an edge of {stats.mde * 100:.2f} points or more." if stats.mde is not None else ""
     cluster_note = ""
@@ -259,7 +266,7 @@ def stats_verdict(stats: SystemStats, decided: int, overfit_filters: int = 0) ->
         else:
             cluster_note = (
                 f" Accounting for {stats.cluster_count} season/week clusters (ICC={stats.icc:.3f}), "
-                f"the ROI 95% CI widens to [{stats.cluster_low * 100:+.2f}%, {stats.cluster_high * 100:+.2f}%]."
+                f"the cluster-robust ROI 95% CI is [{stats.cluster_low * 100:+.2f}%, {stats.cluster_high * 100:+.2f}%]."
             )
     if significant and edge_pct > 0:
         if overfit_filters > 7:
@@ -271,23 +278,33 @@ def stats_verdict(stats: SystemStats, decided: int, overfit_filters: int = 0) ->
                 "hypothesis-generating, not confirmed, until it holds on a fresh season."
                 + cluster_note
             )
+        wilson_note = (
+            " The two-sided Wilson interval still spans break-even, so the two views disagree — "
+            "read the edge as suggestive rather than established."
+            if break_even_in_ci
+            else " Break-even sits outside the Wilson interval too — this looks like real signal, not noise."
+        )
         return (
             f"Edge of {edge_pct:+.2f}% clears both the normal-theory (p={stats.p_value:.4f}) "
-            f"and permutation (p={stats.permutation_p_value:.4f}) tests. "
-            "Break-even sits outside the Wilson interval — this looks like real signal, not noise."
+            f"and permutation (p={stats.permutation_p_value:.4f}) tests."
+            + wilson_note
             + cluster_note
         )
-    if break_even_in_ci or not significant:
+    if edge_pct < 0:
+        # The significance tests are one-sided upper-tail, so they can never
+        # flag a losing system -- say so plainly instead of implying the
+        # absence of a signal here means the same thing it does above.
         return (
-            f"Edge of {edge_pct:+.2f}% is not statistically distinguishable from break-even "
-            f"(p={stats.p_value:.4f}, permutation p={stats.permutation_p_value:.4f}). "
-            "Consistent with random variation around zero edge."
-            + mde_note
+            f"Edge of {edge_pct:+.2f}% is negative — this system lost money over the sample. "
+            "The significance tests only look for a winning edge, so they cannot confirm a "
+            "losing one; judge this on the size of the loss, not on the p-value."
             + cluster_note
         )
     return (
-        f"Edge of {edge_pct:+.2f}% is negative and the tests don't support it as noise either "
-        f"(p={stats.p_value:.4f}). This system is losing money with some statistical weight behind it."
+        f"Edge of {edge_pct:+.2f}% is not statistically distinguishable from break-even "
+        f"(p={stats.p_value:.4f}, permutation p={stats.permutation_p_value:.4f}). "
+        "Consistent with random variation around zero edge."
+        + mde_note
         + cluster_note
     )
 
