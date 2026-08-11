@@ -86,16 +86,21 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
     ),
     FeatureDef(
         "pregame_win_prob",
-        "Pregame Win Prob",
-        "ratings",
+        "Win Prob (contaminated — not pregame)",
+        "result_lookahead",
         "graphql_game_team",
         "winProb",
         "game_id",
         "numeric",
         team_scoped=True,
         description=(
-            "Team-scoped pregame win probability (0–1 scale). Higher means more favored. "
-            "Use perspective (bet-side/opponent/either) to choose which team; entering-game value."
+            "Team-scoped win probability (0–1 scale) from graphql gameTeam. Despite the key name "
+            "this is NOT an entering-game value: the source row carries endElo and final points, "
+            "and the field's tail encodes the outcome. Measured on the built data, the team with "
+            "the higher winProb wins 86.2% of games overall, but teams at winProb >= 0.977 win "
+            "7182/7244 = 99.1% — an accuracy no genuine pregame model reaches. Quarantined as "
+            "lookahead so candidate search cannot select it (see search.py _CANDIDATE_FEATURES). "
+            "Analysis-only; do not use as a betting input."
         ),
     ),
     FeatureDef(
