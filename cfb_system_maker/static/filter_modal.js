@@ -22,6 +22,7 @@
   const viewToggle = document.getElementById("filter-modal-view-toggle");
   const viewChartBtn = document.getElementById("filter-modal-view-chart");
   const viewListBtn = document.getElementById("filter-modal-view-list");
+  const maxRoiBtn = document.getElementById("filter-modal-max-roi");
 
   const CORE_PARAM = {
     "core:season": "filter_seasons",
@@ -57,6 +58,24 @@
     const betTypeEl = filtersForm.querySelector('[name="bet_type"]');
     const betType = betTypeEl ? String(betTypeEl.value || "spread") : "spread";
     return betType === "total" ? "either" : "bet_side";
+  }
+
+  function syncBetSideFieldsets() {
+    const betTypeEl = filtersForm.querySelector('[name="bet_type"]');
+    const spreadFieldset = document.getElementById("spread-side-fieldset");
+    const totalFieldset = document.getElementById("total-side-fieldset");
+    if (!betTypeEl || !spreadFieldset || !totalFieldset) {
+      return;
+    }
+    const isTotal = betTypeEl.value === "total";
+    spreadFieldset.disabled = isTotal;
+    totalFieldset.disabled = !isTotal;
+  }
+
+  syncBetSideFieldsets();
+  const betTypeSelect = filtersForm.querySelector('[name="bet_type"]');
+  if (betTypeSelect) {
+    betTypeSelect.addEventListener("change", syncBetSideFieldsets);
   }
 
   function resolveInitialPerspective(button, committed) {
@@ -479,6 +498,65 @@
     }
   }
 
+  function setMaxRoiVisible(visible) {
+    if (!maxRoiBtn) {
+      return;
+    }
+    maxRoiBtn.hidden = !visible;
+  }
+
+  // Best contiguous [min,max] window by ROI, not just the single best bucket.
+  // ROI isn't additive, but stake is constant across buckets, so ranking
+  // windows by profit / decisions is equivalent to ranking by ROI without
+  // needing to know the stake value.
+  function bestRoiWindow(rows) {
+    const sorted = rows.slice().sort((a, b) => Number(a.value) - Number(b.value));
+    let bestStart = 0;
+    let bestEnd = 0;
+    let bestRatio = -Infinity;
+    for (let i = 0; i < sorted.length; i++) {
+      let money = 0;
+      let decisions = 0;
+      for (let j = i; j < sorted.length; j++) {
+        money += Number(sorted[j].money);
+        decisions += Number(sorted[j].wins) + Number(sorted[j].losses);
+        if (decisions === 0) {
+          continue;
+        }
+        const ratio = money / decisions;
+        if (ratio > bestRatio) {
+          bestRatio = ratio;
+          bestStart = i;
+          bestEnd = j;
+        }
+      }
+    }
+    return { min: Number(sorted[bestStart].value), max: Number(sorted[bestEnd].value) };
+  }
+
+  function applyMaxRoi() {
+    if (!state || !state.rows || !state.rows.length) {
+      return;
+    }
+    if (state.kind === "numeric") {
+      const window = bestRoiWindow(state.rows);
+      state.min = window.min;
+      state.max = window.max;
+      syncBoundInputs();
+      refreshLive();
+    } else {
+      let best = state.rows[0];
+      state.rows.forEach((row) => {
+        if (Number(row.roi) > Number(best.roi)) {
+          best = row;
+        }
+      });
+      state.selected = state.control === "bool" ? [best.value] : [best.value];
+      renderValueTable();
+      refreshLive();
+    }
+  }
+
   function sortedVisibleRows() {
     if (!state || !state.rows) {
       return [];
@@ -638,6 +716,7 @@
     renderPerspectiveControl(() => reloadFeatureDetail());
 
     if (!state.rows.length) {
+      setMaxRoiVisible(false);
       const empty = document.createElement("p");
       empty.className = "filter-modal__hint";
       empty.textContent = "No values in range";
@@ -648,6 +727,7 @@
       controlsEl.appendChild(body);
       return;
     }
+    setMaxRoiVisible(true);
 
     const search = document.createElement("input");
     search.type = "search";
@@ -938,6 +1018,7 @@
       renderMoneyChart();
     }
     setViewToggleVisible(true);
+    setMaxRoiVisible(true);
   }
 
   function renderNumericControls() {
@@ -961,6 +1042,7 @@
         exploreEl.innerHTML = "";
       }
       setViewToggleVisible(false);
+      setMaxRoiVisible(false);
       saveBtn.disabled = true;
       return;
     }
@@ -1171,6 +1253,7 @@
     liveOk = false;
     state = null;
     setViewToggleVisible(false);
+    setMaxRoiVisible(false);
     if (exploreEl) {
       exploreEl.innerHTML = "";
     }
@@ -1232,6 +1315,7 @@
       view: "chart",
     };
     setViewToggleVisible(false);
+    setMaxRoiVisible(false);
     statusEl.textContent = "Loading values…";
     const detailParams = new URLSearchParams(new FormData(filtersForm));
     detailParams.set("candidate_id", candidateId);
@@ -1320,6 +1404,7 @@
     }
 
     setViewToggleVisible(false);
+    setMaxRoiVisible(false);
     const param = CORE_PARAM[candidateId] || button.getAttribute("data-param") || "";
     if (candidateId.indexOf("core:") === 0) {
       state = {
@@ -1411,6 +1496,9 @@
   cancelBtn.addEventListener("click", discardAndClose);
   closeBtn.addEventListener("click", discardAndClose);
   saveBtn.addEventListener("click", saveAndSubmit);
+  if (maxRoiBtn) {
+    maxRoiBtn.addEventListener("click", applyMaxRoi);
+  }
 
   if (viewChartBtn) {
     viewChartBtn.addEventListener("click", () => {

@@ -95,6 +95,10 @@ fieldset {
   margin: 0;
 }
 
+fieldset:disabled {
+  opacity: 0.4;
+}
+
 legend,
 label {
   color: var(--muted);
@@ -626,6 +630,63 @@ code {
   margin-top: 8px;
 }
 
+.compare-link a {
+  display: block;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.compare-link a:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.saved-systems {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.saved-systems h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.load-system-select {
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.saved-systems .loaded-system {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.saved-systems .load-error {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--loss);
+}
+
+.saved-systems .no-saved-systems {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* Filter modal — progressive enhancement + dialog shell */
 .filter-launcher {
   display: none;
@@ -926,6 +987,25 @@ code {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+.filter-modal__max-roi {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filter-modal__max-roi[hidden] {
+  display: none;
+}
+
+.filter-modal__max-roi:hover {
+  background: var(--win-bg);
 }
 
 .filter-modal__explore {

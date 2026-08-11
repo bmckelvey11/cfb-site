@@ -27,7 +27,7 @@
             </select>
           </fieldset>
 
-          <fieldset>
+          <fieldset id="spread-side-fieldset">
             <legend>Spread Side</legend>
             <div class="segmented">
               <label><input type="radio" name="side" value="home" {% if form.side == "home" %}checked{% endif %}> Home</label>
@@ -35,7 +35,7 @@
             </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset id="total-side-fieldset">
             <legend>Total Side</legend>
             <div class="segmented">
               <label><input type="radio" name="total_side" value="over" {% if form.total_side == "over" %}checked{% endif %}> Over</label>
@@ -288,11 +288,12 @@
           {% if load_error %}<p class="load-error">{{ load_error }}</p>{% endif %}
           {% if loaded_system %}<p class="loaded-system">Loaded: <strong>{{ loaded_system }}</strong></p>{% endif %}
           {% if saved_systems %}
-          <ul>
+          <select class="load-system-select" onchange="if (this.value) window.location.href = '?load_system=' + encodeURIComponent(this.value);">
+            <option value="" {% if not loaded_system %}selected{% endif %}>Choose a saved system&hellip;</option>
             {% for name in saved_systems %}
-              <li><a href="?load_system={{ name }}" {% if loaded_system == name %}aria-current="true"{% endif %}>{{ name }}</a></li>
+              <option value="{{ name }}" {% if loaded_system == name %}selected{% endif %}>{{ name }}</option>
             {% endfor %}
-          </ul>
+          </select>
           {% else %}
           <p class="no-saved-systems">No saved systems yet. Configure filters and click Save System.</p>
           {% endif %}
@@ -511,6 +512,7 @@
             <button type="button" id="filter-modal-view-chart" data-view="chart" aria-pressed="true">Chart</button>
             <button type="button" id="filter-modal-view-list" data-view="list" aria-pressed="false">List</button>
           </div>
+          <button type="button" id="filter-modal-max-roi" class="filter-modal__max-roi" hidden>Max ROI</button>
           <p id="filter-modal-status" class="filter-modal__status" aria-live="polite"></p>
           <button type="button" class="filter-modal__close" id="filter-modal-close" aria-label="Close filter dialog">✕</button>
         </header>
