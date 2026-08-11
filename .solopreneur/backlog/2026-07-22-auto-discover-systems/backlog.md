@@ -22,7 +22,7 @@ Spec: `.solopreneur/specs/2026-07-22-auto-discover-systems.md`
 ## P2
 | ID | Title | Status | Depends On | Type | Size |
 |----|-------|--------|------------|------|------|
-| P2-001 | LLM narration of top-K results (opt-in) | pending | P1-002 | eng+design | M |
+| P2-001 | LLM narration of top-K results (opt-in) | done | P1-002 | eng+design | M |
 
 ## Dependency Graph
 
