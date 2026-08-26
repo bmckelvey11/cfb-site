@@ -528,12 +528,15 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     def save():
         form = _form_values_from_post()
         name = str(form.get("save_name", "")).strip()
+        args = _query_args_from_form(form)
         if not name:
-            return redirect(url_for("index"))
+            args.setlist("save_error", ["missing_name"])
+            return redirect("/system?" + urlencode(list(args.items(multi=True))))
         try:
             save_system(name, _system_from_form(form), app.config["DATA_DIR"], theory=form.get("theory", ""))
         except ValueError:
-            return redirect(url_for("index"))
+            args.setlist("save_error", ["invalid_name"])
+            return redirect("/system?" + urlencode(list(args.items(multi=True))))
         return redirect(url_for("index", **{"load_system": name}))
 
     @app.get("/compare")
