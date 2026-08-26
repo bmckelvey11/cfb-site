@@ -79,6 +79,16 @@ This matters for automation: a "wait until N files exist" gate can never be
 satisfied for a `SEASON_WEEK` endpoint with an empty season. Gate on the scrape
 process finishing, or on no new file appearing, rather than a target count.
 
+`advanced_box_score` has **no** such floor — 2012 and 2013 return full team and
+player content, so both seasons are scraped. Do not assume one PER_GAME
+endpoint's floor applies to another; check each.
+
+One 2012 game (`322872655`) returns a **persistent HTTP 500** upstream: three
+retries with 5/10/20s backoff still fail. Such games are skipped and counted
+rather than aborting the season (see `_scrape_per_game`). Expect per-game
+coverage to be a game or two short of the seed count in some seasons; the count
+is printed at the end of the run.
+
 `win_probability` is worth calling out separately: it returns **zero rows for
 every 2012 and 2013 game**, so those seasons write no file. Because PER_GAME
 fans out per game, the scraper still spends ~1,600 calls (~50 min) discovering
