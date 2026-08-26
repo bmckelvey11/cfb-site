@@ -841,6 +841,7 @@
       if (inputType === "radio") {
         input.name = "filter-modal-bool";
       }
+      input.setAttribute("aria-label", String(row.description));
       input.checked = isSelected(row.value);
       input.addEventListener("change", () => {
         toggleSelected(row.value, input.checked);
