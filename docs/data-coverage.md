@@ -89,6 +89,14 @@ rather than aborting the season (see `_scrape_per_game`). Expect per-game
 coverage to be a game or two short of the seed count in some seasons; the count
 is printed at the end of the run.
 
+**Network failures are not retried.** `_call` retries 429 and 5xx only. A DNS
+resolution failure surfaces as `MaxRetryError` / `NameResolutionError` and is
+re-raised immediately, discarding the in-progress season. This cost the
+`win_probability` 2025 season on 2026-08-26 — a transient blip mid-run, with the
+host resolving fine minutes later. A long PER_GAME run is exposed to this for
+hours at a time; if it recurs often, `_call` should treat connection and
+resolution errors as retryable alongside 5xx.
+
 `win_probability` is worth calling out separately: it returns **zero rows for
 every 2012 and 2013 game**, so those seasons write no file. Because PER_GAME
 fans out per game, the scraper still spends ~1,600 calls (~50 min) discovering
