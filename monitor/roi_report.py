@@ -332,10 +332,15 @@ def make_figure(stats, path):
     # sit inside the axes instead of clipping through the title.
     ax.set_ylim(min(float(stats["eq_lo"].min()), 0.0) * 1.12, eq.max() * 1.30)
     y_lab = ax.get_ylim()[1] * 0.98
+    last_lab = -99
     for b, t in stats["season_marks"]:
         ax.axvline(b, color=GRID, lw=0.8, zorder=1)
-        ax.text(b, y_lab, f" {t}", fontsize=6.8, color=MUTED,
-                rotation=90, va="top")
+        # Early seasons are only a couple of bets wide, so their labels would
+        # overprint. Draw every boundary; label only the ones with room.
+        if b - last_lab >= 8:
+            ax.text(b, y_lab, f" {t}", fontsize=6.8, color=MUTED,
+                    rotation=90, va="top")
+            last_lab = b
     ax.annotate(f"terminal +{eq[-1]:,.0f} units risked\n"
                 f"max drawdown −{stats['mdd']:,.0f}",
                 (eq.size, eq[-1]), textcoords="offset points",
@@ -402,14 +407,30 @@ def make_figure(stats, path):
                         (x, top * 0.55 if vals[x] > 0 else bot * 0.55),
                         ha="center", va="center", fontsize=6.8,
                         color=INK, fontweight="bold", zorder=6)
+    # The newest season is also the largest and the flattest. Call it out:
+    # a reader finds that bar in three seconds, and silence there reads as
+    # concealment. Its own CI is what says it is not yet evidence of decay.
+    last = rows[-1]
+    ax.annotate(f"{last['season']}: {last['wins']}–{last['n']-last['wins']}, "
+                f"{last['roi']*100:+.1f}%\nlargest sample, flattest result\n"
+                f"CI [{last['lo']*100:+.0f}, {last['hi']*100:+.0f}] — wide "
+                f"enough that\nthis is not yet decay (see monitor.py)",
+                (len(rows) - 1, last["roi"] * 100),
+                textcoords="offset points", xytext=(-14, 58), ha="right",
+                fontsize=7.4, color=INK,
+                bbox=dict(boxstyle="round,pad=0.4", fc="#fdf6e3", ec=GOLD,
+                          lw=0.9, alpha=0.95),
+                arrowprops=dict(arrowstyle="->", color=GOLD, lw=1.2))
     ax.set_xticks(xs)
     ax.set_xticklabels([f"{r['season']}\nn={r['n']}" for r in rows],
                        fontsize=7.5)
     ax.set_ylabel("return per unit risked (%)")
     ax.set_title(f"Per-season ROI — {stats['pos_seasons']}/{len(rows)} "
-                 "profitable\n~23 bets/season: the bars are noise, "
-                 "the intervals are the point", loc="left")
-    ax.legend(fontsize=7.5, loc="upper right", frameon=False)
+                 f"profitable\n{stats['n_min']}–{stats['n_max']} bets/season "
+                 f"({stats['recent_share']*100:.0f}% of all bets come from "
+                 f"{stats['recent_from']}+): bars are noise, intervals are "
+                 "the point", loc="left")
+    ax.legend(fontsize=7.5, loc="lower right", frameon=False)
 
     # --- Panel 7: threshold sweep, ROI form -------------------------------
     ax = fig.add_subplot(gs[2, 2])
@@ -531,8 +552,15 @@ def main():
         sweep.append({"x": float(x), "n": nn, "roi": unit_roi(ww / nn),
                       "lo": lo_x, "hi": hi_x})
 
+    # Bet counts are heavily back-loaded (2 in the first season, 51 in the
+    # last), so "average bets per season" would misdescribe the sample.
+    recent_from = years[-1] - 3
+    recent_share = sum(r["n"] for r in rows if r["season"] >= recent_from) / n
+
     stats = {
         "threshold": args.threshold, "n": n, "wins": wins, "win": win,
+        "n_min": min(r["n"] for r in rows), "n_max": max(r["n"] for r in rows),
+        "recent_share": recent_share, "recent_from": recent_from,
         "win_lo": win_lo, "win_hi": win_hi,
         "roi": roi, "roi_lo": roi_lo, "roi_hi": roi_hi,
         "kelly": k_roi, "kelly_lo": k_lo, "kelly_hi": k_hi,
@@ -560,7 +588,23 @@ def main():
           f"{k_n}/{n} games staked)")
     print(f"  equity: terminal {equity[-1]:+,.0f} units risked, "
           f"max drawdown {stats['mdd']:,.0f}")
-    print(f"  seasons profitable: {stats['pos_seasons']}/{len(rows)}")
+    print(f"  seasons profitable: {stats['pos_seasons']}/{len(rows)}  "
+          f"({stats['n_min']}-{stats['n_max']} bets/season; "
+          f"{recent_share*100:.0f}% of bets from {recent_from}+)")
+    print("\n  per-season detail:")
+    for r in rows:
+        print(f"    {r['season']}  n={r['n']:>3}  {r['wins']:>3}-"
+              f"{r['n']-r['wins']:<3}  win={r['win']*100:6.2f}%  "
+              f"ROI={r['roi']*100:+7.2f}%  "
+              f"95% [{r['lo']*100:+7.2f}, {r['hi']*100:+7.2f}]")
+    last = rows[-1]
+    print(f"\n  NOTE: {last['season']} is the largest sample "
+          f"(n={last['n']}) and the flattest result "
+          f"({last['roi']*100:+.2f}%).")
+    print(f"  Its interval [{last['lo']*100:+.1f}, {last['hi']*100:+.1f}] "
+          f"spans both the pooled estimate and break-even, so it is not "
+          f"evidence\n  of decay on its own -- monitor/monitor.py is the "
+          f"test that measures decay directly.")
     print("\n  price sensitivity (win rate held fixed):")
     for p in PRICES:
         print(f"    {p:>5}  break-even {breakeven(p)*100:5.2f}%  "
