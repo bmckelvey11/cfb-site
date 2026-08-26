@@ -487,7 +487,6 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 load_error=None,
                 loaded_system="",
                 stale_registry=False,
-                season_filter=CORE_FILTER_META["core:season"],
                 core_filters=CORE_FILTER_META,
             )
 
@@ -530,7 +529,6 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             stale_registry=stale_registry,
             saved_systems=list_systems(app.config["DATA_DIR"]),
             result=result,
-            result_dict=asdict(result),
             bets=result.bet_details[:250],
             chart=_range_chart(result),
             cumulative_chart=_cumulative_chart(result),
@@ -538,7 +536,6 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             season_sign_consistency=sign_consistency(result.season_breakdown),
             tab=tab,
             sentences=sentences,
-            season_filter=CORE_FILTER_META["core:season"],
             core_filters=CORE_FILTER_META,
         )
 
@@ -1100,13 +1097,6 @@ def _enabled_feature_keys(feature_filters: list[dict[str, object]]) -> set[str]:
     return {str(row["key"]) for row in feature_filters if row.get("key")}
 
 
-def _active_filter(feature_filters: list[dict[str, object]], key: str) -> dict[str, object] | None:
-    for row in feature_filters:
-        if row.get("key") == key:
-            return row
-    return None
-
-
 def _form_from_system(system: SystemFilter, loaded_name: str, theory: str = "") -> dict[str, object]:
     return {
         "side": system.side,
@@ -1138,10 +1128,6 @@ def _form_from_system(system: SystemFilter, loaded_name: str, theory: str = "") 
             for filt in system.feature_filters
         ],
     }
-
-
-def _feature_filters_from_request() -> list[dict[str, object]]:
-    return _feature_filters_from_values(request.values)
 
 
 def _feature_filters_from_values(values: MultiDict) -> list[dict[str, object]]:

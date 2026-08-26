@@ -905,12 +905,6 @@ code {
   font-size: 14px;
 }
 
-.filter-modal__season-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .filter-modal__search {
   width: 100%;
   margin-bottom: 12px;
