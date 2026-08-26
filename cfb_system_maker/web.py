@@ -294,8 +294,15 @@ def aggregate_filter_value_rows(
     elif control == "numeric":
         rows.sort(key=lambda row: float(row["value"]))  # type: ignore[arg-type]
     else:
-        rows.sort(key=lambda row: str(row["description"]))
+        rows.sort(key=lambda row: _categorical_sort_key(row["value"]))
     return rows
+
+
+def _categorical_sort_key(value: object) -> tuple:
+    try:
+        return (0, float(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return (1, str(value))
 
 
 def _value_description(value: object, control: str) -> str:
@@ -1313,7 +1320,10 @@ def _range_chart(result: BacktestResult) -> dict[str, object]:
     items = sorted(buckets.items())
     if len(items) > 18:
         step = max(1, len(items) // 18)
-        items = items[::step]
+        sampled = items[::step]
+        if sampled[-1] != items[-1]:
+            sampled.append(items[-1])
+        items = sampled
 
     width = 520
     height = 150
@@ -1763,8 +1773,10 @@ def _current_matches_panel(saved_systems: list[SavedSystem], data_dir: Path) -> 
     is_fallback = bool(meta.get("is_fallback"))
     fallback_label = ""
     if is_fallback:
+        season_type = str(meta.get("season_type") or "").strip()
+        week_word = f"{season_type.title()} Week" if season_type and season_type != "regular" else "Week"
         fallback_label = (
-            f"Most recent week with data: Week {meta.get('week')}, {meta.get('season')}"
+            f"Most recent week with data: {week_word} {meta.get('week')}, {meta.get('season')}"
         )
 
     dt = _parse_kickoff(meta.get("fetched_at"))

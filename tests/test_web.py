@@ -21,7 +21,7 @@ from cfb_system_maker.storage import (
     save_upcoming_games,
     save_upcoming_meta,
 )
-from cfb_system_maker.web import _cumulative_chart, _sparkline, create_app
+from cfb_system_maker.web import _cumulative_chart, _range_chart, _sparkline, create_app
 
 
 def _bet_detail(game_id, season, week, profit, result="win"):
@@ -72,6 +72,32 @@ def _money_won_text(profit: float) -> str:
 
 def _chip_labels(metrics_html: str) -> list[str]:
     return re.findall(r"<span>(.*?)</span>", metrics_html)
+
+
+def test_range_chart_downsampling_keeps_the_last_line_bucket():
+    bets = []
+    for i in range(38):
+        line = float(i)
+        bets.append(
+            BetDetail(
+                game_id=i,
+                season=2023,
+                week=1,
+                team="Alpha",
+                opponent="Beta",
+                side="home",
+                spread=line,
+                total=None,
+                line=line,
+                result="win",
+                profit=1.0,
+            )
+        )
+    result = _result_with_bets(bets)
+
+    chart = _range_chart(result)
+
+    assert chart["points"][-1]["line"] == 37.0
 
 
 def test_cumulative_chart_empty_bet_details_returns_zero_line_only():
@@ -1592,6 +1618,29 @@ def test_current_matches_offseason_shows_notice_and_labelled_fallback_rows(tmp_p
     assert "stale-warning" in panel
     assert "Most recent week with data: Week 16, 2025" in panel
     assert "Play Georgia -7" in panel
+
+
+def test_current_matches_fallback_label_names_postseason(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson", season=2025, week=1)
+    save_upcoming_games(tmp_path, [game], _kick(9001, "2025-12-13T20:00:00+00:00"))
+    save_upcoming_meta(
+        tmp_path,
+        {
+            "fetched_at": "2025-12-13T13:14:00+00:00",
+            "season": 2025,
+            "week": 1,
+            "season_type": "postseason",
+            "is_fallback": True,
+            "row_count": 1,
+        },
+    )
+    save_features_to(upcoming_features_path(tmp_path), {})
+    save_system("home-spreads", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Most recent week with data: Postseason Week 1, 2025" in panel
 
 
 def test_current_matches_week_present_but_no_match_is_neutral_not_amber(tmp_path):
