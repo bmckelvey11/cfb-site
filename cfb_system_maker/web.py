@@ -514,6 +514,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 features_enabled=False,
                 saved_systems=[],
                 load_error=None,
+                parse_warning=False,
                 loaded_system="",
                 stale_registry=False,
                 core_filters=CORE_FILTER_META,
@@ -523,6 +524,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         stale_registry = bool(meta and meta.get("registry_version") != registry_version())
         loaded_name = request.args.get("load_system", "")
         load_error = None
+        parse_warning = False
         if loaded_name:
             try:
                 saved = load_saved_system(loaded_name, app.config["DATA_DIR"])
@@ -534,6 +536,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 system = _system_from_form(form)
                 loaded_name = ""
         else:
+            parse_warning = _has_unparseable_input(request.args)
             form = _form_values()
             system = _system_from_form(form)
 
@@ -549,6 +552,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             "index.html",
             error=None,
             load_error=load_error,
+            parse_warning=parse_warning,
             loaded_system=loaded_name,
             form=form,
             enabled_feature_keys=_enabled_feature_keys(form.get("feature_filters", [])),
@@ -753,6 +757,15 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         domain_values = [row["value"] for row in rows]
         is_numeric = descriptor["control"] == "numeric"
         chart_points = downsample_chart_points(rows) if is_numeric else []
+        # A game with two distinct values (either-perspective home != away, or
+        # a total system's team/conference filter on a cross-{team,conference}
+        # game) contributes its outcome to more than one row. Each row is a
+        # correct standalone Record/ROI, but a window SUM across rows (Max ROI)
+        # would double-count that game -- overlapping_rows tells the client to
+        # fall back to a single best bucket instead of a summed window.
+        overlapping_rows = perspective == "either" or (
+            candidate_id in ("core:team", "core:conference") and system.bet_type == "total"
+        )
         return {
             "candidate_id": candidate_id,
             "label": descriptor["label"],
@@ -762,6 +775,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             "team_scoped": team_scoped,
             "perspective": perspective,
             "allowed_perspectives": allowed,
+            "overlapping_rows": overlapping_rows,
             "domain": {
                 "values": domain_values,
                 "min": min(domain_values) if domain_values and is_numeric else None,
@@ -1016,6 +1030,34 @@ def _empty_form() -> dict[str, object]:
 
 def _valid_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
     return value if value in allowed else default
+
+
+def _has_unparseable_input(args: MultiDict) -> bool:
+    """True if any raw query value would be silently dropped by the lenient
+    HTML-path parsers (_optional_float / _int_set), e.g. a typo'd min_spread.
+
+    The /system page never 400s on bad input (it must stay usable without
+    JS/strict validation), so this only powers a visible "some values were
+    ignored" notice -- it never blocks parsing. This intentionally duplicates
+    the shape of _validate_int_list_fields_strict's per-part int() parsing
+    (different failure mode: warn here, 400 there for /api/backtest) -- do not
+    unify them into one function, or /system would start 400ing on bad input.
+    """
+    for field in ("min_spread", "max_spread", "min_total", "max_total"):
+        raw = str(args.get(field, "")).strip()
+        if raw and _optional_float(raw) is None:
+            return True
+    for field, legacy in (("filter_seasons", "season"), ("filter_weeks", "week")):
+        raw = str(args.get(field, args.get(legacy, ""))).strip()
+        for part in raw.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                int(part)
+            except ValueError:
+                return True
+    return False
 
 
 def _form_values() -> dict[str, object]:

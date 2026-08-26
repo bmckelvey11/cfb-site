@@ -233,6 +233,29 @@ def test_numeric_feature_save_clears_domain_edge_bounds_contract():
     assert "!atDomainMin || !atDomainMax" in draft_block
 
 
+def test_max_roi_uses_single_bucket_when_rows_overlap_contract():
+    """A window SUM across numeric buckets assumes each game contributes to at
+    most one bucket. Either-perspective (and total-system team/conference)
+    rows can put one game in two buckets, so Max ROI must fall back to a
+    single bucket -- never a summed window -- when the server flags
+    overlapping_rows, or it silently double-counts games."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "function bestSingleNumericBucket" in source
+
+    apply_block = source.split("function applyMaxRoi")[1].split("function ")[0]
+    assert "state.overlappingRows" in apply_block
+    assert "bestSingleNumericBucket(state.rows)" in apply_block
+    assert "bestRoiWindow(state.rows)" in apply_block
+
+    assert "state.overlappingRows = Boolean(payload.overlapping_rows);" in source
+    # Disclosed in the About panel (not statusEl -- refreshLive's setUpdating
+    # clears statusEl on every keystroke, so a transient status message here
+    # would never survive to be read).
+    assert "Max ROI picks the single best value" in source
+
+
 def test_save_serializes_seasons_contract():
     from pathlib import Path
 
@@ -329,6 +352,47 @@ def test_aggregate_filter_value_rows_team_on_total_buckets_both_sides():
         games, SystemFilter(side="home"), descriptor, feature_map={}, perspective="single"
     )
     assert {row["value"] for row in spread_rows} == {"Alpha"}
+
+
+def test_filter_detail_overlapping_rows_flag(tmp_path):
+    games = [
+        _game(1, season=2023, week=1, home_points=28, away_points=21, spread=-6.5),
+        _game(2, season=2024, week=2, home_points=14, away_points=28, spread=-3.0),
+    ]
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {
+            "1": {"home_running_win_pct": 0.5, "away_running_win_pct": 0.4},
+            "2": {"home_running_win_pct": 0.6, "away_running_win_pct": 0.3},
+        },
+    )
+    app = create_app(data_dir=tmp_path)
+
+    # either perspective (only valid on a total system): a game's home/away
+    # values can land in different rows, so a summed window would double-count it.
+    either_resp = app.test_client().get(
+        "/filter-detail?candidate_id=feature:running_win_pct&bet_type=total&perspective=either"
+    )
+    assert either_resp.status_code == 200
+    assert either_resp.get_json()["overlapping_rows"] is True
+
+    # bet_side/opponent on a spread system: no overlap, single value per game.
+    bet_side_resp = app.test_client().get(
+        "/filter-detail?candidate_id=feature:running_win_pct&perspective=bet_side"
+    )
+    assert bet_side_resp.status_code == 200
+    assert bet_side_resp.get_json()["overlapping_rows"] is False
+
+    # core:team on a total system: Alpha home / Beta away -> overlapping.
+    team_resp = app.test_client().get("/filter-detail?candidate_id=core:team&bet_type=total")
+    assert team_resp.status_code == 200
+    assert team_resp.get_json()["overlapping_rows"] is True
+
+    # core:team on a spread system: bet-side only, no overlap.
+    team_spread_resp = app.test_client().get("/filter-detail?candidate_id=core:team&bet_type=spread")
+    assert team_spread_resp.status_code == 200
+    assert team_spread_resp.get_json()["overlapping_rows"] is False
 
 
 def test_aggregate_filter_value_rows_categorical_sorted():

@@ -210,6 +210,49 @@ def test_web_malformed_choice_params_fall_back_to_defaults_instead_of_500(tmp_pa
     assert f"{expected.wins}-{expected.losses}-{expected.pushes}, {expected.hit_rate * 100:.1f}%" in metrics_html
 
 
+def test_web_unparseable_min_spread_shows_warning_banner(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/system?min_spread=not-a-number")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "couldn't be read and were ignored" in html
+    # The filter itself is still silently dropped (no_filter), matching
+    # _optional_float's existing lenient behavior -- the banner only adds
+    # visibility, it doesn't change what gets applied.
+    expected = run_backtest(games, SystemFilter(side="home"))
+    metrics_html = _metrics_section(html)
+    assert f"{expected.wins}-{expected.losses}-{expected.pushes}, {expected.hit_rate * 100:.1f}%" in metrics_html
+
+
+def test_web_valid_params_show_no_warning_banner(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/system?min_spread=3&filter_seasons=2023")
+
+    assert response.status_code == 200
+    assert "couldn't be read and were ignored" not in response.get_data(as_text=True)
+
+
+def test_web_loaded_system_never_shows_parse_warning(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    save_system("clean", SystemFilter(side="home", min_spread=-7), tmp_path)
+    app = create_app(data_dir=tmp_path)
+
+    # A trailing garbage query param alongside load_system must not trigger
+    # the banner -- loaded systems parse trusted JSON, not raw query args.
+    response = app.test_client().get("/system?load_system=clean&min_spread=not-a-number")
+
+    assert response.status_code == 200
+    assert "couldn't be read and were ignored" not in response.get_data(as_text=True)
+
+
 def test_web_margin_chip_shows_em_dash_for_total_bet_systems(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

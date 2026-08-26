@@ -566,12 +566,33 @@
     return { min: Number(sorted[bestStart].value), max: Number(sorted[bestEnd].value) };
   }
 
+  // A window SUM across numeric buckets assumes each game contributes to at
+  // most one bucket. Either-perspective rows (and a total system's team/
+  // conference rows) can put one game in two buckets, so a spanning window
+  // would double-count it. A single bucket is never double-counted, so this
+  // is the exact fallback when the server flags overlapping_rows.
+  function bestSingleNumericBucket(rows) {
+    const eligible = rows.filter(
+      (row) => Number(row.wins) + Number(row.losses) >= MAX_ROI_MIN_DECISIONS
+    );
+    const pool = eligible.length ? eligible : rows;
+    let best = pool[0];
+    pool.forEach((row) => {
+      if (Number(row.roi) > Number(best.roi)) {
+        best = row;
+      }
+    });
+    return { min: Number(best.value), max: Number(best.value) };
+  }
+
   function applyMaxRoi() {
     if (!state || !state.rows || !state.rows.length) {
       return;
     }
     if (state.kind === "numeric") {
-      const window = bestRoiWindow(state.rows);
+      const window = state.overlappingRows
+        ? bestSingleNumericBucket(state.rows)
+        : bestRoiWindow(state.rows);
       state.min = window.min;
       state.max = window.max;
       syncBoundInputs();
@@ -665,7 +686,13 @@
     group.className = "filter-modal__perspective";
     group.setAttribute("role", "group");
     group.setAttribute("aria-label", "Perspective");
-    const options = PERSPECTIVE_OPTIONS.slice();
+    // bet_side/opponent only make sense against a spread's home/away side; a
+    // total system's allowedPerspectives (from the server) omits them so the
+    // modal never offers a button that /filter-detail would 400 on.
+    const allowed = state.allowedPerspectives;
+    let options = allowed
+      ? PERSPECTIVE_OPTIONS.filter((opt) => allowed.indexOf(opt.value) !== -1)
+      : PERSPECTIVE_OPTIONS.slice();
     if (state.perspective && !options.some((opt) => opt.value === state.perspective)) {
       const label = state.perspective.charAt(0).toUpperCase() + state.perspective.slice(1);
       options.unshift({ value: state.perspective, label: label });
@@ -732,6 +759,10 @@
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
+        if (payload.allowed_perspectives) {
+          state.allowedPerspectives = payload.allowed_perspectives;
+        }
+        state.overlappingRows = Boolean(payload.overlapping_rows);
         if (state.kind === "numeric") {
           renderNumericControls();
         } else {
@@ -985,7 +1016,7 @@
     // it's translated into a larger canvas here to make room for axis ticks/labels.
     const plotW = 520;
     const plotH = 150;
-    const marginLeft = 46;
+    const marginLeft = 54;
     const marginBottom = 34;
     const marginTop = 6;
     const marginRight = 10;
@@ -1008,7 +1039,7 @@
     const zeroY = plotH - 18 - ((0 - minRoi) / roiSpan) * (plotH - 36);
 
     // Axis lines
-    svg.appendChild(svgText(marginLeft / 2 - 4, marginTop + plotH / 2, "ROI", "filter-modal__axis-title filter-modal__axis-title--y"));
+    svg.appendChild(svgText(10, marginTop + plotH / 2, "ROI", "filter-modal__axis-title filter-modal__axis-title--y"));
     const xTitle = svgText(marginLeft + plotW / 2, height - 4, titleEl.textContent || "Value", "filter-modal__axis-title");
     xTitle.setAttribute("text-anchor", "middle");
     svg.appendChild(xTitle);
@@ -1480,6 +1511,14 @@
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
+        if (payload.allowed_perspectives) {
+          state.allowedPerspectives = payload.allowed_perspectives;
+        }
+        state.overlappingRows = Boolean(payload.overlapping_rows);
+        if (state.overlappingRows) {
+          aboutEl.textContent += (aboutEl.textContent ? "\n\n" : "")
+            + "Either-perspective values can overlap per game, so Max ROI picks the single best value here instead of a range.";
+        }
         if (committed && (Number.isFinite(committed.min) || Number.isFinite(committed.max))) {
           state.min = Number.isFinite(committed.min) ? committed.min : state.domainMin;
           state.max = Number.isFinite(committed.max) ? committed.max : state.domainMax;
@@ -1613,6 +1652,10 @@
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
+        if (payload.allowed_perspectives) {
+          state.allowedPerspectives = payload.allowed_perspectives;
+        }
+        state.overlappingRows = Boolean(payload.overlapping_rows);
         renderValueTable();
         const first = controlsEl.querySelector("input, button");
         if (first) {
