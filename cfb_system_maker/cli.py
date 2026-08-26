@@ -150,6 +150,7 @@ def _graphql(args: argparse.Namespace) -> int:
             data_dir=args.data_dir,
             seasons=args.seasons,
             page_size=args.page_size,
+            tables=args.tables,
             only=set(args.only) if args.only else None,
         )
     ok = [r for r in reports if r.error is None]
@@ -475,6 +476,9 @@ def _build_parser() -> argparse.ArgumentParser:
     graphql_parser.add_argument("--data-dir", default="data")
     graphql_parser.add_argument("--season", dest="seasons", type=int, nargs="+")
     graphql_parser.add_argument("--only", nargs="+")
+    graphql_parser.add_argument("--tables", nargs="+",
+                                help="pull these root tables instead of the default list "
+                                     "(reaches tables not in GQL_DEFAULT_TABLES)")
     graphql_parser.add_argument("--page-size", type=int, default=1000)
     graphql_parser.add_argument("--game-player-stats", action="store_true",
                                 help="bespoke labeled player-game stats, one file per --season")
