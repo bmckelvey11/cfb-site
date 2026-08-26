@@ -70,8 +70,13 @@ silent error:
 | `returning_production` | 2012-2013 |
 | `adjusted_player_passing`, `adjusted_player_rushing`, `player_usage`, `ppa_players_season`, `player_success_season`, `pregame_win_prob` | 2012 |
 
-`ppa_players_games` is missing all 15 weeks of 2012 for the same reason (no file
-is written for an empty week).
+`ppa_players_games` and `player_success_game` are each missing all 15 weeks of
+2012 for the same reason (no file is written for an empty week), so their
+complete counts are 195, not 210.
+
+This matters for automation: a "wait until N files exist" gate can never be
+satisfied for a `SEASON_WEEK` endpoint with an empty season. Gate on the scrape
+process finishing, or on no new file appearing, rather than a target count.
 
 Do **not** `--force` these. Scattered gaps would be suspicious; leading runs are
 the upstream floor. Betting lines floor at 2013 independently.
