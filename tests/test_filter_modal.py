@@ -330,6 +330,24 @@ def test_filter_detail_empty_domain_is_200(tmp_path):
     assert "domain" in payload
 
 
+def test_filter_detail_week_rows_sort_numerically(tmp_path):
+    games = [
+        _game(1, season=2023, week=1),
+        _game(2, season=2023, week=2),
+        _game(3, season=2023, week=10),
+        _game(4, season=2023, week=11),
+    ]
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/filter-detail?candidate_id=core:week&side=home")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    values = [row["value"] for row in payload["rows"]]
+    assert values == [1, 2, 10, 11]
+
+
 def test_index_has_grouped_launchers_and_fallback(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

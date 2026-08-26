@@ -1458,6 +1458,7 @@
       statusEl.textContent = "";
     }
     renderChips({ wins: 0, losses: 0, pushes: 0, money_won: 0, roi: 0 });
+    emptyEl.hidden = true;
     dialog.showModal();
 
     if (control === "numeric") {

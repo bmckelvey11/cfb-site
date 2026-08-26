@@ -25,34 +25,36 @@
           </div>
         </header>
 
-        <table class="finalist-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Filters</th>
-              <th>Holdout Record</th>
-              <th>ROI</th>
-              <th>Raw p</th>
-              <th>Corrected p</th>
-              <th>BH Significant</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in finalist_rows %}
-            <tr>
-              <td>{{ row.index }}</td>
-              <td>{{ row.filters_text }}</td>
-              <td>{{ row.wins }}-{{ row.losses }}-{{ row.pushes }}</td>
-              <td>{{ "%.2f%%"|format(row.roi * 100) }}</td>
-              <td>{{ "%.4f"|format(row.raw_p) }}</td>
-              <td>{{ "%.4f"|format(row.corrected_p) }}</td>
-              <td>{{ "Yes" if row.bh_significant else "No" }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="7">No finalist survived holdout grading.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table class="finalist-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Filters</th>
+                <th>Holdout Record</th>
+                <th>ROI</th>
+                <th>Raw p</th>
+                <th>Corrected p</th>
+                <th>BH Significant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in finalist_rows %}
+              <tr>
+                <td>{{ row.index }}</td>
+                <td>{{ row.filters_text }}</td>
+                <td>{{ row.wins }}-{{ row.losses }}-{{ row.pushes }}</td>
+                <td>{{ "%.2f%%"|format(row.roi * 100) }}</td>
+                <td>{{ "%.4f"|format(row.raw_p) }}</td>
+                <td>{{ "%.4f"|format(row.corrected_p) }}</td>
+                <td>{{ "Yes" if row.bh_significant else "No" }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7">No finalist survived holdout grading.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
 
         <section class="theory-panel narration-panel" id="narration-panel" data-run-name="{{ name }}">
           <button type="button" id="narrate-trigger">Narrate results</button>
