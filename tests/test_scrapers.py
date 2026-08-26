@@ -147,6 +147,29 @@ def test_per_game_is_opt_in(tmp_path):
     assert reports[0].rows == 1
 
 
+def test_per_game_skips_permanently_failing_game(tmp_path):
+    """One game that 500s after retries must not discard the whole season."""
+    save_raw_json(tmp_path, "games", 2023, [{"id": 1}, {"id": 2}, {"id": 3}])
+
+    module = _fake_cfbd()
+    games_api = module.GamesApi(None)
+
+    def flaky(id=None):
+        if id == 2:
+            raise RuntimeError("Internal Server Error (500)")
+        return {"gameId": id, "teams": [{"team": "A"}]}
+
+    games_api.get_advanced_box_score = flaky
+    module.GamesApi = lambda client: games_api
+
+    reports = _run({"advanced_box_score"}, tmp_path, include_per_game=True, cfbd_module=module)
+
+    rows = json.loads((tmp_path / "raw" / "advanced_box_score_2023.json").read_text())
+    assert [r["gameId"] for r in rows] == [1, 3]  # game 2 skipped, others kept
+    assert reports[0].rows == 2
+    assert reports[0].error is None  # a skipped game is not an endpoint failure
+
+
 def test_per_game_id_param_alias(tmp_path):
     save_raw_json(tmp_path, "games", 2023, [{"id": 55}])
     _run({"win_probability"}, tmp_path, include_per_game=True)

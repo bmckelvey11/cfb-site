@@ -318,6 +318,7 @@ def _scrape_per_game(
     files = 0
     total = 0
     skipped = 0
+    failed_games = 0
     for season in seasons:
         if resume and _exists(data_dir, f"{endpoint.name}_{season}.json"):
             skipped += 1
@@ -328,12 +329,21 @@ def _scrape_per_game(
             continue
         rows: list[dict[str, Any]] = []
         for game_id in game_ids:
-            rows.extend(_call(func, _accepted(func, {"id": game_id, "game_id": game_id}), delay))
+            # A single game can 500 permanently upstream (retries exhausted). Skip it
+            # rather than discarding every game already collected for this season.
+            try:
+                rows.extend(_call(func, _accepted(func, {"id": game_id, "game_id": game_id}), delay))
+            except Exception:
+                failed_games += 1
         if not rows:
             continue
         save_raw(data_dir, f"{endpoint.name}_{season}.json", rows)
         files += 1
         total += len(rows)
+    if failed_games:
+        # Not an endpoint-level failure: the season still wrote. Surface it so a
+        # silent hole in per-game coverage is never mistaken for complete data.
+        print(f"  {endpoint.name}: skipped {failed_games} game(s) that failed after retries")
     return ScrapeReport(endpoint.name, endpoint.mode, files=files, rows=total, skipped=skipped)
 
 
