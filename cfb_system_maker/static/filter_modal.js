@@ -956,14 +956,14 @@
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 520 150");
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "Money by value");
+    svg.setAttribute("aria-label", "ROI by value");
     svg.classList.add("filter-modal__chart");
 
-    const moneys = points.map((point) => Number(point.money));
-    const minMoney = Math.min(0, ...moneys);
-    const maxMoney = Math.max(0, ...moneys);
-    const span = maxMoney - minMoney || 1;
-    const zeroY = 150 - 18 - ((0 - minMoney) / span) * (150 - 36);
+    const rois = points.map((point) => Number(point.roi));
+    const minRoi = Math.min(0, ...rois);
+    const maxRoi = Math.max(0, ...rois);
+    const span = maxRoi - minRoi || 1;
+    const zeroY = 150 - 18 - ((0 - minRoi) / span) * (150 - 36);
 
     const zero = document.createElementNS("http://www.w3.org/2000/svg", "line");
     zero.setAttribute("x1", "28");
@@ -980,9 +980,9 @@
       circle.setAttribute("cx", String(x));
       circle.setAttribute("cy", String(y));
       circle.setAttribute("r", "3.5");
-      circle.setAttribute("class", Number(point.money) >= 0 ? "positive" : "negative");
+      circle.setAttribute("class", Number(point.roi) >= 0 ? "positive" : "negative");
       const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-      title.textContent = String(point.value) + ": " + formatRowMoney(point.money);
+      title.textContent = String(point.value) + ": " + formatRowRoi(point.roi) + " ROI (" + formatRowMoney(point.money) + ")";
       circle.appendChild(title);
       svg.appendChild(circle);
     });

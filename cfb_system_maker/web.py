@@ -316,17 +316,27 @@ def downsample_chart_points(
     *,
     cap: int = _CHART_POINTS_CAP,
 ) -> list[dict[str, object]]:
-    """Deterministic visual downsample of exact numeric rows (D-09). Domain bounds stay on rows."""
+    """Deterministic visual downsample of exact numeric rows (D-09). Domain bounds stay on rows.
+
+    Scatter of value (x) vs ROI (y) so a value-ROI correlation is visible at a glance.
+    """
     if not rows:
         return []
-    items = [(float(row["value"]), float(row["money"])) for row in rows]  # type: ignore[arg-type]
+    items = [
+        (float(row["value"]), float(row["roi"]), float(row["money"]))  # type: ignore[arg-type]
+        for row in rows
+    ]
     if len(items) > cap:
         step = max(1, len(items) // cap)
         items = items[::step]
         if len(items) > cap:
             items = items[:cap]
         # Always keep the last observed extreme when stride skips it
-        last = (float(rows[-1]["value"]), float(rows[-1]["money"]))  # type: ignore[arg-type]
+        last = (
+            float(rows[-1]["value"]),  # type: ignore[arg-type]
+            float(rows[-1]["roi"]),  # type: ignore[arg-type]
+            float(rows[-1]["money"]),  # type: ignore[arg-type]
+        )
         if items[-1][0] != last[0]:
             if len(items) >= cap:
                 items[-1] = last
@@ -337,18 +347,23 @@ def downsample_chart_points(
     height = 150
     pad_x = 28
     pad_y = 18
-    values = [money for _, money in items] + [0.0]
-    min_money = min(values)
-    max_money = max(values)
-    span = max_money - min_money or 1.0
+    values = [value for value, _, _ in items]
+    min_value = min(values)
+    max_value = max(values)
+    value_span = max_value - min_value or 1.0
+    rois = [roi for _, roi, _ in items] + [0.0]
+    min_roi = min(rois)
+    max_roi = max(rois)
+    roi_span = max_roi - min_roi or 1.0
 
     points: list[dict[str, object]] = []
-    for index, (value, money) in enumerate(items):
-        x = pad_x if len(items) == 1 else pad_x + (width - pad_x * 2) * index / (len(items) - 1)
-        y = height - pad_y - ((money - min_money) / span) * (height - pad_y * 2)
+    for value, roi, money in items:
+        x = pad_x + (width - pad_x * 2) * (value - min_value) / value_span
+        y = height - pad_y - ((roi - min_roi) / roi_span) * (height - pad_y * 2)
         points.append(
             {
                 "value": value,
+                "roi": roi,
                 "money": money,
                 "x": round(x, 2),
                 "y": round(y, 2),
