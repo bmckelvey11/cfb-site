@@ -842,7 +842,10 @@ def edit_metadata_for_sentence(
 def _allowed_perspectives_for_system(system: SystemFilter) -> list[str]:
     # Modal primary set is Bet-side / Opponent / Either (D-14 / UI-SPEC).
     # home/away remain valid for committed edits and progressive-enhancement fallbacks.
-    return ["bet_side", "opponent", "either", "home", "away"]
+    # bet_side/opponent require a spread's home/away side; totals have no team side, only Either.
+    if system.bet_type == "spread":
+        return ["bet_side", "opponent", "home", "away"]
+    return ["either", "home", "away"]
 
 
 def _feature_coverage(

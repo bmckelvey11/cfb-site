@@ -595,6 +595,41 @@ def test_default_perspective_spread_bet_side_total_either():
     assert default_perspective(SystemFilter(bet_type="total")) == "either"
 
 
+def test_allowed_perspectives_excludes_bet_side_opponent_for_totals():
+    from cfb_system_maker.web import _allowed_perspectives_for_system
+
+    spread_allowed = _allowed_perspectives_for_system(SystemFilter(bet_type="spread"))
+    assert "bet_side" in spread_allowed
+    assert "opponent" in spread_allowed
+
+    total_allowed = _allowed_perspectives_for_system(SystemFilter(bet_type="total"))
+    assert "bet_side" not in total_allowed
+    assert "opponent" not in total_allowed
+    assert "either" in total_allowed
+
+
+def test_filter_detail_rejects_bet_side_perspective_for_total_system(tmp_path):
+    games = [
+        _game(1, season=2023, week=1, home_points=28, away_points=21, spread=-6.5),
+        _game(2, season=2024, week=2, home_points=14, away_points=28, spread=-3.0),
+    ]
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {
+            "1": {"home_running_win_pct": 0.5, "away_running_win_pct": 0.4},
+            "2": {"home_running_win_pct": 0.6, "away_running_win_pct": 0.3},
+        },
+    )
+    app = create_app(data_dir=tmp_path)
+    response = app.test_client().get(
+        "/filter-detail?candidate_id=feature:running_win_pct&bet_type=total&perspective=bet_side"
+    )
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "invalid_perspective"
+
+
 def test_edit_metadata_for_core_and_feature_sentences():
     from cfb_system_maker.web import edit_metadata_for_sentence
 
