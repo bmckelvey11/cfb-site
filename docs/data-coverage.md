@@ -113,9 +113,20 @@ a partially-played season interacts with the no-lookahead rule in `running_stats
 season finishes. Resume is per-season, so interrupting mid-season discards that
 season's calls.
 
-Budget from the measured `_call` path, not from `--delay` alone: a bare API call
-is ~0.16s, but `_call` adds the 1s sleep plus per-call overhead, measuring
-**~1.5s/call** in practice. FBS-only is ~805-935 calls per season, so roughly
-**20 min per season per endpoint**, and `win_probability` + `advanced_box_score`
-over 2012-2025 (11,556 games each) is **~4.9h**, not the ~3.2h a naive
-`calls x delay` estimate gives.
+Budget from the measured `_call` path, not from `--delay` alone. Three estimates,
+each measured a different way, and only the last is trustworthy:
+
+| Method | Per call | 2 endpoints x 11,556 games |
+|---|---|---|
+| `calls x --delay` (naive) | 1.0s | ~3.2h |
+| bare API call, warm connection | 0.16s + 1s sleep | ~3.7h |
+| `_call` sampled across a full season | **~2.3s** | **~7.5h** |
+
+The naive estimate is roughly 2x optimistic. A bare call benchmarked at the front
+of a season reuses one warm HTTP connection and hits the smallest payloads;
+sampling across the whole season (games 0/200/400/600/800) gives ~2.3s/call, so
+**~30 min per season per endpoint**. Note that measuring while a scrape is
+already running inflates both, since the probes share the rate limiter.
+
+Practical consequence: `advanced_box_score` alone is ~3.7h for 2012-2025, and the
+runner finishes all 14 of its seasons before `win_probability` starts.
