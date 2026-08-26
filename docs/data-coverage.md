@@ -89,13 +89,17 @@ rather than aborting the season (see `_scrape_per_game`). Expect per-game
 coverage to be a game or two short of the seed count in some seasons; the count
 is printed at the end of the run.
 
-**Network failures are not retried.** `_call` retries 429 and 5xx only. A DNS
-resolution failure surfaces as `MaxRetryError` / `NameResolutionError` and is
-re-raised immediately, discarding the in-progress season. This cost the
-`win_probability` 2025 season on 2026-08-26 — a transient blip mid-run, with the
-host resolving fine minutes later. A long PER_GAME run is exposed to this for
-hours at a time; if it recurs often, `_call` should treat connection and
-resolution errors as retryable alongside 5xx.
+Measured skip rate: `advanced_box_score` 2012 wrote **790 of 805** seeded games
+(15 permanently failing), while 2013 and 2020 wrote every game. Before the skip
+was added, that one dead game meant 2012 produced **nothing at all**.
+
+**Network failures are retried** (as of `fe4832b`). `_call` originally matched
+only `"429"` and 5xx codes in `str(exc)`, so a DNS blip raised immediately and
+discarded the in-progress season — this cost `win_probability` 2025 on
+2026-08-26, with the host resolving normally minutes later. Network errors are
+now matched by *type* (`urllib3.exceptions.HTTPError`, the common base for
+`MaxRetryError` / `NameResolutionError` / `ProtocolError` / timeouts) and get a
+longer 15/30s backoff than HTTP's 5/10/20s.
 
 `win_probability` is worth calling out separately: it returns **zero rows for
 every 2012 and 2013 game**, so those seasons write no file. Because PER_GAME
