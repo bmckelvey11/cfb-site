@@ -405,7 +405,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
 
         tab = "examples" if request.args.get("tab") == "examples" else "mine"
         try:
-            games = load_processed_games(app.config["DATA_DIR"])
+            games, feature_map = _load_data_cached(app.config["DATA_DIR"])
         except FileNotFoundError:
             return render_template(
                 "dashboard.html",
@@ -416,7 +416,6 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 systems=[],
             )
 
-        feature_map = _try_load_features(app.config["DATA_DIR"])
         seasons = sorted({game.season for game in games}, reverse=True)
         timeframe = _normalize_timeframe(request.args.get("timeframe", ""), seasons)
 
@@ -457,7 +456,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     @app.get("/system")
     def index():
         try:
-            games = load_processed_games(app.config["DATA_DIR"])
+            games, feature_map = _load_data_cached(app.config["DATA_DIR"])
         except FileNotFoundError:
             return render_template(
                 "index.html",
@@ -474,7 +473,6 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 core_filters=CORE_FILTER_META,
             )
 
-        feature_map = _try_load_features(app.config["DATA_DIR"])
         meta = load_features_meta(app.config["DATA_DIR"]) if feature_map is not None else None
         stale_registry = bool(meta and meta.get("registry_version") != registry_version())
         loaded_name = request.args.get("load_system", "")
@@ -493,7 +491,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             form = _form_values()
             system = _system_from_form(form)
 
-        result = run_backtest(games, system, feature_map=feature_map)
+        result = _cached_backtest(system, games, feature_map, app.config["DATA_DIR"])
         coverage = _feature_coverage(games, system, feature_map)
         tab = "matches" if request.args.get("tab") == "matches" else "graph"
         base_query = _query_args_from_form(form) if loaded_name else MultiDict(request.args.items(multi=True))
@@ -509,7 +507,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             form=form,
             enabled_feature_keys=_enabled_feature_keys(form.get("feature_filters", [])),
             options=_options_from_games(games),
-            feature_options=_feature_options(feature_map),
+            feature_options=_feature_options_cached(feature_map, app.config["DATA_DIR"]),
             features_enabled=feature_map is not None,
             stale_registry=stale_registry,
             saved_systems=list_systems(app.config["DATA_DIR"]),
@@ -541,7 +539,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     @app.get("/compare")
     def compare():
         try:
-            games = load_processed_games(app.config["DATA_DIR"])
+            games, feature_map = _load_data_cached(app.config["DATA_DIR"])
         except FileNotFoundError:
             return render_template(
                 "compare.html",
@@ -554,7 +552,6 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 holdout_seasons=set(),
             )
 
-        feature_map = _try_load_features(app.config["DATA_DIR"])
         selected = request.args.getlist("system")
         holdout_seasons = _int_set(",".join(request.args.getlist("holdout_season")))
         available_seasons = {game.season for game in games}
@@ -566,8 +563,8 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 continue
             if holdout_seasons:
                 in_sample, holdout = split_holdout(system, holdout_seasons, available_seasons)
-                in_result = run_backtest(games, in_sample, feature_map=feature_map)
-                holdout_result = run_backtest(games, holdout, feature_map=feature_map)
+                in_result = _cached_backtest(in_sample, games, feature_map, app.config["DATA_DIR"])
+                holdout_result = _cached_backtest(holdout, games, feature_map, app.config["DATA_DIR"])
                 rows.append({
                     "name": f"{name} (in-sample)",
                     "system": in_sample,
@@ -581,7 +578,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                     "sign_consistency": sign_consistency(holdout_result.season_breakdown),
                 })
             else:
-                result = run_backtest(games, system, feature_map=feature_map)
+                result = _cached_backtest(system, games, feature_map, app.config["DATA_DIR"])
                 rows.append({
                     "name": name,
                     "system": system,
@@ -663,10 +660,9 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         except StrictParseError as exc:
             return {"error": exc.error, "message": exc.message}, 400
         try:
-            games = load_processed_games(app.config["DATA_DIR"])
+            games, feature_map = _load_data_cached(app.config["DATA_DIR"])
         except FileNotFoundError:
             return {"error": "missing_data", "message": "Processed games file not found."}, 503
-        feature_map = _try_load_features(app.config["DATA_DIR"])
         return run_backtest_summary(games, system, feature_map=feature_map)
 
     @app.get("/filter-detail")
@@ -682,7 +678,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         except StrictParseError as exc:
             return {"error": exc.error, "message": exc.message}, 400
         try:
-            games = load_processed_games(app.config["DATA_DIR"])
+            games, feature_map = _load_data_cached(app.config["DATA_DIR"])
         except FileNotFoundError:
             return {"error": "missing_data", "message": "Processed games file not found."}, 503
 
@@ -699,7 +695,6 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             allowed = ["single"]
             perspective = "single"
 
-        feature_map = _try_load_features(app.config["DATA_DIR"])
         base_system = remove_candidate_filters(system, candidate_id)
         rows = aggregate_filter_value_rows(
             games,
@@ -1393,6 +1388,34 @@ _EDITOR_PARAMS = frozenset({
 })
 
 _FIGURE_CACHE: dict[tuple, BacktestResult] = {}
+_DATA_CACHE: dict[tuple, tuple[list[GameRecord], dict[int, dict] | None]] = {}
+_FEATURE_OPTIONS_CACHE: dict[tuple, list] = {}
+
+
+def _load_data_cached(data_dir: Path) -> tuple[list[GameRecord], dict[int, dict] | None]:
+    """Games + feature sidecar, memoized on file identity. FileNotFoundError
+    still propagates so the missing_data branches keep working."""
+    key = _data_fingerprint(data_dir)
+    hit = _DATA_CACHE.get(key)
+    if hit is None:
+        games = load_processed_games(data_dir)
+        features = _try_load_features(data_dir)
+        _DATA_CACHE.clear()
+        _FEATURE_OPTIONS_CACHE.clear()
+        _DATA_CACHE[key] = (games, features)
+        return games, features
+    return hit
+
+
+def _feature_options_cached(feature_map: dict[int, dict] | None, data_dir: Path) -> list:
+    if feature_map is None:
+        return []
+    key = _data_fingerprint(data_dir)
+    hit = _FEATURE_OPTIONS_CACHE.get(key)
+    if hit is None:
+        hit = _feature_options(feature_map)
+        _FEATURE_OPTIONS_CACHE[key] = hit
+    return hit
 
 
 def _wants_editor(args: MultiDict) -> bool:
@@ -1459,6 +1482,9 @@ def _cached_backtest(
     key = (_system_key(system), _data_fingerprint(data_dir))
     cached = _FIGURE_CACHE.get(key)
     if cached is None:
+        stale = [k for k in _FIGURE_CACHE if k[1] != key[1]]
+        for k in stale:
+            del _FIGURE_CACHE[k]
         cached = run_backtest(games, system, feature_map=feature_map)
         _FIGURE_CACHE[key] = cached
     return cached
