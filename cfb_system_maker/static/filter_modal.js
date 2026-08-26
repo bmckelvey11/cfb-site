@@ -44,6 +44,7 @@
   let liveGeneration = 0;
   let liveAbort = null;
   let liveTimer = null;
+  let detailGeneration = 0;
   const LIVE_DEBOUNCE_MS = 250;
 
   const PERSPECTIVE_OPTIONS = [
@@ -692,6 +693,7 @@
     if (state.perspective && state.perspective !== "single") {
       detailParams.set("perspective", state.perspective);
     }
+    const generation = ++detailGeneration;
     fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
       .then((response) => {
         if (!response.ok) {
@@ -700,6 +702,9 @@
         return response.json();
       })
       .then((payload) => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         if (payload.description) {
           aboutEl.textContent = payload.description;
           if (payload.lookahead_warning) {
@@ -726,6 +731,9 @@
         refreshLive();
       })
       .catch(() => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         statusEl.textContent = "Couldn’t load filter values.";
         saveBtn.disabled = true;
       });
@@ -1277,6 +1285,7 @@
   function discardAndClose() {
     abortLiveFetch();
     liveGeneration += 1;
+    detailGeneration += 1;
     liveOk = false;
     state = null;
     setViewToggleVisible(false);
@@ -1349,6 +1358,7 @@
     if (state.perspective && state.perspective !== "single") {
       detailParams.set("perspective", state.perspective);
     }
+    const generation = ++detailGeneration;
     fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
       .then((response) => {
         if (!response.ok) {
@@ -1357,6 +1367,9 @@
         return response.json();
       })
       .then((payload) => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         if (payload.lookahead_warning) {
           const warning = typeof payload.lookahead_warning === "string"
             ? payload.lookahead_warning
@@ -1389,6 +1402,9 @@
         refreshLive();
       })
       .catch(() => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         statusEl.textContent = "Couldn’t load filter values.";
         const empty = document.createElement("p");
         empty.className = "filter-modal__hint";
@@ -1414,6 +1430,7 @@
     lastSummary = null;
     liveOk = false;
     liveGeneration += 1;
+    detailGeneration += 1;
     controlsEl.innerHTML = "";
     if (exploreEl) {
       exploreEl.innerHTML = "";
@@ -1478,6 +1495,7 @@
     if (state.kind === "feature" && state.perspective && state.perspective !== "single") {
       detailParams.set("perspective", state.perspective);
     }
+    const generation = ++detailGeneration;
     fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
       .then((response) => {
         if (!response.ok) {
@@ -1486,6 +1504,9 @@
         return response.json();
       })
       .then((payload) => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         if (payload.lookahead_warning) {
           const warning = typeof payload.lookahead_warning === "string"
             ? payload.lookahead_warning
@@ -1506,6 +1527,9 @@
         refreshLive();
       })
       .catch(() => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         statusEl.textContent = "Couldn’t load filter values.";
         const empty = document.createElement("p");
         empty.className = "filter-modal__hint";
