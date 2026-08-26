@@ -179,6 +179,8 @@ def load_saved_system(name: str, data_dir: str | Path) -> SavedSystem:
     name = _safe_system_name(name)
     path = Path(data_dir) / "systems" / f"{name}.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("system payload must be a JSON object")
     return SavedSystem(
         name=str(payload.get("name", name)),
         saved_at=str(payload.get("saved_at", "")),
@@ -259,6 +261,8 @@ def _system_to_dict(saved: SavedSystem) -> dict[str, Any]:
 
 
 def _system_from_dict(payload: dict[str, Any]) -> SystemFilter:
+    if not isinstance(payload, dict):
+        raise ValueError("system payload must be a JSON object")
     system = payload.get("system", payload)
     feature_filters = tuple(
         FeatureFilter(

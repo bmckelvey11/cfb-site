@@ -940,7 +940,7 @@ def _query_href_removing(key: str, base: MultiDict) -> str:
 def _try_load_features(data_dir: Path) -> dict[int, dict] | None:
     try:
         return load_features(data_dir)
-    except FileNotFoundError:
+    except (FileNotFoundError, OSError, ValueError, KeyError, json.JSONDecodeError):
         return None
 
 
