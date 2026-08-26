@@ -5,7 +5,7 @@ import math
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
@@ -403,6 +403,17 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     app = Flask(__name__)
     app.config["DATA_DIR"] = Path(data_dir)
     app.jinja_env.globals["query_href"] = _query_href
+
+    @app.before_request
+    def _reject_cross_origin_posts():
+        if request.method != "POST":
+            return None
+        origin = request.headers.get("Origin")
+        if not origin:
+            return None
+        if urlparse(origin).netloc != request.host:
+            abort(403)
+        return None
 
     @app.get("/")
     def dashboard():

@@ -376,6 +376,38 @@ def test_web_graceful_without_features_json(tmp_path):
     assert "No saved systems yet" in html
 
 
+def test_cross_origin_post_is_rejected(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    response = client.post(
+        "/save",
+        data={"save_name": "x", "bet_type": "spread", "side": "home", "total_side": "over"},
+        headers={"Origin": "http://evil.example"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_same_origin_and_no_origin_posts_still_work(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    no_origin = client.post("/copy-example", data={"name": "nope"})
+    assert no_origin.status_code == 302
+
+    same_origin = client.post(
+        "/copy-example",
+        data={"name": "nope"},
+        headers={"Origin": "http://localhost"},
+    )
+    assert same_origin.status_code == 302
+
+
 def test_failed_save_preserves_form_and_reports_error(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
