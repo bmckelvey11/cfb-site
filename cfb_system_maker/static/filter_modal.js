@@ -773,6 +773,12 @@
     search.addEventListener("input", () => {
       state.search = search.value;
       renderValueTable();
+      const next = controlsEl.querySelector(".filter-modal__search");
+      if (next) {
+        next.focus();
+        const end = next.value.length;
+        next.setSelectionRange(end, end);
+      }
     });
     controlsEl.appendChild(search);
 
@@ -901,16 +907,16 @@
     const minNumber = controlsEl.querySelector('[data-role="min-number"]');
     const maxNumber = controlsEl.querySelector('[data-role="max-number"]');
     const hint = controlsEl.querySelector('[data-role="bound-hint"]');
-    if (minRange) {
+    if (minRange && source !== "minRange") {
       minRange.value = String(state.min);
     }
-    if (maxRange) {
+    if (maxRange && source !== "maxRange") {
       maxRange.value = String(state.max);
     }
-    if (minNumber) {
+    if (minNumber && source !== "minNumber") {
       minNumber.value = String(state.min);
     }
-    if (maxNumber) {
+    if (maxNumber && source !== "maxNumber") {
       maxNumber.value = String(state.max);
     }
     const valid = boundsAreValid();
@@ -1147,12 +1153,14 @@
     maxNumber.value = String(state.max);
     maxNumber.setAttribute("aria-label", "Maximum");
     minNumber.addEventListener("input", () => {
-      state.min = Number(minNumber.value);
+      const parsed = minNumber.value.trim() === "" ? NaN : Number(minNumber.value);
+      state.min = parsed;
       syncBoundInputs("minNumber");
       refreshLive();
     });
     maxNumber.addEventListener("input", () => {
-      state.max = Number(maxNumber.value);
+      const parsed = maxNumber.value.trim() === "" ? NaN : Number(maxNumber.value);
+      state.max = parsed;
       syncBoundInputs("maxNumber");
       refreshLive();
     });
