@@ -106,6 +106,8 @@ ENDPOINTS: list[Endpoint] = [
     Endpoint("stat_categories", "StatsApi", "get_categories", ONCE),
     Endpoint("game_havoc_stats", "StatsApi", "get_game_havoc_stats", SEASON),
     Endpoint("player_season_stats", "StatsApi", "get_player_season_stats", SEASON),
+    Endpoint("player_success_season", "StatsApi", "get_player_season_success_rates", SEASON),
+    Endpoint("player_success_game", "StatsApi", "get_player_game_success_rates", SEASON_WEEK),  # requires week or team
     Endpoint("team_stats", "StatsApi", "get_team_stats", SEASON),
     # Teams
     Endpoint("fbs_teams", "TeamsApi", "get_fbs_teams", SEASON),

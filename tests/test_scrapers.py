@@ -97,8 +97,8 @@ def _run(only, tmp_path, **kwargs):
 
 def test_registry_is_complete_and_unique():
     names = [e.name for e in ENDPOINTS]
-    assert len(names) == 61
-    assert len(set(names)) == 61
+    assert len(names) == 63
+    assert len(set(names)) == 63
 
 
 def test_once_writes_single_file(tmp_path):
