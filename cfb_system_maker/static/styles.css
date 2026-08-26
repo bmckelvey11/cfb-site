@@ -1033,12 +1033,30 @@ code {
 .filter-modal__chart {
   display: block;
   width: 100%;
-  height: 150px;
+  height: 190px;
 }
 
 .filter-modal__chart .zero-line {
   stroke: var(--border);
   stroke-width: 1;
+}
+
+.filter-modal__chart .filter-modal__axis-tick {
+  font-size: 9px;
+  fill: var(--muted);
+}
+
+.filter-modal__chart .filter-modal__axis-title {
+  font-size: 10px;
+  font-weight: 600;
+  fill: var(--muted);
+}
+
+.filter-modal__chart .filter-modal__axis-title--y {
+  text-anchor: middle;
+  transform: rotate(-90deg);
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .filter-modal__chart circle.positive {

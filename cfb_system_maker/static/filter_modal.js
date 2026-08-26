@@ -940,6 +940,25 @@
     fill.style.width = Math.max(0, Math.min(100, right - left)) + "%";
   }
 
+  function svgText(x, y, text, className) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    el.setAttribute("x", String(x));
+    el.setAttribute("y", String(y));
+    if (className) {
+      el.setAttribute("class", className);
+    }
+    el.textContent = text;
+    return el;
+  }
+
+  function formatAxisValue(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return "";
+    }
+    return Number.isInteger(num) ? String(num) : num.toFixed(1);
+  }
+
   function renderMoneyChart() {
     if (!exploreEl || !state) {
       return;
@@ -953,25 +972,63 @@
       exploreEl.appendChild(empty);
       return;
     }
+    // Plot area is the original 520x150/28,18-padded box the server laid points out in;
+    // it's translated into a larger canvas here to make room for axis ticks/labels.
+    const plotW = 520;
+    const plotH = 150;
+    const marginLeft = 46;
+    const marginBottom = 34;
+    const marginTop = 6;
+    const marginRight = 10;
+    const width = plotW + marginLeft + marginRight;
+    const height = plotH + marginTop + marginBottom;
+
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 520 150");
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "ROI by value");
+    svg.setAttribute("aria-label", (titleEl.textContent || "Value") + " vs ROI scatter plot");
     svg.classList.add("filter-modal__chart");
 
+    const values = points.map((point) => Number(point.value));
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
     const rois = points.map((point) => Number(point.roi));
     const minRoi = Math.min(0, ...rois);
     const maxRoi = Math.max(0, ...rois);
-    const span = maxRoi - minRoi || 1;
-    const zeroY = 150 - 18 - ((0 - minRoi) / span) * (150 - 36);
+    const roiSpan = maxRoi - minRoi || 1;
+    const zeroY = plotH - 18 - ((0 - minRoi) / roiSpan) * (plotH - 36);
+
+    // Axis lines
+    svg.appendChild(svgText(marginLeft / 2 - 4, marginTop + plotH / 2, "ROI", "filter-modal__axis-title filter-modal__axis-title--y"));
+    const xTitle = svgText(marginLeft + plotW / 2, height - 4, titleEl.textContent || "Value", "filter-modal__axis-title");
+    xTitle.setAttribute("text-anchor", "middle");
+    svg.appendChild(xTitle);
+
+    [minRoi, (minRoi + maxRoi) / 2, maxRoi].forEach((roiValue) => {
+      const y = marginTop + plotH - 18 - ((roiValue - minRoi) / roiSpan) * (plotH - 36);
+      const tick = svgText(marginLeft - 6, y + 3, formatRowRoi(roiValue), "filter-modal__axis-tick");
+      tick.setAttribute("text-anchor", "end");
+      svg.appendChild(tick);
+    });
+
+    [minValue, (minValue + maxValue) / 2, maxValue].forEach((tickValue) => {
+      const valueSpan = maxValue - minValue || 1;
+      const x = marginLeft + 28 + (plotW - 28 * 2) * (tickValue - minValue) / valueSpan;
+      const tick = svgText(x, marginTop + plotH + 14, formatAxisValue(tickValue), "filter-modal__axis-tick");
+      tick.setAttribute("text-anchor", "middle");
+      svg.appendChild(tick);
+    });
+
+    const plot = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    plot.setAttribute("transform", "translate(" + marginLeft + "," + marginTop + ")");
 
     const zero = document.createElementNS("http://www.w3.org/2000/svg", "line");
     zero.setAttribute("x1", "28");
-    zero.setAttribute("x2", "492");
+    zero.setAttribute("x2", String(plotW - 28));
     zero.setAttribute("y1", String(zeroY));
     zero.setAttribute("y2", String(zeroY));
     zero.setAttribute("class", "zero-line");
-    svg.appendChild(zero);
+    plot.appendChild(zero);
 
     points.forEach((point) => {
       const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -984,8 +1041,9 @@
       const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
       title.textContent = String(point.value) + ": " + formatRowRoi(point.roi) + " ROI (" + formatRowMoney(point.money) + ")";
       circle.appendChild(title);
-      svg.appendChild(circle);
+      plot.appendChild(circle);
     });
+    svg.appendChild(plot);
     exploreEl.appendChild(svg);
   }
 
