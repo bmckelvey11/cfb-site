@@ -279,6 +279,12 @@
 
           <label class="theory-field full-width">Theory<textarea name="theory" placeholder="Add the theory behind your system.">{{ form.theory }}</textarea></label>
 
+          {% if request.args.get('save_error') == 'missing_name' %}
+          <p class="save-error">Enter a name to save this system.</p>
+          {% elif request.args.get('save_error') == 'invalid_name' %}
+          <p class="save-error">That name can't be used — letters, numbers, dashes and underscores only.</p>
+          {% endif %}
+
           <div class="form-actions">
             <button type="submit">Run System</button>
             <label class="save-inline">Save as

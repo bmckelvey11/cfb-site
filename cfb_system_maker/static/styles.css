@@ -603,6 +603,12 @@ code {
   font-size: 0.85rem;
 }
 
+.save-error {
+  color: var(--loss);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0;
+}
+
 .coverage {
   font-size: 0.85rem;
   margin: 12px 0;

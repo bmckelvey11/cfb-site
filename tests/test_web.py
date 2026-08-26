@@ -350,6 +350,23 @@ def test_web_graceful_without_features_json(tmp_path):
     assert "No saved systems yet" in html
 
 
+def test_failed_save_preserves_form_and_reports_error(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    response = client.post(
+        "/save",
+        data={"bet_type": "total", "total_side": "under", "min_total": "55", "save_name": ""},
+    )
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert "min_total=55" in location
+    assert "save_error=" in location
+
+
 def test_web_save_and_load_system(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
@@ -979,7 +996,9 @@ def test_save_without_name_redirects_to_editor_not_dashboard(tmp_path):
     response = app.test_client().post("/save", data={"save_name": "  "})
 
     assert response.status_code == 302
-    assert response.headers["Location"].rstrip("?") == "/system"
+    location = response.headers["Location"]
+    assert location.startswith("/system?")
+    assert "save_error=missing_name" in location
 
 
 def test_dashboard_lists_saved_system_with_record_money_and_roi(tmp_path):
