@@ -34,4 +34,12 @@ and scoping conversation on 2026-08-26.
 
 ## Traceability
 
-*(filled by roadmap)*
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| MERGE-01 | Phase 6 | Pending |
+| MERGE-02 | Phase 6 | Pending |
+| FIX-01 | Phase 7 | Pending |
+| FIX-02 | Phase 7 | Pending |
+| FIX-03 | Phase 7 | Pending |
+| DATA-01 | Phase 8 | Pending |
+| DATA-02 | Phase 9 | Pending |
