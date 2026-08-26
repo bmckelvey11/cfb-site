@@ -562,6 +562,16 @@ def test_count_overfit_filters_follows_d06_counting_rule():
     assert count_overfit_filters(replace(system, fade=True)) == 10
 
 
+def test_count_overfit_filters_excludes_home_away_flags():
+    # home/away only ever narrow matches_system when paired with the matching
+    # `side`, which already implies the same restriction on its own -- the
+    # flag adds no selection information and must not depress the grade.
+    base = SystemFilter(favorite=True)
+    assert count_overfit_filters(base) == 1
+    assert count_overfit_filters(replace(base, home=True, side="home")) == 1
+    assert count_overfit_filters(replace(base, away=True, side="away")) == 1
+
+
 def _grade_stats(**overrides):
     defaults = dict(
         break_even_rate=0.524,

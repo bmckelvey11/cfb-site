@@ -206,7 +206,11 @@ def _overfit_score(active_filter_value_count: int) -> float:
 
 def count_overfit_filters(system: SystemFilter) -> int:
     count = 0
-    for flag in (system.favorite, system.underdog, system.home, system.away):
+    # home/away are excluded: they only ever narrow matches_system when paired
+    # with the matching `side`, and side alone already implies home-only or
+    # away-only for a spread bet -- so the flag carries no extra selection
+    # information and shouldn't count against the sample-narrowing score.
+    for flag in (system.favorite, system.underdog):
         if flag:
             count += 1
     for bound in (system.min_spread, system.max_spread, system.min_total, system.max_total):
@@ -422,7 +426,11 @@ def compute_system_stats(
     edge = round(hit_rate - break_even_rate, 4)
     wilson_low, wilson_high = _wilson_interval(hit_rate, decided)
     z_score, p_value = _hit_rate_z_test(hit_rate, decided, break_even_rate)
-    returns = [bet.profit / stake for bet in details if bet.result in {"win", "loss"}]
+    # roi = profit / (bets * stake) is the mean return over ALL bets (a push
+    # contributes 0), so the matched standard error must be over all bets too
+    # -- not decided-only, which would test a different quantity than the
+    # displayed ROI.
+    returns = [bet.profit / stake for bet in details]
     roi_std_error, roi_t_stat = _roi_stats(returns, roi)
     max_win_streak, max_loss_streak = _streaks(sorted(details, key=lambda bet: (bet.season, bet.week, bet.game_id)))
     permutation_p_value = _permutation_p_value(details, american_odds=american_odds, stake=stake, iterations=iterations, seed=seed)
