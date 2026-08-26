@@ -124,8 +124,9 @@ CORE_FILTER_META: dict[str, dict[str, str]] = {
         "label": "Spread Range",
         "control": "numeric",
         "description": (
-            "Restrict bets to a home-spread range (min/max). Spread is always the home spread; "
-            "negative means home favored."
+            "Restrict bets to a spread range (min/max) on the side you're betting. "
+            "Negative means that side is favored. For an away bet this is the home "
+            "spread negated, not the raw home-spread number."
         ),
         "param": "min_spread,max_spread",
     },
