@@ -1290,7 +1290,7 @@
     });
   }
 
-  function discardAndClose() {
+  function cleanupAfterClose() {
     abortLiveFetch();
     liveGeneration += 1;
     detailGeneration += 1;
@@ -1304,11 +1304,21 @@
     if (statusEl) {
       statusEl.textContent = "";
     }
-    dialog.close();
     if (launcher) {
       launcher.focus();
     }
   }
+
+  function discardAndClose() {
+    dialog.close();
+    cleanupAfterClose();
+  }
+
+  dialog.addEventListener("close", () => {
+    if (state) {
+      cleanupAfterClose();
+    }
+  });
 
   function saveAndSubmit() {
     if (!liveOk || !state) {
@@ -1327,6 +1337,7 @@
     } else if (state.kind === "numeric") {
       writeNumericToForm();
     }
+    state = null;
     dialog.close();
     if (filtersForm.requestSubmit) {
       filtersForm.requestSubmit();
@@ -1550,6 +1561,13 @@
   document.querySelectorAll("[data-candidate-id]").forEach((button) => {
     button.addEventListener("click", () => openCandidate(button));
   });
+
+  const modalForm = document.getElementById("filter-modal-form");
+  if (modalForm) {
+    modalForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+    });
+  }
 
   cancelBtn.addEventListener("click", discardAndClose);
   closeBtn.addEventListener("click", discardAndClose);
