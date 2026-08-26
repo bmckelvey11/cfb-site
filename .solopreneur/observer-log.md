@@ -111,3 +111,44 @@
 **Choice**: [User dismissed — do not proceed, wait for next instruction]
 **Alternatives**: /solopreneur:sprint, visualize-org.py, /solopreneur:standup, /solopreneur:build
 ---
+
+## [2026-08-11 15:42:29] - The bulk data is already complete (2012-2025). What's left are the opt-in fan-out endpoints, which cost one API call per game/player at ~1s delay. How far do you want to go?
+**Choice**: ['Per-game, FBS only (Recommended)']
+**Alternatives**: Per-game, FBS only (Recommended), Per-game, all divisions, Per-player season overview, Nothing more — bulk is enough
+---
+
+## [2026-08-11 16:02:47] - Which tool receives this prompt?
+**Choice**: Both, sequenced
+**Alternatives**: Claude Code (this repo), Claude chat (research)
+**Context**: Prompt 1: research/hypothesis list. Prompt 2: Claude Code backtest harness that tests that list against your data.
+---
+
+## [2026-08-11 16:02:47] - What should the output be?
+**Choice**: Ranked angle list + stats
+**Alternatives**: Working backtest run, New registry features
+**Context**: Table of candidate filters (weather, pace, defense tier, rest, conference, line movement) with expected direction and required feature availability.
+---
+
+## [2026-08-26 10:43:16] - Neither GSD entry point fits a hand-written plan file outside .planning/: gsd-execute-phase needs a phase directory (none exists — last milestone archived), and gsd-quick would discard my 14-task plan and have gsd-planner regenerate a thinner 1-3 task version from scratch. How should Sonnet execute the 14 tasks?
+**Choice**: superpowers:executing-plans (recommended)
+**Alternatives**: superpowers:subagent-driven-development, gsd-quick anyway, accept re-planning, Bootstrap a GSD phase from this plan
+**Context**: The plan's own header names this as the intended path. Executes the plan file task-by-task inline as written (no re-planning, no worktrees), with review checkpoints between tasks. Preserves every code snippet and test I already wrote.
+---
+
+## [2026-08-26 10:43:53] - Repo is on master with a clean tree. The skill requires explicit consent before implementing directly on master/main. Proceed on master, or create a branch first?
+**Choice**: Branch (recommended)
+**Alternatives**: Master directly
+**Context**: Create e.g. fix/web-app-review-2026-08-26 off master. 14 commits land there; you review/merge when done. Matches your CLAUDE.md auto-commit rule without touching master until you say so.
+---
+
+## [2026-08-26 12:18:47] - Found a pre-existing bug (not caused by Tasks 1-7, confirmed present as of Task 6's commit): opening the Spread Range or Total Range numeric modal leaves "Save Filter" permanently disabled and status stuck on "Updating…" — the dual-slider mount fires several rapid /api/backtest calls, and a debounce-generation race discards the winning response. This blocks me from cleanly verifying Task 7's "Save Filter still works" step and will also block later plan tasks that touch numeric ranges (Task 10's chart fix, for one). How do you want to handle it?
+**Choice**: Fix it now, unplanned (recommended)
+**Alternatives**: Note it, keep going, Stop and let me look first
+**Context**: I diagnose and fix the generation-race in refreshLive/renderNumericControls as an extra task, write a regression test, commit it separately from the 14 planned tasks so the diff stays traceable. Blocks nothing downstream.
+---
+
+## [2026-08-26 13:15:13] - Implementation complete: 13 fix/perf/a11y/security/chore commits on fix/web-app-review-2026-08-26, 423 tests passing, branch already pushed to origin throughout. Note: 3 unrelated docs: commits (touching only docs/data-coverage.md) also landed on this branch — presumably from a background scraper session sharing this checkout, not from this task. What next?
+**Choice**: Push and open a Pull Request (recommended)
+**Alternatives**: Merge to master locally, Keep branch as-is
+**Context**: Branch is already pushed — opens a GitHub PR for review before it touches master. Keeps the branch alive for any follow-up. Since the branch mixes my work with 3 foreign docs commits, a PR makes that visible for review rather than merging silently.
+---

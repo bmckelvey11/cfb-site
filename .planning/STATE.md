@@ -143,6 +143,7 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 | 2026-07-20 | filter-group-taxonomy | Split the `pregame` feature group into Matchup / Ratings / Betting Lines / Weather (restored user work quarantined during phase 03) | complete |
 | 2026-07-20 | fix-normalize-select-line-total-drop-fal | `normalize._select_line` picked one line per game; total (over/under) is now backfilled from the first sibling provider that has it when the selected line's total is null — fixes ~93-97% total-null rate in 2013-2016 seasons | complete |
 | 2026-08-26 | total-filter-semantics-fixes | Filter audit findings 1-3: team/conference filters on totals match either side; bet_side/opponent perspectives rejected/normalized on totals; modal Save clears feature bounds at domain edges so full-domain ≠ null-exclusion | complete |
+| 2026-08-26 | register-player-success-rate-endpoints | Registered `player_success_season` and `player_success_game` CFBD endpoints in scraper registry, bringing coverage from 61 to 63 entries | complete |
 
 ## Deferred Items
 
