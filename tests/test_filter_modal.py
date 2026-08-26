@@ -118,6 +118,52 @@ def test_api_backtest_unknown_feature_key_is_400(tmp_path):
     assert "message" in payload
 
 
+def test_api_backtest_rejects_bet_side_perspective_for_total_system(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    for perspective in ("bet_side", "opponent"):
+        response = app.test_client().get(
+            "/api/backtest?bet_type=total&total_side=over"
+            "&ff_enable=running_win_pct&ff_key=running_win_pct"
+            f"&ff_op=gte&ff_value=0.8&ff_perspective={perspective}"
+        )
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "invalid_perspective"
+
+    # Spread systems still accept bet_side.
+    response = app.test_client().get(
+        "/api/backtest?bet_type=spread&side=home"
+        "&ff_enable=running_win_pct&ff_key=running_win_pct"
+        "&ff_op=gte&ff_value=0.8&ff_perspective=bet_side"
+    )
+    assert response.status_code == 200
+
+
+def test_form_parse_normalizes_bet_side_to_either_on_totals():
+    from werkzeug.datastructures import MultiDict
+
+    from cfb_system_maker.web import _form_values_from_args, _system_from_form
+
+    args = MultiDict([
+        ("bet_type", "total"),
+        ("total_side", "over"),
+        ("ff_enable", "running_win_pct"),
+        ("ff_key", "running_win_pct"),
+        ("ff_op", "gte"),
+        ("ff_value", "0.8"),
+        ("ff_perspective", "bet_side"),
+    ])
+    system = _system_from_form(_form_values_from_args(args))
+    assert system.feature_filters[0].perspective == "either"
+
+    args_spread = MultiDict([("bet_type", "spread"), ("side", "home")] + [
+        item for item in args.items(multi=True) if item[0].startswith("ff_")
+    ])
+    system_spread = _system_from_form(_form_values_from_args(args_spread))
+    assert system_spread.feature_filters[0].perspective == "bet_side"
+
+
 def test_api_backtest_missing_data_is_503(tmp_path):
     app = create_app(data_dir=tmp_path)
     response = app.test_client().get("/api/backtest?side=home")

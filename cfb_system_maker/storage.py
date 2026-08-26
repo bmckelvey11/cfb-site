@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from cfb_system_maker.features import effective_perspective
 from cfb_system_maker.models import FeatureFilter, GameRecord, SavedSystem, SearchRun, SearchRunFinalist, SystemFilter
 
 _SYSTEM_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -264,17 +265,20 @@ def _system_from_dict(payload: dict[str, Any]) -> SystemFilter:
     if not isinstance(payload, dict):
         raise ValueError("system payload must be a JSON object")
     system = payload.get("system", payload)
+    bet_type = str(system.get("bet_type", "spread"))
     feature_filters = tuple(
         FeatureFilter(
             key=str(row["key"]),
             op=str(row["op"]),
             value=row["value"],
-            perspective=str(row.get("perspective", "single")),
+            # Legacy saves can carry bet_side/opponent on total systems, which
+            # used to misresolve to the vestigial side field — normalize on load.
+            perspective=effective_perspective(bet_type, str(row.get("perspective", "single"))),
         )
         for row in system.get("feature_filters", [])
     )
     return SystemFilter(
-        bet_type=str(system.get("bet_type", "spread")),
+        bet_type=bet_type,
         side=str(system.get("side", "home")),
         total_side=str(system.get("total_side", "over")),
         seasons=set(system.get("seasons", [])),
@@ -322,8 +326,9 @@ def _finalist_system_to_dict(system: SystemFilter) -> dict[str, Any]:
 
 
 def _finalist_system_from_dict(payload: dict[str, Any]) -> SystemFilter:
+    bet_type = payload.get("bet_type", "spread")
     return SystemFilter(
-        bet_type=payload.get("bet_type", "spread"),
+        bet_type=bet_type,
         side=payload.get("side", "home"),
         total_side=payload.get("total_side", "over"),
         seasons=set(payload.get("seasons", [])),
@@ -341,7 +346,12 @@ def _finalist_system_from_dict(payload: dict[str, Any]) -> SystemFilter:
         min_total=payload.get("min_total"),
         max_total=payload.get("max_total"),
         feature_filters=tuple(
-            FeatureFilter(key=f["key"], op=f["op"], value=f["value"], perspective=f.get("perspective", "single"))
+            FeatureFilter(
+                key=f["key"],
+                op=f["op"],
+                value=f["value"],
+                perspective=effective_perspective(bet_type, f.get("perspective", "single")),
+            )
             for f in payload.get("feature_filters", [])
         ),
     )

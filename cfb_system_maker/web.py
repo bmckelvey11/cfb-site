@@ -30,6 +30,7 @@ from cfb_system_maker.features import (
     FEATURE_BY_KEY,
     FEATURE_REGISTRY,
     FeatureDef,
+    effective_perspective,
     registry_version,
     resolve_feature_value,
 )
@@ -1051,6 +1052,7 @@ def _validate_feature_filters_strict(values: MultiDict) -> None:
     ops = values.getlist("ff_op")
     raw_values = values.getlist("ff_value")
     perspectives = values.getlist("ff_perspective")
+    bet_type = values.get("bet_type", "spread")
     for index, key in enumerate(keys):
         if not key or key not in enabled:
             continue
@@ -1064,6 +1066,13 @@ def _validate_feature_filters_strict(values: MultiDict) -> None:
         perspective = perspectives[index] if index < len(perspectives) else "single"
         if perspective not in _ALLOWED_PERSPECTIVES:
             raise StrictParseError("invalid_perspective", f"Illegal perspective: {perspective}")
+        if bet_type == "total" and perspective in {"bet_side", "opponent"}:
+            # Same rule /filter-detail enforces (a1e6e19): a total bet has no
+            # team side for these perspectives to resolve against.
+            raise StrictParseError(
+                "invalid_perspective",
+                f"Perspective {perspective} is not valid for total systems",
+            )
         raw_value = raw_values[index] if index < len(raw_values) else ""
         if op in {"gte", "lte"}:
             _parse_finite_float(raw_value, field=f"ff_value[{key}]")
@@ -1207,12 +1216,13 @@ def _parse_filter_value(op: str, raw_value: str) -> object | None:
 
 
 def _system_from_form(form: dict[str, object]) -> SystemFilter:
+    bet_type = str(form["bet_type"])
     feature_filters = tuple(
         FeatureFilter(
             key=str(row["key"]),
             op=str(row["op"]),
             value=row["value"],
-            perspective=str(row.get("perspective", "single")),
+            perspective=effective_perspective(bet_type, str(row.get("perspective", "single"))),
         )
         for row in form.get("feature_filters", [])
         if row.get("key")
