@@ -111,4 +111,11 @@ a partially-played season interacts with the no-lookahead rule in `running_stats
 
 `PER_GAME` endpoints write one file per season, only *after* every game in that
 season finishes. Resume is per-season, so interrupting mid-season discards that
-season's calls. Budget accordingly: FBS-only is ~850 calls (~15 min) per season.
+season's calls.
+
+Budget from the measured `_call` path, not from `--delay` alone: a bare API call
+is ~0.16s, but `_call` adds the 1s sleep plus per-call overhead, measuring
+**~1.5s/call** in practice. FBS-only is ~805-935 calls per season, so roughly
+**20 min per season per endpoint**, and `win_probability` + `advanced_box_score`
+over 2012-2025 (11,556 games each) is **~4.9h**, not the ~3.2h a naive
+`calls x delay` estimate gives.
