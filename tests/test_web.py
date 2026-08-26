@@ -220,6 +220,26 @@ def test_compare_tolerates_malformed_holdout(tmp_path):
     assert response.status_code == 200
 
 
+def test_processed_data_is_cached_across_requests(tmp_path, monkeypatch):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    calls = {"n": 0}
+    real = web.load_processed_games
+
+    def counting(data_dir):
+        calls["n"] += 1
+        return real(data_dir)
+
+    monkeypatch.setattr(web, "load_processed_games", counting)
+    web._DATA_CACHE.clear()
+    client.get("/system")
+    client.get("/system")
+    assert calls["n"] == 1
+
+
 def test_corrupt_features_sidecar_does_not_500(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
