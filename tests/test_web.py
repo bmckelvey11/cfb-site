@@ -308,6 +308,42 @@ def test_web_save_and_load_system(tmp_path):
     assert 'name="min_spread" value="3' in html
 
 
+def test_form_from_system_joins_multi_value_sets():
+    from cfb_system_maker.web import _form_from_system
+
+    system = SystemFilter(
+        bet_type="spread", side="home", total_side="over",
+        seasons={2023, 2022}, weeks=set(), teams={"Auburn", "Alabama"},
+        conferences=set(), favorite=False, underdog=False, home=False,
+        away=False, fade=False, providers=set(),
+        min_spread=None, max_spread=None, min_total=None, max_total=None,
+        feature_filters=(),
+    )
+    form = _form_from_system(system, "multi", "")
+    assert form["season"] == "2022,2023"
+    assert form["team"] == "Alabama,Auburn"
+
+
+def test_loading_multi_season_system_renders_joined_value(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    system = SystemFilter(
+        bet_type="spread", side="home", total_side="over",
+        seasons={2022, 2023}, weeks=set(), teams=set(),
+        conferences=set(), favorite=False, underdog=False, home=False,
+        away=False, fade=False, providers=set(),
+        min_spread=None, max_spread=None, min_total=None, max_total=None,
+        feature_filters=(),
+    )
+    save_system("multi", system, tmp_path)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    response = client.get("/system?load_system=multi")
+    html = response.get_data(as_text=True)
+    assert 'value="2022,2023" selected' in html
+
+
 def test_web_save_rejects_path_traversal_name_without_writing_outside_data_dir(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
