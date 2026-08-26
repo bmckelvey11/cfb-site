@@ -1246,10 +1246,10 @@
       const minEl = filtersForm.querySelector('[name="' + fields.min + '"]');
       const maxEl = filtersForm.querySelector('[name="' + fields.max + '"]');
       if (minEl) {
-        minEl.value = String(state.min);
+        minEl.value = (state.domainMin != null && Number(state.min) <= Number(state.domainMin)) ? "" : String(state.min);
       }
       if (maxEl) {
-        maxEl.value = String(state.max);
+        maxEl.value = (state.domainMax != null && Number(state.max) >= Number(state.domainMax)) ? "" : String(state.max);
       }
       return;
     }
@@ -1374,10 +1374,9 @@
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
-        if (committed && committed.min != null && committed.max != null
-            && Number.isFinite(committed.min) && Number.isFinite(committed.max)) {
-          state.min = committed.min;
-          state.max = committed.max;
+        if (committed && (Number.isFinite(committed.min) || Number.isFinite(committed.max))) {
+          state.min = Number.isFinite(committed.min) ? committed.min : state.domainMin;
+          state.max = Number.isFinite(committed.max) ? committed.max : state.domainMax;
         } else if (state.domainMin != null && state.domainMax != null) {
           state.min = state.domainMin;
           state.max = state.domainMax;
