@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
+    {% from "_macros.html" import money %}
     <div class="dash-shell">
       <header class="dash-header">
         <div class="brand">
@@ -81,7 +82,7 @@
                       </td>
                       <td>{{ row.type_label }}</td>
                       <td>{{ fig.wins }}-{{ fig.losses }}-{{ fig.pushes }}, {{ "%.1f%%"|format(fig.hit_rate * 100) }}</td>
-                      <td class="{{ 'positive' if fig.profit > 0 else 'negative' if fig.profit < 0 else '' }}">{% if fig.profit > 0 %}+${{ "{:,.0f}".format(fig.profit * 100) }}{% elif fig.profit < 0 %}-${{ "{:,.0f}".format(-fig.profit * 100) }}{% else %}$0{% endif %}</td>
+                      <td class="{{ 'positive' if fig.profit > 0 else 'negative' if fig.profit < 0 else '' }}">{{ money(fig.profit) }}</td>
                       <td class="{{ 'positive' if fig.roi > 0 else 'negative' if fig.roi < 0 else '' }}">{{ "%.2f%%"|format(fig.roi * 100) }}</td>
                       <td class="trend-cell">{% if row.sparkline.empty %}<span class="trend-empty">&mdash;</span>{% else %}<svg class="sparkline" viewBox="0 0 96 24" width="96" height="24" preserveAspectRatio="none" role="img" aria-label="{{ row.sparkline.label }}"><polyline class="{{ row.sparkline.sign_class }}" points="{{ row.sparkline.polyline }}" /></svg>{% endif %}</td>
                     </tr>

@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
+    {% from "_macros.html" import money %}
     <main class="app-shell">
       <aside class="filter-panel" aria-label="System filters">
         <div class="brand">
@@ -76,26 +77,31 @@
                 <select name="filter_seasons" id="filter-seasons">
                   <option value="">All Seasons</option>
                   {% for season in options.seasons %}<option value="{{ season }}" {% if form.season == season|string %}selected{% endif %}>{{ season }}</option>{% endfor %}
+                  {% if form.season and form.season not in options.seasons|map('string')|list %}<option value="{{ form.season }}" selected>{{ form.season }}</option>{% endif %}
                 </select>
                 {% elif candidate_id == "core:week" %}
                 <select name="filter_weeks" id="filter-weeks">
                   <option value="">All Weeks</option>
                   {% for week in options.weeks %}<option value="{{ week }}" {% if form.week == week|string %}selected{% endif %}>{{ week }}</option>{% endfor %}
+                  {% if form.week and form.week not in options.weeks|map('string')|list %}<option value="{{ form.week }}" selected>{{ form.week }}</option>{% endif %}
                 </select>
                 {% elif candidate_id == "core:team" %}
                 <select name="filter_teams" id="filter-teams">
                   <option value="">All Teams</option>
                   {% for team in options.teams %}<option value="{{ team }}" {% if form.team == team %}selected{% endif %}>{{ team }}</option>{% endfor %}
+                  {% if form.team and form.team not in options.teams %}<option value="{{ form.team }}" selected>{{ form.team }}</option>{% endif %}
                 </select>
                 {% elif candidate_id == "core:conference" %}
                 <select name="filter_conferences" id="filter-conferences">
                   <option value="">All Conferences</option>
                   {% for conference in options.conferences %}<option value="{{ conference }}" {% if form.conference == conference %}selected{% endif %}>{{ conference }}</option>{% endfor %}
+                  {% if form.conference and form.conference not in options.conferences %}<option value="{{ form.conference }}" selected>{{ form.conference }}</option>{% endif %}
                 </select>
                 {% else %}
                 <select name="filter_providers" id="filter-providers">
                   <option value="">All Providers</option>
                   {% for provider in options.providers %}<option value="{{ provider }}" {% if form.provider == provider %}selected{% endif %}>{{ provider }}</option>{% endfor %}
+                  {% if form.provider and form.provider not in options.providers %}<option value="{{ form.provider }}" selected>{{ form.provider }}</option>{% endif %}
                 </select>
                 {% endif %}
               </label>
@@ -274,6 +280,12 @@
 
           <label class="theory-field full-width">Theory<textarea name="theory" placeholder="Add the theory behind your system.">{{ form.theory }}</textarea></label>
 
+          {% if request.args.get('save_error') == 'missing_name' %}
+          <p class="save-error">Enter a name to save this system.</p>
+          {% elif request.args.get('save_error') == 'invalid_name' %}
+          <p class="save-error">That name can't be used — letters, numbers, dashes and underscores only.</p>
+          {% endif %}
+
           <div class="form-actions">
             <button type="submit">Run System</button>
             <label class="save-inline">Save as
@@ -288,7 +300,7 @@
           {% if load_error %}<p class="load-error">{{ load_error }}</p>{% endif %}
           {% if loaded_system %}<p class="loaded-system">Loaded: <strong>{{ loaded_system }}</strong></p>{% endif %}
           {% if saved_systems %}
-          <select class="load-system-select" onchange="if (this.value) window.location.href = '?load_system=' + encodeURIComponent(this.value);">
+          <select class="load-system-select" aria-label="Load saved system" onchange="if (this.value) window.location.href = '?load_system=' + encodeURIComponent(this.value);">
             <option value="" {% if not loaded_system %}selected{% endif %}>Choose a saved system&hellip;</option>
             {% for name in saved_systems %}
               <option value="{{ name }}" {% if loaded_system == name %}selected{% endif %}>{{ name }}</option>
@@ -319,7 +331,7 @@
           <section class="metrics stat-chips" aria-label="Backtest metrics">
             <article><span>Record</span><strong>{{ result.wins }}-{{ result.losses }}-{{ result.pushes }}, {{ "%.1f"|format(result.hit_rate * 100) }}%</strong></article>
             <article><span>Margin</span><strong class="{{ 'positive' if result.average_margin and result.average_margin > 0 else 'negative' if result.average_margin and result.average_margin < 0 else '' }}">{% if result.average_margin is not none %}{{ "%.1f"|format(result.average_margin) }}{% else %}&mdash;{% endif %}</strong></article>
-            <article><span>Money Won</span><strong class="{{ 'positive' if result.profit > 0 else 'negative' if result.profit < 0 else '' }}">{% if result.profit > 0 %}+${{ "{:,.0f}".format(result.profit * 100) }}{% elif result.profit < 0 %}-${{ "{:,.0f}".format(-result.profit * 100) }}{% else %}$0{% endif %}</strong></article>
+            <article><span>Money Won</span><strong class="{{ 'positive' if result.profit > 0 else 'negative' if result.profit < 0 else '' }}">{{ money(result.profit) }}</strong></article>
             <article><span>ROI</span><strong class="{{ 'positive' if result.roi > 0 else 'negative' if result.roi < 0 else '' }}">{{ "%.2f%%"|format(result.roi * 100) }}</strong></article>
             <article><span>Grade</span><strong>{% if result.grade %}{{ result.grade }}{% else %}&mdash;{% endif %}</strong></article>
           </section>
@@ -349,8 +361,6 @@
                     data-team-scoped="{{ '1' if row.edit.team_scoped else '0' }}"
                     {% if row.edit.lookahead_warning %}data-lookahead-warning="{{ row.edit.lookahead_warning }}"{% endif %}
                     {% if row.edit.perspective is defined and row.edit.perspective %}data-perspective="{{ row.edit.perspective }}"{% endif %}
-                    {% if row.edit.min is defined and row.edit.min is not none %}data-min="{{ row.edit.min }}"{% endif %}
-                    {% if row.edit.max is defined and row.edit.max is not none %}data-max="{{ row.edit.max }}"{% endif %}
                     aria-haspopup="dialog"
                     aria-label="Edit filter: {{ row.text }}"
                   >Edit</button>
@@ -534,14 +544,6 @@
       </form>
     </dialog>
 
-    <script>
-      window.addEventListener("pageshow", () => {
-        document.querySelectorAll("[data-initial]").forEach((input) => {
-          input.value = input.dataset.initial || "";
-          input.addEventListener("focus", () => input.removeAttribute("readonly"), { once: true });
-        });
-      });
-    </script>
     <script src="{{ url_for('static', filename='filter_modal.js') }}" defer></script>
   </body>
 </html>

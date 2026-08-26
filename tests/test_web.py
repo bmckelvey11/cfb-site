@@ -21,7 +21,7 @@ from cfb_system_maker.storage import (
     save_upcoming_games,
     save_upcoming_meta,
 )
-from cfb_system_maker.web import _cumulative_chart, _sparkline, create_app
+from cfb_system_maker.web import _cumulative_chart, _range_chart, _sparkline, create_app
 
 
 def _bet_detail(game_id, season, week, profit, result="win"):
@@ -72,6 +72,32 @@ def _money_won_text(profit: float) -> str:
 
 def _chip_labels(metrics_html: str) -> list[str]:
     return re.findall(r"<span>(.*?)</span>", metrics_html)
+
+
+def test_range_chart_downsampling_keeps_the_last_line_bucket():
+    bets = []
+    for i in range(38):
+        line = float(i)
+        bets.append(
+            BetDetail(
+                game_id=i,
+                season=2023,
+                week=1,
+                team="Alpha",
+                opponent="Beta",
+                side="home",
+                spread=line,
+                total=None,
+                line=line,
+                result="win",
+                profit=1.0,
+            )
+        )
+    result = _result_with_bets(bets)
+
+    chart = _range_chart(result)
+
+    assert chart["points"][-1]["line"] == 37.0
 
 
 def test_cumulative_chart_empty_bet_details_returns_zero_line_only():
@@ -196,6 +222,75 @@ def test_web_margin_chip_shows_em_dash_for_total_bet_systems(tmp_path):
     assert '<article><span>Margin</span><strong class="">&mdash;</strong></article>' in metrics_html
 
 
+def test_editor_tolerates_malformed_numeric_params(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    assert client.get("/system?min_spread=abc").status_code == 200
+    assert client.get("/system?min_spread=nan").status_code == 200
+    assert client.get("/system?filter_seasons=abc,2023").status_code == 200
+    assert client.get(
+        "/system?ff_enable=weather_temperature&ff_key=weather_temperature&ff_op=gte&ff_value=abc"
+    ).status_code == 200
+
+
+def test_compare_tolerates_malformed_holdout(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/compare?holdout_season=abc")
+
+    assert response.status_code == 200
+
+
+def test_processed_data_is_cached_across_requests(tmp_path, monkeypatch):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    calls = {"n": 0}
+    real = web.load_processed_games
+
+    def counting(data_dir):
+        calls["n"] += 1
+        return real(data_dir)
+
+    monkeypatch.setattr(web, "load_processed_games", counting)
+    web._DATA_CACHE.clear()
+    client.get("/system")
+    client.get("/system")
+    assert calls["n"] == 1
+
+
+def test_corrupt_features_sidecar_does_not_500(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    (tmp_path / "processed" / "features.json").write_text("{not json", encoding="utf-8")
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/system")
+
+    assert response.status_code == 200
+    assert 'name="min_spread"' in response.get_data(as_text=True)
+
+
+def test_non_dict_system_file_does_not_crash_dashboard(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    systems_dir = tmp_path / "systems"
+    systems_dir.mkdir()
+    (systems_dir / "weird.json").write_text("[]", encoding="utf-8")
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+
+
 def test_web_money_won_chip_renders_unsigned_zero_for_no_matched_bets(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
@@ -281,6 +376,55 @@ def test_web_graceful_without_features_json(tmp_path):
     assert "No saved systems yet" in html
 
 
+def test_cross_origin_post_is_rejected(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    response = client.post(
+        "/save",
+        data={"save_name": "x", "bet_type": "spread", "side": "home", "total_side": "over"},
+        headers={"Origin": "http://evil.example"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_same_origin_and_no_origin_posts_still_work(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    no_origin = client.post("/copy-example", data={"name": "nope"})
+    assert no_origin.status_code == 302
+
+    same_origin = client.post(
+        "/copy-example",
+        data={"name": "nope"},
+        headers={"Origin": "http://localhost"},
+    )
+    assert same_origin.status_code == 302
+
+
+def test_failed_save_preserves_form_and_reports_error(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    response = client.post(
+        "/save",
+        data={"bet_type": "total", "total_side": "under", "min_total": "55", "save_name": ""},
+    )
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert "min_total=55" in location
+    assert "save_error=" in location
+
+
 def test_web_save_and_load_system(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
@@ -306,6 +450,42 @@ def test_web_save_and_load_system(tmp_path):
     assert "away-dogs" in html
     assert 'name="underdog" checked' in html
     assert 'name="min_spread" value="3' in html
+
+
+def test_form_from_system_joins_multi_value_sets():
+    from cfb_system_maker.web import _form_from_system
+
+    system = SystemFilter(
+        bet_type="spread", side="home", total_side="over",
+        seasons={2023, 2022}, weeks=set(), teams={"Auburn", "Alabama"},
+        conferences=set(), favorite=False, underdog=False, home=False,
+        away=False, fade=False, providers=set(),
+        min_spread=None, max_spread=None, min_total=None, max_total=None,
+        feature_filters=(),
+    )
+    form = _form_from_system(system, "multi", "")
+    assert form["season"] == "2022,2023"
+    assert form["team"] == "Alabama,Auburn"
+
+
+def test_loading_multi_season_system_renders_joined_value(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    system = SystemFilter(
+        bet_type="spread", side="home", total_side="over",
+        seasons={2022, 2023}, weeks=set(), teams=set(),
+        conferences=set(), favorite=False, underdog=False, home=False,
+        away=False, fade=False, providers=set(),
+        min_spread=None, max_spread=None, min_total=None, max_total=None,
+        feature_filters=(),
+    )
+    save_system("multi", system, tmp_path)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    response = client.get("/system?load_system=multi")
+    html = response.get_data(as_text=True)
+    assert 'value="2022,2023" selected' in html
 
 
 def test_web_save_rejects_path_traversal_name_without_writing_outside_data_dir(tmp_path):
@@ -874,7 +1054,9 @@ def test_save_without_name_redirects_to_editor_not_dashboard(tmp_path):
     response = app.test_client().post("/save", data={"save_name": "  "})
 
     assert response.status_code == 302
-    assert response.headers["Location"].rstrip("?") == "/system"
+    location = response.headers["Location"]
+    assert location.startswith("/system?")
+    assert "save_error=missing_name" in location
 
 
 def test_dashboard_lists_saved_system_with_record_money_and_roi(tmp_path):
@@ -1468,6 +1650,29 @@ def test_current_matches_offseason_shows_notice_and_labelled_fallback_rows(tmp_p
     assert "stale-warning" in panel
     assert "Most recent week with data: Week 16, 2025" in panel
     assert "Play Georgia -7" in panel
+
+
+def test_current_matches_fallback_label_names_postseason(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson", season=2025, week=1)
+    save_upcoming_games(tmp_path, [game], _kick(9001, "2025-12-13T20:00:00+00:00"))
+    save_upcoming_meta(
+        tmp_path,
+        {
+            "fetched_at": "2025-12-13T13:14:00+00:00",
+            "season": 2025,
+            "week": 1,
+            "season_type": "postseason",
+            "is_fallback": True,
+            "row_count": 1,
+        },
+    )
+    save_features_to(upcoming_features_path(tmp_path), {})
+    save_system("home-spreads", SystemFilter(bet_type="spread", side="home"), tmp_path)
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Most recent week with data: Postseason Week 1, 2025" in panel
 
 
 def test_current_matches_week_present_but_no_match_is_neutral_not_amber(tmp_path):

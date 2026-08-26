@@ -593,6 +593,10 @@ code {
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .metrics.stat-chips {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
 }
 
 .stale-warning {
@@ -601,6 +605,26 @@ code {
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 0.85rem;
+}
+
+.feature-group.lookahead {
+  border: 1px solid #b45309;
+  background: rgba(180, 83, 9, 0.05);
+}
+
+.feature-group.lookahead > legend .lookahead-warning {
+  color: #b45309;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 0.5rem;
+}
+
+.save-error {
+  color: var(--loss);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0;
 }
 
 .coverage {
@@ -879,12 +903,6 @@ code {
   margin: 16px 0 0;
   color: var(--muted);
   font-size: 14px;
-}
-
-.filter-modal__season-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .filter-modal__search {

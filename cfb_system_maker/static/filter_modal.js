@@ -44,6 +44,7 @@
   let liveGeneration = 0;
   let liveAbort = null;
   let liveTimer = null;
+  let detailGeneration = 0;
   const LIVE_DEBOUNCE_MS = 250;
 
   const PERSPECTIVE_OPTIONS = [
@@ -692,6 +693,7 @@
     if (state.perspective && state.perspective !== "single") {
       detailParams.set("perspective", state.perspective);
     }
+    const generation = ++detailGeneration;
     fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
       .then((response) => {
         if (!response.ok) {
@@ -700,6 +702,9 @@
         return response.json();
       })
       .then((payload) => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         if (payload.description) {
           aboutEl.textContent = payload.description;
           if (payload.lookahead_warning) {
@@ -726,6 +731,9 @@
         refreshLive();
       })
       .catch(() => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         statusEl.textContent = "Couldn’t load filter values.";
         saveBtn.disabled = true;
       });
@@ -765,6 +773,12 @@
     search.addEventListener("input", () => {
       state.search = search.value;
       renderValueTable();
+      const next = controlsEl.querySelector(".filter-modal__search");
+      if (next) {
+        next.focus();
+        const end = next.value.length;
+        next.setSelectionRange(end, end);
+      }
     });
     controlsEl.appendChild(search);
 
@@ -827,6 +841,7 @@
       if (inputType === "radio") {
         input.name = "filter-modal-bool";
       }
+      input.setAttribute("aria-label", String(row.description));
       input.checked = isSelected(row.value);
       input.addEventListener("change", () => {
         toggleSelected(row.value, input.checked);
@@ -893,16 +908,16 @@
     const minNumber = controlsEl.querySelector('[data-role="min-number"]');
     const maxNumber = controlsEl.querySelector('[data-role="max-number"]');
     const hint = controlsEl.querySelector('[data-role="bound-hint"]');
-    if (minRange) {
+    if (minRange && source !== "minRange") {
       minRange.value = String(state.min);
     }
-    if (maxRange) {
+    if (maxRange && source !== "maxRange") {
       maxRange.value = String(state.max);
     }
-    if (minNumber) {
+    if (minNumber && source !== "minNumber") {
       minNumber.value = String(state.min);
     }
-    if (maxNumber) {
+    if (maxNumber && source !== "maxNumber") {
       maxNumber.value = String(state.max);
     }
     const valid = boundsAreValid();
@@ -1139,12 +1154,14 @@
     maxNumber.value = String(state.max);
     maxNumber.setAttribute("aria-label", "Maximum");
     minNumber.addEventListener("input", () => {
-      state.min = Number(minNumber.value);
+      const parsed = minNumber.value.trim() === "" ? NaN : Number(minNumber.value);
+      state.min = parsed;
       syncBoundInputs("minNumber");
       refreshLive();
     });
     maxNumber.addEventListener("input", () => {
-      state.max = Number(maxNumber.value);
+      const parsed = maxNumber.value.trim() === "" ? NaN : Number(maxNumber.value);
+      state.max = parsed;
       syncBoundInputs("maxNumber");
       refreshLive();
     });
@@ -1246,10 +1263,10 @@
       const minEl = filtersForm.querySelector('[name="' + fields.min + '"]');
       const maxEl = filtersForm.querySelector('[name="' + fields.max + '"]');
       if (minEl) {
-        minEl.value = String(state.min);
+        minEl.value = (state.domainMin != null && Number(state.min) <= Number(state.domainMin)) ? "" : String(state.min);
       }
       if (maxEl) {
-        maxEl.value = String(state.max);
+        maxEl.value = (state.domainMax != null && Number(state.max) >= Number(state.domainMax)) ? "" : String(state.max);
       }
       return;
     }
@@ -1274,9 +1291,10 @@
     });
   }
 
-  function discardAndClose() {
+  function cleanupAfterClose() {
     abortLiveFetch();
     liveGeneration += 1;
+    detailGeneration += 1;
     liveOk = false;
     state = null;
     setViewToggleVisible(false);
@@ -1287,11 +1305,21 @@
     if (statusEl) {
       statusEl.textContent = "";
     }
-    dialog.close();
     if (launcher) {
       launcher.focus();
     }
   }
+
+  function discardAndClose() {
+    dialog.close();
+    cleanupAfterClose();
+  }
+
+  dialog.addEventListener("close", () => {
+    if (state) {
+      cleanupAfterClose();
+    }
+  });
 
   function saveAndSubmit() {
     if (!liveOk || !state) {
@@ -1310,6 +1338,7 @@
     } else if (state.kind === "numeric") {
       writeNumericToForm();
     }
+    state = null;
     dialog.close();
     if (filtersForm.requestSubmit) {
       filtersForm.requestSubmit();
@@ -1349,6 +1378,7 @@
     if (state.perspective && state.perspective !== "single") {
       detailParams.set("perspective", state.perspective);
     }
+    const generation = ++detailGeneration;
     fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
       .then((response) => {
         if (!response.ok) {
@@ -1357,6 +1387,9 @@
         return response.json();
       })
       .then((payload) => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         if (payload.lookahead_warning) {
           const warning = typeof payload.lookahead_warning === "string"
             ? payload.lookahead_warning
@@ -1374,10 +1407,9 @@
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
-        if (committed && committed.min != null && committed.max != null
-            && Number.isFinite(committed.min) && Number.isFinite(committed.max)) {
-          state.min = committed.min;
-          state.max = committed.max;
+        if (committed && (Number.isFinite(committed.min) || Number.isFinite(committed.max))) {
+          state.min = Number.isFinite(committed.min) ? committed.min : state.domainMin;
+          state.max = Number.isFinite(committed.max) ? committed.max : state.domainMax;
         } else if (state.domainMin != null && state.domainMax != null) {
           state.min = state.domainMin;
           state.max = state.domainMax;
@@ -1390,6 +1422,9 @@
         refreshLive();
       })
       .catch(() => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         statusEl.textContent = "Couldn’t load filter values.";
         const empty = document.createElement("p");
         empty.className = "filter-modal__hint";
@@ -1415,6 +1450,7 @@
     lastSummary = null;
     liveOk = false;
     liveGeneration += 1;
+    detailGeneration += 1;
     controlsEl.innerHTML = "";
     if (exploreEl) {
       exploreEl.innerHTML = "";
@@ -1423,6 +1459,7 @@
       statusEl.textContent = "";
     }
     renderChips({ wins: 0, losses: 0, pushes: 0, money_won: 0, roi: 0 });
+    emptyEl.hidden = true;
     dialog.showModal();
 
     if (control === "numeric") {
@@ -1479,6 +1516,7 @@
     if (state.kind === "feature" && state.perspective && state.perspective !== "single") {
       detailParams.set("perspective", state.perspective);
     }
+    const generation = ++detailGeneration;
     fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
       .then((response) => {
         if (!response.ok) {
@@ -1487,6 +1525,9 @@
         return response.json();
       })
       .then((payload) => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         if (payload.lookahead_warning) {
           const warning = typeof payload.lookahead_warning === "string"
             ? payload.lookahead_warning
@@ -1507,6 +1548,9 @@
         refreshLive();
       })
       .catch(() => {
+        if (!state || generation !== detailGeneration) {
+          return;
+        }
         statusEl.textContent = "Couldn’t load filter values.";
         const empty = document.createElement("p");
         empty.className = "filter-modal__hint";
@@ -1519,6 +1563,13 @@
   document.querySelectorAll("[data-candidate-id]").forEach((button) => {
     button.addEventListener("click", () => openCandidate(button));
   });
+
+  const modalForm = document.getElementById("filter-modal-form");
+  if (modalForm) {
+    modalForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+    });
+  }
 
   cancelBtn.addEventListener("click", discardAndClose);
   closeBtn.addEventListener("click", discardAndClose);

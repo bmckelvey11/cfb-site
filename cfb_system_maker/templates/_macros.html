@@ -1,0 +1,3 @@
+{% macro money(profit) -%}
+{%- if profit > 0 -%}+${{ "{:,.0f}".format(profit * 100) }}{%- elif profit < 0 -%}-${{ "{:,.0f}".format(-profit * 100) }}{%- else -%}$0{%- endif -%}
+{%- endmacro %}
