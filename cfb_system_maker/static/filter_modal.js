@@ -348,10 +348,14 @@
         params.append("ff_perspective", state.perspective || "single");
       }
     } else if (state.kind === "numeric" && boundsAreValid()) {
+      // Domain-edge bounds are cleared on Save (see writeNumericToForm), so the
+      // live preview must drop them too or its chips diverge from the commit.
+      const atDomainMin = state.domainMin != null && Number(state.min) <= Number(state.domainMin);
+      const atDomainMax = state.domainMax != null && Number(state.max) >= Number(state.domainMax);
       const fields = CORE_RANGE_FIELDS[state.candidateId];
       if (fields) {
-        params.set(fields.min, String(state.min));
-        params.set(fields.max, String(state.max));
+        params.set(fields.min, atDomainMin ? "" : String(state.min));
+        params.set(fields.max, atDomainMax ? "" : String(state.max));
       } else if (state.featureKey) {
         const key = state.featureKey;
         const enables = params.getAll("ff_enable").filter((item) => item !== key);
@@ -374,16 +378,21 @@
           params.append("ff_value", values[index] || "");
           params.append("ff_perspective", perspectives[index] || "single");
         });
-        params.append("ff_enable", key);
-        params.append("ff_key", key);
-        params.append("ff_op", "gte");
-        params.append("ff_value", String(state.min));
-        params.append("ff_perspective", state.perspective || "single");
-        params.append("ff_enable", key);
-        params.append("ff_key", key);
-        params.append("ff_op", "lte");
-        params.append("ff_value", String(state.max));
-        params.append("ff_perspective", state.perspective || "single");
+        if (!atDomainMin || !atDomainMax) {
+          params.append("ff_enable", key);
+        }
+        if (!atDomainMin) {
+          params.append("ff_key", key);
+          params.append("ff_op", "gte");
+          params.append("ff_value", String(state.min));
+          params.append("ff_perspective", state.perspective || "single");
+        }
+        if (!atDomainMax) {
+          params.append("ff_key", key);
+          params.append("ff_op", "lte");
+          params.append("ff_value", String(state.max));
+          params.append("ff_perspective", state.perspective || "single");
+        }
       }
     }
     return params;
@@ -1332,17 +1341,23 @@
     if (!fallback) {
       return;
     }
+    // Mirror the core-range behavior above: a bound sitting at the observed
+    // domain edge is cleared instead of committed. Feature values fail closed
+    // on null, so a full-domain gte/lte pair is NOT "no filter" -- it silently
+    // drops every game missing the feature.
+    const atDomainMin = state.domainMin != null && Number(state.min) <= Number(state.domainMin);
+    const atDomainMax = state.domainMax != null && Number(state.max) >= Number(state.domainMax);
     const enable = fallback.querySelector('input[name="ff_enable"]');
     if (enable) {
-      enable.checked = true;
+      enable.checked = !(atDomainMin && atDomainMax);
     }
     const minInput = fallback.querySelector('[data-bound="min"]');
     const maxInput = fallback.querySelector('[data-bound="max"]');
     if (minInput) {
-      minInput.value = String(state.min);
+      minInput.value = atDomainMin ? "" : String(state.min);
     }
     if (maxInput) {
-      maxInput.value = String(state.max);
+      maxInput.value = atDomainMax ? "" : String(state.max);
     }
     fallback.querySelectorAll('[name="ff_perspective"]').forEach((el) => {
       el.value = state.perspective || "single";

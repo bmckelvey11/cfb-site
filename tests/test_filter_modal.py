@@ -214,6 +214,25 @@ def test_cancel_leaves_form_untouched_contract():
     assert "requestSubmit" not in discard_block
 
 
+def test_numeric_feature_save_clears_domain_edge_bounds_contract():
+    """Full-domain feature bounds are NOT "no filter" (nulls fail closed), so
+    Save must clear edge bounds like core ranges do — and the live draft query
+    must drop them the same way or the preview chips diverge from the commit."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+
+    write_block = source.split("function writeNumericToForm")[1].split("function ")[0]
+    assert "atDomainMin" in write_block and "atDomainMax" in write_block
+    assert 'atDomainMin ? ""' in write_block
+    assert 'atDomainMax ? ""' in write_block
+    assert "enable.checked = !(atDomainMin && atDomainMax)" in write_block
+
+    draft_block = source.split("function draftQuery")[1].split("function ")[0]
+    assert "atDomainMin" in draft_block and "atDomainMax" in draft_block
+    assert "!atDomainMin || !atDomainMax" in draft_block
+
+
 def test_save_serializes_seasons_contract():
     from pathlib import Path
 
