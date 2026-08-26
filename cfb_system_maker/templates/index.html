@@ -76,26 +76,31 @@
                 <select name="filter_seasons" id="filter-seasons">
                   <option value="">All Seasons</option>
                   {% for season in options.seasons %}<option value="{{ season }}" {% if form.season == season|string %}selected{% endif %}>{{ season }}</option>{% endfor %}
+                  {% if form.season and form.season not in options.seasons|map('string')|list %}<option value="{{ form.season }}" selected>{{ form.season }}</option>{% endif %}
                 </select>
                 {% elif candidate_id == "core:week" %}
                 <select name="filter_weeks" id="filter-weeks">
                   <option value="">All Weeks</option>
                   {% for week in options.weeks %}<option value="{{ week }}" {% if form.week == week|string %}selected{% endif %}>{{ week }}</option>{% endfor %}
+                  {% if form.week and form.week not in options.weeks|map('string')|list %}<option value="{{ form.week }}" selected>{{ form.week }}</option>{% endif %}
                 </select>
                 {% elif candidate_id == "core:team" %}
                 <select name="filter_teams" id="filter-teams">
                   <option value="">All Teams</option>
                   {% for team in options.teams %}<option value="{{ team }}" {% if form.team == team %}selected{% endif %}>{{ team }}</option>{% endfor %}
+                  {% if form.team and form.team not in options.teams %}<option value="{{ form.team }}" selected>{{ form.team }}</option>{% endif %}
                 </select>
                 {% elif candidate_id == "core:conference" %}
                 <select name="filter_conferences" id="filter-conferences">
                   <option value="">All Conferences</option>
                   {% for conference in options.conferences %}<option value="{{ conference }}" {% if form.conference == conference %}selected{% endif %}>{{ conference }}</option>{% endfor %}
+                  {% if form.conference and form.conference not in options.conferences %}<option value="{{ form.conference }}" selected>{{ form.conference }}</option>{% endif %}
                 </select>
                 {% else %}
                 <select name="filter_providers" id="filter-providers">
                   <option value="">All Providers</option>
                   {% for provider in options.providers %}<option value="{{ provider }}" {% if form.provider == provider %}selected{% endif %}>{{ provider }}</option>{% endfor %}
+                  {% if form.provider and form.provider not in options.providers %}<option value="{{ form.provider }}" selected>{{ form.provider }}</option>{% endif %}
                 </select>
                 {% endif %}
               </label>
