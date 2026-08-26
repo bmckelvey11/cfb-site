@@ -300,7 +300,7 @@
           {% if load_error %}<p class="load-error">{{ load_error }}</p>{% endif %}
           {% if loaded_system %}<p class="loaded-system">Loaded: <strong>{{ loaded_system }}</strong></p>{% endif %}
           {% if saved_systems %}
-          <select class="load-system-select" onchange="if (this.value) window.location.href = '?load_system=' + encodeURIComponent(this.value);">
+          <select class="load-system-select" aria-label="Load saved system" onchange="if (this.value) window.location.href = '?load_system=' + encodeURIComponent(this.value);">
             <option value="" {% if not loaded_system %}selected{% endif %}>Choose a saved system&hellip;</option>
             {% for name in saved_systems %}
               <option value="{{ name }}" {% if loaded_system == name %}selected{% endif %}>{{ name }}</option>
