@@ -239,6 +239,33 @@ def test_aggregate_filter_value_rows_boolean_yes_no():
         assert isinstance(row["record"], str)
 
 
+def test_aggregate_filter_value_rows_team_on_total_buckets_both_sides():
+    games = [_game(1), _game(2)]  # Alpha home, Beta away in both
+    descriptor = {
+        "id": "core:team",
+        "control": "categorical",
+        "key": "team",
+        "team_scoped": False,
+    }
+    rows = aggregate_filter_value_rows(
+        games,
+        SystemFilter(bet_type="total", side="home", total_side="over"),
+        descriptor,
+        feature_map={},
+        perspective="single",
+    )
+    # Total systems have no bet side: every game buckets under BOTH its teams.
+    assert {row["value"] for row in rows} == {"Alpha", "Beta"}
+    for row in rows:
+        assert row["wins"] + row["losses"] + row["pushes"] == 2
+
+    # Spread systems keep bet-side-only buckets.
+    spread_rows = aggregate_filter_value_rows(
+        games, SystemFilter(side="home"), descriptor, feature_map={}, perspective="single"
+    )
+    assert {row["value"] for row in spread_rows} == {"Alpha"}
+
+
 def test_aggregate_filter_value_rows_categorical_sorted():
     games = [
         _game(1, season=2023),

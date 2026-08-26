@@ -96,13 +96,21 @@ CORE_FILTER_META: dict[str, dict[str, str]] = {
     "core:team": {
         "label": "Team",
         "control": "categorical",
-        "description": "Restrict bets to games involving the selected team on the bet side.",
+        "description": (
+            "Restrict bets to games with the selected team on the bet side. "
+            "Over/under systems have no bet side, so there the filter matches games "
+            "involving the team on either side."
+        ),
         "param": "filter_teams",
     },
     "core:conference": {
         "label": "Conference",
         "control": "categorical",
-        "description": "Restrict bets to the selected conference on the bet side.",
+        "description": (
+            "Restrict bets to the selected conference on the bet side. "
+            "Over/under systems have no bet side, so there the filter matches games "
+            "involving the conference on either side."
+        ),
         "param": "filter_conferences",
     },
     "core:provider": {
@@ -201,8 +209,12 @@ def resolve_candidate_value(
     if candidate_id == "core:provider":
         return game.provider
     if candidate_id == "core:team":
+        if system.bet_type == "total":
+            return (game.home_team, game.away_team)
         return game.home_team if system.side.lower() == "home" else game.away_team
     if candidate_id == "core:conference":
+        if system.bet_type == "total":
+            return (game.home_conference, game.away_conference)
         return game.home_conference if system.side.lower() == "home" else game.away_conference
     if candidate_id == "core:spread_range":
         if game.spread is None:

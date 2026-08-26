@@ -364,10 +364,20 @@ def matches_system(
         return False
     if system.providers and game.provider not in system.providers:
         return False
-    if system.teams and team not in system.teams:
-        return False
-    if system.conferences and conference not in system.conferences:
-        return False
+    # A total bet has no team side, so team/conference filters mean "the game
+    # involves ..." — never the vestigial spread-side field.
+    if system.teams:
+        if system.bet_type == "total":
+            if game.home_team not in system.teams and game.away_team not in system.teams:
+                return False
+        elif team not in system.teams:
+            return False
+    if system.conferences:
+        if system.bet_type == "total":
+            if game.home_conference not in system.conferences and game.away_conference not in system.conferences:
+                return False
+        elif conference not in system.conferences:
+            return False
     if system.home and side != "home":
         return False
     if system.away and side != "away":
