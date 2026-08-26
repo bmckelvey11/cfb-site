@@ -196,6 +196,30 @@ def test_web_margin_chip_shows_em_dash_for_total_bet_systems(tmp_path):
     assert '<article><span>Margin</span><strong class="">&mdash;</strong></article>' in metrics_html
 
 
+def test_editor_tolerates_malformed_numeric_params(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    assert client.get("/system?min_spread=abc").status_code == 200
+    assert client.get("/system?min_spread=nan").status_code == 200
+    assert client.get("/system?filter_seasons=abc,2023").status_code == 200
+    assert client.get(
+        "/system?ff_enable=weather_temperature&ff_key=weather_temperature&ff_op=gte&ff_value=abc"
+    ).status_code == 200
+
+
+def test_compare_tolerates_malformed_holdout(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/compare?holdout_season=abc")
+
+    assert response.status_code == 200
+
+
 def test_web_money_won_chip_renders_unsigned_zero_for_no_matched_bets(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

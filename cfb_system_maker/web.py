@@ -556,7 +556,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
 
         feature_map = _try_load_features(app.config["DATA_DIR"])
         selected = request.args.getlist("system")
-        holdout_seasons = {int(value) for value in request.args.getlist("holdout_season") if value.strip()}
+        holdout_seasons = _int_set(",".join(request.args.getlist("holdout_season")))
         available_seasons = {game.season for game in games}
         rows = []
         for name in selected:
@@ -1164,7 +1164,13 @@ def _parse_filter_value(op: str, raw_value: str) -> object | None:
             return raw_value == "true"
         return raw_value if raw_value.strip() else None
     if op in {"gte", "lte"}:
-        return float(raw_value) if raw_value.strip() else None
+        if not raw_value.strip():
+            return None
+        try:
+            number = float(raw_value)
+        except ValueError:
+            return None
+        return number if math.isfinite(number) else None
     return raw_value if str(raw_value).strip() else None
 
 
@@ -1202,7 +1208,16 @@ def _system_from_form(form: dict[str, object]) -> SystemFilter:
 
 
 def _int_set(value: str) -> set[int]:
-    return {int(part.strip()) for part in value.split(",") if part.strip()}
+    result: set[int] = set()
+    for part in value.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            result.add(int(part))
+        except ValueError:
+            continue
+    return result
 
 
 def _str_set(value: str) -> set[str]:
@@ -1210,7 +1225,11 @@ def _str_set(value: str) -> set[str]:
 
 
 def _optional_float(value: str) -> float | None:
-    return float(value) if value.strip() else None
+    try:
+        number = float(value)
+    except ValueError:
+        return None
+    return number if math.isfinite(number) else None
 
 
 def _options_from_games(games: list[GameRecord]) -> dict[str, list[str | int]]:
