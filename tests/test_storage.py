@@ -164,6 +164,17 @@ def test_save_and_load_search_run_round_trips(tmp_path):
     assert list_search_runs(tmp_path) == ["my-run"]
 
 
+def test_system_from_non_dict_payload_raises_value_error(tmp_path):
+    from cfb_system_maker.storage import load_saved_system
+
+    systems_dir = tmp_path / "systems"
+    systems_dir.mkdir()
+    (systems_dir / "weird.json").write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_saved_system("weird", tmp_path)
+
+
 def test_load_search_run_missing_file_raises(tmp_path):
     from cfb_system_maker.storage import load_search_run
 

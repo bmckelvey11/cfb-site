@@ -220,6 +220,31 @@ def test_compare_tolerates_malformed_holdout(tmp_path):
     assert response.status_code == 200
 
 
+def test_corrupt_features_sidecar_does_not_500(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    (tmp_path / "processed" / "features.json").write_text("{not json", encoding="utf-8")
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/system")
+
+    assert response.status_code == 200
+    assert 'name="min_spread"' in response.get_data(as_text=True)
+
+
+def test_non_dict_system_file_does_not_crash_dashboard(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    systems_dir = tmp_path / "systems"
+    systems_dir.mkdir()
+    (systems_dir / "weird.json").write_text("[]", encoding="utf-8")
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+
+
 def test_web_money_won_chip_renders_unsigned_zero_for_no_matched_bets(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
