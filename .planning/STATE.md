@@ -1,19 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Awaiting next milestone
-stopped_at: Completed 05-06-PLAN.md (Current Matches panel)
-last_updated: "2026-07-21T00:41:58.608Z"
-last_activity: 2026-07-20
-last_activity_desc: Milestone v1.0 completed and archived
+milestone: v1.1
+milestone_name: Season Readiness
+status: planning
+last_updated: "2026-08-26T21:08:04.534Z"
+last_activity: 2026-08-26
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 21
-  completed_plans: 21
-current_phase: 5
-current_phase_name: Dashboard & Current Matches
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-07-17)
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-20 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-26 — Milestone v1.1 started
 
 ## Performance Metrics
 

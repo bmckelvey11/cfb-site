@@ -6,7 +6,21 @@
 
 ## Current State
 
-**Shipped v1.0 — Bet Labs Parity** (2026-07-20): 5 phases, 21 plans, ~11k Python LOC, 307 tests passing. All requirements code-verified; two live-in-season checks deferred to season start. Teaser records (DASH-04) descoped. Next milestone not yet defined.
+**Shipped v1.0 — Bet Labs Parity** (2026-07-20): 5 phases, 21 plans, ~11k Python LOC, 307 tests passing. All requirements code-verified; two live-in-season checks deferred to season start. Teaser records (DASH-04) descoped.
+
+**In progress: v1.1 Season Readiness** — closes v1.0's deferred items ahead of the 2026-08-29 season start: merge the `fix/web-app-review-2026-08-26` review branch, run the two deferred live in-season verifications, close two accepted risks that are now reachable/due (`describe()` silent filter drop, Hide Duplicates), and ship the one surviving lead from a week of statistical analysis (neutral-site + indoor unders) as a bundled example system. Full context: [docs/roadmap-v2-2026-08.md](../docs/roadmap-v2-2026-08.md) §2, informed by a competitive survey of 11 betting system-builder tools (§1).
+
+## Current Milestone: v1.1 Season Readiness
+
+**Goal:** Close out v1.0's deferred verifications and accepted risks, and merge in-flight fixes, before the 2026-08-29 season start.
+
+**Target features:**
+- Merge `fix/web-app-review-2026-08-26` (26 review-fix commits) to master
+- Commit the 7 uncommitted analysis docs; fix STATE.md quick-task bookkeeping drift
+- Live in-season verification: Current Matches shows real unplayed games with posted lines; feature-filtered systems match via season-to-date stats
+- Hide Duplicates toggle (drop a game when one `game_id` yields two candidate bets — now reachable since total systems match either side)
+- Close T-01-03: `describe()` must never silently drop an active filter's sentence while `feature_ok()` still applies it
+- Bundle a neutral-site + indoor unders example system (63.3% over 109 games, p=0.014; all three features — `neutralSite`, `gameIndoors`, `venue_dome` — already in the registry)
 
 ## Core Value
 
