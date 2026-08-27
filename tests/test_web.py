@@ -1659,6 +1659,26 @@ def test_current_matches_details_reuse_describe_undecorated(tmp_path):
     assert "remove_href" not in panel
 
 
+def test_current_matches_uncovered_filter_combo_renders_fallback_sentence(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(
+        tmp_path,
+        [game],
+        _kick(9001, "2025-09-06T19:30:00+00:00"),
+        features={"9001": {"neutralSite": True}},
+    )
+    save_system(
+        "neutral-in",
+        SystemFilter(feature_filters=(FeatureFilter(key="neutralSite", op="in", value=[True]),)),
+        tmp_path,
+    )
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Neutral Site filter applied (value: [True])" in panel
+
+
 def test_current_matches_bare_system_omits_the_matched_on_label(tmp_path):
     app, _ = _dashboard_app(tmp_path)
     game = _upcoming_game(9001, "Georgia", "Clemson")
