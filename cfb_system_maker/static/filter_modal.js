@@ -733,9 +733,11 @@
   // disclosure, keyed off state.overlappingRows. Rebuilding (not appending)
   // keeps repeated perspective switches from duplicating the note or leaving
   // it behind after switching away from "Either". Only numeric filters use
-  // Max ROI's single-bucket fallback, so the note is scoped to state.kind
-  // === "numeric" -- value-table (categorical) filters already show a single
-  // value per row and don't need it.
+  // Max ROI's single-bucket fallback, so this note is scoped to state.kind
+  // === "numeric" -- that scoping is specific to the Max ROI window-summing
+  // behavior, not a statement that overlap disclosure is unneeded elsewhere.
+  // The categorical/value-table path has its own separate
+  // row-sum reconciliation caption, rendered directly in renderValueTable().
   function applyOverlapNote(baseText) {
     aboutEl.textContent = baseText
       + (state && state.kind === "numeric" && state.overlappingRows
@@ -776,9 +778,11 @@
             baseText = payload.description + "\n\n" + warning;
           }
           state.overlappingRows = Boolean(payload.overlapping_rows);
+          state.matchedGames = payload.matched_games;
           applyOverlapNote(baseText);
         } else {
           state.overlappingRows = Boolean(payload.overlapping_rows);
+          state.matchedGames = payload.matched_games;
         }
         state.rows = payload.rows || [];
         state.chartPoints = payload.chart_points || [];
@@ -834,6 +838,14 @@
       return;
     }
     setMaxRoiVisible(true);
+
+    if (state.overlappingRows) {
+      const caption = document.createElement("p");
+      caption.className = "filter-modal__hint";
+      caption.textContent = "These rows cover " + state.matchedGames + " games — each game "
+        + "counts once per matching value, so rows can sum to more than " + state.matchedGames + ".";
+      controlsEl.appendChild(caption);
+    }
 
     const search = document.createElement("input");
     search.type = "search";
@@ -1700,6 +1712,7 @@
           state.allowedPerspectives = payload.allowed_perspectives;
         }
         state.overlappingRows = Boolean(payload.overlapping_rows);
+        state.matchedGames = payload.matched_games;
         renderValueTable();
         const first = controlsEl.querySelector("input, button");
         if (first) {
