@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from cfb_system_maker.coach_style import COACH_STYLE_CLUSTERS
 from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, get_nested, registry_version
 from cfb_system_maker.models import GameRecord
 from cfb_system_maker.running_stats import compute_running_stats
@@ -321,6 +322,9 @@ def _lookup_team_scoped(feature: FeatureDef, team: str, season: int, indexes: di
             return None
         if feature.field == "coach_name":
             return f"{record.get('firstName', '')} {record.get('lastName', '')}".strip()
+        if feature.field == "coach_style_cluster":
+            name = f"{record.get('firstName', '')} {record.get('lastName', '')}".strip()
+            return COACH_STYLE_CLUSTERS.get(name)
         return _field_value(record, feature.field)
 
     return None

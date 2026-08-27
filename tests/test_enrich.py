@@ -422,3 +422,31 @@ def test_v1_over_prob_populated_from_cached_fit(tmp_path):
     assert 0.0 <= features["1"]["v1_over_prob"] <= 1.0
     # pick'em (spread == 0) is skipped, same as the fit-time filter
     assert features["2"]["v1_over_prob"] is None
+
+
+def test_coach_style_cluster_from_embedded_mapping(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"coaches_{season}.json").write_text(
+        json.dumps(
+            [
+                {
+                    "firstName": "Kirby",
+                    "lastName": "Smart",
+                    "seasons": [{"year": season, "school": "Alpha", "games": 14}],
+                },
+                {
+                    "firstName": "Totally",
+                    "lastName": "Unknown",
+                    "seasons": [{"year": season, "school": "Beta", "games": 12}],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    features = enrich_games(tmp_path, games)
+    assert features["1"]["home_coach_style_cluster"] == "bend_dont_break"
+    assert features["1"]["away_coach_style_cluster"] is None

@@ -453,6 +453,24 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
             "or final, not a pure pregame betting input."
         ),
     ),
+    FeatureDef(
+        "coach_style_cluster",
+        "Coach Playstyle Cluster",
+        "result_lookahead",
+        "raw_coaches",
+        "coach_style_cluster",
+        "team_season",
+        "categorical",
+        team_scoped=True,
+        description=(
+            "Head coach playstyle group: one of option_ground, attack_defense, bend_dont_break, "
+            "pass_first_efficient, balanced_spread. k=5 k-means over quality-stripped (SP+-residualized) "
+            "advanced season stats 2016-2024, coaches with 3+ seasons; regenerate with "
+            "scripts/build_coach_style_clusters.py. Career-level label, so early-season games read a "
+            "label informed by the coach's later seasons — quarantined as lookahead; use for grouping "
+            "and analysis, not as a discovered betting edge."
+        ),
+    ),
 )
 
 FEATURE_BY_KEY: dict[str, FeatureDef] = {feature.key: feature for feature in FEATURE_REGISTRY}
