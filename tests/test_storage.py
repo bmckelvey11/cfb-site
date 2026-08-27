@@ -109,9 +109,9 @@ def test_no_example_filters_on_provider_weather_or_season_to_date():
         system = load_example_system(name).system
         assert not system.providers, f"{name} declares a provider filter"
         for filt in system.feature_filters:
-            if (name, filt.key) in WEATHER_FILTER_EXCEPTIONS:
-                continue
-            assert filt.key not in WEATHER_KEYS, f"{name} filters on weather {filt.key}"
+            excepted = (name, filt.key) in WEATHER_FILTER_EXCEPTIONS
+            if not excepted:
+                assert filt.key not in WEATHER_KEYS, f"{name} filters on weather {filt.key}"
             assert filt.key not in SEASON_TO_DATE_KEYS, (
                 f"{name} filters on season-to-date {filt.key}"
             )
