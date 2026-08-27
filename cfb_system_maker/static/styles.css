@@ -1521,3 +1521,17 @@ code {
   color: var(--muted);
   line-height: 1.5;
 }
+
+.site-footer {
+  margin-top: 40px;
+  padding: 24px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.site-footer p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
