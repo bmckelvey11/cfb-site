@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-07-20)
 Phase: 9 — Live In-Season Verification
 Plan: Not started
 Status: Ready to execute
-Last activity: 2026-08-27 — Completed quick task 260827-8or: Feature Filters sidebar search and collapsible groups
+Last activity: 2026-08-27 — Completed quick task 260827-b9w: line-movement registry features (spread_open, spread_move, total_open, total_move)
 
 Progress: [██████████] 100%
 
@@ -169,6 +169,7 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 | 2026-08-26 | register-player-success-rate-endpoints | Registered `player_success_season` and `player_success_game` CFBD endpoints in scraper registry, bringing coverage from 61 to 63 entries | complete |
 | 2026-08-27 | feature-filter-sidebar-search-collapsibl | Feature Filters sidebar search + collapsible groups with active-count badges (`5231273`). Planned Fixes 2 and 3 were dropped, not applied: a concurrent session landed `7c2e694`/`969c7ca` (one row per stat, in-modal perspective switcher removed) and the `points\|length <= 60` marker gate, which solved both goals first | complete (1 of 3 landed, 2 superseded) |
 | 2026-08-27 | coach-style-cluster-feature | `coach_style_cluster` registry feature: k=5 k-means coach playstyle labels (option_ground / attack_defense / bend_dont_break / pass_first_efficient / balanced_spread) from quality-stripped 2016-2024 advanced stats; embedded 189-coach dict in `coach_style.py` + generator `scripts/build_coach_style_clusters.py`; quarantined as `result_lookahead` (career-level label) | complete |
+| 2026-08-27 | add-line-movement-registry-features-spre | `spread_open`/`spread_move`/`total_open`/`total_move` registry features (Betting System Builder Phase A): book-matched open vs. close from CFBD `lines_{season}.json`, computed in `enrich.py` (`computed_line_move` source kind), no `GameRecord`/CSV change; excluded from automated search (`search.py` `_LOW_COVERAGE_KEYS`) since only ~18% of games have a book-matched open, a non-random 2023-2025 slice — available for manual system building. Coverage: 2,317/13,014 spread_open, 1,379/13,014 total_open, 0 before 2021 (`3f1d9aa`) | complete |
 
 ## Deferred Items
 
