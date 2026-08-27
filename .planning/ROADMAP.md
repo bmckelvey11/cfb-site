@@ -31,7 +31,8 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 
 ## Phase Details
 
-### Phase 6: Merge & Stale-Stats Audit — ✅ Complete (2026-08-26)
+### Phase 6: Merge & Stale-Stats Audit
+**Status**: ✅ Complete (2026-08-26)
 **Goal**: The 26-commit review branch is on master with nothing lost or broken, and any saved search-run results computed under the old total-system matching semantics are identified and corrected.
 **Depends on**: Phase 5 (v1.0, complete)
 **Requirements**: MERGE-01, MERGE-02
