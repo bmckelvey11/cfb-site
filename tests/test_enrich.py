@@ -450,3 +450,80 @@ def test_coach_style_cluster_from_embedded_mapping(tmp_path):
     features = enrich_games(tmp_path, games)
     assert features["1"]["home_coach_style_cluster"] == "bend_dont_break"
     assert features["1"]["away_coach_style_cluster"] is None
+
+
+def test_line_move_reads_open_from_the_close_providers_row(tmp_path):
+    season = 2024
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"lines_{season}.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": 1,
+                    "lines": [
+                        {"provider": "Bovada", "spreadOpen": -1.0, "overUnderOpen": 40.0},
+                        {"provider": "DraftKings", "spread": -7.0, "spreadOpen": -3.0, "overUnder": 44.0, "overUnderOpen": 41.0},
+                    ],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "DraftKings", -7.0, 44.0)]
+    features = enrich_games(tmp_path, games)
+    row = features["1"]
+
+    assert row["spread_open"] == -3.0
+    assert row["spread_move"] == -4.0  # -7.0 - (-3.0): home became a bigger favorite
+    assert row["total_open"] == 41.0
+    assert row["total_move"] == 3.0  # 44.0 - 41.0
+
+
+def test_line_move_none_when_the_close_providers_row_has_no_open(tmp_path):
+    season = 2024
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"lines_{season}.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": 1,
+                    "lines": [
+                        {"provider": "Bovada", "spreadOpen": -1.0, "overUnderOpen": 40.0},
+                        {"provider": "consensus", "spread": -3.0, "overUnder": 42.0},
+                    ],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.0, 42.0)]
+    features = enrich_games(tmp_path, games)
+    row = features["1"]
+
+    assert row["spread_open"] is None
+    assert row["spread_move"] is None
+    assert row["total_open"] is None
+    assert row["total_move"] is None
+
+
+def test_line_move_none_when_no_open_values_present(tmp_path):
+    season = 2024
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"lines_{season}.json").write_text(
+        json.dumps([{"id": 1, "lines": [{"provider": "consensus", "spread": -3.0, "overUnder": 42.0}]}]),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.0, 42.0)]
+    features = enrich_games(tmp_path, games)
+    row = features["1"]
+
+    assert row["spread_open"] is None
+    assert row["spread_move"] is None
+    assert row["total_open"] is None
+    assert row["total_move"] is None

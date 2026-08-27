@@ -8,6 +8,7 @@ from typing import Any
 from cfb_system_maker.coach_style import COACH_STYLE_CLUSTERS
 from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, get_nested, registry_version
 from cfb_system_maker.models import GameRecord
+from cfb_system_maker.normalize import _first, _select_line, _select_total
 from cfb_system_maker.running_stats import compute_running_stats
 from cfb_system_maker.storage import load_processed_games
 from cfb_system_maker.v1_model import load_v1_fit, score_v1
@@ -129,6 +130,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
 
     indexes["computed_running"] = _build_running_index(data_dir, seasons, games, indexes["raw_game"])
     indexes["computed_v1"] = _build_v1_index(data_dir, games)
+    indexes["computed_line_move"] = _build_line_move_index(data_dir, seasons, games)
 
     return indexes
 
@@ -190,6 +192,65 @@ def _build_v1_index(data_dir: Path, games: list[GameRecord]) -> dict[int, float]
     if fit is None:
         return {}
     return score_v1(games, fit)
+
+
+def _build_line_move_index(
+    data_dir: Path, seasons: list[int], games: list[GameRecord]
+) -> dict[int, dict[str, float | None]]:
+    """spread_open/spread_move/total_open/total_move, keyed by game_id.
+
+    The open must come from the SAME provider row that supplied the built close
+    (game.provider / game.spread / game.total) -- a cross-book open-minus-close is a
+    basis difference, not line movement. Re-selects that row via normalize's own
+    _select_line/_select_total rather than trusting _index_raw_lines, which flattens
+    to lines[0] and would silently pick a different book. Missing open -> all four
+    None (fail closed), never a zero default.
+    """
+    lines_by_season: dict[int, dict[int, list[dict[str, Any]]]] = {}
+    for season in seasons:
+        path = data_dir / "raw" / f"lines_{season}.json"
+        if not path.exists():
+            continue
+        bucket: dict[int, list[dict[str, Any]]] = {}
+        for row in json.loads(path.read_text(encoding="utf-8")):
+            game_id = row.get("id")
+            if game_id is None:
+                continue
+            bucket[int(game_id)] = row.get("lines") or []
+        lines_by_season[season] = bucket
+
+    index: dict[int, dict[str, float | None]] = {}
+    for game in games:
+        season_lines = lines_by_season.get(game.season)
+        if season_lines is None:
+            continue
+        lines = season_lines.get(game.game_id)
+        if not lines:
+            continue
+
+        selected = _select_line(lines, game.provider)
+        if selected is None:
+            continue
+
+        spread_open = _coerce_numeric(selected.get("spreadOpen"))
+        spread_move = (
+            game.spread - spread_open if spread_open is not None and game.spread is not None else None
+        )
+
+        total_row = _select_total(lines, selected)
+        total_open = _coerce_numeric(_first(total_row, "overUnderOpen", "over_under_open"))
+        total_move = (
+            game.total - total_open if total_open is not None and game.total is not None else None
+        )
+
+        index[game.game_id] = {
+            "spread_open": spread_open,
+            "spread_move": spread_move,
+            "total_open": total_open,
+            "total_move": total_move,
+        }
+
+    return index
 
 
 def _coerce_numeric(value: Any) -> float | None:
@@ -280,6 +341,9 @@ def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> A
 
     if feature.source_kind == "computed_v1":
         return indexes["computed_v1"].get(game.game_id)
+
+    if feature.source_kind == "computed_line_move":
+        return indexes["computed_line_move"].get(game.game_id, {}).get(feature.field)
 
     if feature.source_kind == "graphql_game":
         record = indexes["graphql_game"].get(game.game_id)

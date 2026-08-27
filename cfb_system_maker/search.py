@@ -37,9 +37,20 @@ from cfb_system_maker.backtest import (
 from cfb_system_maker.features import FEATURE_REGISTRY, resolve_feature_value
 from cfb_system_maker.models import BacktestResult, FeatureFilter, GameRecord, SystemFilter
 
-# Non-lookahead registry features only, in fixed FEATURE_REGISTRY tuple order
-# (never dict/set order) so downstream iteration is deterministic.
-_CANDIDATE_FEATURES = tuple(f for f in FEATURE_REGISTRY if f.group != "result_lookahead")
+# Excluded from automated search: genuine pregame values, but populated on only ~18%
+# of games (2023-2025 subsample where a DraftKings/Bovada/ESPN Bet close was
+# selected) -- not a random missing-data pattern, so a search finalist found on this
+# slice would be a small-subsample result reported through the same pipeline as a
+# full 13k-game backtest. Fully available for manual system building; not quarantined
+# via result_lookahead because these are not lookahead. Reversible: delete a key here
+# to opt back into search once coverage improves.
+_LOW_COVERAGE_KEYS = frozenset({"spread_open", "spread_move", "total_open", "total_move"})
+
+# Non-lookahead, non-low-coverage registry features only, in fixed FEATURE_REGISTRY
+# tuple order (never dict/set order) so downstream iteration is deterministic.
+_CANDIDATE_FEATURES = tuple(
+    f for f in FEATURE_REGISTRY if f.group != "result_lookahead" and f.key not in _LOW_COVERAGE_KEYS
+)
 
 # Fixed quartile scheme for numeric feature/spread/total thresholds (MVP — no smart
 # binning). Interior cut points only; min/max are not useful thresholds on their own.

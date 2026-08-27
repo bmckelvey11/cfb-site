@@ -31,6 +31,7 @@ SourceKind = Literal[
     "raw_player_agg",
     "computed_running",
     "computed_v1",
+    "computed_line_move",
     "graphql_game",
     "graphql_weather",
     "graphql_lines",
@@ -123,6 +124,49 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "moneylineAway", "Away Moneyline", "betting_lines", "raw_lines", "awayMoneyline", "game_id", "numeric",
         lines_field="awayMoneyline",
         description="Away moneyline in American odds. Negative is favored; pregame market number.",
+    ),
+    FeatureDef(
+        "spread_open", "Spread Open (book-matched)", "betting_lines", "computed_line_move", "spread_open",
+        "game_id", "numeric",
+        description=(
+            "Opening home spread, read from the SAME book row that supplied the built close "
+            "(GameRecord.spread). Negative favors home, matching GameRecord.spread's sign. Null "
+            "whenever that book published no opener for the game — which is most games, since "
+            "far fewer books report opens than closes. Populated on no games before 2021 and on "
+            "roughly half of games 2023-2025. For a spread open regardless of book match, see "
+            "the legacy 'Spread Open' feature — that one is populated far more often but may not "
+            "come from the same book as the close."
+        ),
+    ),
+    FeatureDef(
+        "spread_move", "Spread Move (close − open)", "betting_lines", "computed_line_move", "spread_move",
+        "game_id", "numeric",
+        description=(
+            "close − open, both from the same book row as the built close. Negative means the "
+            "line moved toward the home team (home became a bigger favorite or a smaller "
+            "underdog); positive means it moved toward the away team. Null whenever spread_open "
+            "is null (see that feature's description for coverage)."
+        ),
+    ),
+    FeatureDef(
+        "total_open", "Total Open (book-matched)", "betting_lines", "computed_line_move", "total_open",
+        "game_id", "numeric",
+        description=(
+            "Opening total, read from the same book row that supplied the built close "
+            "(GameRecord.total) — which may be a different book than the one that supplied the "
+            "spread, per normalize's total-selection fallback. Null whenever that book published "
+            "no opener for the game. Populated on no games before 2021 and on roughly a "
+            "quarter to a half of games 2023-2025."
+        ),
+    ),
+    FeatureDef(
+        "total_move", "Total Move (close − open)", "betting_lines", "computed_line_move", "total_move",
+        "game_id", "numeric",
+        description=(
+            "close − open, both from the same book row as the built close total. Positive means "
+            "the total went up; negative means it went down. Null whenever total_open is null "
+            "(see that feature's description for coverage)."
+        ),
     ),
     # --- weather (game_id) ---
     FeatureDef(
