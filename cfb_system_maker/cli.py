@@ -16,6 +16,7 @@ from cfb_system_maker.scrapers import scrape
 from cfb_system_maker.search import beam_search, grade_finalists
 from cfb_system_maker.graphql_client import graphql_scrape, pull_game_player_stats
 from cfb_system_maker.actionnetwork_client import actionnetwork_scrape
+from cfb_system_maker.duckdb_load import TableLoad, build_duckdb, explode_payloads, flatten_stg_nested
 from cfb_system_maker.storage import load_processed_games, load_raw_json, load_system, save_processed_games, save_raw_json, save_system
 from cfb_system_maker.upcoming import build_upcoming
 from cfb_system_maker.v1_model import fit_v1, save_v1_fit
@@ -48,6 +49,8 @@ def main(argv: list[str] | None = None) -> int:
         return _search(args)
     if args.command == "web":
         return _web(args)
+    if args.command == "duckdb":
+        return _duckdb(args)
     parser.print_help()
     return 1
 
@@ -399,6 +402,55 @@ def _search(args: argparse.Namespace) -> int:
     return 0
 
 
+def _duckdb(args: argparse.Namespace) -> int:
+    only = set(args.only) if args.only else None
+
+    def _progress(report: TableLoad) -> None:
+        label = f"{report.schema}.{report.name}"
+        if report.error:
+            print(f"{label:36} FAILED  {report.error}", flush=True)
+        else:
+            print(f"{label:36} {report.files:>4} file(s)  {report.rows:>10} rows", flush=True)
+
+    if args.flatten_nested:
+        db_path = Path(args.output) if args.output else Path(args.data_dir) / "cfb.duckdb"
+        if not db_path.exists():
+            print(f"No DuckDB file at {db_path}. Run `duckdb` without --flatten-nested first.")
+            return 1
+        reports = flatten_stg_nested(db_path, progress=_progress)
+        ok = [r for r in reports if r.error is None]
+        failed = [r for r in reports if r.error is not None]
+        print(f"\n{len(ok)} table(s) flattened, {len(failed)} failed.")
+        print(f"Wrote nested columns into {db_path}")
+        return 1 if failed and not ok else 0
+
+    if args.explode_only:
+        db_path = Path(args.output) if args.output else Path(args.data_dir) / "cfb.duckdb"
+        if not db_path.exists():
+            print(f"No DuckDB file at {db_path}. Run `duckdb` without --explode-only first.")
+            return 1
+        reports = explode_payloads(db_path, progress=_progress)
+        ok = [r for r in reports if r.error is None]
+        failed = [r for r in reports if r.error is not None]
+        print(f"\n{len(ok)} table(s) exploded, {len(failed)} failed.")
+        print(f"Wrote stg.* into {db_path}")
+        return 1 if failed and not ok else 0
+
+    path, reports = build_duckdb(
+        args.data_dir,
+        output=args.output,
+        only=only,
+        include_actionnetwork=not args.skip_actionnetwork,
+        explode=args.explode,
+        progress=_progress,
+    )
+    ok = [r for r in reports if r.error is None]
+    failed = [r for r in reports if r.error is not None]
+    print(f"\n{len(ok)} table(s) loaded, {len(failed)} failed.")
+    print(f"Wrote {path}")
+    return 1 if failed and not ok else 0
+
+
 def _web(args: argparse.Namespace) -> int:
     from cfb_system_maker.web import create_app
 
@@ -542,10 +594,43 @@ def _build_parser() -> argparse.ArgumentParser:
         "--save-run", dest="save_run", default=None, help="save the full search run under this name"
     )
 
+    duckdb_parser = subparsers.add_parser("duckdb", help="load data/raw + data/graphql JSON into a DuckDB file")
+    duckdb_parser.add_argument("--data-dir", default="data")
+    duckdb_parser.add_argument("--output", help="DuckDB path (default: {data-dir}/cfb.duckdb)")
+    duckdb_parser.add_argument("--only", nargs="+", help="load only these table names")
+    duckdb_parser.add_argument(
+        "--skip-actionnetwork",
+        action="store_true",
+        help="skip data/raw/actionnetwork/ scoreboard+history objects",
+    )
+    duckdb_parser.add_argument(
+        "--explode",
+        action="store_true",
+        help="after load, explode JSON payloads into stg.* columns",
+    )
+    duckdb_parser.add_argument(
+        "--explode-only",
+        action="store_true",
+        help="explode payloads in an existing DuckDB file; do not reload JSON",
+    )
+    duckdb_parser.add_argument(
+        "--flatten-nested",
+        action="store_true",
+        help="flatten leftover STRUCT columns on existing stg.* tables",
+    )
+
     web = subparsers.add_parser("web")
     web.add_argument("--data-dir", default=os.environ.get("CFB_DATA_DIR", "data"))
-    web.add_argument("--host", default=os.environ.get("CFB_WEB_HOST", "127.0.0.1"))
-    web.add_argument("--port", type=int, default=int(os.environ.get("CFB_WEB_PORT", "5000")))
+    web.add_argument(
+        "--host",
+        default=os.environ.get("CFB_WEB_HOST")
+        or ("0.0.0.0" if os.environ.get("PORT") or os.environ.get("FLY_APP_NAME") else "127.0.0.1"),
+    )
+    web.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("CFB_WEB_PORT") or os.environ.get("PORT") or "5000"),
+    )
     web.add_argument("--debug", action="store_true")
 
     return parser
