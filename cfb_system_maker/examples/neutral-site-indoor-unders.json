@@ -1,0 +1,44 @@
+{
+  "name": "neutral-site-indoor-unders",
+  "saved_at": "2026-08-26T00:00:00+00:00",
+  "system": {
+    "away": false,
+    "bet_type": "total",
+    "conferences": [],
+    "fade": false,
+    "favorite": false,
+    "feature_filters": [
+      {
+        "key": "neutralSite",
+        "op": "eq",
+        "perspective": "single",
+        "value": true
+      },
+      {
+        "key": "gameIndoors",
+        "op": "eq",
+        "perspective": "single",
+        "value": true
+      },
+      {
+        "key": "venue_dome",
+        "op": "eq",
+        "perspective": "single",
+        "value": true
+      }
+    ],
+    "home": false,
+    "max_spread": null,
+    "max_total": null,
+    "min_spread": null,
+    "min_total": null,
+    "providers": [],
+    "seasons": [],
+    "side": "home",
+    "teams": [],
+    "total_side": "under",
+    "underdog": false,
+    "weeks": []
+  },
+  "theory": "PLACEHOLDER: finalized in Task 2 after real backtest numbers for this exact 3-filter set are measured against data/games.csv and data/features.json."
+}

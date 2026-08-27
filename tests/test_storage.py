@@ -62,6 +62,7 @@ def test_processed_games_csv_round_trip(tmp_path):
 # --- Bundled example systems (Phase 5, Plan 05) -------------------------------
 
 EXPECTED_EXAMPLE_NAMES = [
+    "neutral-site-indoor-unders",
     "nonconference-away-dogs",
     "spread-home-favorites",
     "total-unders-high-lines",
@@ -72,8 +73,16 @@ SEASON_TO_DATE_KEYS = {
 }
 WEATHER_KEYS = {feature.key for feature in FEATURE_REGISTRY if feature.group == "weather"}
 
+# DATA-01 / 08-CONTEXT.md "Zero-Match Live Weeks": neutral-site-indoor-unders
+# deliberately filters on gameIndoors (group="weather") as one of its 3 filters.
+# A mid-season week showing 0 Current Matches for this example is expected,
+# correct behavior (gameIndoors sources from the sometimes-gated weather
+# endpoint) -- not the guarantee-zero-matches failure mode D-21 exists to catch
+# for every other example. This is the one narrow, documented exception.
+WEATHER_FILTER_EXCEPTIONS = {("neutral-site-indoor-unders", "gameIndoors")}
 
-def test_list_examples_returns_the_three_bundled_names(tmp_path):
+
+def test_list_examples_returns_the_bundled_names(tmp_path):
     # Independent of any data directory: examples live in the package (D-14).
     assert list_examples() == EXPECTED_EXAMPLE_NAMES
 
@@ -93,11 +102,15 @@ def test_every_example_round_trips_with_a_written_theory():
 
 def test_no_example_filters_on_provider_weather_or_season_to_date():
     # D-21: these would guarantee zero matches on upcoming games. Written as a
-    # loop so a fourth example added later cannot quietly violate it.
+    # loop so a fifth example added later cannot quietly violate it. The one
+    # documented exception (WEATHER_FILTER_EXCEPTIONS) is neutral-site-indoor-unders'
+    # gameIndoors filter -- see comment above that set.
     for name in list_examples():
         system = load_example_system(name).system
         assert not system.providers, f"{name} declares a provider filter"
         for filt in system.feature_filters:
+            if (name, filt.key) in WEATHER_FILTER_EXCEPTIONS:
+                continue
             assert filt.key not in WEATHER_KEYS, f"{name} filters on weather {filt.key}"
             assert filt.key not in SEASON_TO_DATE_KEYS, (
                 f"{name} filters on season-to-date {filt.key}"
