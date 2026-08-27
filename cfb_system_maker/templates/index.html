@@ -526,22 +526,27 @@
             <div class="range-chart chart-card" aria-label="Money Won by Line Range">
               <h3>Money Won</h3>
               <svg viewBox="0 0 520 170" role="img" preserveAspectRatio="none" class="money-chart">
+                {# The same geometry drawn twice and clipped at the zero axis:
+                   whatever sits above zero paints green, whatever dips below
+                   paints red. A line that crosses zero gets both. #}
                 <defs>
-                  <linearGradient id="fillPos" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stop-color="var(--win)" stop-opacity="0.22" />
-                    <stop offset="100%" stop-color="var(--win)" stop-opacity="0" />
-                  </linearGradient>
+                  <clipPath id="rangeWin"><rect x="0" y="0" width="520" height="{{ chart.zero_y }}" /></clipPath>
+                  <clipPath id="rangeLoss"><rect x="0" y="{{ chart.zero_y }}" width="520" height="{{ 170 - chart.zero_y }}" /></clipPath>
                 </defs>
                 <line x1="28" x2="492" y1="{{ chart.zero_y }}" y2="{{ chart.zero_y }}" class="zero-line" />
-                {% if chart.area %}<polygon class="chart-area" points="{{ chart.area }}" />{% endif %}
-                {% if chart.polyline %}<polyline points="{{ chart.polyline }}" />{% endif %}
-                {# Markers only when there are few enough to read; thousands of
-                   dots render as a blob and hide the line's shape. #}
-                {% if chart.points|length <= 60 %}
-                  {% for point in chart.points %}
-                    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="3" />
-                  {% endfor %}
-                {% endif %}
+                {% for band in [('positive', 'rangeWin'), ('negative', 'rangeLoss')] %}
+                  <g class="{{ band[0] }}" clip-path="url(#{{ band[1] }})">
+                    {% if chart.area %}<polygon class="chart-area" points="{{ chart.area }}" />{% endif %}
+                    {% if chart.polyline %}<polyline points="{{ chart.polyline }}" />{% endif %}
+                    {# Markers only when there are few enough to read; thousands of
+                       dots render as a blob and hide the line's shape. #}
+                    {% if chart.points|length <= 60 %}
+                      {% for point in chart.points %}
+                        <circle cx="{{ point.x }}" cy="{{ point.y }}" r="3" />
+                      {% endfor %}
+                    {% endif %}
+                  </g>
+                {% endfor %}
               </svg>
               <div class="chart-axis"><span>{{ chart.min_x if chart.min_x is not none else "-" }}</span><span>{{ chart.max_x if chart.max_x is not none else "-" }}</span></div>
             </div>
@@ -550,16 +555,24 @@
           <section class="cumulative-chart chart-card" aria-label="Money Won Over Time">
             <h3>Money Won Over Time</h3>
             <svg viewBox="0 0 520 170" role="img" preserveAspectRatio="none" class="money-chart">
+              <defs>
+                <clipPath id="cumWin"><rect x="0" y="0" width="520" height="{{ cumulative_chart.zero_y }}" /></clipPath>
+                <clipPath id="cumLoss"><rect x="0" y="{{ cumulative_chart.zero_y }}" width="520" height="{{ 170 - cumulative_chart.zero_y }}" /></clipPath>
+              </defs>
               <line x1="28" x2="492" y1="{{ cumulative_chart.zero_y }}" y2="{{ cumulative_chart.zero_y }}" class="zero-line" />
-              {% if cumulative_chart.area %}<polygon class="chart-area" points="{{ cumulative_chart.area }}" />{% endif %}
-              {% if cumulative_chart.polyline %}<polyline points="{{ cumulative_chart.polyline }}" />{% endif %}
-              {% if cumulative_chart.points|length <= 60 %}
-                {% for point in cumulative_chart.points %}
-                  <circle cx="{{ point.x }}" cy="{{ point.y }}" r="3">
-                    <title>Bet {{ point.order + 1 }}: {% if point.profit >= 0 %}+{% endif %}${{ "%.2f"|format(point.profit * 100) }}</title>
-                  </circle>
-                {% endfor %}
-              {% endif %}
+              {% for band in [('positive', 'cumWin'), ('negative', 'cumLoss')] %}
+                <g class="{{ band[0] }}" clip-path="url(#{{ band[1] }})">
+                  {% if cumulative_chart.area %}<polygon class="chart-area" points="{{ cumulative_chart.area }}" />{% endif %}
+                  {% if cumulative_chart.polyline %}<polyline points="{{ cumulative_chart.polyline }}" />{% endif %}
+                  {% if cumulative_chart.points|length <= 60 %}
+                    {% for point in cumulative_chart.points %}
+                      <circle cx="{{ point.x }}" cy="{{ point.y }}" r="3">
+                        <title>Bet {{ point.order + 1 }}: {% if point.profit >= 0 %}+{% endif %}${{ "%.2f"|format(point.profit * 100) }}</title>
+                      </circle>
+                    {% endfor %}
+                  {% endif %}
+                </g>
+              {% endfor %}
             </svg>
             <div class="chart-axis"><span>Bet {{ (cumulative_chart.min_x + 1) if cumulative_chart.min_x is not none else "-" }}</span><span>Bet {{ (cumulative_chart.max_x + 1) if cumulative_chart.max_x is not none else "-" }}</span></div>
           </section>

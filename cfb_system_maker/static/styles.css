@@ -1896,9 +1896,27 @@ code {
 }
 
 .chart-area {
-  fill: var(--accent);
-  opacity: 0.1;
+  opacity: 0.12;
   stroke: none;
+}
+
+/* Money charts are split at the zero axis: profit paints green, loss red. */
+.money-chart .positive polyline,
+.money-chart .positive circle {
+  stroke: var(--accent);
+}
+
+.money-chart .positive .chart-area {
+  fill: var(--accent);
+}
+
+.money-chart .negative polyline,
+.money-chart .negative circle {
+  stroke: var(--loss);
+}
+
+.money-chart .negative .chart-area {
+  fill: var(--loss);
 }
 
 .range-chart polyline,
