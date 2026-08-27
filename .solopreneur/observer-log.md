@@ -186,3 +186,21 @@
 **Alternatives**: Skip Phase 6 manually, start autonomous at Phase 7
 **Context**: It'll generate real PLAN.md/re-verify MERGE-01/02 — harmless since both are already true (merge done, search_runs empty); costs one wasted cycle but keeps everything tool-consistent
 ---
+
+## [2026-08-26 21:41:09] - Filter-detail double-count semantics (Grey Area 1/2). A total system's team/conference filter with either-perspective returns a tuple (home_value, away_value) per game; today's bug: same bet counted in BOTH team's value rows, ~2x the true matched-game count. Recommended: one row per matching team-value is legitimate (a game supports both teams' cover), fix is to show/label the row-sum separately from the true matched-game count — rationale: preserves the per-team breakdown Bet Labs users expect, avoids collapsing genuinely useful either-side data, and PITFALLS.md's own fix suggestion (WR-01 test) assumes fan-out stays and is bypassed only for domain-edge clearing, not collapsed to one row.
+**Choice**: Accept: fan-out is correct, add labeled row-sum (Recommended)
+**Alternatives**: Change: collapse to one row per game instead, You decide
+**Context**: One row per matching team-value; modal shows a caption/total that reconciles with top-line bets so the two numbers never look contradictory
+---
+
+## [2026-08-26 21:41:27] - describe() fallback wording (Grey Area 2/2). PITFALLS.md warns a naive fallback risks masking real registry gaps forever (nobody adds a real branch once the symptom disappears). Recommended: deliberately distinct wording (e.g. "{label} filter applied (value: {value})") rather than mimicking natural English — signals "we don't have a nice sentence for this yet" instead of blending in, per PITFALLS.md Pitfall 4's explicit prevention advice.
+**Choice**: Accept: deliberately distinct fallback text (Recommended)
+**Alternatives**: Change: blend in as natural English, You decide
+**Context**: "{label} filter applied (value: {value})" — visibly not hand-written, keeps pressure to add real branches as registry grows
+---
+
+## [2026-08-26 21:42:16] - Captured: (1) filter-detail double-count — keep tuple fan-out, add labeled row-sum reconciling with top-line total; (2) describe() fallback — deliberately distinct text signaling a registry gap, not natural-English blend-in. Any other gray areas unclear for Phase 7?
+**Choice**: I'm ready for context (Recommended)
+**Alternatives**: Explore more gray areas
+**Context**: Proceed to write CONTEXT.md from these decisions
+---
