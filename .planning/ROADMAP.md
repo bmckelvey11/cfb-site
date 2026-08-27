@@ -25,7 +25,7 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 **Milestone Goal:** Close out v1.0's deferred verifications and accepted risks, and merge in-flight fixes, before the 2026-08-29 season start.
 
 - [x] **Phase 6: Merge & Stale-Stats Audit** - Land the review branch on master and confirm no stale search-run results silently disagree with the new matching semantics — completed 2026-08-26
-- [ ] **Phase 7: Integrity Fixes** - Close the describe() silent-drop risk, fix the filter-detail modal's double-counting bug, and close out the Hide Duplicates deferral with the correct architectural resolution
+- [x] **Phase 7: Integrity Fixes** - Close the describe() silent-drop risk, fix the filter-detail modal's double-counting bug, and close out the Hide Duplicates deferral with the correct architectural resolution (completed 2026-08-26)
 - [ ] **Phase 8: Neutral-Site & Indoor Unders Example** - Ship the 4th bundled example system with an honest, disclosed sample size
 - [ ] **Phase 9: Live In-Season Verification** - Confirm Current Matches and feature-filtered matching work against the real 2026 season
 
@@ -96,6 +96,6 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 | 4. Filter Popup Modal | v1.0 | 4/4 | Complete | 2026-07-17 |
 | 5. Dashboard & Current Matches | v1.0 | 6/6 | Complete | 2026-07-20 |
 | 6. Merge & Stale-Stats Audit | v1.1 | 2/1 | Complete    | 2026-08-26 |
-| 7. Integrity Fixes | v1.1 | 3/3 | In Progress|  |
+| 7. Integrity Fixes | v1.1 | 3/3 | Complete    | 2026-08-26 |
 | 8. Neutral-Site & Indoor Unders Example | v1.1 | 0/TBD | Not started | - |
 | 9. Live In-Season Verification | v1.1 | 0/TBD | Not started | - |

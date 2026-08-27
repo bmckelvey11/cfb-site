@@ -52,11 +52,12 @@ A saved system's main page reads like a Bet Labs system editor (stat chips, cumu
 - ✓ `upcoming` CLI pipeline + Current Matches panel: upcoming (unplayed, lines-only) games matched against saved systems, fade-correct play text, reused `describe()` filter details — Phase 5
 - ✓ `fix/web-app-review-2026-08-26` merged to `master` (total-filter-semantics fixes, security/a11y/perf fixes) with full test suite passing — Phase 6 (MERGE-01)
 - ✓ `data/search_runs/` audited for stale pre-merge `SearchRun`/`SearchRunFinalist` data — confirmed empty, no-op — Phase 6 (MERGE-02)
+- ✓ `describe()` renders a visibly-distinct fallback sentence (never `|safe`) for any active filter whose `(op, control)` combo isn't covered by a hand-written branch, with a working remove-link and Edit correctly suppressed for the whole filter group when any member is unrenderable; verified live in-browser on both the system editor and Current Matches panel — Phase 7 (FIX-01, closes T-01-03)
+- ✓ `/filter-detail` modal's per-value rows for total-system team/conference filters keep their tuple fan-out (correct per-team breakdown) and now show a reconciliation caption stating the true distinct-matched-game count, verified live in-browser — Phase 7 (FIX-02)
+- ✓ Hide Duplicates deferral closed in `PROJECT.md` Out of Scope with the accurate architectural finding — Phase 7 (FIX-03)
 
 ### Active
 
-- [ ] Close T-01-03: `describe()` must never silently drop an active filter's sentence while `feature_ok()` still applies it — Phase 7 (FIX-01)
-- [ ] `/filter-detail` modal's per-value Record/ROI/Money rows must reconcile with the top-line backtest result for total-system team/conference filters (currently double-count) — Phase 7 (FIX-02)
 - [ ] Bundle a neutral-site + indoor unders example system (63.3% over 109 games, p=0.014; all three features — `neutralSite`, `gameIndoors`, `venue_dome` — already in the registry) — Phase 8 (DATA-01)
 - [ ] Live in-season verification: Current Matches shows real unplayed games with posted lines; feature-filtered systems match via season-to-date stats — Phase 9 (DATA-02)
 
@@ -95,7 +96,8 @@ A saved system's main page reads like a Bet Labs system editor (stat chips, cumu
 | Keep current main-page layout (sidebar + workspace); filter configuration moves into popup modals rather than replacing the whole page | User explicitly likes the current main-page GUI; the popup-modal interaction is the specific gap vs Bet Labs | ✓ Validated — Phase 1 shipped stat chips/graph/filter sentences/theory into the existing layout, no page restructure |
 | Whole bet-labs-parity-plan in scope (not just the popup modal) | User chose broad scope over narrow slice when asked | ✓ Delivered — v1.0 shipped all five phases (editor, integrity, data, modal, dashboard) |
 | Data extension (backfill + more CFBD/GraphQL endpoints into registry) included in this project | User wants both deeper history and broader feature coverage, not just UI work | ✓ Delivered — Phase 3 (2013 floor confirmed; success-rate/explosiveness/wEPA features added) |
-| Hide Duplicates deferred | Only relevant once systems can match both sides of a single game; not true of side-fixed systems today | Superseded — Phase 6 research confirmed `run_backtest` is structurally 1:1 on `game_id`; there is no top-line duplication to toggle away. The real bug is a `/filter-detail` modal per-value double-count, scoped to close formally in Phase 7 (FIX-02/FIX-03) |
+| Hide Duplicates deferred | Only relevant once systems can match both sides of a single game; not true of side-fixed systems today | Superseded — Phase 6 research confirmed `run_backtest` is structurally 1:1 on `game_id`; there is no top-line duplication to toggle away. The real bug is a `/filter-detail` modal per-value double-count, closed via reconciliation caption in Phase 7 (FIX-02/FIX-03) |
+| describe() fallback and Edit-suppression gate must key on "whole filter group renderable", not "any filter in the group renderable" | Code review (Phase 7, WR-01) found the original implementation dropped a sibling filter sharing a `(key, perspective)` with a renderable one — silently violating the phase's own "never hide an active filter" goal, and risking data loss on modal re-save | ✓ Fixed — Phase 7 (commit `da558f8`), `group_is_renderable()` requires the whole group to match an exact round-trippable shape; verified live in-browser post-fix |
 | Rename historical execution artifacts to avoid GSD plan/summary ID collisions | GSD's `phase-plan-index` matches summaries to plans by filename ID prefix (`{phase}-{plan}-SUMMARY.md`); a pre-existing summary sharing a plan's ID number silently marks that plan complete without its tasks ever running | ✓ Applied — Phase 6: renamed a direct-execution record to `06-00-DIRECT-EXECUTION-SUMMARY.md` so `06-01-SUMMARY.md` correctly pairs with `06-01-PLAN.md`'s actual (re-)verification |
 | Worktree-isolated agents checking a gitignored directory must read the shared checkout's absolute path, not a worktree-relative `cd` | `data/` is gitignored; a fresh agent worktree structurally lacks it regardless of the shared checkout's real contents — a worktree-relative `ls` proves worktree isolation, not directory state | ✓ Learned — Phase 6 (06-01-SUMMARY.md); pattern to reuse for any future gitignored-path check from an isolated executor |
 | Teaser / alternate-line records (DASH-04) descoped from v1.0 during Phase 5 discussion | Two pricing questions unresolved (teasers don't price at -110; totals direction); shelved to avoid guessing | ✓ Deferred — 2026-07-20, partial decisions preserved in Phase 5 context archive |
@@ -123,4 +125,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-26 after Phase 6 (Merge & Stale-Stats Audit)*
+*Last updated: 2026-08-26 after Phase 7 (Integrity Fixes)*
