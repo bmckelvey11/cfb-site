@@ -61,14 +61,11 @@ def main() -> None:
         miss = [f for f in want if f not in on_disk]
         detail[ep.name] = miss
 
-        # empty `[]` payloads among files we do have
-        blank = []
-        for f in have:
-            try:
-                if json.loads((raw / f).read_text()) == []:
-                    blank.append(f)
-            except Exception:
-                blank.append(f + " (UNREADABLE)")
+        # Empty `[]` payloads among files we do have. Tested by size, not by parsing:
+        # save_raw writes json.dumps(rows, indent=2), so an empty list is exactly the
+        # 2 bytes `[]`. Parsing instead would read every file, and data/raw/ holds
+        # multi-GB per-game dumps.
+        blank = [f for f in have if _is_empty_json(raw / f)]
         if blank:
             empties[ep.name] = blank
 
@@ -118,6 +115,22 @@ def main() -> None:
                 print(f"  per-season shards: {', '.join(shards)}")
         except Exception as exc:  # pragma: no cover
             print("\nGRAPHQL: could not compare —", exc)
+
+
+_EMPTY_JSON = {b"[]", b"{}"}
+
+
+def _is_empty_json(path: Path) -> bool:
+    """True if the file holds an empty JSON array/object, by size rather than parsing.
+
+    Anything larger than a few bytes has content, so only tiny files are opened.
+    """
+    try:
+        if path.stat().st_size > 8:
+            return False
+        return path.read_bytes().strip() in _EMPTY_JSON
+    except OSError:
+        return False
 
 
 def _is_shard(stem: str, stems: set[str]) -> bool:
