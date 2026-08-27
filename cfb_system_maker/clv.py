@@ -95,3 +95,41 @@ def find_closing_line(bet: BetLogRecord, data_dir: str | Path) -> float | None:
                     return line[field]
         return None  # game found but no usable line from any preferred provider
     return None
+
+
+def compute_clv_chart(bets_with_clv: list[tuple[BetLogRecord, float]]) -> dict:
+    if not bets_with_clv:
+        return {"points": [], "polyline": "", "zero_y": 75, "min_x": None, "max_x": None}
+
+    ordered = sorted(bets_with_clv, key=lambda pair: pair[0].date)
+
+    width = 520
+    height = 150
+    pad_x = 28
+    pad_y = 18
+
+    running = 0.0
+    running_values = []
+    for _, clv in ordered:
+        running = round(running + clv, 4)
+        running_values.append(running)
+
+    values = running_values + [0]
+    min_clv = min(values)
+    max_clv = max(values)
+    span = max_clv - min_clv or 1
+
+    points = []
+    for index, clv in enumerate(running_values):
+        x = pad_x if len(ordered) == 1 else pad_x + (width - pad_x * 2) * index / (len(ordered) - 1)
+        y = height - pad_y - ((clv - min_clv) / span) * (height - pad_y * 2)
+        points.append({"x": round(x, 2), "y": round(y, 2), "order": index, "clv": clv})
+
+    zero_y = height - pad_y - ((0 - min_clv) / span) * (height - pad_y * 2)
+    return {
+        "points": points,
+        "polyline": " ".join(f"{point['x']},{point['y']}" for point in points),
+        "zero_y": round(zero_y, 2),
+        "min_x": 0,
+        "max_x": len(ordered) - 1,
+    }

@@ -4,6 +4,7 @@ from cfb_system_maker.clv import (
     SeasonClv,
     compute_clv,
     compute_clv_by_season,
+    compute_clv_chart,
     compute_clv_stats,
     find_closing_line,
 )
@@ -145,3 +146,19 @@ def test_find_closing_line_falls_back_to_prior_season_for_january_bet(tmp_path):
     bet = _bet(game_id=1, date="2024-01-08", bet_type="spread")
     closing = find_closing_line(bet, tmp_path)
     assert closing == -3.0
+
+
+def test_compute_clv_chart_empty_input_returns_empty_shape():
+    result = compute_clv_chart([])
+    assert result == {"points": [], "polyline": "", "zero_y": 75, "min_x": None, "max_x": None}
+
+
+def test_compute_clv_chart_orders_by_date_and_accumulates():
+    later = _bet(game_id=2, date="2023-09-08")
+    earlier = _bet(game_id=1, date="2023-09-01")
+    # passed out of order -- function must sort by date
+    result = compute_clv_chart([(later, 3.0), (earlier, 2.0)])
+    assert len(result["points"]) == 2
+    assert result["points"][0]["clv"] == 2.0  # earlier bet first, cumulative 2.0
+    assert result["points"][1]["clv"] == 5.0  # earlier + later, cumulative 2.0 + 3.0
+    assert result["max_x"] == 1
