@@ -8,7 +8,7 @@ status: executing
 stopped_at: Completed 08-01-PLAN.md
 last_updated: "2026-08-27T09:34:04.282Z"
 last_activity: 2026-08-27
-last_activity_desc: Phase 8 complete, transitioned to Phase 9
+last_activity_desc: "Quick task 260827-8or: Feature Filters sidebar search and collapsible groups"
 progress:
   total_phases: 4
   completed_phases: 3
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-07-20)
 Phase: 9 — Live In-Season Verification
 Plan: Not started
 Status: Ready to execute
-Last activity: 2026-08-27 — Phase 8 complete, transitioned to Phase 9
+Last activity: 2026-08-27 — Completed quick task 260827-8or: Feature Filters sidebar search and collapsible groups
 
 Progress: [██████████] 100%
 
@@ -167,6 +167,7 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 | 2026-07-20 | fix-normalize-select-line-total-drop-fal | `normalize._select_line` picked one line per game; total (over/under) is now backfilled from the first sibling provider that has it when the selected line's total is null — fixes ~93-97% total-null rate in 2013-2016 seasons | complete |
 | 2026-08-26 | total-filter-semantics-fixes | Filter audit findings 1-6 + 5 smaller UX gaps: totals semantics (1-3), description/grade/stats accuracy (4-6), no-JS perspective sync + dead modal buttons + silent parse warnings + Max ROI overlap fix (UX gaps) | complete |
 | 2026-08-26 | register-player-success-rate-endpoints | Registered `player_success_season` and `player_success_game` CFBD endpoints in scraper registry, bringing coverage from 61 to 63 entries | complete |
+| 2026-08-27 | feature-filter-sidebar-search-collapsibl | Feature Filters sidebar search + collapsible groups with active-count badges (`5231273`). Planned Fixes 2 and 3 were dropped, not applied: a concurrent session landed `7c2e694`/`969c7ca` (one row per stat, in-modal perspective switcher removed) and the `points\|length <= 60` marker gate, which solved both goals first | complete (1 of 3 landed, 2 superseded) |
 
 ## Deferred Items
 
