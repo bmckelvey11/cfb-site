@@ -12,3 +12,6 @@ __pycache__/
 .claude/proven-config.json
 .cursor/
 graphify-out/
+
+# Superpowers/SDD per-run plan progress (scratch state, not a deliverable)
+.sdd-progress/
