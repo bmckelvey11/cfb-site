@@ -136,9 +136,10 @@ def test_describe_feature_filter_numeric_exact_and_perspective_coalesce():
             )
         )
     )
-    assert {"text": f"Bet-side {label} is exactly 0.5", "key": "ff:returning_ppa"} in exact
-    keys = [row["key"] for row in exact if row["key"] == "ff:returning_ppa"]
-    assert keys == ["ff:returning_ppa"]
+    assert {"text": f"Bet-side {label} is exactly 0.5", "key": "ff:returning_ppa@bet_side"} in exact
+    # The gte/lte pair still coalesces to ONE sentence for the perspective.
+    keys = [row["key"] for row in exact if row["key"].startswith("ff:returning_ppa")]
+    assert keys == ["ff:returning_ppa@bet_side"]
 
 
 def test_describe_unknown_feature_key_renders_warning_sentence():
@@ -162,7 +163,9 @@ def test_describe_feature_filter_perspective_prefixes_team_scoped_label():
         )
         result = describe(system)
         expected_text = f"{expected_prefix} {label} is at least 0.5"
-        assert {"text": expected_text, "key": "ff:returning_ppa"} in result
+        # Team-scoped sentences are keyed per perspective so each one gets its
+        # own Edit/Remove -- the same stat can be filtered on both teams.
+        assert {"text": expected_text, "key": f"ff:returning_ppa@{perspective}"} in result
 
 
 def test_describe_feature_filter_perspective_single_default_has_no_prefix_even_when_team_scoped():
