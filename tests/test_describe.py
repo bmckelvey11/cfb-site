@@ -208,6 +208,28 @@ def test_describe_module_has_no_flask_dependency():
     assert "request" not in source.lower()
 
 
+def test_describe_uncovered_op_control_combo_renders_distinct_fallback_sentence():
+    label = FEATURE_BY_KEY["neutralSite"].label
+    system = SystemFilter(feature_filters=(FeatureFilter(key="neutralSite", op="in", value=[True]),))
+    result = describe(system)
+    assert {
+        "text": f"{label} filter applied (value: {[True]!r})",
+        "key": "ff:neutralSite",
+    } in result
+
+    # Distinct from the 4 hand-written branches: only the fallback (and the
+    # pre-existing "Unknown filter" branch) ever emits "filter applied".
+    branch_texts = [
+        f"{label} is Yes",
+        f"{label} is No",
+        f"{label} is one of True",
+        "the neutralSite is between",
+    ]
+    fallback_text = next(row["text"] for row in result if row["key"] == "ff:neutralSite")
+    assert "filter applied" in fallback_text
+    assert fallback_text not in branch_texts
+
+
 def test_describe_non_finite_numbers_do_not_crash():
     spread_system = SystemFilter(bet_type="spread", min_spread=float("nan"))
     result = describe(spread_system)
