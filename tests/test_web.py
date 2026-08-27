@@ -2092,3 +2092,14 @@ def test_500_renders_branded_error_page(tmp_path):
     assert resp.status_code == 500
     assert b"Something went wrong" in resp.data
     assert b"kaboom" not in resp.data  # no leak
+
+
+def test_security_headers_present_on_all_pages(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+    for path in ("/", "/system", "/compare"):
+        resp = client.get(path)
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+        assert resp.headers["Referrer-Policy"] == "same-origin"
+        assert resp.headers["Content-Security-Policy"] == "default-src 'self'"
+        assert resp.headers["X-Frame-Options"] == "DENY"

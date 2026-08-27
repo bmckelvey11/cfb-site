@@ -464,6 +464,10 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         start = g.get("request_start")
         elapsed_ms = (_time.perf_counter() - start) * 1000 if start is not None else 0.0
         logger.info("%s %s %s %.0fms", request.method, request.full_path.rstrip("?"), response.status_code, elapsed_ms)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("Content-Security-Policy", "default-src 'self'")
+        response.headers.setdefault("X-Frame-Options", "DENY")
         return response
 
     @app.get("/")
