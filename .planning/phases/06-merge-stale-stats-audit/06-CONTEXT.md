@@ -8,7 +8,7 @@
 
 Merge `fix/web-app-review-2026-08-26` into `master` with the full test suite passing, and audit `data/search_runs/` for `SearchRun`/`SearchRunFinalist` JSON computed under pre-merge total-filter matching semantics — regenerate or flag any that are stale.
 
-**Both requirements are already satisfied and verified as of 2026-08-26** — see `06-01-SUMMARY.md` in this directory:
+**Both requirements are already satisfied and verified as of 2026-08-26** — see `06-00-DIRECT-EXECUTION-SUMMARY.md` in this directory:
 - MERGE-01: `fix/web-app-review-2026-08-26` merged to `master` (commit `2e86ba5`, pushed to `origin/master`), full test suite (441 tests) passing post-merge, 2 real conflicts resolved (`filter_modal.js`, `test_storage.py`, both additive — verified against surrounding code before resolving).
 - MERGE-02: `data/search_runs/` audited directly (`ls data/search_runs/*.json`) — 0 files present, so there is nothing stale to regenerate or flag. Confirmed by inspection, not assumption.
 
@@ -28,7 +28,7 @@ This is a pure infrastructure phase (merge + directory audit; no user-facing beh
 ## Existing Code Insights
 
 ### Reusable Assets
-- `06-01-SUMMARY.md` in this phase directory — full record of what was done, which files changed, and why, including the discovery that PR #2 had partially merged the branch out-of-band.
+- `06-00-DIRECT-EXECUTION-SUMMARY.md` in this phase directory — full record of what was done, which files changed, and why, including the discovery that PR #2 had partially merged the branch out-of-band.
 
 ### Established Patterns
 - Merge-conflict resolution pattern used and worth reusing if any new conflicts surface: when a conflict block has an empty `HEAD` side and a populated incoming side, verify the incoming addition against surrounding uses of the same state/fields elsewhere in the file before taking it wholesale.
