@@ -636,7 +636,7 @@ code {
 
 .banner-error {
   background: #fee;
-  border: 1px solid #f5a;
+  border: 1px solid var(--loss);
   color: var(--loss);
 }
 
