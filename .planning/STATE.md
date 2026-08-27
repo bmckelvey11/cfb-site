@@ -148,7 +148,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 7 scheduled] T-01-03 (`01-SECURITY.md`): describe()'s four hardcoded (op,control) render branches don't cover every combo `feature_ok()` will actually evaluate — a mismatch is reachable via crafted query params, not the normal form UI. Scheduled to close in v1.1 Phase 7 (FIX-01).
+None open. T-01-03 (`describe()` silent filter drop) closed 2026-08-26 in Phase 7 (FIX-01, commit `da558f8` for the WR-01 follow-up fix).
 
 ## Quick Tasks Completed
 
