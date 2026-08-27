@@ -25,6 +25,16 @@
   const maxRoiBtn = document.getElementById("filter-modal-max-roi");
   const clearBtn = document.getElementById("filter-modal-clear");
 
+  // Exclusions post to a parallel hidden input rather than an operator on the
+  // include select, matching the server's separate exclude_* fields.
+  const CORE_EXCLUDE_PARAM = {
+    "filter_seasons": "filter_exclude_seasons",
+    "filter_weeks": "filter_exclude_weeks",
+    "filter_teams": "filter_exclude_teams",
+    "filter_conferences": "filter_exclude_conferences",
+    "filter_providers": "filter_exclude_providers",
+  };
+
   const CORE_PARAM = {
     "core:season": "filter_seasons",
     "core:week": "filter_weeks",
@@ -225,6 +235,21 @@
     return value.split(",").map((part) => part.trim()).filter(Boolean);
   }
 
+  // A committed exclusion lives in the hidden filter_exclude_* input, so
+  // reopening the modal restores the toggle rather than defaulting to include.
+  function committedCoreExclusion(paramName) {
+    const excludeName = CORE_EXCLUDE_PARAM[paramName];
+    if (!excludeName) {
+      return [];
+    }
+    const el = filtersForm.querySelector('[name="' + excludeName + '"]');
+    const value = el ? String(el.value || "").trim() : "";
+    if (!value) {
+      return [];
+    }
+    return value.split(",").map((part) => part.trim()).filter(Boolean);
+  }
+
   function committedFeature(key) {
     const fallback = document.querySelector('[data-fallback-for="feature:' + key + '"]');
     if (!fallback) {
@@ -253,7 +278,7 @@
     };
   }
 
-  function committedNumericBounds(candidateId) {
+  function committedNumericBounds(candidateId, wantPerspective) {
     const fields = CORE_RANGE_FIELDS[candidateId];
     if (fields) {
       const minEl = filtersForm.querySelector('[name="' + fields.min + '"]');
@@ -304,11 +329,15 @@
       if (!any) {
         return null;
       }
-      const first = Object.keys(byPerspective)[0];
+      // Each launcher chip owns ONE perspective; restore that chip's own bounds
+      // rather than whichever perspective happened to be written first.
+      const pick = (wantPerspective && byPerspective[wantPerspective])
+        ? wantPerspective
+        : Object.keys(byPerspective)[0];
       return {
-        min: byPerspective[first].min,
-        max: byPerspective[first].max,
-        perspective: first,
+        min: byPerspective[pick].min,
+        max: byPerspective[pick].max,
+        perspective: pick,
         byPerspective: byPerspective,
       };
     }
@@ -345,10 +374,15 @@
       return params;
     }
     if (state.kind === "core-list") {
+      const excludeName = CORE_EXCLUDE_PARAM[state.param];
       params.delete(state.param);
       params.delete(state.param.replace("filter_", ""));
+      if (excludeName) {
+        params.delete(excludeName);
+        params.delete(excludeName.replace("filter_", ""));
+      }
       if (state.selected.length) {
-        params.set(state.param, state.selected.join(","));
+        params.set(state.exclude && excludeName ? excludeName : state.param, state.selected.join(","));
       }
     } else if (state.kind === "feature") {
       const key = state.featureKey;
@@ -435,31 +469,6 @@
           params.append("ff_op", "lte");
           params.append("ff_value", String(state.max));
           params.append("ff_perspective", state.perspective || "single");
-        }
-        // Second perspective (opponent) rides along as its own rows so the live
-        // preview reflects BOTH constraints, exactly as Save will commit them.
-        const sec = state.secondaryBounds;
-        if (sec && sec.min != null && sec.max != null
-            && Number.isFinite(Number(sec.min)) && Number.isFinite(Number(sec.max))) {
-          const secLow = state.domainMin != null && Number(sec.min) <= Number(state.domainMin);
-          const secHigh = state.domainMax != null && Number(sec.max) >= Number(state.domainMax);
-          if (!secLow || !secHigh) {
-            if (params.getAll("ff_enable").indexOf(key) === -1) {
-              params.append("ff_enable", key);
-            }
-            if (!secLow) {
-              params.append("ff_key", key);
-              params.append("ff_op", "gte");
-              params.append("ff_value", String(sec.min));
-              params.append("ff_perspective", "opponent");
-            }
-            if (!secHigh) {
-              params.append("ff_key", key);
-              params.append("ff_op", "lte");
-              params.append("ff_value", String(sec.max));
-              params.append("ff_perspective", "opponent");
-            }
-          }
         }
       }
     }
@@ -918,6 +927,7 @@
     }
 
     renderPerspectiveControl(() => reloadFeatureDetail());
+    renderExcludeControl();
 
     if (!state.rows.length) {
       setMaxRoiVisible(false);
@@ -1422,88 +1432,41 @@
     hint.hidden = boundsAreValid();
     controlsEl.appendChild(hint);
 
-    renderSecondaryBounds();
-
     updateSelectedSpan();
     renderNumericExplore();
   }
 
-  // Team-scoped spread systems can constrain the opponent independently of the
-  // team being bet on. Rendered as a plain number pair (not a second slider):
-  // the chart and Max ROI above describe the bet-side distribution only.
-  function secondaryAvailable() {
-    if (!state || state.kind !== "numeric" || !state.teamScoped) {
-      return false;
-    }
-    if (state.perspective === "opponent") {
-      return false;
-    }
-    const allowed = state.allowedPerspectives;
-    return Boolean(allowed && allowed.indexOf("opponent") !== -1);
-  }
-
-  function renderSecondaryBounds() {
-    if (!secondaryAvailable()) {
-      state.secondaryBounds = null;
+  // Include/exclude toggle for core list filters. Feature filters carry their
+  // own op, so this only applies to the core-list kind.
+  function renderExcludeControl() {
+    if (!state || state.kind !== "core-list" || !CORE_EXCLUDE_PARAM[state.param]) {
       return;
     }
     const wrap = document.createElement("div");
-    wrap.className = "filter-modal__secondary";
-
-    const heading = document.createElement("p");
-    heading.className = "filter-modal__secondary-title";
-    heading.textContent = "Opponent";
-    wrap.appendChild(heading);
-
-    const note = document.createElement("p");
-    note.className = "filter-modal__hint";
-    note.textContent = "Optional. Also require the opposing team's value to fall in this range.";
-    wrap.appendChild(note);
-
-    const row = document.createElement("div");
-    row.className = "filter-modal__between";
-    const label = document.createElement("span");
-    label.textContent = "BETWEEN";
-    const step = stepForDomain(state.domainMin, state.domainMax);
-    const sec = state.secondaryBounds || {};
-    const minEl = document.createElement("input");
-    minEl.type = "number";
-    minEl.step = step;
-    minEl.dataset.role = "secondary-min";
-    minEl.setAttribute("aria-label", "Opponent minimum");
-    minEl.value = sec.min == null ? "" : String(sec.min);
-    const and = document.createElement("span");
-    and.textContent = "AND";
-    const maxEl = document.createElement("input");
-    maxEl.type = "number";
-    maxEl.step = step;
-    maxEl.dataset.role = "secondary-max";
-    maxEl.setAttribute("aria-label", "Opponent maximum");
-    maxEl.value = sec.max == null ? "" : String(sec.max);
-
-    const onEdit = () => {
-      const rawMin = minEl.value.trim();
-      const rawMax = maxEl.value.trim();
-      if (rawMin === "" && rawMax === "") {
-        state.secondaryBounds = null;
-      } else {
-        // A half-filled pair falls back to the domain edge so the bound the user
-        // did type still applies, instead of silently doing nothing.
-        state.secondaryBounds = {
-          min: rawMin === "" ? state.domainMin : Number(rawMin),
-          max: rawMax === "" ? state.domainMax : Number(rawMax),
-        };
-      }
-      refreshLive();
-    };
-    minEl.addEventListener("input", onEdit);
-    maxEl.addEventListener("input", onEdit);
-
-    row.appendChild(label);
-    row.appendChild(minEl);
-    row.appendChild(and);
-    row.appendChild(maxEl);
-    wrap.appendChild(row);
+    wrap.className = "filter-modal__exclude";
+    const group = document.createElement("div");
+    group.className = "filter-modal__exclude-group";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Include or exclude the selected values");
+    [
+      { mode: false, label: "Is one of" },
+      { mode: true, label: "Is not one of" },
+    ].forEach((option) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = option.label;
+      button.setAttribute("aria-pressed", String(Boolean(state.exclude) === option.mode));
+      button.addEventListener("click", () => {
+        if (Boolean(state.exclude) === option.mode) {
+          return;
+        }
+        state.exclude = option.mode;
+        renderValueTable();
+        refreshLive();
+      });
+      group.appendChild(button);
+    });
+    wrap.appendChild(group);
     controlsEl.appendChild(wrap);
   }
 
@@ -1515,7 +1478,23 @@
     if (!select) {
       return;
     }
+    const excludeName = CORE_EXCLUDE_PARAM[state.param];
+    const excludeEl = excludeName
+      ? filtersForm.querySelector('[name="' + excludeName + '"]')
+      : null;
     const joined = state.selected.slice().map(String).sort().join(",");
+    // Include and exclude are mutually exclusive for one filter: writing one
+    // always clears the other, so a saved system never carries both.
+    if (state.exclude) {
+      select.value = "";
+      if (excludeEl) {
+        excludeEl.value = joined;
+      }
+      return;
+    }
+    if (excludeEl) {
+      excludeEl.value = "";
+    }
     let draftOpt = select.querySelector("option[data-modal-draft='1']");
     if (joined && !Array.from(select.options).some((opt) => opt.value === joined)) {
       if (!draftOpt) {
@@ -1614,29 +1593,27 @@
     const enable = fallback.querySelector('input[name="ff_enable"]');
     const perRows = fallback.querySelectorAll("[data-bound-perspective]");
     if (perRows.length) {
-      // Dual-perspective feature: write every perspective's bounds, clearing the
-      // ones the user left at full domain. Enable if ANY perspective constrains.
-      const secondary = state.secondaryBounds || null;
+      // A team-scoped stat renders one gte/lte pair PER perspective and each
+      // launcher chip edits exactly one of them. Touch only this chip's rows so
+      // the bet-side and opponent filters never overwrite each other; the
+      // feature stays enabled while ANY perspective still constrains it.
+      const mine = state.perspective || "single";
       let anyActive = false;
       perRows.forEach((row) => {
-        const persp = row.getAttribute("data-bound-perspective");
         const input = row.querySelector("[data-bound]");
         if (!input) {
           return;
         }
-        const which = input.getAttribute("data-bound");
-        const isSecondary = persp === "opponent" && state.perspective !== "opponent";
-        const src = isSecondary ? secondary : state;
-        if (!src || src.min == null || src.max == null || Number.isNaN(Number(src.min))) {
-          input.value = "";
+        if (row.getAttribute("data-bound-perspective") !== mine) {
+          if (String(input.value || "").trim() !== "") {
+            anyActive = true;
+          }
           return;
         }
-        const lowEdge = state.domainMin != null && Number(src.min) <= Number(state.domainMin);
-        const highEdge = state.domainMax != null && Number(src.max) >= Number(state.domainMax);
-        if (which === "min") {
-          input.value = (!singleValuePick && lowEdge) ? "" : String(src.min);
+        if (input.getAttribute("data-bound") === "min") {
+          input.value = atDomainMin ? "" : String(state.min);
         } else {
-          input.value = (!singleValuePick && highEdge) ? "" : String(src.max);
+          input.value = atDomainMax ? "" : String(state.max);
         }
         if (input.value !== "") {
           anyActive = true;
@@ -1721,7 +1698,10 @@
   }
 
   function openNumericCandidate(candidateId, description, lookahead, button) {
-    const committed = committedNumericBounds(candidateId);
+    const committed = committedNumericBounds(
+      candidateId,
+      button ? button.getAttribute("data-perspective") : null,
+    );
     const teamScoped = button ? button.getAttribute("data-team-scoped") === "1" : false;
     const perspective = button
       ? resolveInitialPerspective(button, committed)
@@ -1737,15 +1717,6 @@
       perspective: perspective,
       min: null,
       max: null,
-      // Opponent-side bounds restored from a saved system, if any. A saved
-      // half-open bound (only a min, or only a max) leaves the other side null
-      // until the domain arrives; fillSecondaryDomain patches it in then.
-      secondaryBounds: (committed && committed.byPerspective && committed.byPerspective.opponent)
-        ? {
-          min: committed.byPerspective.opponent.min,
-          max: committed.byPerspective.opponent.max,
-        }
-        : null,
       domainMin: null,
       domainMax: null,
       rows: [],
@@ -1792,14 +1763,6 @@
         state.chartPoints = payload.chart_points || [];
         state.domainMin = payload.domain && payload.domain.min != null ? Number(payload.domain.min) : null;
         state.domainMax = payload.domain && payload.domain.max != null ? Number(payload.domain.max) : null;
-        if (state.secondaryBounds) {
-          if (state.secondaryBounds.min == null) {
-            state.secondaryBounds.min = state.domainMin;
-          }
-          if (state.secondaryBounds.max == null) {
-            state.secondaryBounds.max = state.domainMax;
-          }
-        }
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
@@ -1873,13 +1836,15 @@
     setClearVisible(false);
     const param = CORE_PARAM[candidateId] || button.getAttribute("data-param") || "";
     if (candidateId.indexOf("core:") === 0) {
+      const committedExcluded = committedCoreExclusion(param);
       state = {
         kind: "core-list",
         candidateId: candidateId,
         control: "categorical",
         teamScoped: false,
         param: param,
-        selected: committedCoreList(param),
+        exclude: committedExcluded.length > 0,
+        selected: committedExcluded.length ? committedExcluded : committedCoreList(param),
         rows: [],
         search: "",
         sortKey: "description",

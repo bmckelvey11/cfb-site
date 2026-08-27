@@ -64,6 +64,11 @@ _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
     "teams": ("filter_teams",),
     "conferences": ("filter_conferences",),
     "providers": ("filter_providers",),
+    "exclude_seasons": ("filter_exclude_seasons",),
+    "exclude_weeks": ("filter_exclude_weeks",),
+    "exclude_teams": ("filter_exclude_teams",),
+    "exclude_conferences": ("filter_exclude_conferences",),
+    "exclude_providers": ("filter_exclude_providers",),
 }
 
 _ALLOWED_PERSPECTIVES = frozenset({"single", "home", "away", "bet_side", "opponent", "either"})
@@ -1163,6 +1168,11 @@ def _form_values_from_args(args: MultiDict) -> dict[str, object]:
         "team": args.get("filter_teams", args.get("team", "")),
         "conference": args.get("filter_conferences", args.get("conference", "")),
         "provider": args.get("filter_providers", args.get("provider", "")),
+        "exclude_season": args.get("filter_exclude_seasons", args.get("exclude_season", "")),
+        "exclude_week": args.get("filter_exclude_weeks", args.get("exclude_week", "")),
+        "exclude_team": args.get("filter_exclude_teams", args.get("exclude_team", "")),
+        "exclude_conference": args.get("filter_exclude_conferences", args.get("exclude_conference", "")),
+        "exclude_provider": args.get("filter_exclude_providers", args.get("exclude_provider", "")),
         "min_spread": args.get("min_spread", ""),
         "max_spread": args.get("max_spread", ""),
         "min_total": args.get("min_total", ""),
@@ -1225,7 +1235,12 @@ def _validate_numeric_fields_strict(values: MultiDict) -> None:
 
 
 def _validate_int_list_fields_strict(values: MultiDict) -> None:
-    for field, legacy in (("filter_seasons", "season"), ("filter_weeks", "week")):
+    for field, legacy in (
+        ("filter_seasons", "season"),
+        ("filter_weeks", "week"),
+        ("filter_exclude_seasons", "exclude_season"),
+        ("filter_exclude_weeks", "exclude_week"),
+    ):
         raw = values.get(field, values.get(legacy, ""))
         if not raw or not str(raw).strip():
             continue
@@ -1241,6 +1256,9 @@ def _validate_int_list_fields_strict(values: MultiDict) -> None:
         ("filter_teams", "team"),
         ("filter_conferences", "conference"),
         ("filter_providers", "provider"),
+        ("filter_exclude_teams", "exclude_team"),
+        ("filter_exclude_conferences", "exclude_conference"),
+        ("filter_exclude_providers", "exclude_provider"),
     ):
         raw = values.get(field, values.get(legacy, ""))
         if not raw or not str(raw).strip():
@@ -1374,6 +1392,11 @@ def _system_from_form(form: dict[str, object]) -> SystemFilter:
         away=bool(form["away"]),
         fade=bool(form["fade"]),
         providers=_str_set(str(form["provider"])),
+        exclude_seasons=_int_set(str(form.get("exclude_season", ""))),
+        exclude_weeks=_int_set(str(form.get("exclude_week", ""))),
+        exclude_teams=_str_set(str(form.get("exclude_team", ""))),
+        exclude_conferences=_str_set(str(form.get("exclude_conference", ""))),
+        exclude_providers=_str_set(str(form.get("exclude_provider", ""))),
         min_spread=_optional_float(str(form["min_spread"])),
         max_spread=_optional_float(str(form["max_spread"])),
         min_total=_optional_float(str(form["min_total"])),

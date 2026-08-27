@@ -21,6 +21,13 @@
         </div>
 
         <form id="filters-form" method="get" class="filters" autocomplete="off">
+          {# Exclusions have no inline control -- the filter modal writes them.
+             Hidden inputs keep them on the query string across submissions. #}
+          <input type="hidden" name="filter_exclude_seasons" id="filter-exclude-seasons" value="{{ form.exclude_season }}">
+          <input type="hidden" name="filter_exclude_weeks" id="filter-exclude-weeks" value="{{ form.exclude_week }}">
+          <input type="hidden" name="filter_exclude_teams" id="filter-exclude-teams" value="{{ form.exclude_team }}">
+          <input type="hidden" name="filter_exclude_conferences" id="filter-exclude-conferences" value="{{ form.exclude_conference }}">
+          <input type="hidden" name="filter_exclude_providers" id="filter-exclude-providers" value="{{ form.exclude_provider }}">
           <fieldset>
             <legend>Bet Type</legend>
             <select name="bet_type">
@@ -196,8 +203,24 @@
                       data-description="{{ feature.description }}"
                       data-lookahead-warning="{{ feature.lookahead_warning }}"
                       data-team-scoped="{{ '1' if feature.team_scoped else '0' }}"
+                      {% if feature.team_scoped and form.bet_type == "spread" %}data-perspective="{{ primary_p }}"{% endif %}
                       aria-haspopup="dialog"
-                    >{{ feature.label }}</button>
+                    >{{ feature.label }}{% if feature.team_scoped and form.bet_type == "spread" %} — Bet-side{% endif %}</button>
+                    {% if feature.team_scoped and form.bet_type == "spread" %}
+                      {# The opponent is its own filter chip: same stat, other team,
+                         independently editable and removable. #}
+                      <button
+                        type="button"
+                        class="filter-launcher"
+                        data-candidate-id="{{ feature.candidate_id }}"
+                        data-control="{{ feature.control }}"
+                        data-description="{{ feature.description }}"
+                        data-lookahead-warning="{{ feature.lookahead_warning }}"
+                        data-team-scoped="1"
+                        data-perspective="{{ secondary_p }}"
+                        aria-haspopup="dialog"
+                      >{{ feature.label }} — Opponent</button>
+                    {% endif %}
                     <div class="filter-fallback" data-fallback-for="{{ feature.candidate_id }}">
                       <details {% if feature.key in enabled_feature_keys %}open{% endif %}>
                         <summary>

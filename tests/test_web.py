@@ -2117,3 +2117,50 @@ def test_disclaimer_footer_on_main_pages(tmp_path):
     client = app.test_client()
     for path in ("/", "/system", "/compare"):
         assert b"research tool" in client.get(path).data
+
+
+def test_exclude_params_parse_into_system(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    with app.test_request_context(
+        "/?bet_type=spread&side=home"
+        "&exclude_team=Michigan,Ohio State"
+        "&exclude_conference=Big Ten"
+        "&exclude_season=2020"
+        "&exclude_week=1"
+        "&exclude_provider=consensus"
+    ):
+        system = web.parse_system_strict()
+    assert system.exclude_teams == {"Michigan", "Ohio State"}
+    assert system.exclude_conferences == {"Big Ten"}
+    assert system.exclude_seasons == {2020}
+    assert system.exclude_weeks == {1}
+    assert system.exclude_providers == {"consensus"}
+
+
+def test_exclude_params_absent_default_empty(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    with app.test_request_context("/?bet_type=spread&side=home"):
+        system = web.parse_system_strict()
+    assert system.exclude_teams == set()
+    assert system.exclude_conferences == set()
+
+
+def test_negated_feature_op_accepted_by_strict_parse(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    with app.test_request_context(
+        "/?bet_type=spread&side=home&ff_enable=venue&ff_key=venue&ff_op=not_eq&ff_value=Ohio+Stadium"
+    ):
+        system = web.parse_system_strict()
+    assert system.feature_filters[0].op == "not_eq"
+
+
+def test_unknown_op_still_rejected(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    with app.test_request_context(
+        "/?bet_type=spread&side=home&ff_enable=venue&ff_key=venue&ff_op=regex&ff_value=x"
+    ):
+        try:
+            web.parse_system_strict()
+        except web.StrictParseError:
+            return
+        raise AssertionError("expected StrictParseError for unsupported op")

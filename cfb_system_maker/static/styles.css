@@ -1044,6 +1044,32 @@ code {
   color: #fff;
 }
 
+.filter-modal__exclude {
+  margin-bottom: 12px;
+}
+
+.filter-modal__exclude-group {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.filter-modal__exclude-group button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filter-modal__exclude-group button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .filter-modal__actions {
   display: flex;
   align-items: center;
