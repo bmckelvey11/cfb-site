@@ -152,3 +152,9 @@
 **Alternatives**: Merge to master locally, Keep branch as-is
 **Context**: Branch is already pushed — opens a GitHub PR for review before it touches master. Keeps the branch alive for any follow-up. Since the branch mixes my work with 3 foreign docs commits, a PR makes that visible for review rather than merging silently.
 ---
+
+## [2026-08-26 20:26:07] - Merge preview looks clean (no conflicts) — fix/web-app-review-2026-08-26 into master. This lands: remaining total-filter-semantics fixes, the full v1.1 planning session (PROJECT/ROADMAP/REQUIREMENTS/STATE.md), 7 analysis docs, roadmap-v2 doc, scraper fixes. Proceed?
+**Choice**: Merge now via git (Recommended)
+**Alternatives**: Open a PR instead, Wait — let me look first
+**Context**: git checkout master && git merge fix/web-app-review-2026-08-26 locally, then push
+---
