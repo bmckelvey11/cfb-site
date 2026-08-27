@@ -280,6 +280,38 @@
     if (!enable || !enable.checked) {
       return null;
     }
+    // Team-scoped numerics render one gte/lte pair per perspective; collect them
+    // all so the modal can restore both the bet-side and opponent bounds.
+    const perRows = fallback.querySelectorAll("[data-bound-perspective]");
+    if (perRows.length) {
+      const byPerspective = {};
+      let any = false;
+      perRows.forEach((row) => {
+        const persp = row.getAttribute("data-bound-perspective");
+        const input = row.querySelector("[data-bound]");
+        if (!persp || !input) {
+          return;
+        }
+        const which = input.getAttribute("data-bound");
+        const raw = String(input.value || "").trim();
+        if (raw === "") {
+          return;
+        }
+        byPerspective[persp] = byPerspective[persp] || { min: null, max: null };
+        byPerspective[persp][which] = Number(raw);
+        any = true;
+      });
+      if (!any) {
+        return null;
+      }
+      const first = Object.keys(byPerspective)[0];
+      return {
+        min: byPerspective[first].min,
+        max: byPerspective[first].max,
+        perspective: first,
+        byPerspective: byPerspective,
+      };
+    }
     const minInput = fallback.querySelector('[data-bound="min"]');
     const maxInput = fallback.querySelector('[data-bound="max"]');
     const perspectiveEl = fallback.querySelector('[name="ff_perspective"]');
@@ -403,6 +435,31 @@
           params.append("ff_op", "lte");
           params.append("ff_value", String(state.max));
           params.append("ff_perspective", state.perspective || "single");
+        }
+        // Second perspective (opponent) rides along as its own rows so the live
+        // preview reflects BOTH constraints, exactly as Save will commit them.
+        const sec = state.secondaryBounds;
+        if (sec && sec.min != null && sec.max != null
+            && Number.isFinite(Number(sec.min)) && Number.isFinite(Number(sec.max))) {
+          const secLow = state.domainMin != null && Number(sec.min) <= Number(state.domainMin);
+          const secHigh = state.domainMax != null && Number(sec.max) >= Number(state.domainMax);
+          if (!secLow || !secHigh) {
+            if (params.getAll("ff_enable").indexOf(key) === -1) {
+              params.append("ff_enable", key);
+            }
+            if (!secLow) {
+              params.append("ff_key", key);
+              params.append("ff_op", "gte");
+              params.append("ff_value", String(sec.min));
+              params.append("ff_perspective", "opponent");
+            }
+            if (!secHigh) {
+              params.append("ff_key", key);
+              params.append("ff_op", "lte");
+              params.append("ff_value", String(sec.max));
+              params.append("ff_perspective", "opponent");
+            }
+          }
         }
       }
     }
@@ -1365,8 +1422,89 @@
     hint.hidden = boundsAreValid();
     controlsEl.appendChild(hint);
 
+    renderSecondaryBounds();
+
     updateSelectedSpan();
     renderNumericExplore();
+  }
+
+  // Team-scoped spread systems can constrain the opponent independently of the
+  // team being bet on. Rendered as a plain number pair (not a second slider):
+  // the chart and Max ROI above describe the bet-side distribution only.
+  function secondaryAvailable() {
+    if (!state || state.kind !== "numeric" || !state.teamScoped) {
+      return false;
+    }
+    if (state.perspective === "opponent") {
+      return false;
+    }
+    const allowed = state.allowedPerspectives;
+    return Boolean(allowed && allowed.indexOf("opponent") !== -1);
+  }
+
+  function renderSecondaryBounds() {
+    if (!secondaryAvailable()) {
+      state.secondaryBounds = null;
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "filter-modal__secondary";
+
+    const heading = document.createElement("p");
+    heading.className = "filter-modal__secondary-title";
+    heading.textContent = "Opponent";
+    wrap.appendChild(heading);
+
+    const note = document.createElement("p");
+    note.className = "filter-modal__hint";
+    note.textContent = "Optional. Also require the opposing team's value to fall in this range.";
+    wrap.appendChild(note);
+
+    const row = document.createElement("div");
+    row.className = "filter-modal__between";
+    const label = document.createElement("span");
+    label.textContent = "BETWEEN";
+    const step = stepForDomain(state.domainMin, state.domainMax);
+    const sec = state.secondaryBounds || {};
+    const minEl = document.createElement("input");
+    minEl.type = "number";
+    minEl.step = step;
+    minEl.dataset.role = "secondary-min";
+    minEl.setAttribute("aria-label", "Opponent minimum");
+    minEl.value = sec.min == null ? "" : String(sec.min);
+    const and = document.createElement("span");
+    and.textContent = "AND";
+    const maxEl = document.createElement("input");
+    maxEl.type = "number";
+    maxEl.step = step;
+    maxEl.dataset.role = "secondary-max";
+    maxEl.setAttribute("aria-label", "Opponent maximum");
+    maxEl.value = sec.max == null ? "" : String(sec.max);
+
+    const onEdit = () => {
+      const rawMin = minEl.value.trim();
+      const rawMax = maxEl.value.trim();
+      if (rawMin === "" && rawMax === "") {
+        state.secondaryBounds = null;
+      } else {
+        // A half-filled pair falls back to the domain edge so the bound the user
+        // did type still applies, instead of silently doing nothing.
+        state.secondaryBounds = {
+          min: rawMin === "" ? state.domainMin : Number(rawMin),
+          max: rawMax === "" ? state.domainMax : Number(rawMax),
+        };
+      }
+      refreshLive();
+    };
+    minEl.addEventListener("input", onEdit);
+    maxEl.addEventListener("input", onEdit);
+
+    row.appendChild(label);
+    row.appendChild(minEl);
+    row.appendChild(and);
+    row.appendChild(maxEl);
+    wrap.appendChild(row);
+    controlsEl.appendChild(wrap);
   }
 
   function writeCoreListToForm() {
@@ -1474,6 +1612,41 @@
     const atDomainMax = !singleValuePick
       && state.domainMax != null && Number(state.max) >= Number(state.domainMax);
     const enable = fallback.querySelector('input[name="ff_enable"]');
+    const perRows = fallback.querySelectorAll("[data-bound-perspective]");
+    if (perRows.length) {
+      // Dual-perspective feature: write every perspective's bounds, clearing the
+      // ones the user left at full domain. Enable if ANY perspective constrains.
+      const secondary = state.secondaryBounds || null;
+      let anyActive = false;
+      perRows.forEach((row) => {
+        const persp = row.getAttribute("data-bound-perspective");
+        const input = row.querySelector("[data-bound]");
+        if (!input) {
+          return;
+        }
+        const which = input.getAttribute("data-bound");
+        const isSecondary = persp === "opponent" && state.perspective !== "opponent";
+        const src = isSecondary ? secondary : state;
+        if (!src || src.min == null || src.max == null || Number.isNaN(Number(src.min))) {
+          input.value = "";
+          return;
+        }
+        const lowEdge = state.domainMin != null && Number(src.min) <= Number(state.domainMin);
+        const highEdge = state.domainMax != null && Number(src.max) >= Number(state.domainMax);
+        if (which === "min") {
+          input.value = (!singleValuePick && lowEdge) ? "" : String(src.min);
+        } else {
+          input.value = (!singleValuePick && highEdge) ? "" : String(src.max);
+        }
+        if (input.value !== "") {
+          anyActive = true;
+        }
+      });
+      if (enable) {
+        enable.checked = anyActive;
+      }
+      return;
+    }
     if (enable) {
       enable.checked = !(atDomainMin && atDomainMax);
     }
@@ -1564,6 +1737,15 @@
       perspective: perspective,
       min: null,
       max: null,
+      // Opponent-side bounds restored from a saved system, if any. A saved
+      // half-open bound (only a min, or only a max) leaves the other side null
+      // until the domain arrives; fillSecondaryDomain patches it in then.
+      secondaryBounds: (committed && committed.byPerspective && committed.byPerspective.opponent)
+        ? {
+          min: committed.byPerspective.opponent.min,
+          max: committed.byPerspective.opponent.max,
+        }
+        : null,
       domainMin: null,
       domainMax: null,
       rows: [],
@@ -1610,6 +1792,14 @@
         state.chartPoints = payload.chart_points || [];
         state.domainMin = payload.domain && payload.domain.min != null ? Number(payload.domain.min) : null;
         state.domainMax = payload.domain && payload.domain.max != null ? Number(payload.domain.max) : null;
+        if (state.secondaryBounds) {
+          if (state.secondaryBounds.min == null) {
+            state.secondaryBounds.min = state.domainMin;
+          }
+          if (state.secondaryBounds.max == null) {
+            state.secondaryBounds.max = state.domainMax;
+          }
+        }
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }

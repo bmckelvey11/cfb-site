@@ -1177,7 +1177,12 @@ def _validate_feature_filters_strict(values: MultiDict) -> None:
             )
         raw_value = raw_values[index] if index < len(raw_values) else ""
         if op in {"gte", "lte"}:
-            _parse_finite_float(raw_value, field=f"ff_value[{key}]")
+            # A team-scoped numeric renders a gte/lte pair per perspective, so
+            # constraining only one side leaves the other pair blank. An empty
+            # bound is "no constraint", not a malformed number -- skip it, the
+            # same way _parse_filter_value already does at read time.
+            if str(raw_value).strip():
+                _parse_finite_float(raw_value, field=f"ff_value[{key}]")
         if op == "in":
             parts = [part.strip() for part in str(raw_value).split(",") if part.strip()]
             if len(parts) > _MAX_IN_LIST:

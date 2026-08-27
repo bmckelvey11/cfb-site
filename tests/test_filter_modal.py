@@ -960,3 +960,72 @@ def test_filter_modal_js_matched_games_caption_suppressed_on_empty_rows():
     empty_branch = render_value_table_body[empty_branch_start:empty_branch_end]
     assert "state.matchedGames" not in empty_branch
     assert "overlappingRows" not in empty_branch
+
+
+def test_blank_bound_row_is_ignored_not_rejected(tmp_path):
+    """A team-scoped numeric renders a gte/lte pair PER perspective, so
+    constraining only one side leaves the other pair's ff_value empty. An empty
+    bound carries no constraint -- it must be skipped, matching what
+    _parse_filter_value already does, not 400 as an invalid number."""
+    games = [
+        _game(1, season=2023, week=1, home_points=28, away_points=21, spread=-6.5),
+        _game(2, season=2024, week=2, home_points=14, away_points=28, spread=-3.0),
+    ]
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {
+            "1": {"home_running_win_pct": 0.5, "away_running_win_pct": 0.4},
+            "2": {"home_running_win_pct": 0.6, "away_running_win_pct": 0.3},
+        },
+    )
+    client = create_app(data_dir=tmp_path).test_client()
+    query = (
+        "ff_enable=running_win_pct"
+        "&ff_key=running_win_pct&ff_op=gte&ff_value=0.5&ff_perspective=bet_side"
+        "&ff_key=running_win_pct&ff_op=lte&ff_value=&ff_perspective=bet_side"
+        "&ff_key=running_win_pct&ff_op=gte&ff_value=&ff_perspective=opponent"
+        "&ff_key=running_win_pct&ff_op=lte&ff_value=0.45&ff_perspective=opponent"
+    )
+    detail = client.get(f"/filter-detail?candidate_id=feature:running_win_pct&perspective=bet_side&{query}")
+    assert detail.status_code == 200
+
+    api = client.get(f"/api/backtest?{query}")
+    assert api.status_code == 200
+
+
+def test_dual_perspective_bounds_both_apply(tmp_path):
+    """Two rows on the same feature key with different perspectives are ANDed:
+    the bet-side team AND its opponent must both satisfy their own bound."""
+    games = [
+        _game(1, season=2023, week=1, home_points=28, away_points=21, spread=-6.5),
+        _game(2, season=2024, week=2, home_points=30, away_points=10, spread=-7.0),
+    ]
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {
+            # game 1: home 0.8 vs away 0.2 -> passes "home strong, away weak"
+            "1": {"home_running_win_pct": 0.8, "away_running_win_pct": 0.2},
+            # game 2: home 0.8 but away 0.7 -> fails the opponent bound
+            "2": {"home_running_win_pct": 0.8, "away_running_win_pct": 0.7},
+        },
+    )
+    client = create_app(data_dir=tmp_path).test_client()
+
+    bet_side_only = client.get(
+        "/api/backtest?side=home&ff_enable=running_win_pct"
+        "&ff_key=running_win_pct&ff_op=gte&ff_value=0.5&ff_perspective=bet_side"
+    ).get_json()
+    both = client.get(
+        "/api/backtest?side=home&ff_enable=running_win_pct"
+        "&ff_key=running_win_pct&ff_op=gte&ff_value=0.5&ff_perspective=bet_side"
+        "&ff_key=running_win_pct&ff_op=lte&ff_value=0.3&ff_perspective=opponent"
+    ).get_json()
+
+    def decided(payload):
+        return payload["wins"] + payload["losses"] + payload["pushes"]
+
+    # Both games clear the bet-side bound; only game 1 also clears the opponent one.
+    assert decided(bet_side_only) == 2
+    assert decided(both) == 1

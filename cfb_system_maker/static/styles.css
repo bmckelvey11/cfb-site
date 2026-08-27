@@ -814,12 +814,18 @@ code {
 .filter-modal__header {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 16px;
-  align-items: start;
+  /* Title spans the row; chips and the action buttons share the row below it,
+     so the buttons stay on one line instead of wrapping into their own rows. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 16px;
+  align-items: center;
   /* Right padding clears the absolutely positioned close button. */
   padding: 24px 72px 16px 32px;
   border-bottom: 1px solid var(--border);
+}
+
+.filter-modal__title {
+  grid-column: 1 / -1;
 }
 
 .filter-modal__title {
@@ -1203,6 +1209,19 @@ code {
 
 .filter-modal__range--max {
   z-index: 2;
+}
+
+.filter-modal__secondary {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.filter-modal__secondary-title {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .filter-modal__between {

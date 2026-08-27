@@ -168,11 +168,23 @@
                 </legend>
                 {% for feature in group.features %}
                   {% set active = namespace(filt=none, gte=none, lte=none) %}
+                  {# Team-scoped numerics carry one gte/lte pair PER perspective, so a
+                     system can constrain the bet-side team and its opponent at once. #}
+                  {% set dual = namespace(primary_gte=none, primary_lte=none, secondary_gte=none, secondary_lte=none) %}
+                  {% set primary_p = 'bet_side' if form.bet_type == 'spread' else 'either' %}
+                  {% set secondary_p = 'opponent' %}
                   {% for filt in form.feature_filters %}
                     {% if filt.key == feature.key %}
                       {% set active.filt = filt %}
                       {% if filt.op == 'gte' %}{% set active.gte = filt %}{% endif %}
                       {% if filt.op == 'lte' %}{% set active.lte = filt %}{% endif %}
+                      {% if filt.perspective == secondary_p %}
+                        {% if filt.op == 'gte' %}{% set dual.secondary_gte = filt %}{% endif %}
+                        {% if filt.op == 'lte' %}{% set dual.secondary_lte = filt %}{% endif %}
+                      {% else %}
+                        {% if filt.op == 'gte' %}{% set dual.primary_gte = filt %}{% endif %}
+                        {% if filt.op == 'lte' %}{% set dual.primary_lte = filt %}{% endif %}
+                      {% endif %}
                     {% endif %}
                   {% endfor %}
                   <div class="filter-launch-row">
@@ -197,21 +209,51 @@
                         </summary>
                         {% if feature.control == "numeric" %}
                           {% set perspective = (active.gte or active.lte or active.filt).perspective if (active.gte or active.lte or active.filt) else 'single' %}
-                          <div class="feature-row" data-numeric-bound="min">
-                            {% if feature.team_scoped %}
-                              <select name="ff_perspective">
-                                <option value="home" {% if perspective == 'home' %}selected{% endif %}>Home</option>
-                                <option value="away" {% if perspective == 'away' %}selected{% endif %}>Away</option>
-                                {% if form.bet_type == "spread" %}
-                                  <option value="bet_side" {% if perspective == 'bet_side' %}selected{% endif %}>Bet-side</option>
-                                  <option value="opponent" {% if perspective == 'opponent' %}selected{% endif %}>Opponent</option>
-                                {% else %}
-                                  <option value="either" {% if perspective == 'either' %}selected{% endif %}>Either</option>
-                                {% endif %}
-                              </select>
-                            {% else %}
-                              <input type="hidden" name="ff_perspective" value="single">
+                          {% if feature.team_scoped %}
+                            {# Two independent bound-pairs: the team being bet on, and its
+                               opponent. Each pair has a FIXED hidden perspective -- picking
+                               one no longer replaces the other. #}
+                            <div class="feature-row" data-numeric-bound="min" data-bound-perspective="{{ primary_p }}">
+                              <input type="hidden" name="ff_perspective" value="{{ primary_p }}">
+                              <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                              <input type="hidden" name="ff_op" value="gte">
+                              <label>{{ 'Either' if form.bet_type != 'spread' else 'Bet-side' }} Min
+                                <input name="ff_value" type="number" step="any" data-bound="min"
+                                  value="{% if dual.primary_gte %}{{ dual.primary_gte.value }}{% endif %}"
+                                  placeholder="{% if feature.min_value is not none %}{{ feature.min_value }}{% endif %}"></label>
+                            </div>
+                            <div class="feature-row" data-numeric-bound="max" data-bound-perspective="{{ primary_p }}">
+                              <input type="hidden" name="ff_perspective" value="{{ primary_p }}">
+                              <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                              <input type="hidden" name="ff_op" value="lte">
+                              <label>{{ 'Either' if form.bet_type != 'spread' else 'Bet-side' }} Max
+                                <input name="ff_value" type="number" step="any" data-bound="max"
+                                  value="{% if dual.primary_lte %}{{ dual.primary_lte.value }}{% endif %}"
+                                  placeholder="{% if feature.max_value is not none %}{{ feature.max_value }}{% endif %}"></label>
+                            </div>
+                            {% if form.bet_type == "spread" %}
+                              <div class="feature-row" data-numeric-bound="min" data-bound-perspective="{{ secondary_p }}">
+                                <input type="hidden" name="ff_perspective" value="{{ secondary_p }}">
+                                <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                                <input type="hidden" name="ff_op" value="gte">
+                                <label>Opponent Min
+                                  <input name="ff_value" type="number" step="any" data-bound="min"
+                                    value="{% if dual.secondary_gte %}{{ dual.secondary_gte.value }}{% endif %}"
+                                    placeholder="{% if feature.min_value is not none %}{{ feature.min_value }}{% endif %}"></label>
+                              </div>
+                              <div class="feature-row" data-numeric-bound="max" data-bound-perspective="{{ secondary_p }}">
+                                <input type="hidden" name="ff_perspective" value="{{ secondary_p }}">
+                                <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                                <input type="hidden" name="ff_op" value="lte">
+                                <label>Opponent Max
+                                  <input name="ff_value" type="number" step="any" data-bound="max"
+                                    value="{% if dual.secondary_lte %}{{ dual.secondary_lte.value }}{% endif %}"
+                                    placeholder="{% if feature.max_value is not none %}{{ feature.max_value }}{% endif %}"></label>
+                              </div>
                             {% endif %}
+                          {% else %}
+                          <div class="feature-row" data-numeric-bound="min">
+                            <input type="hidden" name="ff_perspective" value="single">
                             <input type="hidden" name="ff_key" value="{{ feature.key }}">
                             <input type="hidden" name="ff_op" value="gte">
                             <label>Min <input name="ff_value" type="number" step="any" data-bound="min"
@@ -219,26 +261,14 @@
                               placeholder="{% if feature.min_value is not none %}{{ feature.min_value }}{% endif %}"></label>
                           </div>
                           <div class="feature-row" data-numeric-bound="max">
-                            {% if feature.team_scoped %}
-                              <select name="ff_perspective" class="feature-row-perspective-mirror" aria-label="Perspective (max)">
-                                <option value="home" {% if perspective == 'home' %}selected{% endif %}>Home</option>
-                                <option value="away" {% if perspective == 'away' %}selected{% endif %}>Away</option>
-                                {% if form.bet_type == "spread" %}
-                                  <option value="bet_side" {% if perspective == 'bet_side' %}selected{% endif %}>Bet-side</option>
-                                  <option value="opponent" {% if perspective == 'opponent' %}selected{% endif %}>Opponent</option>
-                                {% else %}
-                                  <option value="either" {% if perspective == 'either' %}selected{% endif %}>Either</option>
-                                {% endif %}
-                              </select>
-                            {% else %}
-                              <input type="hidden" name="ff_perspective" value="single">
-                            {% endif %}
+                            <input type="hidden" name="ff_perspective" value="single">
                             <input type="hidden" name="ff_key" value="{{ feature.key }}">
                             <input type="hidden" name="ff_op" value="lte">
                             <label>Max <input name="ff_value" type="number" step="any" data-bound="max"
                               value="{% if active.lte %}{{ active.lte.value }}{% endif %}"
                               placeholder="{% if feature.max_value is not none %}{{ feature.max_value }}{% endif %}"></label>
                           </div>
+                          {% endif %}
                         {% else %}
                         <div class="feature-row">
                           {% if feature.team_scoped %}
