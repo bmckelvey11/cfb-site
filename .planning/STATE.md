@@ -5,15 +5,15 @@ milestone_name: Season Readiness
 current_phase: 7
 current_phase_name: Integrity Fixes
 status: executing
-stopped_at: ROADMAP.md created for v1.1 Season Readiness (Phases 6-9); REQUIREMENTS.md traceability filled
-last_updated: "2026-08-27T02:00:14.641Z"
-last_activity: 2026-08-26
-last_activity_desc: Phase 7 execution started
+stopped_at: Completed 07-01-PLAN.md and 07-03-PLAN.md (wave 1)
+last_updated: "2026-08-27T02:32:04.710Z"
+last_activity: 2026-08-27
+last_activity_desc: Completed 07-01 (describe() fallback sentence, FIX-01) and 07-03 (PROJECT.md Out of Scope closure, FIX-03) — wave 1 done, wave 2 (07-02) next
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 3
   percent: 25
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-20)
 ## Current Position
 
 Phase: 7 (Integrity Fixes) — EXECUTING
-Plan: 1 of 3
+Plan: 3 of 3 (wave 1 complete: 07-01, 07-03; wave 2 next: 07-02)
 Status: Executing Phase 7
-Last activity: 2026-08-26 — Phase 7 execution started
+Last activity: 2026-08-27 — Completed 07-01 (describe() fallback sentence, FIX-01) and 07-03 (PROJECT.md Out of Scope closure, FIX-03)
 
-Progress: [██████░░░] 6/9 phases (v1.0 complete; Phase 6 complete; v1.1 phases 7-9 remaining)
+Progress: [█████░░░░░] 50%
 
 **Note:** Phase 6 was executed directly (git merge + directory audit) rather than through the plan-phase/execute-phase pipeline — no PLAN.md/SUMMARY.md artifacts exist for it. Both requirements (MERGE-01, MERGE-02) are satisfied and verified (test suite + directory listing), recorded here for traceability.
 
@@ -87,6 +87,7 @@ Progress: [██████░░░] 6/9 phases (v1.0 complete; Phase 6 compl
 | Phase 05 P04 | 25m | 2 tasks | 4 files |
 | Phase 05 P05 | ~50m | 2 tasks | 6 files |
 | Phase 05-dashboard-current-matches P06 | ~60 min | 3 tasks | 4 files |
+| Phase 07 P01 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 05-06: Current Matches panel play text runs grade_bet's normalization (fade inversion + away sign flip), never the declared side (D-08)
 - [Phase ?]: 05-06: Panel computed per-request (matching is cheap, no permutation test); did not couple upcoming.csv into the My Systems backtest cache fingerprint
 - [Phase ?]: 05-06: TBD kickoffs render date-only (correctness fix over UI-SPEC date-and-time) — no fabricated clock time
+- [Phase ?]: Fallback sentence text uses filt.value!r (Python repr) per D-locked wording, not a reformatted/joined value
+- [Phase ?]: Phase 7: edit_metadata_for_sentence gates on explicit (op,control) renderable shapes before building Edit metadata, mirroring describe()'s 4 hand-written combos
 
 ### Pending Todos
 
@@ -169,8 +172,8 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-20:
 
 ## Session Continuity
 
-Last session: 2026-08-26T21:58:21.770Z
-Stopped at: ROADMAP.md created for v1.1 Season Readiness (Phases 6-9); REQUIREMENTS.md traceability filled
+Last session: 2026-08-27T02:32:04.670Z
+Stopped at: Completed 07-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

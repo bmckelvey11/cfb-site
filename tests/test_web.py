@@ -7,7 +7,7 @@ from markupsafe import escape
 from cfb_system_maker import web
 from cfb_system_maker.backtest import compute_grade, run_backtest
 from cfb_system_maker.enrich import save_features_to, upcoming_features_path
-from cfb_system_maker.models import BacktestResult, BetDetail, GameRecord, SystemFilter
+from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SystemFilter
 from cfb_system_maker.sample_data import SAMPLE_GAMES_2023, SAMPLE_LINES_2023
 from cfb_system_maker.normalize import normalize_games
 from cfb_system_maker.storage import (
@@ -853,6 +853,49 @@ def test_web_active_filter_sentence_renders_with_remove_control(tmp_path):
     assert 'aria-label="Remove filter: the team is a favorite"' in html
 
 
+def test_web_uncovered_filter_combo_renders_fallback_without_edit_button(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    save_system(
+        "neutral-in",
+        SystemFilter(feature_filters=(FeatureFilter(key="neutralSite", op="in", value=[True]),)),
+        tmp_path,
+    )
+
+    response = client.get("/system?load_system=neutral-in")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+
+    assert "Neutral Site filter applied (value:" in html
+    assert 'aria-label="Remove filter: Neutral Site filter applied (value: [True])"' in html
+    assert 'aria-label="Edit filter: Neutral Site filter applied (value: [True])"' not in html
+
+
+def test_web_uncovered_filter_combo_remove_link_actually_clears_it(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    save_system(
+        "neutral-in",
+        SystemFilter(feature_filters=(FeatureFilter(key="neutralSite", op="in", value=[True]),)),
+        tmp_path,
+    )
+
+    response = client.get("/system?load_system=neutral-in")
+    html = response.get_data(as_text=True)
+    href = _remove_href_for(html, "Remove filter: Neutral Site filter applied (value: [True])")
+
+    second_response = client.get("/system" + href)
+    assert second_response.status_code == 200
+    second_html = second_response.get_data(as_text=True)
+    assert "Neutral Site filter applied" not in second_html
+
+
 def test_web_save_and_load_system_preserves_theory(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
@@ -1614,6 +1657,26 @@ def test_current_matches_details_reuse_describe_undecorated(tmp_path):
     # No editor remove/edit affordances on the dashboard details.
     assert "Remove" not in panel
     assert "remove_href" not in panel
+
+
+def test_current_matches_uncovered_filter_combo_renders_fallback_sentence(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    game = _upcoming_game(9001, "Georgia", "Clemson")
+    _write_upcoming(
+        tmp_path,
+        [game],
+        _kick(9001, "2025-09-06T19:30:00+00:00"),
+        features={"9001": {"neutralSite": True}},
+    )
+    save_system(
+        "neutral-in",
+        SystemFilter(feature_filters=(FeatureFilter(key="neutralSite", op="in", value=[True]),)),
+        tmp_path,
+    )
+
+    panel = _panel(app.test_client().get("/").get_data(as_text=True))
+
+    assert "Neutral Site filter applied (value: [True])" in panel
 
 
 def test_current_matches_bare_system_omits_the_matched_on_label(tmp_path):
