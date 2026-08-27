@@ -226,7 +226,13 @@ def save_betlog(records: list[BetLogRecord], data_dir: str | Path) -> None:
 
 
 def _build_games_by_date(data_dir: str | Path, in_scope: list[RawBetRow]) -> dict[str, list[GameRecord]]:
-    seasons_needed = {int(row.start_time[:4]) for row in in_scope}
+    # CFBD's games_{season}.json files are keyed by CFBD season, not calendar
+    # year: a January bowl/CFP game dated e.g. "2024-01-08" belongs to the 2023
+    # season's file. Always check both the bet's calendar year and the year
+    # before it -- a season file that turns out not to have the game is
+    # already safely absorbed by the FileNotFoundError handling below.
+    bet_years = {int(row.start_time[:4]) for row in in_scope}
+    seasons_needed = bet_years | {year - 1 for year in bet_years}
     games_by_date: dict[str, list[GameRecord]] = {}
     for season in seasons_needed:
         try:
@@ -267,7 +273,14 @@ def import_betlog(csv_path: str | Path, data_dir: str | Path) -> ImportSummary:
             continue
         matched_bets.append(bet)
 
-    new_bets = [bet for bet in matched_bets if _dedupe_key(bet) not in existing_keys]
+    seen_keys = set(existing_keys)
+    new_bets: list[BetLogRecord] = []
+    for bet in matched_bets:
+        key = _dedupe_key(bet)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        new_bets.append(bet)
     already_imported = len(matched_bets) - len(new_bets)
 
     save_betlog(existing + new_bets, data_dir)
