@@ -83,7 +83,12 @@ def _feature_group_sentence(filts: list[FeatureFilter]) -> dict[str, object] | N
             text = f"{label} is one of {', '.join(filt.value)}"
         if text is not None:
             return {"text": text, "key": f"ff:{key}"}
-    return None
+
+    # Fallback: an (op, control) combo feature_ok() applies but no branch above
+    # covers. Deliberately distinct wording (never blends in) so an uncovered
+    # combo stays visible instead of silently vanishing from the sentence list.
+    filt = filts[0]
+    return {"text": f"{label} filter applied (value: {filt.value!r})", "key": f"ff:{key}"}
 
 
 def describe(system: SystemFilter) -> list[dict[str, object]]:
