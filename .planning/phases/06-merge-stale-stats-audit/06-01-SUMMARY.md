@@ -22,7 +22,7 @@ tech-stack:
 
 key-files:
   created:
-    - .planning/phases/06-merge-stale-stats-audit/06-02-SUMMARY.md
+    - .planning/phases/06-merge-stale-stats-audit/06-01-SUMMARY.md
   modified: []
 
 key-decisions:
@@ -97,7 +97,7 @@ This plan is verification-only (`files_modified: []`); no production code was to
 
 ## Files Created/Modified
 
-- `.planning/phases/06-merge-stale-stats-audit/06-02-SUMMARY.md` — this file, recording the re-verification outcome.
+- `.planning/phases/06-merge-stale-stats-audit/06-01-SUMMARY.md` — this file, recording the re-verification outcome.
 
 No other files were created, modified, or deleted. Both plan tasks were read-only.
 
@@ -105,7 +105,7 @@ No other files were created, modified, or deleted. Both plan tasks were read-onl
 
 - Ran verification from an agent worktree rather than the literal shared-checkout path the plan's verify commands `cd` into, after confirming the worktree's `master` ref and `origin/master` share the identical SHA (`27d20e3`) — so worktree-relative git ancestry/log/test checks are equivalent to running them from the shared checkout (worktrees share the object database and refs).
 - For the `data/search_runs/` check specifically, did NOT rely on the worktree-relative result, because `data/` is gitignored (`.gitignore` line 1) and therefore structurally absent from a fresh worktree regardless of the shared checkout's actual contents. Used a direct absolute-path read against the shared checkout instead (permitted — it is a plain filesystem read, not a git operation redirected at the shared checkout, which the sandbox does refuse).
-- Filename `06-02-SUMMARY.md` (not `06-01-SUMMARY.md`) used exactly as specified in the task prompt, to avoid GSD's plan/summary pairing logic conflating this with the pre-existing `06-00-DIRECT-EXECUTION-SUMMARY.md`. Downstream implication: `06-01-PLAN.md` still has no `06-01-SUMMARY.md` on disk, so GSD's plan/summary pairing may continue to read this specific plan file as unexecuted even though its tasks are done and recorded here — this is the caller's tooling tradeoff to resolve, not overridden in this execution.
+- The executor originally wrote this file as `06-02-SUMMARY.md` per its task prompt, to avoid conflicting with the pre-existing `06-00-DIRECT-EXECUTION-SUMMARY.md` at the time. After the executor's worktree branch was merged back to `master`, the orchestrator renamed it to `06-01-SUMMARY.md` (the plan-ID-matching filename `phase-plan-index` actually keys off) since `06-01-SUMMARY.md` was free by that point — the earlier historical-execution summary had already been renamed to `06-00-DIRECT-EXECUTION-SUMMARY.md` in an earlier commit.
 
 ## Deviations from Plan
 
@@ -123,7 +123,7 @@ None - no external service configuration required.
 
 MERGE-01 and MERGE-02 both re-confirmed with no regression since 2026-08-26. `master` (SHA `27d20e3` at time of this verification) has the full fix branch merged, including the total-filter-semantics fixes Phase 7's FIX-02/FIX-03 build on. `data/search_runs/` remains empty in the shared checkout — no stale beam-search results block Phase 7 or later phases. No blockers.
 
-One tooling note for whoever runs completion detection next: this plan's file is `06-01-PLAN.md`, but its summary was deliberately written to `06-02-SUMMARY.md` per explicit task instruction (avoiding a naming collision with `06-00-DIRECT-EXECUTION-SUMMARY.md`). If GSD's plan/summary pairing logic expects an exact `06-01-SUMMARY.md` match, it may not automatically recognize `06-01-PLAN.md` as closed out even though both its tasks are verified complete and recorded here.
+Filename note (resolved): this file was renamed from `06-02-SUMMARY.md` to `06-01-SUMMARY.md` after merge, matching `06-01-PLAN.md` per `phase-plan-index`'s ID-based pairing. Verified post-rename: `has_summary: true` for plan `06-01`.
 
 ---
 *Phase: 06-merge-stale-stats-audit*
