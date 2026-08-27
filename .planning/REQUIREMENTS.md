@@ -7,8 +7,8 @@ and scoping conversation on 2026-08-26.
 
 ### Merge & Integration
 
-- [ ] **MERGE-01**: `fix/web-app-review-2026-08-26` (26 commits) is merged to `master` with all 435 tests passing.
-- [ ] **MERGE-02**: Any `SearchRun`/`SearchRunFinalist` JSON persisted in `data/search_runs/` under pre-merge matching semantics is audited and, if stale, regenerated or flagged — so a beam-search result never silently disagrees with the post-merge matching behavior.
+- [x] **MERGE-01**: `fix/web-app-review-2026-08-26` (26 commits) is merged to `master` with all 435 tests passing. — done 2026-08-26 (commit `2e86ba5`, 441 tests passing)
+- [x] **MERGE-02**: Any `SearchRun`/`SearchRunFinalist` JSON persisted in `data/search_runs/` under pre-merge matching semantics is audited and, if stale, regenerated or flagged — so a beam-search result never silently disagrees with the post-merge matching behavior. — done 2026-08-26 (audited: directory empty, no-op)
 
 ### Integrity Fixes
 

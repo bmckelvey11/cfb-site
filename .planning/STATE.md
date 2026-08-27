@@ -7,7 +7,7 @@ last_updated: "2026-08-26T21:58:21.770Z"
 last_activity: 2026-08-26
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 0
   completed_plans: 0
   percent: 0
@@ -20,16 +20,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20)
 
 **Core value:** A saved system's main page reads like a Bet Labs system editor (stat chips, cumulative money-won graph, plain-English active filters) and configuring any filter opens a live popup — slider or value table, per-value Record/ROI/Money, before you commit — instead of static inline form fields.
-**Current focus:** v1.1 Season Readiness — Phase 6 (Merge & Stale-Stats Audit)
+**Current focus:** v1.1 Season Readiness — Phase 7 (Integrity Fixes)
 
 ## Current Position
 
-Phase: 6 of 9 (Merge & Stale-Stats Audit)
-Plan: — (roadmap created, not yet planned)
+Phase: 7 of 9 (Integrity Fixes)
+Plan: — (not yet planned)
 Status: Ready to plan
-Last activity: 2026-08-26 — ROADMAP.md created for v1.1 (Phases 6-9)
+Last activity: 2026-08-26 — Phase 6 (Merge & Stale-Stats Audit) complete: fix/web-app-review-2026-08-26 merged to master (commit 2e86ba5), 441 tests passing; data/search_runs/ audited and confirmed empty (MERGE-02 no-op — nothing stale to regenerate)
 
-Progress: [█████░░░░] 5/9 phases (v1.0 complete; v1.1 phases 6-9 not started)
+Progress: [██████░░░] 6/9 phases (v1.0 complete; Phase 6 complete; v1.1 phases 7-9 remaining)
+
+**Note:** Phase 6 was executed directly (git merge + directory audit) rather than through the plan-phase/execute-phase pipeline — no PLAN.md/SUMMARY.md artifacts exist for it. Both requirements (MERGE-01, MERGE-02) are satisfied and verified (test suite + directory listing), recorded here for traceability.
+
+**Discovered during Phase 6:** PR #2 (`review-fixes-only`) had already merged a 13-commit subset of `fix/web-app-review-2026-08-26` directly to master outside this session, diverging the working branch from what `/gsd-new-milestone` had planned against. Resolved by merging the full fix branch (2 conflicts: `filter_modal.js`, `test_storage.py` — both additive, no logic lost) rather than replanning from master.
 
 ## Performance Metrics
 

@@ -24,21 +24,22 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 
 **Milestone Goal:** Close out v1.0's deferred verifications and accepted risks, and merge in-flight fixes, before the 2026-08-29 season start.
 
-- [ ] **Phase 6: Merge & Stale-Stats Audit** - Land the review branch on master and confirm no stale search-run results silently disagree with the new matching semantics
+- [x] **Phase 6: Merge & Stale-Stats Audit** - Land the review branch on master and confirm no stale search-run results silently disagree with the new matching semantics — completed 2026-08-26
 - [ ] **Phase 7: Integrity Fixes** - Close the describe() silent-drop risk, fix the filter-detail modal's double-counting bug, and close out the Hide Duplicates deferral with the correct architectural resolution
 - [ ] **Phase 8: Neutral-Site & Indoor Unders Example** - Ship the 4th bundled example system with an honest, disclosed sample size
 - [ ] **Phase 9: Live In-Season Verification** - Confirm Current Matches and feature-filtered matching work against the real 2026 season
 
 ## Phase Details
 
-### Phase 6: Merge & Stale-Stats Audit
+### Phase 6: Merge & Stale-Stats Audit — ✅ Complete (2026-08-26)
 **Goal**: The 26-commit review branch is on master with nothing lost or broken, and any saved search-run results computed under the old total-system matching semantics are identified and corrected.
 **Depends on**: Phase 5 (v1.0, complete)
 **Requirements**: MERGE-01, MERGE-02
 **Success Criteria** (what must be TRUE):
-  1. `master` contains all 26 commits from `fix/web-app-review-2026-08-26`, and the full test suite (435 tests) passes on `master` post-merge.
-  2. Every `SearchRun`/`SearchRunFinalist` JSON file in `data/search_runs/` has been re-checked against post-merge matching behavior; any whose bet count or result changed under the new semantics is either regenerated or explicitly flagged as stale, so no beam-search result silently disagrees with current matching behavior.
-**Plans**: TBD
+  1. ✅ `master` contains all commits from `fix/web-app-review-2026-08-26` (merge commit `2e86ba5`; 2 conflicts resolved — `filter_modal.js`, `test_storage.py`, both additive), and the full test suite (441 tests) passes on `master` post-merge.
+  2. ✅ `data/search_runs/` audited directly — the directory is empty (0 files), so no `SearchRun`/`SearchRunFinalist` JSON exists to be stale. No-op by inspection, not by assumption.
+**Note**: PR #2 (`review-fixes-only`) had already merged a 13-commit subset directly to master outside the planning session, ahead of this phase running. Resolved by merging the full branch rather than replanning against the partial state — see STATE.md for detail.
+**Plans**: None — executed directly (merge + directory audit), no PLAN.md generated.
 
 ### Phase 7: Integrity Fixes
 **Goal**: The system editor and Current Matches panel never silently hide an active filter, the filter-detail modal's per-value numbers reconcile with the top-line backtest result, and the Hide Duplicates deferral is closed with an accurate architectural reason instead of a stale one.
@@ -78,7 +79,7 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 | 3. Data Depth & Breadth | v1.0 | 4/4 | Complete | 2026-07-20 |
 | 4. Filter Popup Modal | v1.0 | 4/4 | Complete | 2026-07-17 |
 | 5. Dashboard & Current Matches | v1.0 | 6/6 | Complete | 2026-07-20 |
-| 6. Merge & Stale-Stats Audit | v1.1 | 0/TBD | Not started | - |
+| 6. Merge & Stale-Stats Audit | v1.1 | n/a | Complete | 2026-08-26 |
 | 7. Integrity Fixes | v1.1 | 0/TBD | Not started | - |
 | 8. Neutral-Site & Indoor Unders Example | v1.1 | 0/TBD | Not started | - |
 | 9. Live In-Season Verification | v1.1 | 0/TBD | Not started | - |
