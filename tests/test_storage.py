@@ -124,6 +124,21 @@ def test_at_least_one_example_exercises_a_registry_feature():
     assert any(load_example_system(name).system.feature_filters for name in list_examples())
 
 
+def test_neutral_site_indoor_unders_pins_its_exact_filter_set():
+    # DATA-01: the generic loops above don't check this example's specific
+    # filter set, so pin it directly.
+    system = load_example_system("neutral-site-indoor-unders").system
+    assert system.bet_type == "total"
+    assert system.total_side == "under"
+    assert len(system.feature_filters) == 3
+    keys = {filt.key for filt in system.feature_filters}
+    assert keys == {"neutralSite", "gameIndoors", "venue_dome"}
+    for filt in system.feature_filters:
+        assert filt.op == "eq"
+        assert filt.perspective == "single"
+        assert filt.value is True
+
+
 def test_load_example_system_rejects_path_traversal_name():
     with pytest.raises(ValueError):
         load_example_system("../../outside_secret")
