@@ -4,8 +4,9 @@
     {
       "name": "CFB System Maker (web)",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "cfb_system_maker", "web", "--data-dir", "data", "--port", "5000"],
-      "port": 5000
+      "runtimeArgs": ["-m", "cfb_system_maker", "web", "--data-dir", "data"],
+      "port": 5000,
+      "autoPort": true
     }
   ]
 }
