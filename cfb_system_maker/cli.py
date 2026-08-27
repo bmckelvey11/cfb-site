@@ -401,7 +401,12 @@ def _web(args: argparse.Namespace) -> int:
     from cfb_system_maker.web import create_app
 
     app = create_app(data_dir=args.data_dir)
-    app.run(host=args.host, port=args.port, debug=args.debug)
+    if args.debug:
+        app.run(host=args.host, port=args.port, debug=True)
+    else:
+        from waitress import serve
+
+        serve(app, host=args.host, port=args.port, threads=8)
     return 0
 
 

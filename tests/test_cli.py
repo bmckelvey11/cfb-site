@@ -395,6 +395,34 @@ def test_search_command_save_run_flag_persists_full_finalist_list(tmp_path, caps
         assert run.finalists[0].corrected_p >= 0.0
 
 
+def test_web_command_defaults_to_production_server(monkeypatch, tmp_path):
+    served = {}
+
+    def fake_serve(app, host, port, threads):
+        served.update(host=host, port=port, threads=threads)
+
+    monkeypatch.setattr("waitress.serve", fake_serve)
+
+    exit_code = main(["web", "--data-dir", str(tmp_path), "--port", "5000"])
+
+    assert exit_code == 0
+    assert served == {"host": "127.0.0.1", "port": 5000, "threads": 8}
+
+
+def test_web_command_debug_uses_flask_dev_server(monkeypatch, tmp_path):
+    ran = {}
+
+    def fake_run(self, host, port, debug):
+        ran.update(host=host, port=port, debug=debug)
+
+    monkeypatch.setattr("flask.Flask.run", fake_run)
+
+    exit_code = main(["web", "--data-dir", str(tmp_path), "--port", "5000", "--debug"])
+
+    assert exit_code == 0
+    assert ran == {"host": "127.0.0.1", "port": 5000, "debug": True}
+
+
 def test_search_command_save_run_flag_persists_even_with_zero_finalists(tmp_path, capsys, monkeypatch):
     save_processed_games(tmp_path, _search_fixture_games())
     main(["enrich", "--data-dir", str(tmp_path)])
