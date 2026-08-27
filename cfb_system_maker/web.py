@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
+import time as _time
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
-from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from cfb_system_maker.backtest import (
@@ -137,6 +139,9 @@ CORE_FILTER_META: dict[str, dict[str, str]] = {
         "param": "min_total,max_total",
     },
 }
+
+
+logger = logging.getLogger(__name__)
 
 
 class StrictParseError(Exception):
@@ -446,6 +451,17 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         if urlparse(origin).netloc != request.host:
             abort(403)
         return None
+
+    @app.before_request
+    def _start_timer():
+        g.request_start = _time.perf_counter()
+
+    @app.after_request
+    def _access_log(response):
+        start = g.get("request_start")
+        elapsed_ms = (_time.perf_counter() - start) * 1000 if start is not None else 0.0
+        logger.info("%s %s %s %.0fms", request.method, request.full_path.rstrip("?"), response.status_code, elapsed_ms)
+        return response
 
     @app.get("/")
     def dashboard():

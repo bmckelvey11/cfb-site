@@ -2016,3 +2016,17 @@ def test_narrate_route_missing_run_returns_404(tmp_path):
     response = client.post("/search-runs/does-not-exist/narrate")
 
     assert response.status_code == 404
+
+
+def test_requests_emit_one_access_log_line(tmp_path, caplog):
+    import logging
+
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    with caplog.at_level(logging.INFO, logger="cfb_system_maker.web"):
+        client.get("/")
+
+    lines = [r for r in caplog.records if "GET /" in r.getMessage()]
+    assert len(lines) == 1
+    assert "200" in lines[0].getMessage()
