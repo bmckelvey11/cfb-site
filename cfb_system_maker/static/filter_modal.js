@@ -23,6 +23,7 @@
   const viewChartBtn = document.getElementById("filter-modal-view-chart");
   const viewListBtn = document.getElementById("filter-modal-view-list");
   const maxRoiBtn = document.getElementById("filter-modal-max-roi");
+  const clearBtn = document.getElementById("filter-modal-clear");
 
   const CORE_PARAM = {
     "core:season": "filter_seasons",
@@ -65,6 +66,7 @@
     const betTypeEl = filtersForm.querySelector('[name="bet_type"]');
     const spreadFieldset = document.getElementById("spread-side-fieldset");
     const totalFieldset = document.getElementById("total-side-fieldset");
+    const positionFieldset = document.getElementById("position-fieldset");
     if (!betTypeEl || !spreadFieldset || !totalFieldset) {
       return;
     }
@@ -75,6 +77,10 @@
     // then gets persisted by Save System.
     spreadFieldset.classList.toggle("fieldset-inactive", isTotal);
     totalFieldset.classList.toggle("fieldset-inactive", !isTotal);
+    // Favorite/underdog are spread-only concepts; same class-not-disabled rule.
+    if (positionFieldset) {
+      positionFieldset.classList.toggle("fieldset-inactive", isTotal);
+    }
   }
 
   syncBetSideFieldsets();
@@ -524,6 +530,37 @@
     maxRoiBtn.hidden = !visible;
   }
 
+  function setClearVisible(visible) {
+    if (!clearBtn) {
+      return;
+    }
+    clearBtn.hidden = !visible;
+  }
+
+  // "No filter" is already defined by the save path: both bounds sitting at the
+  // observed domain edges (writeNumericToForm), or an empty selection for the
+  // list kinds. Clear just restores that state -- it does not commit; the user
+  // still has to Save.
+  function clearFilter() {
+    if (!state) {
+      return;
+    }
+    if (state.kind === "numeric") {
+      if (state.domainMin == null || state.domainMax == null) {
+        return;
+      }
+      state.min = state.domainMin;
+      state.max = state.domainMax;
+      // Domain-edge bounds must read as "cleared", not as a deliberate pick.
+      state.singleValuePick = false;
+      syncBoundInputs();
+    } else {
+      state.selected = [];
+      renderValueTable();
+    }
+    refreshLive();
+  }
+
   // Minimum decided bets a window must hold before it can win. Without a floor,
   // ranking by profit-per-bet always picks the smallest sample: one win at -110
   // scores 0.91, while a genuine +5% ROI over a thousand bets scores 0.05. The
@@ -827,6 +864,7 @@
 
     if (!state.rows.length) {
       setMaxRoiVisible(false);
+      setClearVisible(false);
       const empty = document.createElement("p");
       empty.className = "filter-modal__hint";
       empty.textContent = "No values in range";
@@ -838,6 +876,7 @@
       return;
     }
     setMaxRoiVisible(true);
+    setClearVisible(true);
 
     if (state.overlappingRows) {
       const caption = document.createElement("p");
@@ -1207,6 +1246,7 @@
     }
     setViewToggleVisible(true);
     setMaxRoiVisible(true);
+    setClearVisible(true);
   }
 
   function renderNumericControls() {
@@ -1231,6 +1271,7 @@
       }
       setViewToggleVisible(false);
       setMaxRoiVisible(false);
+      setClearVisible(false);
       saveBtn.disabled = true;
       return;
     }
@@ -1457,6 +1498,7 @@
     state = null;
     setViewToggleVisible(false);
     setMaxRoiVisible(false);
+    setClearVisible(false);
     if (exploreEl) {
       exploreEl.innerHTML = "";
     }
@@ -1530,6 +1572,7 @@
     };
     setViewToggleVisible(false);
     setMaxRoiVisible(false);
+    setClearVisible(false);
     statusEl.textContent = "Loading values…";
     const detailParams = new URLSearchParams(new FormData(filtersForm));
     detailParams.set("candidate_id", candidateId);
@@ -1637,6 +1680,7 @@
 
     setViewToggleVisible(false);
     setMaxRoiVisible(false);
+    setClearVisible(false);
     const param = CORE_PARAM[candidateId] || button.getAttribute("data-param") || "";
     if (candidateId.indexOf("core:") === 0) {
       state = {
@@ -1749,6 +1793,9 @@
   saveBtn.addEventListener("click", saveAndSubmit);
   if (maxRoiBtn) {
     maxRoiBtn.addEventListener("click", applyMaxRoi);
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener("click", clearFilter);
   }
 
   if (viewChartBtn) {

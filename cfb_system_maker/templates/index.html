@@ -16,7 +16,7 @@
           <div>
             <h1>CFB System Maker</h1>
             <p>{{ options.seasons|length and (options.seasons[0] ~ "-" ~ options.seasons[-1]) or "No data" }}</p>
-            <p><a href="{{ url_for('dashboard') }}">&larr; My Systems</a></p>
+            <p><a class="dash-cta" href="{{ url_for('dashboard') }}">&larr; My Systems</a></p>
           </div>
         </div>
 
@@ -45,7 +45,7 @@
             </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset id="position-fieldset">
             <legend>Position</legend>
             <div class="check-grid">
               <label class="check"><input type="checkbox" name="favorite" {% if form.favorite %}checked{% endif %}> Favorite</label>
@@ -530,11 +530,14 @@
               <strong id="filter-modal-roi">0%</strong>
             </article>
           </div>
-          <div id="filter-modal-view-toggle" class="filter-modal__view-toggle" hidden role="group" aria-label="Chart or List">
-            <button type="button" id="filter-modal-view-chart" data-view="chart" aria-pressed="true">Chart</button>
-            <button type="button" id="filter-modal-view-list" data-view="list" aria-pressed="false">List</button>
+          <div class="filter-modal__actions">
+            <div id="filter-modal-view-toggle" class="filter-modal__view-toggle" hidden role="group" aria-label="Chart or List">
+              <button type="button" id="filter-modal-view-chart" data-view="chart" aria-pressed="true">Chart</button>
+              <button type="button" id="filter-modal-view-list" data-view="list" aria-pressed="false">List</button>
+            </div>
+            <button type="button" id="filter-modal-clear" class="filter-modal__clear" hidden>Clear Filter</button>
+            <button type="button" id="filter-modal-max-roi" class="filter-modal__max-roi" hidden>Max ROI</button>
           </div>
-          <button type="button" id="filter-modal-max-roi" class="filter-modal__max-roi" hidden>Max ROI</button>
           <p id="filter-modal-status" class="filter-modal__status" aria-live="polite"></p>
           <button type="button" class="filter-modal__close" id="filter-modal-close" aria-label="Close filter dialog">✕</button>
         </header>
