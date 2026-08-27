@@ -89,9 +89,29 @@ rather than aborting the season (see `_scrape_per_game`). Expect per-game
 coverage to be a game or two short of the seed count in some seasons; the count
 is printed at the end of the run.
 
-Measured skip rate: `advanced_box_score` 2012 wrote **790 of 805** seeded games
-(15 permanently failing), while 2013 and 2020 wrote every game. Before the skip
-was added, that one dead game meant 2012 produced **nothing at all**.
+### PER_GAME final coverage (2026-08-26)
+
+Both FBS-only per-game endpoints are complete:
+
+| Endpoint | Games | Seeded | Missing |
+|---|---|---|---|
+| `advanced_box_score` (2012-2025) | 11,484 | 11,556 | 72 (0.6%) |
+| `win_probability` (2014-2025) | 9,740 | 9,938 | 198 (2.0%) |
+
+The 72 `advanced_box_score` gaps are games that return a **permanent upstream
+500** after retries; they are skipped and counted rather than aborting the
+season. Before that fix, one dead game meant its whole season produced *nothing*
+-- 2012 has 15 such games and wrote zero rows.
+
+The 198 `win_probability` gaps are different: those games return **0 rows**, i.e.
+CFBD has no win-probability data for them. Verified by re-querying a random
+sample of 12 missing 2025 games -- all 12 came back empty, none had data. 2025
+accounts for 131 of the 198, spread across many weeks (not clustered), and is
+not explained by FBS-vs-FCS classification (98 of the 131 are FBS-vs-FBS).
+
+Note `advanced_box_score` rows carry **no game id** -- `gameInfo` has team names
+and scores but no `gameId`. Coverage for that endpoint must be measured by row
+count (one row per game call), not by distinct id.
 
 **Network failures are retried** (as of `fe4832b`). `_call` originally matched
 only `"429"` and 5xx codes in `str(exc)`, so a DNS blip raised immediately and
