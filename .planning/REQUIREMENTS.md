@@ -18,7 +18,7 @@ and scoping conversation on 2026-08-26.
 
 ### Data & Verification
 
-- [ ] **DATA-01**: A 4th bundled example system ("Neutral-Site & Indoor Unders") ships on the Example Systems tab, using existing registry features (`neutralSite`, `gameIndoors`, `venue_dome`). Its `theory` field discloses the sample size and significance (n=109, p=0.014) so the example doesn't read as a stronger claim than the underlying analysis supports.
+- [x] **DATA-01**: A 4th bundled example system ("Neutral-Site & Indoor Unders") ships on the Example Systems tab, using existing registry features (`neutralSite`, `gameIndoors`, `venue_dome`). Its `theory` field discloses the sample size and significance (n=109, p=0.014) so the example doesn't read as a stronger claim than the underlying analysis supports.
 - [ ] **DATA-02**: Current Matches is confirmed against the live 2026 season to show real unplayed games with posted lines, and feature-filtered systems are confirmed to match those games via season-to-date stats. A pre-season dry run checks whether the live CFBD calendar API returns `startDate`/`endDate` as `str` (untested path — historical fixtures only exercised `datetime` objects). Scheduled for week 3+ of the season, not week 1 (season-to-date accumulators are `games_played=0` and fail closed in week 1 by design — a week-1 empty result is not a bug).
 
 ## Future Requirements (deferred out of v1.1)
@@ -41,5 +41,5 @@ and scoping conversation on 2026-08-26.
 | FIX-01 | Phase 7 | Complete |
 | FIX-02 | Phase 7 | Complete |
 | FIX-03 | Phase 7 | Complete |
-| DATA-01 | Phase 8 | Pending |
+| DATA-01 | Phase 8 | Complete |
 | DATA-02 | Phase 9 | Pending |
