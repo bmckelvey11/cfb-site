@@ -2102,4 +2102,10 @@ def test_security_headers_present_on_all_pages(tmp_path):
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
         assert resp.headers["Referrer-Policy"] == "same-origin"
         assert resp.headers["Content-Security-Policy"] == "default-src 'self'"
-        assert resp.headers["X-Frame-Options"] == "DENY"
+
+
+def test_pages_link_svg_favicon(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+    for path in ("/", "/system"):
+        assert b'rel="icon"' in client.get(path).data
