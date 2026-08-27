@@ -1492,3 +1492,19 @@ code {
 .trend-empty {
   color: var(--muted);
 }
+
+.error-page {
+  max-width: 480px;
+  margin: 15vh auto 0;
+  padding: 32px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.error-page p {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}

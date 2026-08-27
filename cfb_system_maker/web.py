@@ -811,6 +811,17 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     def favicon():
         return "", 204
 
+    @app.errorhandler(404)
+    def _not_found(err):
+        return render_template("error.html", title="Page not found",
+                               message="That page does not exist."), 404
+
+    @app.errorhandler(500)
+    def _server_error(err):
+        logger.exception("unhandled error on %s %s", request.method, request.path)
+        return render_template("error.html", title="Something went wrong",
+                               message="An internal error occurred. Details are in the server log."), 500
+
     return app
 
 

@@ -2030,3 +2030,28 @@ def test_requests_emit_one_access_log_line(tmp_path, caplog):
     lines = [r for r in caplog.records if "GET /" in r.getMessage()]
     assert len(lines) == 1
     assert "200" in lines[0].getMessage()
+
+
+def test_404_renders_branded_error_page(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+    resp = client.get("/definitely-not-a-route")
+    assert resp.status_code == 404
+    assert b"Page not found" in resp.data
+    assert b"styles.css" in resp.data  # branded, not werkzeug default
+
+
+def test_500_renders_branded_error_page(tmp_path):
+    app = create_app(data_dir=tmp_path)
+
+    @app.route("/boom")
+    def boom():
+        raise RuntimeError("kaboom")
+
+    app.config["PROPAGATE_EXCEPTIONS"] = False
+    app.config["TESTING"] = False  # TESTING=True makes Flask re-raise instead of using the errorhandler
+    client = app.test_client()
+    resp = client.get("/boom")
+    assert resp.status_code == 500
+    assert b"Something went wrong" in resp.data
+    assert b"kaboom" not in resp.data  # no leak
