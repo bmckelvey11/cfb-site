@@ -147,7 +147,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Phase 9 (Live In-Season Verification, DATA-02) — criterion 1 (pre-season calendar dry run against `GamesApi.get_calendar()`) is executable now, no date gate. Criteria 2-3 (Current Matches shows real posted-line games; season-to-date feature filters match correctly) are genuinely calendar-blocked: criterion 2 needs the season live (~2026-08-29), criterion 3 needs week 3+ specifically (week 1-2 `games_played=0` fails closed by design, not a bug). Resume with `/gsd-autonomous --from 9` or `/gsd-plan-phase 9` once those dates pass.
+- Phase 9 (Live In-Season Verification, DATA-02) — criterion 1 (pre-season calendar dry run) DONE 2026-08-27, see `.planning/phases/09-live-in-season-verification/09-DRY-RUN.md`: `startDate`/`endDate` are real `datetime` objects, live-calendar branch fires correctly, no type mismatch. Criteria 2-3 (Current Matches shows real posted-line games; season-to-date feature filters match correctly) remain genuinely calendar-blocked: criterion 2 needs the season live (~2026-08-29), criterion 3 needs week 3+ specifically (week 1-2 `games_played=0` fails closed by design, not a bug). Resume with `/gsd-autonomous --from 9` or `/gsd-plan-phase 9` once those dates pass.
+- Environment gap discovered during the dry run: system Python (3.14, pydantic 2.13.4) cannot import the vendored `cfbd-python` client (`PydanticUserError`); use `.venv/Scripts/python.exe` (pydantic 1.10.26, matches `requirements.lock`) for anything touching CFBD API calls. `.venv` is also missing `waitress` (2 failing tests in `tests/test_cli.py`, added by the concurrent deploy-hardening work, unrelated to this milestone) — run `.venv/Scripts/python.exe -m pip install -r requirements.lock` (or equivalent) to resync.
 
 ### Blockers/Concerns
 
