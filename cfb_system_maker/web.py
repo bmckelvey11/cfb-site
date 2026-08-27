@@ -820,10 +820,6 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             "chart_points": chart_points,
         }
 
-    @app.get("/favicon.ico")
-    def favicon():
-        return "", 204
-
     @app.errorhandler(404)
     def _not_found(err):
         return render_template("error.html", title="Page not found",
