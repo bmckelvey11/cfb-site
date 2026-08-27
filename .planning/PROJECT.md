@@ -70,7 +70,7 @@ A saved system's main page reads like a Bet Labs system editor (stat chips, cumu
 - Widget/embed, Live Help chat — no external audience for embeds; Live Help is a support feature, not a betting tool
 - Moneyline wager type (third `bet_type` beyond spread/total) — add later once spread/total UX (popup modals, dashboard) is settled
 - Public betting-percentage filters — CFBD has no bet-share data source; would need a different provider (Action Network client exists as a future option, not wired to the registry today)
-- Hide Duplicates toggle — only matters once a system can match both sides of one game (e.g. `bet_side`-identifying systems); current side-fixed systems can't self-collide, so this waits until that mechanism exists
+- Hide Duplicates toggle as originally specified — architecture research confirmed `run_backtest` is structurally 1:1 on `game_id`; a total system's either-side team/conference filter matches more games, never two candidate bets on the same `game_id`. There is no top-line duplication to toggle away. The real bug this deferral was gesturing at was the `/filter-detail` modal's per-value double-count, fixed directly in FIX-02 (Phase 7).
 
 ## Context
 

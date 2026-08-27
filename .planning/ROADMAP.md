@@ -56,11 +56,11 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
   2. In the `/filter-detail` modal for a total-system team/conference filter, the per-value Record/ROI/Money rows reconcile with (do not double-count against) the top-line backtest result.
   3. `PROJECT.md` no longer describes Hide Duplicates as a reachable, pending deferral in either the Out of Scope bullet or the Key Decisions table — both are updated to record the correct architectural finding (`run_backtest` is 1:1 on `game_id`; no top-line duplicate bets exist to toggle away; the real bug was the filter-detail double-count fixed by FIX-02).
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 - [x] 07-01-PLAN.md — describe() fallback sentence for uncovered (op, control) combos (FIX-01)
 - [ ] 07-02-PLAN.md — filter-detail modal reconciliation caption for double-counted rows (FIX-02)
-- [ ] 07-03-PLAN.md — close Hide Duplicates deferral in PROJECT.md Out of Scope (FIX-03)
+- [x] 07-03-PLAN.md — close Hide Duplicates deferral in PROJECT.md Out of Scope (FIX-03)
 
 ### Phase 8: Neutral-Site & Indoor Unders Example
 
