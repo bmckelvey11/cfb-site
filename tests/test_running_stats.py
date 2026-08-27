@@ -22,8 +22,8 @@ def _game(game_id, week, home="Alpha", away="Beta", home_points=None, away_point
 def test_first_game_of_season_has_zero_history():
     games = [_game(1, 1, home_points=21, away_points=14, spread=-3.5)]
     stats = compute_running_stats(games)
-    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
-    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
+    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
+    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
 
 
 def test_no_lookahead_stats_reflect_only_strictly_prior_games():
@@ -81,7 +81,7 @@ def test_seasons_reset():
         _game(2, 1, season=2023, home_points=0, away_points=0, spread=-1.0),
     ]
     stats = compute_running_stats(games)
-    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
+    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
 
 
 def test_start_dates_override_week_order():
@@ -162,3 +162,63 @@ def test_ppa_handles_partial_none_values():
     stats = compute_running_stats(games, ppa=ppa)
     assert stats[(2, "Alpha")]["ppa_off"] is None
     assert stats[(2, "Alpha")]["ppa_def"] == -0.25
+
+
+def test_win_streak_is_signed_and_entering_game():
+    games = [
+        _game(1, 1, home_points=21, away_points=14),   # Alpha win  -> +1 entering g2
+        _game(2, 2, home_points=28, away_points=10),   # Alpha win  -> +2 entering g3
+        _game(3, 3, home_points=3, away_points=30),    # Alpha loss -> -1 entering g4
+        _game(4, 4, home_points=1, away_points=40),    # Alpha loss -> -2 entering g5
+        _game(5, 5, home_points=7, away_points=7),     # tie: breaks streak -> 0 entering g6
+        _game(6, 6, home_points=10, away_points=0),
+    ]
+    stats = compute_running_stats(games)
+    assert stats[(1, "Alpha")]["streak"] == 0     # season opener, no history
+    assert stats[(2, "Alpha")]["streak"] == 1
+    assert stats[(3, "Alpha")]["streak"] == 2
+    assert stats[(4, "Alpha")]["streak"] == -1
+    assert stats[(5, "Alpha")]["streak"] == -2
+    assert stats[(6, "Alpha")]["streak"] == 0
+    # Beta is the mirror image of every Alpha result
+    assert stats[(3, "Beta")]["streak"] == -2
+    assert stats[(4, "Beta")]["streak"] == 1
+
+
+def test_ats_streak_is_signed_and_pushes_break_it():
+    games = [
+        # Alpha -3.5 favourite, wins by 7 -> covers  => +1
+        _game(1, 1, home_points=21, away_points=14, spread=-3.5),
+        # Alpha -3.5, wins by 10 -> covers           => +2
+        _game(2, 2, home_points=24, away_points=14, spread=-3.5),
+        # Alpha -10, wins by 3 -> fails to cover     => -1
+        _game(3, 3, home_points=17, away_points=14, spread=-10.0),
+        # Alpha -7, wins by exactly 7 -> ATS push    => 0
+        _game(4, 4, home_points=21, away_points=14, spread=-7.0),
+        _game(5, 5, home_points=10, away_points=0, spread=-3.0),
+    ]
+    stats = compute_running_stats(games)
+    assert stats[(1, "Alpha")]["ats_streak"] == 0
+    assert stats[(2, "Alpha")]["ats_streak"] == 1
+    assert stats[(3, "Alpha")]["ats_streak"] == 2
+    assert stats[(4, "Alpha")]["ats_streak"] == -1
+    assert stats[(5, "Alpha")]["ats_streak"] == 0   # push broke the streak
+
+
+def test_streak_ignores_games_without_scores():
+    games = [
+        _game(1, 1, home_points=21, away_points=14),
+        _game(2, 2, home_points=None, away_points=None),   # unplayed: no effect
+        _game(3, 3, home_points=28, away_points=0),
+    ]
+    stats = compute_running_stats(games)
+    assert stats[(3, "Alpha")]["streak"] == 1
+
+
+def test_streak_does_not_carry_across_seasons():
+    games = [
+        _game(1, 12, home_points=35, away_points=0, season=2022),
+        _game(2, 1, home_points=10, away_points=7, season=2023),
+    ]
+    stats = compute_running_stats(games)
+    assert stats[(2, "Alpha")]["streak"] == 0

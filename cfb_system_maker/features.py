@@ -71,10 +71,6 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "seasonType", "Season Type", "matchup", "raw_game", "seasonType", "game_id", "categorical",
         description="Season segment label (for example regular or postseason). Pregame schedule category.",
     ),
-    FeatureDef(
-        "media_outlet", "TV Network", "matchup", "raw_media", "outlet", "game_id", "categorical",
-        description="Broadcast outlet or TV network name for the game. Pregame media label.",
-    ),
     # --- ratings (game_id) ---
     FeatureDef(
         "homePregameElo", "Home Pregame Elo", "ratings", "raw_game", "homePregameElo", "game_id", "numeric",
@@ -337,6 +333,24 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         description=(
             "Against-the-spread win percentage from prior games this season (0–1). "
             "Entering-game value; current game excluded. Team-scoped."
+        ),
+    ),
+    FeatureDef(
+        "running_streak", "Win/Loss Streak (to date)", "season_to_date", "computed_running",
+        "streak", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Signed current win/loss run entering this game: +3 means won the last 3, "
+            "-2 means lost the last 2, 0 for a season opener or after a tie. "
+            "Entering-game value; team-scoped."
+        ),
+    ),
+    FeatureDef(
+        "running_ats_streak", "ATS Streak (to date)", "season_to_date", "computed_running",
+        "ats_streak", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Signed current against-the-spread run entering this game: +3 means covered the "
+            "last 3, -2 means failed to cover the last 2, 0 for a season opener or after an "
+            "ATS push. Entering-game value; team-scoped."
         ),
     ),
     FeatureDef(

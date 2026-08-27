@@ -35,6 +35,9 @@ def compute_running_stats(
         entries.sort(key=lambda entry: (entry[0], entry[1]))
         played = wins = losses = 0
         ats_wins = ats_losses = 0
+        # Signed run length entering the game: +n won/covered last n, -n lost/
+        # failed to cover last n, 0 for no history or after a tie/ATS push.
+        streak = ats_streak = 0
         ppa_off_sum = ppa_def_sum = 0.0
         ppa_off_count = ppa_def_count = 0
         adv_sums: dict[str, float] = {out_key: 0.0 for out_key in _ADV_FIELDS}
@@ -47,6 +50,8 @@ def compute_running_stats(
                 "games_played": played,
                 "win_pct": round(wins / decided, 4) if decided else None,
                 "ats_pct": round(ats_wins / ats_decided, 4) if ats_decided else None,
+                "streak": streak,
+                "ats_streak": ats_streak,
                 "ppa_off": round(ppa_off_sum / ppa_off_count, 4) if ppa_off_count else None,
                 "ppa_def": round(ppa_def_sum / ppa_def_count, 4) if ppa_def_count else None,
                 **{
@@ -62,15 +67,23 @@ def compute_running_stats(
             played += 1
             if team_points > opponent_points:
                 wins += 1
+                streak = streak + 1 if streak > 0 else 1
             elif team_points < opponent_points:
                 losses += 1
+                streak = streak - 1 if streak < 0 else -1
+            else:
+                streak = 0  # a tie belongs to neither run
             if game.spread is not None:
                 side_spread = game.spread if side == "home" else -game.spread
                 margin = team_points + side_spread - opponent_points
                 if margin > 0:
                     ats_wins += 1
+                    ats_streak = ats_streak + 1 if ats_streak > 0 else 1
                 elif margin < 0:
                     ats_losses += 1
+                    ats_streak = ats_streak - 1 if ats_streak < 0 else -1
+                else:
+                    ats_streak = 0
                 # margin == 0 is an ATS push: counts toward neither side
             game_ppa = ppa.get((game_id, team))
             if game_ppa:
