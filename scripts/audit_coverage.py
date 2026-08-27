@@ -103,14 +103,27 @@ def main() -> None:
             from cfb_system_maker.graphql_client import GQL_DEFAULT_TABLES
             got = {p.stem for p in gql.glob("*.json")}
             missing = [t for t in GQL_DEFAULT_TABLES if t not in got]
-            extra = sorted(got - set(GQL_DEFAULT_TABLES))
-            print(f"\nGRAPHQL: {len(got)}/{len(GQL_DEFAULT_TABLES)} default tables on disk")
+            have_default = len(GQL_DEFAULT_TABLES) - len(missing)
+            # A per-season pull writes `{table}_{season}.json`; count those as shards of
+            # their base table, not as separate tables.
+            extra = sorted(t for t in got - set(GQL_DEFAULT_TABLES) if not _is_shard(t, got))
+            shards = sorted(t for t in got - set(GQL_DEFAULT_TABLES) if _is_shard(t, got))
+            print(f"\nGRAPHQL: {have_default}/{len(GQL_DEFAULT_TABLES)} default tables on disk"
+                  f" ({len(got)} file(s) total)")
             if missing:
                 print("  missing:", ", ".join(missing))
             if extra:
                 print("  extra (not in default list):", ", ".join(extra))
+            if shards:
+                print(f"  per-season shards: {', '.join(shards)}")
         except Exception as exc:  # pragma: no cover
             print("\nGRAPHQL: could not compare —", exc)
+
+
+def _is_shard(stem: str, stems: set[str]) -> bool:
+    """True if `stem` is `{base}_{season}` for a base table also present on disk."""
+    base, sep, tail = stem.rpartition("_")
+    return bool(sep) and tail.isdigit() and len(tail) == 4 and base in stems
 
 
 def _compact(files: list[str]) -> str:
