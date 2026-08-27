@@ -607,6 +607,19 @@ code {
   font-size: 0.85rem;
 }
 
+.feature-group > legend {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-bottom: 8px;
+  margin-top: 20px;
+}
+
+.feature-group:first-of-type > legend {
+  margin-top: 0;
+}
+
 .feature-group.lookahead {
   border: 1px solid #b45309;
   background: rgba(180, 83, 9, 0.05);
@@ -799,11 +812,13 @@ code {
 }
 
 .filter-modal__header {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   gap: 16px;
   align-items: start;
-  padding: 24px 32px 16px;
+  /* Right padding clears the absolutely positioned close button. */
+  padding: 24px 72px 16px 32px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -869,6 +884,9 @@ code {
 }
 
 .filter-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
   min-height: 36px;
   min-width: 36px;
   padding: 0 10px;
@@ -1018,6 +1036,39 @@ code {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+.filter-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.filter-modal__clear {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filter-modal__clear[hidden] {
+  display: none;
+}
+
+.filter-modal__clear:hover:not(:disabled) {
+  background: var(--loss-bg);
+  color: var(--loss);
+}
+
+.filter-modal__clear:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .filter-modal__max-roi {
@@ -1241,6 +1292,7 @@ code {
 }
 
 .dash-cta {
+  display: inline-block;
   padding: 8px 16px;
   border-radius: 6px;
   background: var(--accent);
