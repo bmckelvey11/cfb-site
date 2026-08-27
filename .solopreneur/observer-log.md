@@ -158,3 +158,31 @@
 **Alternatives**: Open a PR instead, Wait — let me look first
 **Context**: git checkout master && git merge fix/web-app-review-2026-08-26 locally, then push
 ---
+
+## [2026-08-26 20:38:09] - No CONTEXT.md for Phase 7 (Integrity Fixes: describe() fallback, filter-detail modal double-count fix, Hide Duplicates closure). Continue or capture context first?
+**Choice**: Run discuss-phase first (Recommended)
+**Alternatives**: Continue without context
+**Context**: Capture decisions before planning — e.g. how the fallback sentence should read, whether the modal fix changes displayed totals users have already seen
+---
+
+## [2026-08-26 20:39:18] - Phase 7: Integrity Fixes. Domain: never silently hide a filter, never show wrong per-value counts in the modal, and stop calling a non-existent bug 'Hide Duplicates'. Which areas do you want to discuss?
+**Choice**: ['Filter-detail double-count semantics (Recommended)', 'describe() fallback wording (Recommended)']
+**Alternatives**: Filter-detail double-count semantics (Recommended), describe() fallback wording (Recommended), None — proceed with research's recommendations
+---
+
+## [2026-08-26 20:39:58] - Filter-detail double-count semantics. A total system's team/conference filter with either-perspective now returns a tuple (home_value, away_value) per game. Today's bug: the same bet gets counted in BOTH team's value rows, so the per-value table's total sums to ~2x the actual matched-game count. What should the fixed behavior be?
+**Choice**: [User dismissed — do not proceed, wait for next instruction]
+**Alternatives**: One row per matching team-value is correct, just needs correct total (Recommended), Each game should count once, period, You decide — go with what the code architecture supports most cleanly
+---
+
+## [2026-08-26 20:40:16] - You just dismissed the filter-detail double-count question mid-discussion for Phase 7. /gsd-autonomous would now run all remaining phases (7-9) unattended, auto-picking answers to gray areas like that one instead of asking you. Confirm this is what you want.
+**Choice**: Yes, run autonomous — auto-pick reasonable defaults
+**Alternatives**: No — let me answer that question first
+**Context**: Proceed through phases 7-9 with Claude choosing gray-area answers (including the double-count semantics), pausing only for real blockers
+---
+
+## [2026-08-26 20:48:20] - Phase 6 was done directly (git merge + audit), not through plan-phase→execute-phase. I wrote a SUMMARY.md so the tool sees it, but its completion check also wants a PLAN.md (plan_count must be >0), which doesn't exist and would misrepresent what happened if I fabricate one. How should autonomous mode treat Phase 6?
+**Choice**: Let autonomous re-run Phase 6's discuss/plan/execute (Recommended)
+**Alternatives**: Skip Phase 6 manually, start autonomous at Phase 7
+**Context**: It'll generate real PLAN.md/re-verify MERGE-01/02 — harmless since both are already true (merge done, search_runs empty); costs one wasted cycle but keeps everything tool-consistent
+---
