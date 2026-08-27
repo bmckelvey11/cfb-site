@@ -350,8 +350,13 @@
     } else if (state.kind === "numeric" && boundsAreValid()) {
       // Domain-edge bounds are cleared on Save (see writeNumericToForm), so the
       // live preview must drop them too or its chips diverge from the commit.
-      const atDomainMin = state.domainMin != null && Number(state.min) <= Number(state.domainMin);
-      const atDomainMax = state.domainMax != null && Number(state.max) >= Number(state.domainMax);
+      // Exception: a Max ROI single-value pick (state.singleValuePick) is an
+      // explicit selection, not "user dragged to the edge" -- write both
+      // bounds unconditionally so the preview matches what Save commits.
+      const atDomainMin = !state.singleValuePick
+        && state.domainMin != null && Number(state.min) <= Number(state.domainMin);
+      const atDomainMax = !state.singleValuePick
+        && state.domainMax != null && Number(state.max) >= Number(state.domainMax);
       const fields = CORE_RANGE_FIELDS[state.candidateId];
       if (fields) {
         params.set(fields.min, atDomainMin ? "" : String(state.min));
@@ -595,6 +600,11 @@
         : bestRoiWindow(state.rows);
       state.min = window.min;
       state.max = window.max;
+      // bestSingleNumericBucket explicitly selects one value rather than
+      // spanning a range; min===max landing on a domain edge must not be
+      // read as "user dragged to the edge, clear the filter" (see
+      // writeNumericToForm/draftQuery).
+      state.singleValuePick = Boolean(state.overlappingRows);
       syncBoundInputs();
       refreshLive();
     } else {
@@ -752,6 +762,8 @@
         }
         state.rows = payload.rows || [];
         state.chartPoints = payload.chart_points || [];
+        // New rows/domain invalidate any prior Max ROI single-value pick.
+        state.singleValuePick = false;
         if (payload.domain) {
           state.domainMin = payload.domain.min != null ? Number(payload.domain.min) : state.domainMin;
           state.domainMax = payload.domain.max != null ? Number(payload.domain.max) : state.domainMax;
@@ -929,6 +941,11 @@
   function syncBoundInputs(source) {
     if (!state || state.kind !== "numeric") {
       return;
+    }
+    if (source) {
+      // A manual drag/type overrides any prior Max ROI single-value pick,
+      // restoring normal domain-edge-clearing semantics.
+      state.singleValuePick = false;
     }
     let min = Number(state.min);
     let max = Number(state.max);
@@ -1356,15 +1373,19 @@
     if (!state || state.kind !== "numeric" || !boundsAreValid()) {
       return;
     }
+    // A Max ROI single-value pick (state.singleValuePick) explicitly selected
+    // one value; min===max landing on a domain edge must not be read as
+    // "user dragged to the edge, clear the filter" in that case.
+    const singleValuePick = Boolean(state.singleValuePick);
     const fields = CORE_RANGE_FIELDS[state.candidateId];
     if (fields) {
       const minEl = filtersForm.querySelector('[name="' + fields.min + '"]');
       const maxEl = filtersForm.querySelector('[name="' + fields.max + '"]');
       if (minEl) {
-        minEl.value = (state.domainMin != null && Number(state.min) <= Number(state.domainMin)) ? "" : String(state.min);
+        minEl.value = (!singleValuePick && state.domainMin != null && Number(state.min) <= Number(state.domainMin)) ? "" : String(state.min);
       }
       if (maxEl) {
-        maxEl.value = (state.domainMax != null && Number(state.max) >= Number(state.domainMax)) ? "" : String(state.max);
+        maxEl.value = (!singleValuePick && state.domainMax != null && Number(state.max) >= Number(state.domainMax)) ? "" : String(state.max);
       }
       return;
     }
@@ -1376,8 +1397,10 @@
     // domain edge is cleared instead of committed. Feature values fail closed
     // on null, so a full-domain gte/lte pair is NOT "no filter" -- it silently
     // drops every game missing the feature.
-    const atDomainMin = state.domainMin != null && Number(state.min) <= Number(state.domainMin);
-    const atDomainMax = state.domainMax != null && Number(state.max) >= Number(state.domainMax);
+    const atDomainMin = !singleValuePick
+      && state.domainMin != null && Number(state.min) <= Number(state.domainMin);
+    const atDomainMax = !singleValuePick
+      && state.domainMax != null && Number(state.max) >= Number(state.domainMax);
     const enable = fallback.querySelector('input[name="ff_enable"]');
     if (enable) {
       enable.checked = !(atDomainMin && atDomainMax);
