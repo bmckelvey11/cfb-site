@@ -862,9 +862,18 @@ def edit_metadata_for_sentence(
         filts = [filt for filt in system.feature_filters if filt.key == feature_key]
         if not filts:
             return None
+        control = str(descriptor["control"])
+        renderable = (
+            (control == "numeric" and any(filt.op in ("gte", "lte") for filt in filts))
+            or (control == "bool" and any(filt.op == "eq" for filt in filts))
+            or (control == "categorical" and any(filt.op in ("eq", "in") for filt in filts))
+        )
+        if not renderable:
+            # Same (op, control) shape describe()'s fallback branch renders —
+            # no modal representation exists to edit into.
+            return None
         perspective = filts[0].perspective
         meta["perspective"] = perspective
-        control = str(descriptor["control"])
         if control == "numeric":
             meta["min"] = next((float(filt.value) for filt in filts if filt.op == "gte"), None)
             meta["max"] = next((float(filt.value) for filt in filts if filt.op == "lte"), None)
