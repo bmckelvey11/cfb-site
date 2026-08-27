@@ -71,3 +71,18 @@ python -m cfb_system_maker web --data-dir data --port 5000
 ```
 
 Open `http://127.0.0.1:5000`.
+
+## Development: browser smoke test (optional)
+
+`tests/test_browser_smoke.py` drives the filter modal editor UI with a real headless
+browser to catch uncaught JS errors that source-level tests can't see. It's optional,
+dev-only, and marked `slow` so it does not run as part of the default `pytest -q` suite.
+
+```powershell
+pip install playwright
+playwright install chromium
+python -m pytest -m slow tests/test_browser_smoke.py
+```
+
+Requires a built `data/` directory (`python -m cfb_system_maker sample --data-dir data`
+is enough); the test skips itself if `data/processed/games.csv` is missing.
