@@ -63,6 +63,7 @@
                     <th>Money Won</th>
                     <th>ROI</th>
                     <th>Trend</th>
+                    {% if tab != 'examples' %}<th class="actions-col"><span class="sr-only">Actions</span></th>{% endif %}
                   </tr>
                 </thead>
                 <tbody>
@@ -89,6 +90,23 @@
                       <td class="{{ 'positive' if fig.profit > 0 else 'negative' if fig.profit < 0 else '' }}">{{ money(fig.profit) }}</td>
                       <td class="{{ 'positive' if fig.roi > 0 else 'negative' if fig.roi < 0 else '' }}">{{ "%.2f%%"|format(fig.roi * 100) }}</td>
                       <td class="trend-cell">{% if row.sparkline.empty %}<span class="trend-empty">&mdash;</span>{% else %}<svg class="sparkline" viewBox="0 0 96 24" width="96" height="24" preserveAspectRatio="none" role="img" aria-label="{{ row.sparkline.label }}"><polyline class="{{ row.sparkline.sign_class }}" points="{{ row.sparkline.polyline }}" /></svg>{% endif %}</td>
+                      {% if tab != 'examples' %}
+                      <td class="actions-cell">
+                        <details class="row-menu">
+                          <summary aria-label="Actions for {{ row.name }}">&hellip;</summary>
+                          <div class="row-menu__pop">
+                            <form method="post" action="{{ url_for('rename_saved_system', name=row.name) }}" class="row-menu__form">
+                              <input name="new_name" value="{{ row.name }}" aria-label="New name for {{ row.name }}" required>
+                              <button type="submit">Rename</button>
+                            </form>
+                            <form method="post" action="{{ url_for('delete_saved_system', name=row.name) }}"
+                                  onsubmit="return confirm('Delete {{ row.name }}? This cannot be undone.');">
+                              <button type="submit" class="row-menu__delete">Delete</button>
+                            </form>
+                          </div>
+                        </details>
+                      </td>
+                      {% endif %}
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -123,15 +141,19 @@
               <ul class="matches-list">
                 {% for row in panel.rows %}
                   <li class="match-row">
-                    <div class="cm-kickoff">{{ row.kickoff }}</div>
+                    <div class="cm-top">
+                      <span class="cm-kickoff">{{ row.kickoff }}</span>
+                      <span class="cm-type">{{ row.type_label }}</span>
+                    </div>
                     <div class="cm-play">{{ row.play }}</div>
                     <div class="cm-matchup">{{ row.matchup }}</div>
-                    <div class="cm-system"><a class="system-link" href="{{ url_for('index') }}?load_system={{ row.system_name|urlencode }}">{{ row.system_name }}</a> <span class="cm-type">{{ row.type_label }}</span></div>
+                    <div class="cm-system"><a class="system-link" href="{{ url_for('index') }}?load_system={{ row.system_name|urlencode }}">{{ row.system_name }}</a></div>
                     {% if row.details %}
-                    <div class="cm-details">
-                      <span class="cm-details-label">Matched on</span>
-                      <ul>{% for detail in row.details %}<li>{{ detail }}</li>{% endfor %}</ul>
-                    </div>
+                      {# The match reasons are supporting detail, not the headline --
+                         inline chips instead of a labelled bullet list per row. #}
+                      <div class="cm-details">
+                        {% for detail in row.details %}<span class="cm-tag">{{ detail }}</span>{% endfor %}
+                      </div>
                     {% endif %}
                   </li>
                 {% endfor %}

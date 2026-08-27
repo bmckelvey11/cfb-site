@@ -106,7 +106,9 @@ def test_cumulative_chart_empty_bet_details_returns_zero_line_only():
     assert _cumulative_chart(result) == {
         "points": [],
         "polyline": "",
-        "zero_y": 75,
+        "area": "",
+        # Half of the 170-unit viewBox the chart renders into.
+        "zero_y": 85,
         "min_x": None,
         "max_x": None,
     }
@@ -592,7 +594,7 @@ def test_web_default_tab_shows_results_graph_view(tmp_path):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "Money Won Over Time" in html
-    assert 'class="range-chart"' in html
+    assert "range-chart" in html
     assert '<section class="table-wrap">' not in html
 
 
@@ -2164,3 +2166,90 @@ def test_unknown_op_still_rejected(tmp_path):
         except web.StrictParseError:
             return
         raise AssertionError("expected StrictParseError for unsupported op")
+
+
+def test_save_slugifies_human_names_instead_of_rejecting(tmp_path):
+    """"My Cool System" is what people actually type. The name doubles as the
+    filename, so it still has to be path-safe -- slugify it rather than fail."""
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+
+    response = _save_a_system(client, "My Cool System")
+
+    assert response.status_code == 302
+    assert "save_error" not in response.headers["Location"]
+    assert "load_system=my-cool-system" in response.headers["Location"]
+    assert (tmp_path / "systems" / "my-cool-system.json").exists()
+
+
+def test_save_rejects_a_name_that_slugifies_to_nothing(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().post("/save", data={"save_name": "///"})
+
+    assert response.status_code == 302
+    assert "save_error=invalid_name" in response.headers["Location"]
+
+
+def test_save_name_cannot_escape_the_systems_directory(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+
+    response = _save_a_system(client, "../../etc/passwd")
+
+    # Slugified to a flat, safe name -- never written outside systems/.
+    assert response.status_code == 302
+    assert not (tmp_path / "systems" / ".." / ".." / "etc").exists()
+    written = list((tmp_path / "systems").glob("*.json"))
+    assert all(path.parent == tmp_path / "systems" for path in written)
+
+
+def test_delete_system_removes_it(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "doomed")
+    assert (tmp_path / "systems" / "doomed.json").exists()
+
+    response = client.post("/systems/doomed/delete")
+
+    assert response.status_code == 302
+    assert not (tmp_path / "systems" / "doomed.json").exists()
+
+
+def test_delete_missing_system_does_not_500(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().post("/systems/never-existed/delete")
+
+    assert response.status_code == 302
+
+
+def test_rename_system_moves_it_and_keeps_contents(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "before")
+    original = json.loads((tmp_path / "systems" / "before.json").read_text(encoding="utf-8"))
+
+    response = client.post("/systems/before/rename", data={"new_name": "After The Rename"})
+
+    assert response.status_code == 302
+    assert not (tmp_path / "systems" / "before.json").exists()
+    renamed_path = tmp_path / "systems" / "after-the-rename.json"
+    assert renamed_path.exists()
+    renamed = json.loads(renamed_path.read_text(encoding="utf-8"))
+    assert renamed["name"] == "after-the-rename"
+    assert renamed["system"] == original["system"]
+
+
+def test_rename_onto_an_existing_name_is_refused(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "keeper")
+    _save_a_system(client, "other")
+
+    response = client.post("/systems/other/rename", data={"new_name": "keeper"})
+
+    assert response.status_code == 302
+    # Neither system is destroyed by the refused rename.
+    assert (tmp_path / "systems" / "keeper.json").exists()
+    assert (tmp_path / "systems" / "other.json").exists()

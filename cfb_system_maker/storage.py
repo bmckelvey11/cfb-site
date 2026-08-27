@@ -27,6 +27,54 @@ def _safe_system_name(name: str) -> str:
     return name
 
 
+def slugify_system_name(name: str) -> str:
+    """Turn what a person types into a filename-safe system name.
+
+    The name doubles as the file name, so it has to stay flat and path-safe --
+    but rejecting "My Cool System" outright just looks like saving is broken.
+    Anything that isn't a letter, digit, dash or underscore becomes a dash;
+    runs collapse; leading/trailing dashes are trimmed. Raises ValueError when
+    nothing usable is left, so the caller can report it rather than write a
+    file named "-".
+    """
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", name.strip()).strip("-_")
+    slug = re.sub(r"-{2,}", "-", slug).lower()
+    if not slug:
+        raise ValueError(f"invalid system name: {name!r}")
+    return _safe_system_name(slug)
+
+
+def delete_system(name: str, data_dir: str | Path) -> bool:
+    """Remove a saved system. Returns False when it was already gone."""
+    path = Path(data_dir) / "systems" / f"{_safe_system_name(name)}.json"
+    if not path.exists():
+        return False
+    path.unlink()
+    return True
+
+
+def rename_system(old_name: str, new_name: str, data_dir: str | Path) -> str:
+    """Rename a saved system, returning the slug actually used.
+
+    Refuses to clobber an existing system -- renaming should never silently
+    destroy the thing it collides with.
+    """
+    systems = Path(data_dir) / "systems"
+    source = systems / f"{_safe_system_name(old_name)}.json"
+    if not source.exists():
+        raise FileNotFoundError(source)
+    slug = slugify_system_name(new_name)
+    target = systems / f"{slug}.json"
+    if target.exists() and target != source:
+        raise FileExistsError(target)
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["name"] = slug
+    target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    if target != source:
+        source.unlink()
+    return slug
+
+
 def save_raw_json(data_dir: str | Path, name: str, season: int, rows: list[dict[str, Any]]) -> Path:
     path = Path(data_dir) / "raw" / f"{name}_{season}.json"
     path.parent.mkdir(parents=True, exist_ok=True)

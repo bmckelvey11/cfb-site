@@ -39,6 +39,9 @@ from cfb_system_maker.features import (
 from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SavedSystem, SystemFilter
 from cfb_system_maker.narration import NarrationError, narrate_run
 from cfb_system_maker.storage import (
+    delete_system,
+    rename_system,
+    slugify_system_name,
     EXAMPLES_DIR,
     list_examples,
     list_systems,
@@ -374,7 +377,7 @@ def downsample_chart_points(
                 items.append(last)
 
     width = 520
-    height = 150
+    height = 170
     pad_x = 28
     pad_y = 18
     values = [value for value, _, _ in items]
@@ -613,11 +616,37 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             args.setlist("save_error", ["missing_name"])
             return redirect("/system?" + urlencode(list(args.items(multi=True))))
         try:
+            # Accept what people actually type ("My Cool System") and slugify it;
+            # the name is still used as a filename, so it stays path-safe.
+            name = slugify_system_name(name)
             save_system(name, _system_from_form(form), app.config["DATA_DIR"], theory=form.get("theory", ""))
         except ValueError:
             args.setlist("save_error", ["invalid_name"])
             return redirect("/system?" + urlencode(list(args.items(multi=True))))
         return redirect(url_for("index", **{"load_system": name}))
+
+    @app.post("/systems/<name>/delete")
+    def delete_saved_system(name: str):
+        try:
+            delete_system(name, app.config["DATA_DIR"])
+        except ValueError:
+            pass
+        return redirect(url_for("dashboard"))
+
+    @app.post("/systems/<name>/rename")
+    def rename_saved_system(name: str):
+        new_name = str(request.form.get("new_name", "")).strip()
+        if not new_name:
+            return redirect(url_for("dashboard", rename_error="missing_name"))
+        try:
+            rename_system(name, new_name, app.config["DATA_DIR"])
+        except FileNotFoundError:
+            return redirect(url_for("dashboard", rename_error="not_found"))
+        except FileExistsError:
+            return redirect(url_for("dashboard", rename_error="name_taken"))
+        except ValueError:
+            return redirect(url_for("dashboard", rename_error="invalid_name"))
+        return redirect(url_for("dashboard"))
 
     @app.get("/compare")
     def compare():
@@ -1501,9 +1530,17 @@ def _scan_values(feature: FeatureDef, feature_map: dict[int, dict]) -> list[obje
     return sorted(seen, key=lambda item: str(item))
 
 
+def _chart_area(points: list[dict], zero_y: float) -> str:
+    """Polygon for the shaded region between the line and the zero axis."""
+    if len(points) < 2:
+        return ""
+    coords = " ".join(f"{point['x']},{point['y']}" for point in points)
+    return f"{points[0]['x']},{zero_y} {coords} {points[-1]['x']},{zero_y}"
+
+
 def _range_chart(result: BacktestResult) -> dict[str, object]:
     if not result.bet_details:
-        return {"points": [], "polyline": "", "zero_y": 75, "min_x": None, "max_x": None}
+        return {"points": [], "polyline": "", "area": "", "zero_y": 85, "min_x": None, "max_x": None}
 
     buckets: dict[float, float] = {}
     for bet in result.bet_details:
@@ -1519,7 +1556,7 @@ def _range_chart(result: BacktestResult) -> dict[str, object]:
         items = sampled
 
     width = 520
-    height = 150
+    height = 170
     pad_x = 28
     pad_y = 18
     values = [profit for _, profit in items] + [0]
@@ -1533,11 +1570,12 @@ def _range_chart(result: BacktestResult) -> dict[str, object]:
         y = height - pad_y - ((profit - min_profit) / span) * (height - pad_y * 2)
         points.append({"x": round(x, 2), "y": round(y, 2), "line": line, "profit": profit})
 
-    zero_y = height - pad_y - ((0 - min_profit) / span) * (height - pad_y * 2)
+    zero_y = round(height - pad_y - ((0 - min_profit) / span) * (height - pad_y * 2), 2)
     return {
         "points": points,
         "polyline": " ".join(f"{point['x']},{point['y']}" for point in points),
-        "zero_y": round(zero_y, 2),
+        "area": _chart_area(points, zero_y),
+        "zero_y": zero_y,
         "min_x": items[0][0],
         "max_x": items[-1][0],
     }
@@ -1545,12 +1583,12 @@ def _range_chart(result: BacktestResult) -> dict[str, object]:
 
 def _cumulative_chart(result: BacktestResult) -> dict[str, object]:
     if not result.bet_details:
-        return {"points": [], "polyline": "", "zero_y": 75, "min_x": None, "max_x": None}
+        return {"points": [], "polyline": "", "area": "", "zero_y": 85, "min_x": None, "max_x": None}
 
     ordered = sorted(result.bet_details, key=lambda bet: (bet.season, bet.week, bet.game_id))
 
     width = 520
-    height = 150
+    height = 170
     pad_x = 28
     pad_y = 18
 
@@ -1571,11 +1609,12 @@ def _cumulative_chart(result: BacktestResult) -> dict[str, object]:
         y = height - pad_y - ((profit - min_profit) / span) * (height - pad_y * 2)
         points.append({"x": round(x, 2), "y": round(y, 2), "order": index, "profit": profit})
 
-    zero_y = height - pad_y - ((0 - min_profit) / span) * (height - pad_y * 2)
+    zero_y = round(height - pad_y - ((0 - min_profit) / span) * (height - pad_y * 2), 2)
     return {
         "points": points,
         "polyline": " ".join(f"{point['x']},{point['y']}" for point in points),
-        "zero_y": round(zero_y, 2),
+        "area": _chart_area(points, zero_y),
+        "zero_y": zero_y,
         "min_x": 0,
         "max_x": len(ordered) - 1,
     }
