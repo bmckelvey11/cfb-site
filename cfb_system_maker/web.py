@@ -19,7 +19,7 @@ from cfb_system_maker.backtest import (
     sign_consistency,
     split_holdout,
 )
-from cfb_system_maker.describe import describe
+from cfb_system_maker.describe import describe, group_is_renderable
 from cfb_system_maker.enrich import (
     load_features,
     load_features_from,
@@ -865,18 +865,25 @@ def edit_metadata_for_sentence(
         meta["max"] = system.max_total
     elif candidate_id.startswith("feature:"):
         feature_key = candidate_id.split(":", 1)[1]
+        # Deliberately scoped by key only, not (key, perspective): the sentence
+        # this Edit button is attached to (row["key"] == f"ff:{feature_key}")
+        # is itself per-key, not per-perspective (describe.py groups by
+        # (key, perspective) but emits one sentence per group under the same
+        # "ff:{key}" sentence key). So if ANY perspective-group for this key is
+        # unrenderable, suppress Edit here too — fail closed rather than open
+        # a modal that can't represent every filter the sentence covers.
         filts = [filt for filt in system.feature_filters if filt.key == feature_key]
         if not filts:
             return None
         control = str(descriptor["control"])
-        renderable = (
-            (control == "numeric" and any(filt.op in ("gte", "lte") for filt in filts))
-            or (control == "bool" and any(filt.op == "eq" for filt in filts))
-            or (control == "categorical" and any(filt.op in ("eq", "in") for filt in filts))
-        )
+        groups: dict[str, list[FeatureFilter]] = {}
+        for filt in filts:
+            groups.setdefault(filt.perspective, []).append(filt)
+        renderable = all(group_is_renderable(group, control) for group in groups.values())
         if not renderable:
-            # Same (op, control) shape describe()'s fallback branch renders —
-            # no modal representation exists to edit into.
+            # Same shape describe()'s fallback branch renders — no modal
+            # representation exists that can edit every filter without
+            # silently dropping one.
             return None
         perspective = filts[0].perspective
         meta["perspective"] = perspective

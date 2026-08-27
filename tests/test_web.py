@@ -896,6 +896,63 @@ def test_web_uncovered_filter_combo_remove_link_actually_clears_it(tmp_path):
     assert "Neutral Site filter applied" not in second_html
 
 
+def test_web_mixed_renderable_and_unrenderable_group_suppresses_edit_button(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    save_system(
+        "neutral-mixed",
+        SystemFilter(
+            feature_filters=(
+                FeatureFilter(key="neutralSite", op="eq", value=True),
+                FeatureFilter(key="neutralSite", op="in", value=[True]),
+            )
+        ),
+        tmp_path,
+    )
+
+    response = client.get("/system?load_system=neutral-mixed")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+
+    label = "Neutral Site"
+    assert f"{label} is Yes" not in html
+    assert "filter applied" in html
+    assert "Edit filter:" not in html
+
+
+def test_web_mixed_group_remove_link_clears_both_filters(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    save_system(
+        "neutral-mixed",
+        SystemFilter(
+            feature_filters=(
+                FeatureFilter(key="neutralSite", op="eq", value=True),
+                FeatureFilter(key="neutralSite", op="in", value=[True]),
+            )
+        ),
+        tmp_path,
+    )
+
+    response = client.get("/system?load_system=neutral-mixed")
+    html = response.get_data(as_text=True)
+    match = re.search(r'<a class="remove-filter" href="([^"]*)" aria-label="Remove filter:[^"]*">', html)
+    assert match is not None
+    href = match.group(1).replace("&amp;", "&")
+
+    second_response = client.get("/system" + href)
+    assert second_response.status_code == 200
+    second_html = second_response.get_data(as_text=True)
+    assert "Neutral Site" not in second_html
+    assert "filter applied" not in second_html
+
+
 def test_web_save_and_load_system_preserves_theory(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

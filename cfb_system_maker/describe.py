@@ -55,6 +55,22 @@ def _labeled_range_sentence(
     return {"text": text, "key": key}
 
 
+def group_is_renderable(filts: list[FeatureFilter], control: str) -> bool:
+    """True only if the WHOLE group matches a shape the hand-written branches
+    can round-trip. Partial coverage (e.g. one renderable filter alongside an
+    uncovered one, or two filters that would each render but collide, like
+    eq=True + eq=False) must fall back — never drop a sibling filter silently.
+    """
+    if control == "numeric":
+        ops = [filt.op for filt in filts]
+        return all(op in ("gte", "lte") for op in ops) and len(ops) == len(set(ops))
+    if control == "bool":
+        return len(filts) == 1 and filts[0].op == "eq"
+    if control == "categorical":
+        return len(filts) == 1 and filts[0].op in ("eq", "in")
+    return False
+
+
 def _feature_group_sentence(filts: list[FeatureFilter]) -> dict[str, object] | None:
     key = filts[0].key
     perspective = filts[0].perspective
@@ -67,28 +83,27 @@ def _feature_group_sentence(filts: list[FeatureFilter]) -> dict[str, object] | N
     else:
         label = feature.label
 
-    if feature.control == "numeric":
-        gte = next((float(filt.value) for filt in filts if filt.op == "gte"), None)
-        lte = next((float(filt.value) for filt in filts if filt.op == "lte"), None)
-        return _labeled_range_sentence(gte, lte, label=label, key=f"ff:{key}")
-
-    # Bool / categorical: one sentence per filter (existing wording)
-    for filt in filts:
-        text: str | None = None
+    if group_is_renderable(filts, feature.control):
+        if feature.control == "numeric":
+            gte = next((float(filt.value) for filt in filts if filt.op == "gte"), None)
+            lte = next((float(filt.value) for filt in filts if filt.op == "lte"), None)
+            return _labeled_range_sentence(gte, lte, label=label, key=f"ff:{key}")
+        filt = filts[0]
         if filt.op == "eq" and feature.control == "bool":
             text = f"{label} is {'Yes' if filt.value else 'No'}"
         elif filt.op == "eq" and feature.control == "categorical":
             text = f"{label} is {filt.value}"
-        elif filt.op == "in" and feature.control == "categorical":
+        else:  # op == "in" and feature.control == "categorical"
             text = f"{label} is one of {', '.join(filt.value)}"
-        if text is not None:
-            return {"text": text, "key": f"ff:{key}"}
+        return {"text": text, "key": f"ff:{key}"}
 
-    # Fallback: an (op, control) combo feature_ok() applies but no branch above
-    # covers. Deliberately distinct wording (never blends in) so an uncovered
-    # combo stays visible instead of silently vanishing from the sentence list.
-    filt = filts[0]
-    return {"text": f"{label} filter applied (value: {filt.value!r})", "key": f"ff:{key}"}
+    # Fallback: the group doesn't match a shape the branches above can
+    # round-trip (uncovered op/control combo, or multiple filters that would
+    # each individually render but can't be coalesced into one sentence
+    # without dropping one). Deliberately distinct wording (never blends in)
+    # and joins every filter's value so nothing in the group vanishes.
+    values = ", ".join(repr(filt.value) for filt in filts)
+    return {"text": f"{label} filter applied (value: {values})", "key": f"ff:{key}"}
 
 
 def describe(system: SystemFilter) -> list[dict[str, object]]:

@@ -230,6 +230,54 @@ def test_describe_uncovered_op_control_combo_renders_distinct_fallback_sentence(
     assert fallback_text not in branch_texts
 
 
+def test_describe_mixed_renderable_and_unrenderable_group_falls_back_for_whole_group():
+    label = FEATURE_BY_KEY["neutralSite"].label
+    system = SystemFilter(
+        feature_filters=(
+            FeatureFilter(key="neutralSite", op="eq", value=True),
+            FeatureFilter(key="neutralSite", op="in", value=[True]),
+        )
+    )
+    result = describe(system)
+    keys = [row["key"] for row in result if row["key"] == "ff:neutralSite"]
+    assert keys == ["ff:neutralSite"]
+
+    fallback_text = next(row["text"] for row in result if row["key"] == "ff:neutralSite")
+    assert "filter applied" in fallback_text
+    assert fallback_text != f"{label} is Yes"
+    # Both filters' values must be visible — neither is silently dropped.
+    assert repr(True) in fallback_text
+
+
+def test_describe_two_bool_eq_filters_same_key_falls_back_instead_of_dropping_one():
+    label = FEATURE_BY_KEY["neutralSite"].label
+    system = SystemFilter(
+        feature_filters=(
+            FeatureFilter(key="neutralSite", op="eq", value=True),
+            FeatureFilter(key="neutralSite", op="eq", value=False),
+        )
+    )
+    result = describe(system)
+    rows = [row for row in result if row["key"] == "ff:neutralSite"]
+    assert len(rows) == 1
+    text = rows[0]["text"]
+    assert "filter applied" in text
+    assert text != f"{label} is Yes"
+    assert text != f"{label} is No"
+    assert repr(True) in text
+    assert repr(False) in text
+
+
+def test_describe_numeric_eq_op_falls_back_instead_of_vanishing():
+    label = FEATURE_BY_KEY["weather_temperature"].label
+    system = SystemFilter(feature_filters=(FeatureFilter(key="weather_temperature", op="eq", value=50.0),))
+    result = describe(system)
+    rows = [row for row in result if row["key"] == "ff:weather_temperature"]
+    assert len(rows) == 1
+    assert "filter applied" in rows[0]["text"]
+    assert label in rows[0]["text"]
+
+
 def test_describe_non_finite_numbers_do_not_crash():
     spread_system = SystemFilter(bet_type="spread", min_spread=float("nan"))
     result = describe(spread_system)
