@@ -12,7 +12,7 @@ and scoping conversation on 2026-08-26.
 
 ### Integrity Fixes
 
-- [ ] **FIX-01**: `describe()` renders a fallback sentence for any active filter whose `(op, control)` combination isn't covered by an existing branch, so no active filter is ever silently missing from the displayed filter list (closes T-01-03). Fallback preserves a working remove-link and is verified on both the system editor and the Current Matches dashboard panel (both surfaces reuse `describe()`).
+- [x] **FIX-01**: `describe()` renders a fallback sentence for any active filter whose `(op, control)` combination isn't covered by an existing branch, so no active filter is ever silently missing from the displayed filter list (closes T-01-03). Fallback preserves a working remove-link and is verified on both the system editor and the Current Matches dashboard panel (both surfaces reuse `describe()`).
 - [ ] **FIX-02**: `aggregate_filter_value_rows` (backs `GET /filter-detail`) no longer double-counts a bet across multiple value buckets for total-system team/conference filters — per-value Record/ROI/Money in the modal table reconciles with the top-line backtest result.
 - [ ] **FIX-03**: The original "Hide Duplicates" deferral is closed in `PROJECT.md` as architecturally not applicable — `run_backtest` is verified 1:1 on `game_id` (no top-line double-counting exists to toggle away); the real bug addressed instead is FIX-02.
 
@@ -38,7 +38,7 @@ and scoping conversation on 2026-08-26.
 |-------------|-------|--------|
 | MERGE-01 | Phase 6 | Complete |
 | MERGE-02 | Phase 6 | Complete |
-| FIX-01 | Phase 7 | Pending |
+| FIX-01 | Phase 7 | Complete |
 | FIX-02 | Phase 7 | Pending |
 | FIX-03 | Phase 7 | Pending |
 | DATA-01 | Phase 8 | Pending |
