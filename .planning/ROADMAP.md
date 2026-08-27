@@ -91,8 +91,16 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 **Plans:** 3 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 09-01-PLAN.md — record criterion 1 (already passed) + mechanical calendar gate probe for criteria 2/3
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 09-02-PLAN.md — criterion 2: live Current Matches panel against real posted-line games (calendar-gated on season start)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 09-03-PLAN.md — criterion 3: season-to-date feature-filtered matching against live week 3+ (calendar-gated)
 
 ## Progress
