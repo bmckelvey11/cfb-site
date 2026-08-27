@@ -396,6 +396,7 @@ def test_search_command_save_run_flag_persists_full_finalist_list(tmp_path, caps
 
 
 def test_web_command_defaults_to_production_server(monkeypatch, tmp_path):
+    monkeypatch.delenv("CFB_WEB_HOST", raising=False)
     served = {}
 
     def fake_serve(app, host, port, threads):
@@ -410,6 +411,7 @@ def test_web_command_defaults_to_production_server(monkeypatch, tmp_path):
 
 
 def test_web_command_debug_uses_flask_dev_server(monkeypatch, tmp_path):
+    monkeypatch.delenv("CFB_WEB_HOST", raising=False)
     ran = {}
 
     def fake_run(self, host, port, debug):
