@@ -227,3 +227,134 @@
 **Alternatives**: Explore more gray areas
 **Context**: Proceed to write CONTEXT.md from these decisions
 ---
+
+## [2026-08-27 01:42:20] - Phase 9 (Live In-Season Verification) is genuinely calendar-gated: only criterion 1 (pre-season calendar dry run) is executable today (2026-08-27). Criteria 2-3 need the season live (~08-29) and week 3+ respectively. How should autonomous mode handle this phase?
+**Choice**: Stop autonomous mode here, resume manually after season starts
+**Alternatives**: Run criterion 1 now, defer 2-3 explicitly (Recommended)
+**Context**: End the /gsd-autonomous run now that phases 6-8 are done; you'll manually trigger phase 9's remaining checks once the season is live
+---
+
+## [2026-08-27 04:18:17] - v1.2 (roadmap-v2 §3) bundles 6 items: bet-log ingestion, CLV computation, 3 UI surfaces (CLV page, live-record-per-system, paper-tracking), plus a stretch item. The AN→CFBD team map that item 2.1 needs doesn't exist in the repo (it was a throwaway scratchpad script, never committed) — it has to be rebuilt from scratch. Item 2.4 (live record) depends on 2.5 (paper tracking) existing first. This is too much for one plan. How do you want to slice it?
+**Choice**: Sub-project 1 only: ingestion + CLV core (Recommended)
+**Alternatives**: Everything in v1.2 as one big plan, Something narrower — let me specify
+**Context**: Design+plan just 2.1 (betlog CLI, rebuild the AN→CFBD map as a real tested module) + 2.2 (CLV computation) + a minimal CLV page (2.3, no live-record/paper-tracking yet). Gets the flagship's actual measured edge into the product first; 2.4/2.5 become their own follow-up sub-project once this lands.
+---
+
+## [2026-08-27 04:18:56] - Bet-log ingestion input: the CLV analysis used a manual Action Network CSV export (~/Downloads/history.csv, 580 rows, with a stray browser-artifact first line). Should the betlog CLI import from that same manual-export CSV format going forward, or is there a different/better source you'd want it to pull from (e.g. the Action Network scraper's own API, if it can be extended to also fetch personal bet history)?
+**Choice**: Manual CSV export (Recommended)
+**Alternatives**: Extend the AN scraper to pull bet history via API, Other / let me specify
+**Context**: Import from the same Action Network "export history" CSV format already analyzed. Simple, no new auth/API work, matches what's already proven to work for the 344-bet analysis. You re-export and re-run the import periodically.
+---
+
+## [2026-08-27 04:37:06] - How far should the TV Network removal go?
+**Choice**: Registry only (Recommended)
+**Alternatives**: Registry + raw_media plumbing
+**Context**: Delete the media_outlet FeatureDef from features.py. Button disappears from the UI. Leaves the raw_media plumbing in enrich.py and the media_*.json scrape intact, so it's a one-line revert if you want it back.
+---
+
+## [2026-08-27 04:42:19] - The CLV analysis excluded moneyline and live (in-game) bets, keeping only pre-game spread/total bets (344 of 580 rows). Should the betlog importer for this sub-project also filter to spread/total pre-game bets only (matching what's already validated), or ingest everything from the CSV and let CLV computation skip/flag rows it can't handle?
+**Choice**: Import spread/total pre-game bets only (Recommended)
+**Alternatives**: Import everything, skip/flag unsupported rows at CLV time
+**Context**: Matches the CLV analysis exactly. Moneyline CLV needs a different unit (implied probability, not points) and live bets have no fixed "closing line" concept in the same sense — both are real scope expansions, not this sub-project.
+---
+
+## [2026-08-27 04:42:56] - The AN→CFBD team abbreviation map needs to be rebuilt as a real module. Join logic is date + teams (no shared game_id between AN's export and CFBD). What should happen when a bet's game can't be confidently matched (ambiguous team name, date mismatch, bye week confusion, etc.)?
+**Choice**: Skip and report (Recommended)
+**Alternatives**: Fail the whole import on any unmatched bet
+**Context**: Unmatched bets are excluded from betlog.csv (or written with a null game_id), counted, and named in the import summary so you can see exactly which bets failed to join and why — no silent data loss, no guessing.
+---
+
+## [2026-08-27 04:43:28] - Re-running the betlog import later (e.g. after re-exporting a fresher Action Network history CSV with more bets) — should it be idempotent (safe to re-run, merges/dedupes against what's already in data/betlog/bets.csv) or does it just overwrite the file each time and you manage re-imports manually?
+**Choice**: Idempotent merge/dedupe (Recommended)
+**Alternatives**: Overwrite each time
+**Context**: Re-running import with a newer export adds new bets and leaves existing ones untouched, deduped by a stable key (e.g. date+teams+bet-type+odds). Matches how `scrape`/`fetch` already resume-skip existing files in this codebase — consistent convention.
+---
+
+## [2026-08-27 04:44:19] - CLV computation: the analysis doc used a provider preference order for the closing line (consensus → DraftKings → Bovada → ESPN Bet → Caesars → William Hill), same pattern as normalize.py's existing `_select_line`. Should CLV computation reuse/adapt that exact existing function, or is there a reason to write separate selection logic for CLV specifically?
+**Choice**: Reuse/adapt _select_line (Recommended)
+**Alternatives**: Write separate selection logic for CLV
+**Context**: One line-selection algorithm for the whole app, tested once. Adapt it if CLV needs a slightly different signature (e.g. it needs the specific provider's line, not just "pick one usable line"), but keep the preference order and selection logic shared rather than duplicated.
+---
+
+## [2026-08-27 04:44:54] - CLV surface (item 2.3): roadmap describes a bet-log page with per-bet CLV (traffic-light), aggregate stats (t-stat, per-season split — same treatment as hit-rate stats), a CLV-over-time chart, and "expected profit (CLV-implied) vs actual." That's a full new page with real statistical + charting work. For this first sub-project, how much of that do you want built now vs. deferred?
+**Choice**: Full page as described (Recommended)
+**Alternatives**: Minimal: table + aggregate stats only, no chart yet, Bare minimum: CLI report only, no web page yet
+**Context**: Bet-log table with per-bet CLV, aggregate CLV stats (mean, t-stat, per-season breakdown reusing existing stats.py machinery), CLV-over-time chart. Expected-vs-actual profit framing included since it's mostly presentation over numbers already computed.
+---
+
+## [2026-08-27 04:45:36] - Should the new /betlog page be linked from the dashboard (e.g. a new tab or nav link, similar to how My Systems/Examples/Current Matches are tabbed today), or should it start as a standalone page reachable only by direct URL for now (like /search-runs/ currently is — an orphan route with no inbound link)?
+**Choice**: Linked from dashboard nav (Recommended)
+**Alternatives**: Standalone for now, link it later
+**Context**: Add a visible link/tab so it's discoverable — this is the flagship feature per the roadmap's own framing, an orphan route would undercut that.
+---
+
+## [2026-08-27 05:01:01] - Season starts in 2 days (2026-08-29). Phase 9 criteria 2-3 still gated. How to proceed?
+**Choice**: Auto-check 2026-08-29
+**Alternatives**: Wait for me to ask
+**Context**: Schedule a wakeup for season start to check Current Matches and run criterion 2 automatically.
+---
+
+## [2026-08-27 05:05:29] - Working tree has uncommitted changes I don't recognize (features.py, running_stats.py, duckdb_load.py, TODO.md, etc) — looks like concurrent session work, not from this Phase 9 thread. Phase 9 itself also has no plan yet, and criteria 2-3 are still calendar-gated (2 days out). How to proceed?
+**Choice**: Plan phase 9 now (Recommended)
+**Alternatives**: Investigate dirty files first, Wait, do nothing
+**Context**: Run /gsd-plan-phase 9 despite the dirty tree — planning doesn't touch those files, and the auto-check wakeup will execute once season starts.
+---
+
+## [2026-08-27 05:06:19] - No CONTEXT.md for phase 9 (discuss-phase was never run — you stopped autonomous mode before it). Plan directly, or discuss first?
+**Choice**: Continue without context (Recommended)
+**Alternatives**: Run discuss-phase first
+**Context**: Criteria are already fully specified in ROADMAP.md — no design decisions needed. Plan from research + requirements only.
+---
+
+## [2026-08-27 05:08:42] - Research before planning Phase 9: Live In-Season Verification?
+**Choice**: Skip research (Recommended)
+**Alternatives**: Research first
+**Context**: This phase verifies existing code (Current Matches panel, season-to-date filters) against live data — no new patterns or dependencies to investigate. Criterion 1's approach is already proven from the dry run.
+---
+
+## [2026-08-27 05:19:19] - What does "like not and such" mean — which operators do you want?
+**Choice**: ['NOT / exclusion (Recommended)', 'Comparison operators']
+**Alternatives**: NOT / exclusion (Recommended), Boolean AND/OR between filters, Comparison operators, Everything above
+---
+
+## [2026-08-27 05:19:19] - Who is the generated prompt for?
+**Choice**: Claude Code — this session (Recommended)
+**Alternatives**: Claude Code — fresh session, GSD workflow command, Claude.ai / other chat
+**Context**: Agentic prompt with file scope, stop conditions, acceptance criteria. Front-loaded for Opus literalism. I'd then execute it here.
+---
+
+## [2026-08-27 05:25:04] - Which execution approach for the 7-task CLV/bet-log plan?
+**Choice**: Subagent-Driven (Recommended)
+**Alternatives**: Inline Execution
+**Context**: Fresh implementer subagent per task, task-scoped code review between tasks, matches how Phases 0-4 were executed in this session.
+---
+
+## [2026-08-27 05:30:04] - GSD agents can't spawn: gsd-planner pins effort xhigh, but your global settings.json has alwaysThinkingEnabled:false. How do you want to unblock it?
+**Choice**: Re-enable thinking (Recommended)
+**Alternatives**: Skip GSD, implement directly, Lower planner effort to high, Stop — I'll fix settings myself
+**Context**: Remove "alwaysThinkingEnabled": false from ~/.claude/settings.json. Fixes every GSD agent at once and matches what GSD expects. Affects all projects.
+---
+
+## [2026-08-27 06:32:51] - Spec wants nested AND/OR/NOT filter groups, saved macros, rule-tree view, and JSON/SQL rule export. Current engine is flat AND with negation/exclusion operators (matches Bet Labs). How much logic engine?
+**Choice**: Flat AND + exclusions (Recommended)
+**Alternatives**: Add nested OR groups, Full spec logic
+**Context**: Keep current engine. Cut nested groups, macros, rule tree, SQL export from spec. Keep plain-English summary (already planned Phase 1).
+---
+
+## [2026-08-27 06:32:51] - Spec makes versioning a differentiator: snapshot per save, version diff (added/removed filters, KPI deltas), lifecycle states (Draft/Validated/Live/Archived/Published/Followed). What level?
+**Choice**: Light snapshots + diff (Recommended)
+**Alternatives**: Save-as-copy only, Full lifecycle
+**Context**: Append version snapshot to SavedSystem JSON on each save; compare page shows rule + KPI diff. No lifecycle states beyond an archive flag.
+---
+
+## [2026-08-27 06:32:51] - Line-movement filters (open vs close, steam, delta) and CLV need open/close odds. Action Network data is scraped (2015+, per-book 2024-25) but not joined into the pipeline. Scope?
+**Choice**: In scope now
+**Alternatives**: Defer to V2, keep in spec (Recommended), Cut entirely
+**Context**: Join Action Network open/close into GameRecord/features; adds a storage migration + registry features this cycle.
+---
+
+## [2026-08-27 06:32:51] - Spec's Alerts area (trigger feed, delivery channels, snooze) vs parity plan's in-app Current Matches (upcoming games matching each saved system). Paper trading also in spec. What ships?
+**Choice**: Current Matches only (Recommended)
+**Alternatives**: Current Matches + email, Cut alerts entirely
+**Context**: In-app upcoming-qualifiers page per parity plan Phase 4. No email/SMS, no alert rules engine. Paper trading replaced by 'Since Built' timeframe window.
+---
