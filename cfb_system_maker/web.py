@@ -516,7 +516,8 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             example = load_example_system(name, EXAMPLES_DIR)
             save_system(name, example.system, app.config["DATA_DIR"], theory=example.theory)
         except (ValueError, OSError, json.JSONDecodeError):
-            pass
+            logger.exception("copy_example failed for %r", name)
+            return redirect("/?tab=examples&copy_error=1")
         return redirect("/?tab=examples")
 
     @app.get("/system")

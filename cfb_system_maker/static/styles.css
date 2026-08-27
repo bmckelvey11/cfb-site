@@ -627,6 +627,19 @@ code {
   margin: 0.25rem 0 0;
 }
 
+.banner {
+  font-size: 0.85rem;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.banner-error {
+  background: #fee;
+  border: 1px solid #f5a;
+  color: var(--loss);
+}
+
 .coverage {
   font-size: 0.85rem;
   margin: 12px 0;

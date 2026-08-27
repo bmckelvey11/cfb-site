@@ -1533,6 +1533,16 @@ def test_copy_example_rejects_an_unknown_name(tmp_path):
     assert list_systems(tmp_path) == []
 
 
+def test_copy_example_failure_redirects_with_error_flag(tmp_path, monkeypatch):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    monkeypatch.setattr("cfb_system_maker.web.save_system",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("disk")))
+    resp = client.post("/copy-example", data={"name": "spread-home-favorites"})
+    assert resp.status_code == 302
+    assert "copy_error=1" in resp.headers["Location"]
+
+
 def test_example_systems_tab_escapes_name_and_theory(tmp_path, monkeypatch):
     app, _ = _dashboard_app(tmp_path)
     hostile = tmp_path / "hostile-examples"
