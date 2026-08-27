@@ -52,10 +52,10 @@ coverage:
     requirement: "DATA-01"
     verification:
       - kind: other
-        ref: "one-off backtest script against data/games.csv + data/features.json via cfb_system_maker.backtest.run_backtest -- output recorded in this SUMMARY's Accomplishments section"
+        ref: "one-off backtest script against data/games.csv + data/features.json via cfb_system_maker.backtest.run_backtest -- record/rate/ROI/p-value and era/week breakdowns all independently verified against bet_details, recorded in this SUMMARY's Accomplishments section"
         status: pass
     human_judgment: true
-    rationale: "Whether the prose is 'honest' (accurately represents caveats, doesn't overstate) is a qualitative judgment about wording, not something a unit test can assert."
+    rationale: "Whether the prose is 'honest' (accurately represents caveats, doesn't overstate) and grammatically sound is a qualitative judgment about wording, not something a unit test can assert."
   - id: D3
     description: "Copy to My Systems works for the new example the same way it does for the existing three"
     requirement: "DATA-01"
@@ -95,7 +95,7 @@ status: complete
 - Created `cfb_system_maker/examples/neutral-site-indoor-unders.json`: a totals/unders system filtering on `neutralSite=true`, `gameIndoors=true`, `venue_dome=true` (all `op: eq`, `perspective: single`), matching the shape of the 3 existing bundled examples.
 - Ran the exact 3-filter system against real production data (`data/games.csv` + `data/features.json`) via `cfb_system_maker.backtest.run_backtest` directly (CLI has no `--feature-filter` flag). Measured result: **69 wins - 40 losses - 1 push (n=109 decided, 110 total), 63.30% under rate, +20.66% ROI, p-value approx 0.0112**. Season breakdown confirmed the doc's era split exactly: 2013-2019 = 31-22 (58.49%, n=53) vs 2020-2025 = 38-18 (67.86%, n=56); positive-ROI in 9 of 12 seasons.
 - Confirmed the measured population is identical to `docs/under-team-stats-analysis.md`'s 2-condition (neutral+indoor) cell: in this dataset, every indoor game is also played in a dome, so adding `venue_dome` to the filter set narrows nothing further. The theory text cites the app's own measured ROI (+20.66%) and p-value (~0.011) rather than the doc's figures (+20.85%/p=0.014) for the record/rate/n that are numerically identical, since the plan's honesty requirement is "actually observed" numbers from backtesting the exact filter set shipped.
-- Wrote the final `theory` field: prose hypothesis style matching the 3 existing examples, stating the record/rate/ROI/n, the era and week-of-season stability (verified era split; week-bucket figures carried from the source doc since the population is confirmed identical), and the small-sample/Bonferroni-does-not-survive caveat from the source doc's own "best available lead, not a proven edge" framing.
+- Wrote the final `theory` field: prose hypothesis style matching the 3 existing examples, stating the record/rate/ROI/n, the era and week-of-season stability, and the small-sample/Bonferroni-does-not-survive caveat from the source doc's own "best available lead, not a proven edge" framing. Both the era split and the week-of-season split were independently verified against this plan's own `bet_details` (not carried from the doc on the assumption of an identical population): bucketing the 109 decided bets by week gives wk1 19-11 (63.33%, n=30), wk2-13 21-12 (63.64%, n=33), wk14+ 29-17 (63.04%, n=46) -- all matching the doc's wk1/wk2-13/wk14+ figures (63.3%/63.6%/63.0%) to the tenth, and the win/loss totals (19+21+29=69, 11+12+17=40) reconcile with the overall 69-40 record.
 - Narrowed (not deleted) the pre-existing D-21 "no example filters on weather" guard in `tests/test_storage.py`: added a `WEATHER_FILTER_EXCEPTIONS = {("neutral-site-indoor-unders", "gameIndoors")}` set with a comment citing DATA-01 and 08-CONTEXT.md's Zero-Match Live Weeks decision, and updated the guard's loop to skip only that exact `(name, key)` pair. Every other example and every other weather key on this example remain blocked unchanged.
 - Updated `EXPECTED_EXAMPLE_NAMES` to `["neutral-site-indoor-unders", "nonconference-away-dogs", "spread-home-favorites", "total-unders-high-lines"]` (sorted order — "ne" sorts before "no").
 - Added `test_neutral_site_indoor_unders_pins_its_exact_filter_set`, a targeted assertion pinning the new example's exact filter set (3 `eq`/`single`/`True` filters on `neutralSite`, `gameIndoors`, `venue_dome`; `bet_type == "total"`; `total_side == "under"`), since the existing generic loops don't check this specific requirement.
@@ -107,8 +107,9 @@ Each task was committed atomically:
 
 1. **Task 1: Create the example JSON, narrow the D-21 weather guard, and backtest it against real data** - `a6dc49b` (feat)
 2. **Task 2: Write the honest theory prose against observed numbers and verify the UI end-to-end** - `b026205` (feat)
+3. **Post-review copy fix: correct a grammatically broken sentence in the theory prose, drop the venue_dome-no-op implementation detail from user-facing text, and tighten the guard's `continue` to only skip the weather assertion (not season-to-date) for the excepted pair** - `30e81a6` (fix)
 
-_Note: full test suite (457 tests) run and passing after each task._
+_Note: full test suite (457 tests) run and passing after each task and after the post-review fix._
 
 ## Files Created/Modified
 
