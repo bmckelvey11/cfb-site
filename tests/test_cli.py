@@ -423,6 +423,50 @@ def test_web_command_debug_uses_flask_dev_server(monkeypatch, tmp_path):
     assert ran == {"host": "127.0.0.1", "port": 5000, "debug": True}
 
 
+def test_web_command_reads_env_defaults(monkeypatch, tmp_path):
+    # _web() does a LOCAL `from cfb_system_maker.web import create_app` inside the
+    # function body, re-executed on every call -- so patching the name on the
+    # source module (cfb_system_maker.web.create_app) works, since the local
+    # import re-binds from that module's current attribute at call time. A patch
+    # on `cfb_system_maker.cli.create_app` would not: no such module-level name
+    # exists there to intercept.
+    created = {}
+
+    def fake_create_app(data_dir):
+        created["data_dir"] = data_dir
+        import flask
+
+        return flask.Flask("fake")
+
+    served = {}
+
+    def fake_serve(app, host, port, threads):
+        served.update(host=host, port=port, threads=threads)
+
+    monkeypatch.setattr("cfb_system_maker.web.create_app", fake_create_app)
+    monkeypatch.setattr("waitress.serve", fake_serve)
+    monkeypatch.setenv("CFB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CFB_WEB_HOST", "0.0.0.0")
+    monkeypatch.setenv("CFB_WEB_PORT", "8123")
+
+    exit_code = main(["web"])
+
+    assert exit_code == 0
+    assert created["data_dir"] == str(tmp_path)
+    assert served == {"host": "0.0.0.0", "port": 8123, "threads": 8}
+
+    # Explicit CLI flags still win over env vars (this task's Interfaces contract),
+    # with the same env vars from above still set -- a real conflict, not just the
+    # absence of one.
+    created.clear()
+    served.clear()
+    exit_code = main(["web", "--data-dir", "cli-dir", "--host", "1.2.3.4", "--port", "6001"])
+
+    assert exit_code == 0
+    assert created["data_dir"] == "cli-dir"
+    assert served == {"host": "1.2.3.4", "port": 6001, "threads": 8}
+
+
 def test_search_command_save_run_flag_persists_even_with_zero_finalists(tmp_path, capsys, monkeypatch):
     save_processed_games(tmp_path, _search_fixture_games())
     main(["enrich", "--data-dir", str(tmp_path)])

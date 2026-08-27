@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -538,9 +539,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     web = subparsers.add_parser("web")
-    web.add_argument("--data-dir", default="data")
-    web.add_argument("--host", default="127.0.0.1")
-    web.add_argument("--port", type=int, default=5000)
+    web.add_argument("--data-dir", default=os.environ.get("CFB_DATA_DIR", "data"))
+    web.add_argument("--host", default=os.environ.get("CFB_WEB_HOST", "127.0.0.1"))
+    web.add_argument("--port", type=int, default=int(os.environ.get("CFB_WEB_PORT", "5000")))
     web.add_argument("--debug", action="store_true")
 
     return parser
