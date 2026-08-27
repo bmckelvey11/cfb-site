@@ -5,16 +5,16 @@ milestone_name: Season Readiness
 current_phase: 8
 current_phase_name: Neutral-Site & Indoor Unders Example
 status: executing
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-08-27T03:59:19.231Z"
-last_activity: 2026-08-26
-last_activity_desc: Phase 8 execution started
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-08-27T04:27:46.048Z"
+last_activity: 2026-08-27
+last_activity_desc: Completed 08-01 (neutral-site-indoor-unders example, DATA-01)
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 4
-  percent: 50
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
+  percent: 75
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-20)
 
 ## Current Position
 
-Phase: 8 (Neutral-Site & Indoor Unders Example) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 8
-Last activity: 2026-08-26 — Phase 8 execution started
+Phase: 8 — Neutral-Site & Indoor Unders Example
+Plan: 1 of 1 (complete)
+Status: Phase complete — DATA-01 closed
+Last activity: 2026-08-27 — Completed 08-01 (neutral-site-indoor-unders example, DATA-01)
 
 Progress: [██████████] 100%
 
@@ -90,6 +90,7 @@ Progress: [██████████] 100%
 | Phase 05-dashboard-current-matches P06 | ~60 min | 3 tasks | 4 files |
 | Phase 07 P01 | 25min | 2 tasks | 4 files |
 | Phase 07 P02 | 20min | 2 tasks | 3 files |
+| Phase 08 P01 | 45min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 7: edit_metadata_for_sentence gates on explicit (op,control) renderable shapes before building Edit metadata, mirroring describe()'s 4 hand-written combos
 - [Phase ?]: matched_game_ids populated inside aggregate_filter_value_rows's existing loop (post resolve_candidate_value-None skip) as the exact bucket denominator, exposed via /filter-detail as matched_games
 - [Phase ?]: Reconciliation caption in renderValueTable() references only state.matchedGames, never the Record chip, per UI-SPEC's no-third-number rule
+- [Phase ?]: DATA-01: theory text cites the app's own measured backtest numbers (69-40-1, 63.30% under, +20.66% ROI, n=109, p~0.011) over the source doc's figures where they diverge (ROI/p-value), since a user backtesting the exact 3-filter system in the app would see the app's own output
 
 ### Pending Todos
 
@@ -176,8 +178,8 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-20:
 
 ## Session Continuity
 
-Last session: 2026-08-27T02:51:44.479Z
-Stopped at: Completed 07-02-PLAN.md
+Last session: 2026-08-27T04:27:46.001Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

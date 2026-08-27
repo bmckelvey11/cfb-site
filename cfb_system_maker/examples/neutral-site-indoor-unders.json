@@ -1,0 +1,44 @@
+{
+  "name": "neutral-site-indoor-unders",
+  "saved_at": "2026-08-26T00:00:00+00:00",
+  "system": {
+    "away": false,
+    "bet_type": "total",
+    "conferences": [],
+    "fade": false,
+    "favorite": false,
+    "feature_filters": [
+      {
+        "key": "neutralSite",
+        "op": "eq",
+        "perspective": "single",
+        "value": true
+      },
+      {
+        "key": "gameIndoors",
+        "op": "eq",
+        "perspective": "single",
+        "value": true
+      },
+      {
+        "key": "venue_dome",
+        "op": "eq",
+        "perspective": "single",
+        "value": true
+      }
+    ],
+    "home": false,
+    "max_spread": null,
+    "max_total": null,
+    "min_spread": null,
+    "min_total": null,
+    "providers": [],
+    "seasons": [],
+    "side": "home",
+    "teams": [],
+    "total_side": "under",
+    "underdog": false,
+    "weeks": []
+  },
+  "theory": "Neutral-site games played indoors are showcase events: kickoff classics, conference championships, neutral-site bowls. Public money piles onto these marquee matchups and books shade the total up to meet it, which can leave the under live even after the shade. Backtesting this exact spot goes 69-40 to the under across 109 decided bets (63.30%, +20.66% ROI, p approximately 0.011), and it holds up across the calendar (week 1 63.3%, weeks 2-13 63.6%, week 14 and later 63.0%) and across eras (58.5% from 2013-2019, 67.9% from 2020-2025), arguing against a bowl-season fluke. Treat it as a lead, not an edge: 109 games is small, this was one of roughly 25 situational splits tested in the same analysis, and its p-value does not survive a Bonferroni correction across that full set. It is also seasonally rare and clustered in a handful of weeks, so expect it to surface a match only occasionally."
+}

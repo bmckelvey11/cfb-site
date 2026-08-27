@@ -26,7 +26,7 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 
 - [x] **Phase 6: Merge & Stale-Stats Audit** - Land the review branch on master and confirm no stale search-run results silently disagree with the new matching semantics — completed 2026-08-26
 - [x] **Phase 7: Integrity Fixes** - Close the describe() silent-drop risk, fix the filter-detail modal's double-counting bug, and close out the Hide Duplicates deferral with the correct architectural resolution (completed 2026-08-26)
-- [ ] **Phase 8: Neutral-Site & Indoor Unders Example** - Ship the 4th bundled example system with an honest, disclosed sample size
+- [x] **Phase 8: Neutral-Site & Indoor Unders Example** - Ship the 4th bundled example system with an honest, disclosed sample size - completed 2026-08-27
 - [ ] **Phase 9: Live In-Season Verification** - Confirm Current Matches and feature-filtered matching work against the real 2026 season
 
 ## Phase Details
@@ -73,9 +73,9 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
   2. The system's `theory` field, visible to the user, states the sample size and significance (n=109, p=0.014) rather than reading as a stronger claim than the underlying analysis supports.
   3. Copy to My Systems works for the new example the same way it does for the existing three.
 
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 
-- [ ] 08-01-PLAN.md — bundle the neutral-site/indoor-unders example JSON, narrow the D-21 weather-filter test guard, and verify with a real backtest
+- [x] 08-01-PLAN.md — bundle the neutral-site/indoor-unders example JSON, narrow the D-21 weather-filter test guard, and verify with a real backtest
 
 ### Phase 9: Live In-Season Verification
 
@@ -99,5 +99,5 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 | 5. Dashboard & Current Matches | v1.0 | 6/6 | Complete | 2026-07-20 |
 | 6. Merge & Stale-Stats Audit | v1.1 | 2/1 | Complete    | 2026-08-26 |
 | 7. Integrity Fixes | v1.1 | 3/3 | Complete    | 2026-08-26 |
-| 8. Neutral-Site & Indoor Unders Example | v1.1 | 0/1 | Not started | - |
+| 8. Neutral-Site & Indoor Unders Example | v1.1 | 1/1 | Complete | 2026-08-27 |
 | 9. Live In-Season Verification | v1.1 | 0/TBD | Not started | - |

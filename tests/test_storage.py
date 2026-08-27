@@ -62,6 +62,7 @@ def test_processed_games_csv_round_trip(tmp_path):
 # --- Bundled example systems (Phase 5, Plan 05) -------------------------------
 
 EXPECTED_EXAMPLE_NAMES = [
+    "neutral-site-indoor-unders",
     "nonconference-away-dogs",
     "spread-home-favorites",
     "total-unders-high-lines",
@@ -72,8 +73,16 @@ SEASON_TO_DATE_KEYS = {
 }
 WEATHER_KEYS = {feature.key for feature in FEATURE_REGISTRY if feature.group == "weather"}
 
+# DATA-01 / 08-CONTEXT.md "Zero-Match Live Weeks": neutral-site-indoor-unders
+# deliberately filters on gameIndoors (group="weather") as one of its 3 filters.
+# A mid-season week showing 0 Current Matches for this example is expected,
+# correct behavior (gameIndoors sources from the sometimes-gated weather
+# endpoint) -- not the guarantee-zero-matches failure mode D-21 exists to catch
+# for every other example. This is the one narrow, documented exception.
+WEATHER_FILTER_EXCEPTIONS = {("neutral-site-indoor-unders", "gameIndoors")}
 
-def test_list_examples_returns_the_three_bundled_names(tmp_path):
+
+def test_list_examples_returns_the_bundled_names(tmp_path):
     # Independent of any data directory: examples live in the package (D-14).
     assert list_examples() == EXPECTED_EXAMPLE_NAMES
 
@@ -93,12 +102,16 @@ def test_every_example_round_trips_with_a_written_theory():
 
 def test_no_example_filters_on_provider_weather_or_season_to_date():
     # D-21: these would guarantee zero matches on upcoming games. Written as a
-    # loop so a fourth example added later cannot quietly violate it.
+    # loop so a fifth example added later cannot quietly violate it. The one
+    # documented exception (WEATHER_FILTER_EXCEPTIONS) is neutral-site-indoor-unders'
+    # gameIndoors filter -- see comment above that set.
     for name in list_examples():
         system = load_example_system(name).system
         assert not system.providers, f"{name} declares a provider filter"
         for filt in system.feature_filters:
-            assert filt.key not in WEATHER_KEYS, f"{name} filters on weather {filt.key}"
+            excepted = (name, filt.key) in WEATHER_FILTER_EXCEPTIONS
+            if not excepted:
+                assert filt.key not in WEATHER_KEYS, f"{name} filters on weather {filt.key}"
             assert filt.key not in SEASON_TO_DATE_KEYS, (
                 f"{name} filters on season-to-date {filt.key}"
             )
@@ -109,6 +122,21 @@ def test_at_least_one_example_exercises_a_registry_feature():
     kinds = {load_example_system(name).system.bet_type for name in list_examples()}
     assert {"spread", "total"} <= kinds
     assert any(load_example_system(name).system.feature_filters for name in list_examples())
+
+
+def test_neutral_site_indoor_unders_pins_its_exact_filter_set():
+    # DATA-01: the generic loops above don't check this example's specific
+    # filter set, so pin it directly.
+    system = load_example_system("neutral-site-indoor-unders").system
+    assert system.bet_type == "total"
+    assert system.total_side == "under"
+    assert len(system.feature_filters) == 3
+    keys = {filt.key for filt in system.feature_filters}
+    assert keys == {"neutralSite", "gameIndoors", "venue_dome"}
+    for filt in system.feature_filters:
+        assert filt.op == "eq"
+        assert filt.perspective == "single"
+        assert filt.value is True
 
 
 def test_load_example_system_rejects_path_traversal_name():
