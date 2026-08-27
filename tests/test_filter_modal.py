@@ -354,6 +354,30 @@ def test_aggregate_filter_value_rows_team_on_total_buckets_both_sides():
     assert {row["value"] for row in spread_rows} == {"Alpha"}
 
 
+def test_aggregate_filter_value_rows_matched_game_ids_distinct_count():
+    games = [_game(1), _game(2)]  # Alpha home, Beta away in both
+    descriptor = {
+        "id": "core:team",
+        "control": "categorical",
+        "key": "team",
+        "team_scoped": False,
+    }
+    ids: set[int] = set()
+    rows = aggregate_filter_value_rows(
+        games,
+        SystemFilter(bet_type="total", side="home", total_side="over"),
+        descriptor,
+        feature_map={},
+        perspective="either",
+        matched_game_ids=ids,
+    )
+    # 2 distinct games, even though each game is counted once per matching
+    # team-value (2 rows x 2 games each = 4 total row-level bet counts).
+    assert ids == {1, 2}
+    assert len(ids) == 2
+    assert sum(row["wins"] + row["losses"] + row["pushes"] for row in rows) == 4
+
+
 def test_filter_detail_overlapping_rows_flag(tmp_path):
     games = [
         _game(1, season=2023, week=1, home_points=28, away_points=21, spread=-6.5),
@@ -387,7 +411,15 @@ def test_filter_detail_overlapping_rows_flag(tmp_path):
     # core:team on a total system: Alpha home / Beta away -> overlapping.
     team_resp = app.test_client().get("/filter-detail?candidate_id=core:team&bet_type=total")
     assert team_resp.status_code == 200
-    assert team_resp.get_json()["overlapping_rows"] is True
+    team_payload = team_resp.get_json()
+    assert team_payload["overlapping_rows"] is True
+    # matched_games is the distinct-game denominator (2 games), which is
+    # smaller than the per-value row sum (each game counted once per team).
+    assert team_payload["matched_games"] == 2
+    assert (
+        sum(row["wins"] + row["losses"] + row["pushes"] for row in team_payload["rows"])
+        > team_payload["matched_games"]
+    )
 
     # core:team on a spread system: bet-side only, no overlap.
     team_spread_resp = app.test_client().get("/filter-detail?candidate_id=core:team&bet_type=spread")
