@@ -2110,14 +2110,14 @@ def test_security_headers_present_on_all_pages(tmp_path):
 def test_pages_link_svg_favicon(tmp_path):
     app = create_app(data_dir=tmp_path)
     client = app.test_client()
-    for path in ("/", "/system"):
+    for path in ("/", "/system", "/betlog"):
         assert b'rel="icon"' in client.get(path).data
 
 
 def test_disclaimer_footer_on_main_pages(tmp_path):
     app = create_app(data_dir=tmp_path)
     client = app.test_client()
-    for path in ("/", "/system", "/compare"):
+    for path in ("/", "/system", "/compare", "/betlog"):
         assert b"research tool" in client.get(path).data
 
 
