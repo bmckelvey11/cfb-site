@@ -634,6 +634,35 @@ code {
   margin-left: 0.5rem;
 }
 
+.feature-group__badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.feature-group__toggle {
+  float: right;
+  min-width: 24px;
+  padding: 0 6px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* Collapse goes inert while a search term is active, so a collapsed group still
+   reveals its matching rows -- search overrides collapse. */
+.feature-filters:not(.is-searching) .feature-group.is-collapsed .filter-launch-row {
+  display: none;
+}
+
 .save-error {
   color: var(--loss);
   font-size: 0.85rem;
@@ -761,6 +790,23 @@ code {
 
 .js .filter-fallback {
   display: none;
+}
+
+/* Same progressive-enhancement pair as .filter-launcher above, but keyed off
+   feature_sidebar.js's own flag: with no JS the search box would do nothing. */
+.filter-search {
+  display: none;
+}
+
+.feature-sidebar-js .filter-search {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
 .filter-launch-row {

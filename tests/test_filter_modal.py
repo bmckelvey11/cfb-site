@@ -1029,3 +1029,59 @@ def test_dual_perspective_bounds_both_apply(tmp_path):
     # Both games clear the bet-side bound; only game 1 also clears the opponent one.
     assert decided(bet_side_only) == 2
     assert decided(both) == 1
+
+
+def test_feature_sidebar_search_input_renders_without_a_name(tmp_path):
+    """The search box sits inside filters-form, so a name attribute would be
+    serialized into every backtest query and into every saved system."""
+    import re
+
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {str(game.game_id): {"weather_temperature": 55.0} for game in games},
+    )
+    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
+
+    tag = re.search(r"<input[^>]*filter-search[^>]*>", html)
+    assert tag is not None
+    assert "name=" not in tag.group(0)
+    assert 'aria-label="Search feature filters"' in html
+    assert "feature_sidebar.js" in html
+
+
+def test_feature_sidebar_js_search_collapse_contract():
+    """Search must hide rows by display only, never by disabling them, and must
+    swallow Enter so typing a term does not submit the backtest form."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/feature_sidebar.js").read_text(encoding="utf-8")
+
+    # display:none inputs still serialize; disabled ones are dropped from
+    # FormData, which would silently delete already-committed filters.
+    assert "style.display" in source
+    assert ".disabled" not in source
+    assert "disabled = true" not in source
+
+    keydown_tail = source.split('"keydown"')[1]
+    assert "Enter" in keydown_tail
+    assert "preventDefault" in keydown_tail
+
+    # Badge counts committed filters once at load.
+    assert 'input[name="ff_enable"]:checked' in source
+    # Collapse is a real button exposing its state.
+    assert "aria-expanded" in source
+    assert "is-collapsed" in source
+
+
+def test_feature_sidebar_collapse_yields_to_active_search():
+    """A collapsed group must still reveal its matches while a term is active,
+    or search cannot find anything inside a collapsed group."""
+    from pathlib import Path
+
+    css = Path("cfb_system_maker/static/styles.css").read_text(encoding="utf-8")
+    assert ".feature-filters:not(.is-searching) .feature-group.is-collapsed" in css
+
+    source = Path("cfb_system_maker/static/feature_sidebar.js").read_text(encoding="utf-8")
+    assert "is-searching" in source
