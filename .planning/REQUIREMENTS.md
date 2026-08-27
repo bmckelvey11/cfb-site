@@ -36,8 +36,8 @@ and scoping conversation on 2026-08-26.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MERGE-01 | Phase 6 | Pending |
-| MERGE-02 | Phase 6 | Pending |
+| MERGE-01 | Phase 6 | Complete |
+| MERGE-02 | Phase 6 | Complete |
 | FIX-01 | Phase 7 | Pending |
 | FIX-02 | Phase 7 | Pending |
 | FIX-03 | Phase 7 | Pending |
