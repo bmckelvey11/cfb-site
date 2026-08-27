@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from cfb_system_maker.backtest import run_backtest, sign_consistency, split_holdout
+from cfb_system_maker.betlog import import_betlog
 from cfb_system_maker.cfbd_client import fetch_games_and_lines
 from cfb_system_maker.enrich import load_features, run_enrich
 from cfb_system_maker.models import BacktestResult, SystemFilter
@@ -43,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         return _graphql(args)
     if args.command == "actionnetwork":
         return _actionnetwork(args)
+    if args.command == "betlog" and args.betlog_command == "import":
+        return _betlog_import(args)
     if args.command == "backtest":
         return _backtest(args)
     if args.command == "search":
@@ -193,6 +196,20 @@ def _actionnetwork(args: argparse.Namespace) -> int:
             print(f"{'':20} last: {report.error}")
     total_errors = sum(r.errors for r in reports)
     print(f"\n{len(reports)} stage(s), {total_errors} per-item error(s).")
+    return 0
+
+
+def _betlog_import(args: argparse.Namespace) -> int:
+    summary = import_betlog(args.csv, args.data_dir)
+    print(f"{summary.total_rows} rows in CSV, {summary.in_scope} in scope (spread/total, pre-game)")
+    print(f"{summary.already_imported} already imported, {summary.newly_imported} new")
+    print(f"{summary.matched} matched to CFBD games ({len(summary.unmatched)} unmatched)")
+    if summary.unmatched:
+        print("Unmatched:")
+        for item in summary.unmatched:
+            print(f"  {item}")
+    if summary.malformed:
+        print(f"{summary.malformed} malformed rows skipped")
     return 0
 
 
@@ -618,6 +635,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="flatten leftover STRUCT columns on existing stg.* tables",
     )
+
+    betlog_parser = subparsers.add_parser("betlog")
+    betlog_subparsers = betlog_parser.add_subparsers(dest="betlog_command", required=True)
+    betlog_import_parser = betlog_subparsers.add_parser("import")
+    betlog_import_parser.add_argument("--csv", required=True)
+    betlog_import_parser.add_argument("--data-dir", default="data")
 
     web = subparsers.add_parser("web")
     web.add_argument("--data-dir", default=os.environ.get("CFB_DATA_DIR", "data"))

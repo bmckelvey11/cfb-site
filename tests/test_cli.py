@@ -469,6 +469,25 @@ def test_web_command_reads_env_defaults(monkeypatch, tmp_path):
     assert served == {"host": "1.2.3.4", "port": 6001, "threads": 8}
 
 
+def test_betlog_import_command_reports_summary(tmp_path, monkeypatch, capsys):
+    from cfb_system_maker import cli
+
+    def fake_import(csv_path, data_dir):
+        from cfb_system_maker.betlog import ImportSummary
+        return ImportSummary(
+            total_rows=580, in_scope=344, already_imported=0,
+            newly_imported=344, matched=338, unmatched=["2023-09-01 XYZ @ ABC"],
+            malformed=15,
+        )
+
+    monkeypatch.setattr("cfb_system_maker.cli.import_betlog", fake_import)
+    exit_code = cli.main(["betlog", "import", "--csv", "fake.csv", "--data-dir", str(tmp_path)])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "344" in captured.out
+    assert "338" in captured.out
+
+
 def test_search_command_save_run_flag_persists_even_with_zero_finalists(tmp_path, capsys, monkeypatch):
     save_processed_games(tmp_path, _search_fixture_games())
     main(["enrich", "--data-dir", str(tmp_path)])

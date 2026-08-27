@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cfb_system_maker.models import GameRecord
+from cfb_system_maker.storage import load_raw_json
 from cfb_system_maker.team_abbreviations import resolve_team
 
 _IN_SCOPE_TYPES = {"spread_home", "spread_away", "over", "under"}
@@ -156,4 +157,127 @@ def match_to_game(row: RawBetRow, games_by_date: dict[str, list[GameRecord]]) ->
         result=row.result,
         units_wagered=row.units_wagered,
         units_net=row.units_net,
+    )
+
+
+_BETLOG_FIELDS = [
+    "game_id", "date", "home_team", "away_team", "bet_type", "side",
+    "line_taken", "odds", "result", "units_wagered", "units_net",
+]
+
+
+@dataclass(frozen=True)
+class ImportSummary:
+    total_rows: int
+    in_scope: int
+    already_imported: int
+    newly_imported: int
+    matched: int
+    unmatched: list[str]
+    malformed: int
+
+
+def _dedupe_key(bet: BetLogRecord) -> tuple:
+    return (bet.date, bet.home_team, bet.away_team, bet.bet_type, bet.side, bet.odds)
+
+
+def load_betlog(data_dir: str | Path) -> list[BetLogRecord]:
+    path = Path(data_dir) / "betlog" / "bets.csv"
+    if not path.exists():
+        return []
+    with open(path, encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        return [
+            BetLogRecord(
+                game_id=int(row["game_id"]),
+                date=row["date"],
+                home_team=row["home_team"],
+                away_team=row["away_team"],
+                bet_type=row["bet_type"],
+                side=row["side"],
+                line_taken=float(row["line_taken"]),
+                odds=int(row["odds"]),
+                result=row["result"],
+                units_wagered=float(row["units_wagered"]),
+                units_net=float(row["units_net"]),
+            )
+            for row in reader
+        ]
+
+
+def save_betlog(records: list[BetLogRecord], data_dir: str | Path) -> None:
+    directory = Path(data_dir) / "betlog"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "bets.csv"
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=_BETLOG_FIELDS)
+        writer.writeheader()
+        for record in records:
+            writer.writerow(
+                {
+                    "game_id": record.game_id, "date": record.date,
+                    "home_team": record.home_team, "away_team": record.away_team,
+                    "bet_type": record.bet_type, "side": record.side,
+                    "line_taken": record.line_taken, "odds": record.odds,
+                    "result": record.result, "units_wagered": record.units_wagered,
+                    "units_net": record.units_net,
+                }
+            )
+
+
+def _build_games_by_date(data_dir: str | Path, in_scope: list[RawBetRow]) -> dict[str, list[GameRecord]]:
+    seasons_needed = {int(row.start_time[:4]) for row in in_scope}
+    games_by_date: dict[str, list[GameRecord]] = {}
+    for season in seasons_needed:
+        try:
+            raw_games = load_raw_json(data_dir, "games", season)
+        except FileNotFoundError:
+            continue
+        for raw in raw_games:
+            date = str(raw.get("startDate", ""))[:10]
+            if not date:
+                continue
+            games_by_date.setdefault(date, []).append(
+                GameRecord(
+                    game_id=raw["id"], season=season, week=raw.get("week", 0),
+                    home_team=raw.get("homeTeam", ""), away_team=raw.get("awayTeam", ""),
+                    home_conference=raw.get("homeConference"), away_conference=raw.get("awayConference"),
+                    home_points=raw.get("homePoints"), away_points=raw.get("awayPoints"),
+                    provider=None, spread=None, total=None,
+                )
+            )
+    return games_by_date
+
+
+def import_betlog(csv_path: str | Path, data_dir: str | Path) -> ImportSummary:
+    parsed = parse_betlog_csv(csv_path)
+    total_rows = len(parsed.in_scope) + parsed.out_of_scope_count + parsed.malformed_count
+
+    games_by_date = _build_games_by_date(data_dir, parsed.in_scope)
+
+    existing = load_betlog(data_dir)
+    existing_keys = {_dedupe_key(bet) for bet in existing}
+
+    matched_bets: list[BetLogRecord] = []
+    unmatched: list[str] = []
+    for row in parsed.in_scope:
+        bet = match_to_game(row, games_by_date)
+        if bet is None:
+            unmatched.append(f"{row.start_time[:10]} {row.game}")
+            continue
+        matched_bets.append(bet)
+
+    new_bets = [bet for bet in matched_bets if _dedupe_key(bet) not in existing_keys]
+    already_imported = len(matched_bets) - len(new_bets)
+
+    save_betlog(existing + new_bets, data_dir)
+
+    return ImportSummary(
+        total_rows=total_rows,
+        in_scope=len(parsed.in_scope),
+        already_imported=already_imported,
+        newly_imported=len(new_bets),
+        matched=len(matched_bets),
+        unmatched=unmatched,
+        malformed=parsed.malformed_count,
     )
