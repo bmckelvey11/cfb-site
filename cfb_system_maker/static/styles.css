@@ -763,6 +763,65 @@ code {
   display: none;
 }
 
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+}
+
+.stat-row:hover {
+  background: var(--panel-strong);
+}
+
+.stat-row__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  min-width: 0;
+}
+
+.stat-row__sides {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* Overrides .filter-launcher's full-width block styling: these sit inline. */
+.js .stat-row__side {
+  display: inline-block;
+  width: auto;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.js .stat-row__side:hover {
+  background: var(--panel);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* An active filter on this side reads as a solid pill, so a configured stat is
+   visible without opening it. */
+.js .stat-row__side[data-has-filter="1"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.js .filter-launcher[data-has-filter="1"] {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .filter-launch-row {
   display: flex;
   flex-direction: column;
@@ -1631,4 +1690,233 @@ code {
   color: var(--muted);
   line-height: 1.5;
   margin: 0;
+}
+
+
+/* ---- Dashboard: systems table fits its column ------------------------- */
+
+/* The global `table { min-width: 860px }` forces the dashboard table to scroll
+   sideways inside its (narrower) column. This table sizes to the space it has;
+   the long theory blurb is what gets to wrap, not the numbers. */
+.systems-table {
+  min-width: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.systems-table th,
+.systems-table td {
+  white-space: nowrap;
+}
+
+.systems-table .system-cell {
+  width: 40%;
+  max-width: none;
+  white-space: normal;
+}
+
+.systems-table .system-theory {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.systems-table .trend-cell {
+  width: 104px;
+}
+
+.systems-table .actions-col,
+.systems-table .actions-cell {
+  width: 44px;
+  text-align: right;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- Row actions (rename / delete) ------------------------------------ */
+
+.row-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.row-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.row-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.row-menu > summary:hover {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.row-menu__pop {
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  min-width: 216px;
+  margin-top: 6px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  text-align: left;
+  white-space: normal;
+}
+
+.row-menu__form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.row-menu__form input {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 13px;
+}
+
+.row-menu__delete {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--loss);
+  color: var(--loss);
+  font-weight: 700;
+}
+
+.row-menu__delete:hover {
+  background: var(--loss);
+  color: #fff;
+}
+
+
+/* ---- Charts ------------------------------------------------------------ */
+
+.chart-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px 12px;
+}
+
+.money-chart {
+  height: 170px;
+  overflow: visible;
+}
+
+.chart-area {
+  fill: var(--accent);
+  opacity: 0.1;
+  stroke: none;
+}
+
+.range-chart polyline,
+.cumulative-chart polyline {
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.range-chart .zero-line,
+.cumulative-chart .zero-line {
+  stroke: var(--border);
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.range-chart circle,
+.cumulative-chart circle {
+  fill: var(--panel);
+  stroke: var(--accent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-axis {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- Current Matches --------------------------------------------------- */
+
+.match-row {
+  padding: 14px;
+  margin-top: 10px;
+  border-top: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.match-row:first-child {
+  margin-top: 0;
+}
+
+.match-row:hover {
+  border-color: var(--accent);
+}
+
+.cm-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cm-play {
+  margin-top: 6px;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.cm-matchup {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.cm-system {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.cm-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.cm-tag {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
 }

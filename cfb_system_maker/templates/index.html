@@ -195,20 +195,42 @@
                     {% endif %}
                   {% endfor %}
                   <div class="filter-launch-row">
-                    <button
-                      type="button"
-                      class="filter-launcher"
-                      data-candidate-id="{{ feature.candidate_id }}"
-                      data-control="{{ feature.control }}"
-                      data-description="{{ feature.description }}"
-                      data-lookahead-warning="{{ feature.lookahead_warning }}"
-                      data-team-scoped="{{ '1' if feature.team_scoped else '0' }}"
-                      {% if feature.team_scoped and form.bet_type == "spread" %}data-perspective="{{ primary_p }}"{% endif %}
-                      aria-haspopup="dialog"
-                    >{{ feature.label }}{% if feature.team_scoped and form.bet_type == "spread" %} — Bet-side{% endif %}</button>
                     {% if feature.team_scoped and form.bet_type == "spread" %}
-                      {# The opponent is its own filter chip: same stat, other team,
-                         independently editable and removable. #}
+                      {# One row per stat: the name once, then a compact button per
+                         side. Each side is its own filter -- independently set,
+                         edited and removed. #}
+                      <div class="stat-row">
+                        <span class="stat-row__label">{{ feature.label }}</span>
+                        <span class="stat-row__sides">
+                          <button
+                            type="button"
+                            class="filter-launcher stat-row__side"
+                            data-candidate-id="{{ feature.candidate_id }}"
+                            data-control="{{ feature.control }}"
+                            data-description="{{ feature.description }}"
+                            data-lookahead-warning="{{ feature.lookahead_warning }}"
+                            data-team-scoped="1"
+                            data-perspective="{{ primary_p }}"
+                            data-label="{{ feature.label }} — {{ 'Either' if form.bet_type != 'spread' else 'Bet-side' }}"
+                            {% if dual.primary_gte or dual.primary_lte %}data-has-filter="1"{% endif %}
+                            aria-haspopup="dialog"
+                          >Bet-side</button>
+                          <button
+                            type="button"
+                            class="filter-launcher stat-row__side"
+                            data-candidate-id="{{ feature.candidate_id }}"
+                            data-control="{{ feature.control }}"
+                            data-description="{{ feature.description }}"
+                            data-lookahead-warning="{{ feature.lookahead_warning }}"
+                            data-team-scoped="1"
+                            data-perspective="{{ secondary_p }}"
+                            data-label="{{ feature.label }} — Opponent"
+                            {% if dual.secondary_gte or dual.secondary_lte %}data-has-filter="1"{% endif %}
+                            aria-haspopup="dialog"
+                          >Opponent</button>
+                        </span>
+                      </div>
+                    {% else %}
                       <button
                         type="button"
                         class="filter-launcher"
@@ -216,10 +238,10 @@
                         data-control="{{ feature.control }}"
                         data-description="{{ feature.description }}"
                         data-lookahead-warning="{{ feature.lookahead_warning }}"
-                        data-team-scoped="1"
-                        data-perspective="{{ secondary_p }}"
+                        data-team-scoped="{{ '1' if feature.team_scoped else '0' }}"
+                        {% if active.filt %}data-has-filter="1"{% endif %}
                         aria-haspopup="dialog"
-                      >{{ feature.label }} — Opponent</button>
+                      >{{ feature.label }}</button>
                     {% endif %}
                     <div class="filter-fallback" data-fallback-for="{{ feature.candidate_id }}">
                       <details {% if feature.key in enabled_feature_keys %}open{% endif %}>
@@ -496,29 +518,43 @@
           {% endif %}
 
           <section class="filter-detail">
-            <div class="range-chart" aria-label="Money Won by Line Range">
+            <div class="range-chart chart-card" aria-label="Money Won by Line Range">
               <h3>Money Won</h3>
-              <svg viewBox="0 0 520 150" role="img">
+              <svg viewBox="0 0 520 170" role="img" preserveAspectRatio="none" class="money-chart">
+                <defs>
+                  <linearGradient id="fillPos" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="var(--win)" stop-opacity="0.22" />
+                    <stop offset="100%" stop-color="var(--win)" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
                 <line x1="28" x2="492" y1="{{ chart.zero_y }}" y2="{{ chart.zero_y }}" class="zero-line" />
+                {% if chart.area %}<polygon class="chart-area" points="{{ chart.area }}" />{% endif %}
                 {% if chart.polyline %}<polyline points="{{ chart.polyline }}" />{% endif %}
-                {% for point in chart.points %}
-                  <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" />
-                {% endfor %}
+                {# Markers only when there are few enough to read; thousands of
+                   dots render as a blob and hide the line's shape. #}
+                {% if chart.points|length <= 60 %}
+                  {% for point in chart.points %}
+                    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="3" />
+                  {% endfor %}
+                {% endif %}
               </svg>
               <div class="chart-axis"><span>{{ chart.min_x if chart.min_x is not none else "-" }}</span><span>{{ chart.max_x if chart.max_x is not none else "-" }}</span></div>
             </div>
           </section>
 
-          <section class="cumulative-chart" aria-label="Money Won Over Time">
+          <section class="cumulative-chart chart-card" aria-label="Money Won Over Time">
             <h3>Money Won Over Time</h3>
-            <svg viewBox="0 0 520 150" role="img">
+            <svg viewBox="0 0 520 170" role="img" preserveAspectRatio="none" class="money-chart">
               <line x1="28" x2="492" y1="{{ cumulative_chart.zero_y }}" y2="{{ cumulative_chart.zero_y }}" class="zero-line" />
+              {% if cumulative_chart.area %}<polygon class="chart-area" points="{{ cumulative_chart.area }}" />{% endif %}
               {% if cumulative_chart.polyline %}<polyline points="{{ cumulative_chart.polyline }}" />{% endif %}
-              {% for point in cumulative_chart.points %}
-                <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4">
-                  <title>Bet {{ point.order + 1 }}: {% if point.profit >= 0 %}+{% endif %}${{ "%.2f"|format(point.profit * 100) }}</title>
-                </circle>
-              {% endfor %}
+              {% if cumulative_chart.points|length <= 60 %}
+                {% for point in cumulative_chart.points %}
+                  <circle cx="{{ point.x }}" cy="{{ point.y }}" r="3">
+                    <title>Bet {{ point.order + 1 }}: {% if point.profit >= 0 %}+{% endif %}${{ "%.2f"|format(point.profit * 100) }}</title>
+                  </circle>
+                {% endfor %}
+              {% endif %}
             </svg>
             <div class="chart-axis"><span>Bet {{ (cumulative_chart.min_x + 1) if cumulative_chart.min_x is not none else "-" }}</span><span>Bet {{ (cumulative_chart.max_x + 1) if cumulative_chart.max_x is not none else "-" }}</span></div>
           </section>
