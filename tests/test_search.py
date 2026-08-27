@@ -100,6 +100,25 @@ def test_never_emits_noop_or_unchanged_candidate():
         assert count_dimensions(c) > 0
 
 
+def test_low_coverage_line_move_features_excluded_from_candidate_pool():
+    """spread_open/spread_move/total_open/total_move are genuine pregame values but
+    populated on only ~18% of games, non-randomly (2023-2025, book-matched closes).
+    Search must not silently include them -- re-enabling is a deliberate code change,
+    not a side effect of registering the features."""
+    games = _games()
+    feature_map = {
+        1: {**_feature_map()[1], "spread_open": -3.0, "spread_move": -1.0, "total_open": 50.0, "total_move": 2.5},
+        2: {**_feature_map()[2], "spread_open": 2.0, "spread_move": 1.0, "total_open": 47.0, "total_move": 1.0},
+        3: {**_feature_map()[3], "spread_open": 6.0, "spread_move": 1.5, "total_open": 58.0, "total_move": 2.0},
+        4: {**_feature_map()[4], "spread_open": -2.0, "spread_move": -1.5, "total_open": 53.0, "total_move": 2.0},
+    }
+    low_coverage_keys = {"spread_open", "spread_move", "total_open", "total_move"}
+    children = expand_candidates(SystemFilter(), games, feature_map)
+    for child in children:
+        for filt in child.feature_filters:
+            assert filt.key not in low_coverage_keys
+
+
 def test_lookahead_features_never_appear_as_candidates():
     games = _games()
     feature_map = {
