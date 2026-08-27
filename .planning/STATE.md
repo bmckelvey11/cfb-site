@@ -147,9 +147,11 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Phase 9 (Live In-Season Verification, DATA-02) — criterion 1 (pre-season calendar dry run against `GamesApi.get_calendar()`) is executable now, no date gate. Criteria 2-3 (Current Matches shows real posted-line games; season-to-date feature filters match correctly) are genuinely calendar-blocked: criterion 2 needs the season live (~2026-08-29), criterion 3 needs week 3+ specifically (week 1-2 `games_played=0` fails closed by design, not a bug). Resume with `/gsd-autonomous --from 9` or `/gsd-plan-phase 9` once those dates pass.
 
 ### Blockers/Concerns
+
+- None open — Phase 9 is deferred on the calendar, not blocked by a defect. See Pending Todos above.
 
 None open. T-01-03 (`describe()` silent filter drop) closed 2026-08-26 in Phase 7 (FIX-01, commit `da558f8` for the WR-01 follow-up fix).
 
