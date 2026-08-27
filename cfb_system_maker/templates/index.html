@@ -165,6 +165,11 @@
             <p class="stale-warning">features.json was built with an older field registry — run <code>python -m cfb_system_maker enrich --data-dir data</code> to refresh.</p>
             {% endif %}
             <p class="feature-hint filter-fallback">Check a filter to enable it. Un-checked filters are ignored.</p>
+            {# Deliberately has NO name attribute: this input sits inside
+               filters-form, so a named field would be serialized into every
+               backtest query and saved system. #}
+            <input type="search" class="filter-search" autocomplete="off"
+              aria-label="Search feature filters" placeholder="Search filters…">
             {% for group in feature_options %}
               <fieldset class="feature-group {% if group.group == 'result_lookahead' %}lookahead{% endif %}">
                 <legend>
@@ -649,6 +654,7 @@
     </dialog>
 
     <script src="{{ url_for('static', filename='filter_modal.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='feature_sidebar.js') }}" defer></script>
     {% include "_footer.html" %}
   </body>
 </html>
