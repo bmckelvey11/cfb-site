@@ -200,6 +200,13 @@
                     {% endif %}
                   {% endfor %}
                   <div class="filter-launch-row">
+                    {# One launcher per feature: the modal already has a working
+                       Bet-side/Opponent toggle, so a second chip only doubled the
+                       sidebar. It deliberately emits NO data-perspective -- with
+                       none set, committedNumericBounds picks whichever perspective
+                       is actually constrained and resolveInitialPerspective falls
+                       back to defaultPerspective(). The results-page Edit chips
+                       still pass data-perspective, so that branch stays. #}
                     <button
                       type="button"
                       class="filter-launcher"
@@ -208,24 +215,8 @@
                       data-description="{{ feature.description }}"
                       data-lookahead-warning="{{ feature.lookahead_warning }}"
                       data-team-scoped="{{ '1' if feature.team_scoped else '0' }}"
-                      {% if feature.team_scoped and form.bet_type == "spread" %}data-perspective="{{ primary_p }}"{% endif %}
                       aria-haspopup="dialog"
-                    >{{ feature.label }}{% if feature.team_scoped and form.bet_type == "spread" %} — Bet-side{% endif %}</button>
-                    {% if feature.team_scoped and form.bet_type == "spread" %}
-                      {# The opponent is its own filter chip: same stat, other team,
-                         independently editable and removable. #}
-                      <button
-                        type="button"
-                        class="filter-launcher"
-                        data-candidate-id="{{ feature.candidate_id }}"
-                        data-control="{{ feature.control }}"
-                        data-description="{{ feature.description }}"
-                        data-lookahead-warning="{{ feature.lookahead_warning }}"
-                        data-team-scoped="1"
-                        data-perspective="{{ secondary_p }}"
-                        aria-haspopup="dialog"
-                      >{{ feature.label }} — Opponent</button>
-                    {% endif %}
+                    >{{ feature.label }}</button>
                     <div class="filter-fallback" data-fallback-for="{{ feature.candidate_id }}">
                       <details {% if feature.key in enabled_feature_keys %}open{% endif %}>
                         <summary>

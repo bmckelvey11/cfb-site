@@ -1075,6 +1075,50 @@ def test_feature_sidebar_js_search_collapse_contract():
     assert "is-collapsed" in source
 
 
+def test_team_scoped_feature_renders_one_launcher_keeping_both_bound_rows(tmp_path):
+    """The modal owns Bet-side/Opponent switching, so the sidebar needs one chip
+    per feature -- but both perspectives' hidden rows are the form-serialization
+    contract and must still render."""
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {str(game.game_id): {"running_win_pct": 0.5} for game in games},
+    )
+    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
+
+    launchers = html.count('data-candidate-id="feature:running_win_pct"')
+    assert launchers == 1
+    assert "— Opponent" not in html
+    assert "— Bet-side" not in html
+
+    # Both bound-pairs survive: one chip still edits exactly one perspective per Save.
+    assert 'data-bound-perspective="bet_side"' in html
+    assert 'data-bound-perspective="opponent"' in html
+
+
+def test_perspective_switch_rereads_committed_bounds_contract():
+    """Switching perspective must re-read bounds from the form. Otherwise the
+    previous perspective's bounds stay in state and Save writes them into the
+    newly selected perspective's rows -- a silent wrong write, not just stale UI."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+
+    reload_block = source.split("function reloadFeatureDetail")[1].split("\n  function ")[0]
+    assert "committedNumericBounds" in reload_block
+    assert "state.min =" in reload_block
+    assert "state.max =" in reload_block
+
+    # Re-reading is not enough on its own. committedNumericBounds falls back to
+    # the first populated perspective when the wanted one has nothing committed,
+    # so switching bet-side(10-20) -> opponent(empty) hands back the bet-side
+    # numbers under perspective "bet_side". They must be rejected on that
+    # mismatch, or Save writes 10-20 into the opponent rows -- the exact silent
+    # wrong write this fix exists to close.
+    assert "committed.perspective === state.perspective" in reload_block
+
+
 def test_feature_sidebar_collapse_yields_to_active_search():
     """A collapsed group must still reveal its matches while a term is active,
     or search cannot find anything inside a collapsed group."""

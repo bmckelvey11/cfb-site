@@ -902,6 +902,23 @@
           state.allowedPerspectives = payload.allowed_perspectives;
         }
         if (state.kind === "numeric") {
+          // This function is only ever called when the perspective changed, so
+          // state.min/state.max still hold the PREVIOUS perspective's bounds.
+          // Re-read them for the new perspective, or Save writes bet-side bounds
+          // into the opponent's rows. Mirrors the open path's fallback.
+          const committed = committedNumericBounds(state.candidateId, state.perspective);
+          // committedNumericBounds falls back to the first populated perspective
+          // when the wanted one has nothing committed, so a returned object is
+          // only OURS if its perspective matches. Adopting a mismatched one is
+          // the bug itself: it puts bet-side numbers under an opponent heading.
+          const own = committed && committed.perspective === state.perspective ? committed : null;
+          if (own && (Number.isFinite(own.min) || Number.isFinite(own.max))) {
+            state.min = Number.isFinite(own.min) ? own.min : state.domainMin;
+            state.max = Number.isFinite(own.max) ? own.max : state.domainMax;
+          } else if (state.domainMin != null && state.domainMax != null) {
+            state.min = state.domainMin;
+            state.max = state.domainMax;
+          }
           renderNumericControls();
         } else {
           renderValueTable();
