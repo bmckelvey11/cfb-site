@@ -727,6 +727,22 @@
     controlsEl.appendChild(group);
   }
 
+  const OVERLAP_NOTE = "Either-perspective values can overlap per game, so Max ROI picks the single best value here instead of a range.";
+
+  // Rebuilds aboutEl from a base description/lookahead text plus the overlap
+  // disclosure, keyed off state.overlappingRows. Rebuilding (not appending)
+  // keeps repeated perspective switches from duplicating the note or leaving
+  // it behind after switching away from "Either". Only numeric filters use
+  // Max ROI's single-bucket fallback, so the note is scoped to state.kind
+  // === "numeric" -- value-table (categorical) filters already show a single
+  // value per row and don't need it.
+  function applyOverlapNote(baseText) {
+    aboutEl.textContent = baseText
+      + (state && state.kind === "numeric" && state.overlappingRows
+        ? (baseText ? "\n\n" : "") + OVERLAP_NOTE
+        : "");
+  }
+
   function reloadFeatureDetail() {
     if (!state || (state.kind !== "feature" && !(state.kind === "numeric" && state.featureKey))) {
       return;
@@ -752,13 +768,17 @@
           return;
         }
         if (payload.description) {
-          aboutEl.textContent = payload.description;
+          let baseText = payload.description;
           if (payload.lookahead_warning) {
             const warning = typeof payload.lookahead_warning === "string"
               ? payload.lookahead_warning
               : "lookahead — analysis only";
-            aboutEl.textContent = payload.description + "\n\n" + warning;
+            baseText = payload.description + "\n\n" + warning;
           }
+          state.overlappingRows = Boolean(payload.overlapping_rows);
+          applyOverlapNote(baseText);
+        } else {
+          state.overlappingRows = Boolean(payload.overlapping_rows);
         }
         state.rows = payload.rows || [];
         state.chartPoints = payload.chart_points || [];
@@ -774,7 +794,6 @@
         if (payload.allowed_perspectives) {
           state.allowedPerspectives = payload.allowed_perspectives;
         }
-        state.overlappingRows = Boolean(payload.overlapping_rows);
         if (state.kind === "numeric") {
           renderNumericControls();
         } else {
@@ -1517,15 +1536,20 @@
         if (!state || generation !== detailGeneration) {
           return;
         }
+        // Default to what aboutEl already holds (set synchronously to
+        // description(+lookahead) when the modal opened) so a payload with
+        // neither description nor lookahead_warning leaves it unchanged,
+        // matching pre-fix behavior.
+        let baseText = aboutEl.textContent;
         if (payload.lookahead_warning) {
           const warning = typeof payload.lookahead_warning === "string"
             ? payload.lookahead_warning
             : "lookahead — analysis only";
-          aboutEl.textContent = (payload.description || description) + "\n\n" + warning;
+          baseText = (payload.description || description) + "\n\n" + warning;
         } else if (payload.description) {
-          aboutEl.textContent = payload.description;
+          baseText = payload.description;
         } else if (lookahead) {
-          aboutEl.textContent = description + (description ? "\n\n" : "") + lookahead;
+          baseText = description + (description ? "\n\n" : "") + lookahead;
         }
         state.rows = payload.rows || [];
         state.chartPoints = payload.chart_points || [];
@@ -1538,10 +1562,7 @@
           state.allowedPerspectives = payload.allowed_perspectives;
         }
         state.overlappingRows = Boolean(payload.overlapping_rows);
-        if (state.overlappingRows) {
-          aboutEl.textContent += (aboutEl.textContent ? "\n\n" : "")
-            + "Either-perspective values can overlap per game, so Max ROI picks the single best value here instead of a range.";
-        }
+        applyOverlapNote(baseText);
         if (committed && (Number.isFinite(committed.min) || Number.isFinite(committed.max))) {
           state.min = Number.isFinite(committed.min) ? committed.min : state.domainMin;
           state.max = Number.isFinite(committed.max) ? committed.max : state.domainMax;
