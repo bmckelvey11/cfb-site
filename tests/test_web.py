@@ -153,6 +153,28 @@ def test_cumulative_chart_same_season_week_produces_separate_points_by_game_id()
     assert profits == [-1.0, 0.0]
 
 
+def test_cumulative_chart_thins_markers_but_keeps_full_fidelity_polyline():
+    # 200 bets: the template emits a <circle> + <title> per returned point, so the
+    # markers must be capped, while the polyline (a single DOM node) keeps every bet.
+    bets = [
+        _bet_detail(game_id=i, season=2023, week=i, profit=1.0 if i % 2 else -1.0)
+        for i in range(200)
+    ]
+    result = _result_with_bets(bets)
+
+    chart = _cumulative_chart(result)
+
+    assert len(chart["points"]) <= 60
+    assert len(chart["polyline"].split(" ")) == 200
+    assert chart["max_x"] == 199
+    assert chart["points"][-1]["order"] == 199
+    assert set(chart["points"][0].keys()) == {"x", "y", "order", "profit"}
+    # x-scaling must come from the FULL list: thinning before scaling bunches the
+    # retained points leftward and the last one stops reaching the right edge.
+    assert chart["points"][0]["x"] == 28
+    assert chart["points"][-1]["x"] == 492
+
+
 def test_web_index_loads_filters_and_default_results(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

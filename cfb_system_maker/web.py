@@ -1571,9 +1571,21 @@ def _cumulative_chart(result: BacktestResult) -> dict[str, object]:
         y = height - pad_y - ((profit - min_profit) / span) * (height - pad_y * 2)
         points.append({"x": round(x, 2), "y": round(y, 2), "order": index, "profit": profit})
 
+    # The polyline is one DOM node whatever the bet count, so it stays at full
+    # fidelity and the equity curve keeps every drawdown. The markers were the
+    # whole explosion -- the template emits a <circle> + <title> per point, ~26k
+    # nodes on an unfiltered backtest -- so thin only those.
+    markers = points
+    if len(points) > _CHART_POINTS_CAP:
+        # Ceiling division: floor striding overshoots the cap (13003 bets -> 61).
+        step = -(-len(points) // _CHART_POINTS_CAP)
+        markers = points[::step]
+        # Keep the true ending equity hoverable instead of the last strided point.
+        markers[-1] = points[-1]
+
     zero_y = height - pad_y - ((0 - min_profit) / span) * (height - pad_y * 2)
     return {
-        "points": points,
+        "points": markers,
         "polyline": " ".join(f"{point['x']},{point['y']}" for point in points),
         "zero_y": round(zero_y, 2),
         "min_x": 0,
