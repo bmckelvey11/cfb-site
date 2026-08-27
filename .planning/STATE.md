@@ -2,13 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Season Readiness
-status: planning
-last_updated: "2026-08-26T21:58:21.770Z"
+current_phase: 6
+current_phase_name: Merge & Stale-Stats Audit
+status: executing
+stopped_at: ROADMAP.md created for v1.1 Season Readiness (Phases 6-9); REQUIREMENTS.md traceability filled
+last_updated: "2026-08-27T00:55:55.339Z"
 last_activity: 2026-08-26
+last_activity_desc: Phase 6 execution started
 progress:
-  total_phases: 9
-  completed_phases: 6
-  total_plans: 0
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 1
   completed_plans: 0
   percent: 0
 ---
@@ -20,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20)
 
 **Core value:** A saved system's main page reads like a Bet Labs system editor (stat chips, cumulative money-won graph, plain-English active filters) and configuring any filter opens a live popup — slider or value table, per-value Record/ROI/Money, before you commit — instead of static inline form fields.
-**Current focus:** v1.1 Season Readiness — Phase 7 (Integrity Fixes)
+**Current focus:** Phase 6 — Merge & Stale-Stats Audit
 
 ## Current Position
 
-Phase: 7 of 9 (Integrity Fixes)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-08-26 — Phase 6 (Merge & Stale-Stats Audit) complete: fix/web-app-review-2026-08-26 merged to master (commit 2e86ba5), 441 tests passing; data/search_runs/ audited and confirmed empty (MERGE-02 no-op — nothing stale to regenerate)
+Phase: 6 (Merge & Stale-Stats Audit) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 6
+Last activity: 2026-08-26 — Phase 6 execution started
 
 Progress: [██████░░░] 6/9 phases (v1.0 complete; Phase 6 complete; v1.1 phases 7-9 remaining)
 
