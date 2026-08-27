@@ -84,9 +84,16 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 **Requirements**: DATA-02
 **Success Criteria** (what must be TRUE):
 
-  1. A pre-season dry run against a live-but-past CFBD calendar date confirms whether `GamesApi.get_calendar()` returns `startDate`/`endDate` as `str` or `datetime` in production, and the live-calendar branch handles whichever shape is returned (closes the untested-path risk before it's exercised for real).
+  1. ✅ A pre-season dry run against a live-but-past CFBD calendar date confirms whether `GamesApi.get_calendar()` returns `startDate`/`endDate` as `str` or `datetime` in production, and the live-calendar branch handles whichever shape is returned (closes the untested-path risk before it's exercised for real). PASSED 2026-08-27, see `09-DRY-RUN.md`.
   2. Once the 2026 season is underway, the Current Matches panel shows real unplayed games with posted lines, matched correctly (not graded) against saved systems.
   3. From week 3 onward, a feature-filtered system using season-to-date stats correctly matches upcoming games using those computed stats (not week-1's expected-empty `games_played=0` state, which fails closed by design and is not a bug).
+
+**Plans:** 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — record criterion 1 (already passed) + mechanical calendar gate probe for criteria 2/3
+- [ ] 09-02-PLAN.md — criterion 2: live Current Matches panel against real posted-line games (calendar-gated on season start)
+- [ ] 09-03-PLAN.md — criterion 3: season-to-date feature-filtered matching against live week 3+ (calendar-gated)
 
 ## Progress
 
