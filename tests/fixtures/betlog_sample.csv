@@ -1,0 +1,8 @@
+data:text/csv;charset=utf-8,
+League,Start Time,Game,Pick Desc,Type,Period,Odds,Odds/Spread/Total,Result,Units Wagered,Units Net,Money Wagered,Money Net,Tag
+ncaaf,2023-08-26T23:00:00.000Z,OHIO @ SDSU,OHIO +4 -110,spread_away,game,-110,4,loss,1,-1,1000,-1000,
+ncaaf,2023-08-26T23:00:00.000Z,OHIO @ SDSU,SDSU -4 -110,spread_home,live,-110,-4,win,1,0.91,1000,910,
+ncaaf,2023-09-02T17:00:00.000Z,NAVY @ ND,under 51 -110,under,game,-110,51,win,2,1.82,2000,1820,
+ncaaf,2023-09-02T17:00:00.000Z,NAVY @ ND,ND -3.5 -110,spread_home,firsthalf,-110,-3.5,loss,1,-1,1000,-1000,
+ncaaf,2023-09-09T20:00:00.000Z,MASS @ NMSU,NMSU ml -180,ml_home,game,-180,0,win,1,0.56,1000,556,
+ncaaf,2023-09-09,MASS @ NMSU,over 55 -110,over,game,-110,55,win,1,0.91,1000,910,extra,field,here
