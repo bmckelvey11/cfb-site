@@ -99,5 +99,5 @@ Full phase details, success criteria, and plan breakdowns archived in [milestone
 | 5. Dashboard & Current Matches | v1.0 | 6/6 | Complete | 2026-07-20 |
 | 6. Merge & Stale-Stats Audit | v1.1 | 2/1 | Complete    | 2026-08-26 |
 | 7. Integrity Fixes | v1.1 | 3/3 | Complete    | 2026-08-26 |
-| 8. Neutral-Site & Indoor Unders Example | v1.1 | 1/1 | Complete | 2026-08-27 |
+| 8. Neutral-Site & Indoor Unders Example | v1.1 | 1/1 | Complete    | 2026-08-27 |
 | 9. Live In-Season Verification | v1.1 | 0/TBD | Not started | - |
