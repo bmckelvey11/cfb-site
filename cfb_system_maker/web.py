@@ -248,6 +248,7 @@ def aggregate_filter_value_rows(
     perspective: str,
     stake: float = 1.0,
     american_odds: int = -110,
+    matched_game_ids: set[int] | None = None,
 ) -> list[dict[str, object]]:
     """One-pass per-value Record/ROI/Money with the candidate already removed from base_system."""
     feature_map = feature_map or {}
@@ -267,6 +268,8 @@ def aggregate_filter_value_rows(
         )
         if raw is None:
             continue
+        if matched_game_ids is not None:
+            matched_game_ids.add(game.game_id)
         if isinstance(raw, tuple):
             values = []
             for item in raw:
@@ -747,12 +750,14 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             perspective = "single"
 
         base_system = remove_candidate_filters(system, candidate_id)
+        matched_game_ids: set[int] = set()
         rows = aggregate_filter_value_rows(
             games,
             base_system,
             descriptor,
             feature_map=feature_map,
             perspective=perspective,
+            matched_game_ids=matched_game_ids,
         )
         domain_values = [row["value"] for row in rows]
         is_numeric = descriptor["control"] == "numeric"
@@ -776,6 +781,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             "perspective": perspective,
             "allowed_perspectives": allowed,
             "overlapping_rows": overlapping_rows,
+            "matched_games": len(matched_game_ids),
             "domain": {
                 "values": domain_values,
                 "min": min(domain_values) if domain_values and is_numeric else None,
