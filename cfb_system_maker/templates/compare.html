@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Compare Systems - CFB System Maker</title>
+    <title>Compare — CFB System Maker</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
@@ -71,5 +72,6 @@
         {% endif %}
       </section>
     </main>
+    {% include "_footer.html" %}
   </body>
 </html>
