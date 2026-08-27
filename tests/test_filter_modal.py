@@ -896,12 +896,18 @@ def test_filter_modal_js_edit_prefill_and_perspective_contract():
 
     source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
     assert "edit-filter" in source or "openCandidate" in source
-    assert "Bet-side" in source
-    assert "Opponent" in source
-    assert "Either" in source
+    # The perspective is now chosen by which launcher chip you click, so the
+    # human-facing labels live in the template. What the JS must still do is
+    # honour the chip's perspective and default sensibly without one.
+    assert "data-perspective" in source
     assert "defaultPerspective" in source or "bet_side" in source
+    assert "opponent" in source
     assert "team_scoped" in source or "team-scoped" in source or "data-team-scoped" in source
     assert "perspective" in source
+
+    template = Path("cfb_system_maker/templates/index.html").read_text(encoding="utf-8")
+    assert "Bet-side" in template
+    assert "Opponent" in template
 
 
 def test_filter_modal_js_debounce_stale_retry_and_focus_contract():

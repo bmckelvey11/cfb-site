@@ -58,12 +58,6 @@
   let detailGeneration = 0;
   const LIVE_DEBOUNCE_MS = 250;
 
-  const PERSPECTIVE_OPTIONS = [
-    { value: "bet_side", label: "Bet-side" },
-    { value: "opponent", label: "Opponent" },
-    { value: "either", label: "Either" },
-  ];
-
   document.documentElement.classList.add("js");
 
   function defaultPerspective() {
@@ -791,45 +785,6 @@
     }
   }
 
-  function renderPerspectiveControl(onChange) {
-    if (!state || !state.teamScoped) {
-      return;
-    }
-    const group = document.createElement("div");
-    group.className = "filter-modal__perspective";
-    group.setAttribute("role", "group");
-    group.setAttribute("aria-label", "Perspective");
-    // bet_side/opponent only make sense against a spread's home/away side; a
-    // total system's allowedPerspectives (from the server) omits them so the
-    // modal never offers a button that /filter-detail would 400 on.
-    const allowed = state.allowedPerspectives;
-    let options = allowed
-      ? PERSPECTIVE_OPTIONS.filter((opt) => allowed.indexOf(opt.value) !== -1)
-      : PERSPECTIVE_OPTIONS.slice();
-    if (state.perspective && !options.some((opt) => opt.value === state.perspective)) {
-      const label = state.perspective.charAt(0).toUpperCase() + state.perspective.slice(1);
-      options.unshift({ value: state.perspective, label: label });
-    }
-    options.forEach((opt) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = opt.label;
-      btn.setAttribute("aria-pressed", state.perspective === opt.value ? "true" : "false");
-      if (state.perspective === opt.value) {
-        btn.classList.add("is-active");
-      }
-      btn.addEventListener("click", () => {
-        if (state.perspective === opt.value) {
-          return;
-        }
-        state.perspective = opt.value;
-        onChange();
-      });
-      group.appendChild(btn);
-    });
-    controlsEl.appendChild(group);
-  }
-
   const OVERLAP_NOTE = "Either-perspective values can overlap per game, so Max ROI picks the single best value here instead of a range.";
 
   // Rebuilds aboutEl from a base description/lookahead text plus the overlap
@@ -926,7 +881,6 @@
       return;
     }
 
-    renderPerspectiveControl(() => reloadFeatureDetail());
     renderExcludeControl();
 
     if (!state.rows.length) {
@@ -1321,8 +1275,6 @@
     if (!state || state.kind !== "numeric") {
       return;
     }
-
-    renderPerspectiveControl(() => reloadFeatureDetail());
 
     if (state.domainMin == null || state.domainMax == null || !state.rows.length) {
       const empty = document.createElement("p");
