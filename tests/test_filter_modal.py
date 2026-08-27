@@ -922,3 +922,41 @@ def test_filter_modal_js_debounce_stale_retry_and_focus_contract():
     assert "focus-visible" in css
     html = Path("cfb_system_maker/templates/index.html").read_text(encoding="utf-8")
     assert 'aria-labelledby="filter-modal-title"' in html
+
+
+def test_filter_modal_js_matched_games_overlap_caption_contract():
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+
+    # Both fetch call sites store matched_games onto state, alongside overlappingRows.
+    assert "state.matchedGames = payload.matched_games;" in source
+
+    # renderValueTable() builds a caption from state.matchedGames and state.overlappingRows.
+    render_value_table_start = source.index("function renderValueTable()")
+    next_function_start = source.index("\n  function ", render_value_table_start + 1)
+    render_value_table_body = source[render_value_table_start:next_function_start]
+    assert "state.matchedGames" in render_value_table_body
+    assert "state.overlappingRows" in render_value_table_body
+
+    # Caption is appended via textContent/appendChild, never innerHTML +=.
+    assert "innerHTML +=" not in source
+
+    # The stale "don't need it" comment is corrected.
+    assert "don't need it" not in source
+    assert "row-sum reconciliation caption" in source
+
+
+def test_filter_modal_js_matched_games_caption_suppressed_on_empty_rows():
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    render_value_table_start = source.index("function renderValueTable()")
+    next_function_start = source.index("\n  function ", render_value_table_start + 1)
+    render_value_table_body = source[render_value_table_start:next_function_start]
+
+    empty_branch_start = render_value_table_body.index("if (!state.rows.length)")
+    empty_branch_end = render_value_table_body.index("setMaxRoiVisible(true);")
+    empty_branch = render_value_table_body[empty_branch_start:empty_branch_end]
+    assert "state.matchedGames" not in empty_branch
+    assert "overlappingRows" not in empty_branch
