@@ -1127,3 +1127,98 @@ def test_stats_verdict_includes_cluster_note_when_enough_clusters():
     assert f"[{stats.cluster_low * 100:+.2f}%, {stats.cluster_high * 100:+.2f}%]" in verdict
     # The old copy claimed the interval "widens to" a baseline the UI never shows.
     assert "widens to" not in verdict
+
+
+def _exclusion_game(**overrides):
+    base = dict(
+        game_id=1,
+        season=2023,
+        week=1,
+        home_team="Michigan",
+        away_team="East Carolina",
+        home_conference="Big Ten",
+        away_conference="American",
+        home_points=30,
+        away_points=14,
+        provider="consensus",
+        spread=-14.5,
+        total=52.5,
+    )
+    base.update(overrides)
+    return GameRecord(**base)
+
+
+def test_exclude_teams_drops_the_named_bet_side_team():
+    game = _exclusion_game()
+    assert matches_system(game, SystemFilter(side="home"))
+    assert not matches_system(game, SystemFilter(side="home", exclude_teams={"Michigan"}))
+    # Excluding the other side's team leaves a home bet untouched.
+    assert matches_system(game, SystemFilter(side="home", exclude_teams={"East Carolina"}))
+
+
+def test_exclude_teams_on_total_drops_games_involving_the_team():
+    game = _exclusion_game()
+    system = SystemFilter(bet_type="total", total_side="over")
+    assert matches_system(game, system)
+    # A total has no bet side, so either team appearing disqualifies the game.
+    assert not matches_system(game, replace(system, exclude_teams={"Michigan"}))
+    assert not matches_system(game, replace(system, exclude_teams={"East Carolina"}))
+
+
+def test_exclude_conferences_drops_the_named_bet_side_conference():
+    game = _exclusion_game()
+    assert not matches_system(game, SystemFilter(side="home", exclude_conferences={"Big Ten"}))
+    assert matches_system(game, SystemFilter(side="home", exclude_conferences={"American"}))
+
+
+def test_exclude_conferences_on_total_drops_games_involving_the_conference():
+    game = _exclusion_game()
+    system = SystemFilter(bet_type="total", total_side="over")
+    assert not matches_system(game, replace(system, exclude_conferences={"Big Ten"}))
+    assert not matches_system(game, replace(system, exclude_conferences={"American"}))
+
+
+def test_exclude_conference_fails_closed_on_unknown_conference():
+    # A null conference is "unknown", not "not Big Ten". Excluding Big Ten must
+    # not silently sweep in every FCS opponent with no conference recorded.
+    game = _exclusion_game(home_conference=None)
+    assert not matches_system(game, SystemFilter(side="home", exclude_conferences={"Big Ten"}))
+
+
+def test_exclude_seasons_weeks_providers():
+    game = _exclusion_game()
+    assert not matches_system(game, SystemFilter(side="home", exclude_seasons={2023}))
+    assert matches_system(game, SystemFilter(side="home", exclude_seasons={2024}))
+    assert not matches_system(game, SystemFilter(side="home", exclude_weeks={1}))
+    assert matches_system(game, SystemFilter(side="home", exclude_weeks={2}))
+    assert not matches_system(game, SystemFilter(side="home", exclude_providers={"consensus"}))
+    assert matches_system(game, SystemFilter(side="home", exclude_providers={"other"}))
+
+
+def test_include_and_exclude_are_disjoint():
+    games = [
+        _exclusion_game(game_id=1, home_conference="Big Ten"),
+        _exclusion_game(game_id=2, home_conference="SEC"),
+    ]
+    included = run_backtest(games, SystemFilter(side="home", conferences={"Big Ten"}))
+    excluded = run_backtest(games, SystemFilter(side="home", exclude_conferences={"Big Ten"}))
+    assert included.bets == 1
+    assert excluded.bets == 1
+    assert included.bets + excluded.bets == len(games)
+    included_ids = {d.game_id for d in included.bet_details}
+    excluded_ids = {d.game_id for d in excluded.bet_details}
+    assert included_ids.isdisjoint(excluded_ids)
+
+
+def test_existing_system_unchanged_when_exclusions_default_empty():
+    # Regression guard: a system saved before exclusions existed must backtest
+    # identically once the new fields are present and defaulted.
+    games = [
+        _exclusion_game(game_id=1),
+        _exclusion_game(game_id=2, home_conference="SEC", home_points=10, away_points=40),
+    ]
+    system = SystemFilter(side="home", favorite=True)
+    result = run_backtest(games, system)
+    assert result.bets == 2
+    assert result.wins == 1
+    assert result.losses == 1

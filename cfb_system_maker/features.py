@@ -569,12 +569,24 @@ def feature_ok(
 
 
 def _value_matches(op: str, expected: object, actual: Any) -> bool:
+    # Negated ops are spelled out rather than wrapping the positive result in
+    # `not`. Callers (feature_ok) drop null values before dispatching here, so
+    # "not X" always means "has a value, and it is not X" -- a missing feature
+    # never satisfies a negation.
     if op == "eq":
         return actual == expected
+    if op == "not_eq":
+        return actual != expected
     if op == "in":
         return actual in expected  # type: ignore[operator]
+    if op == "not_in":
+        return actual not in expected  # type: ignore[operator]
     if op == "gte":
         return float(actual) >= float(expected)  # type: ignore[arg-type]
     if op == "lte":
         return float(actual) <= float(expected)  # type: ignore[arg-type]
+    if op == "gt":
+        return float(actual) > float(expected)  # type: ignore[arg-type]
+    if op == "lt":
+        return float(actual) < float(expected)  # type: ignore[arg-type]
     raise ValueError(f"unsupported op: {op}")

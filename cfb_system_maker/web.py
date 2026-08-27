@@ -70,7 +70,7 @@ _ALLOWED_PERSPECTIVES = frozenset({"single", "home", "away", "bet_side", "oppone
 
 _NARRATE_COOLDOWN_S = 30.0
 _NARRATE_LAST: dict[str, float] = {"t": 0.0}
-_ALLOWED_OPS = frozenset({"eq", "in", "gte", "lte"})
+_ALLOWED_OPS = frozenset({"eq", "not_eq", "in", "not_in", "gte", "lte", "gt", "lt"})
 _MAX_IN_LIST = 256
 _CHART_POINTS_CAP = 60
 _CORE_CANDIDATE_CLEAR: dict[str, dict[str, object]] = {
@@ -862,10 +862,14 @@ def edit_metadata_for_sentence(
         return None
 
     candidate_id: str | None = None
+    sentence_perspective: str | None = None
     if key in _SENTENCE_TO_CANDIDATE:
         candidate_id = _SENTENCE_TO_CANDIDATE[key]
     elif key.startswith("ff:"):
-        candidate_id = f"feature:{key[len('ff:'):]}"
+        feature_part = key[len("ff:"):]
+        if "@" in feature_part:
+            feature_part, sentence_perspective = feature_part.split("@", 1)
+        candidate_id = f"feature:{feature_part}"
     if candidate_id is None:
         return None
 
@@ -909,6 +913,10 @@ def edit_metadata_for_sentence(
         # unrenderable, suppress Edit here too — fail closed rather than open
         # a modal that can't represent every filter the sentence covers.
         filts = [filt for filt in system.feature_filters if filt.key == feature_key]
+        if sentence_perspective is not None:
+            # This sentence describes ONE perspective group; Edit must open that
+            # group's bounds, not a merge of every perspective on the key.
+            filts = [filt for filt in filts if filt.perspective == sentence_perspective]
         if not filts:
             return None
         control = str(descriptor["control"])
@@ -1038,16 +1046,33 @@ def _query_href_removing(key: str, base: MultiDict) -> str:
         copy.setlist("tab", ["matches"])
     if key.startswith("ff:"):
         feature_key = key[len("ff:"):]
+        # "ff:{key}@{perspective}" removes only that perspective's rows; a bare
+        # "ff:{key}" still removes every row for the feature.
+        target_perspective: str | None = None
+        if "@" in feature_key:
+            feature_key, target_perspective = feature_key.split("@", 1)
         keys = copy.getlist("ff_key")
         ops = copy.getlist("ff_op")
         values = copy.getlist("ff_value")
         perspectives = copy.getlist("ff_perspective")
-        keep = [index for index, item in enumerate(keys) if item != feature_key]
+        keep = [
+            index
+            for index, item in enumerate(keys)
+            if item != feature_key
+            or (
+                target_perspective is not None
+                and (perspectives[index] if index < len(perspectives) else "single") != target_perspective
+            )
+        ]
         copy.setlist("ff_key", [keys[index] for index in keep])
         copy.setlist("ff_op", [ops[index] for index in keep if index < len(ops)])
         copy.setlist("ff_value", [values[index] for index in keep if index < len(values)])
         copy.setlist("ff_perspective", [perspectives[index] for index in keep if index < len(perspectives)])
-        copy.setlist("ff_enable", [value for value in copy.getlist("ff_enable") if value != feature_key])
+        still_present = {keys[index] for index in keep}
+        copy.setlist(
+            "ff_enable",
+            [value for value in copy.getlist("ff_enable") if value != feature_key or value in still_present],
+        )
     else:
         for param in _REMOVE_PARAM_MAP.get(key, ()):
             copy.poplist(param)
@@ -1176,14 +1201,14 @@ def _validate_feature_filters_strict(values: MultiDict) -> None:
                 f"Perspective {perspective} is not valid for total systems",
             )
         raw_value = raw_values[index] if index < len(raw_values) else ""
-        if op in {"gte", "lte"}:
+        if op in {"gte", "lte", "gt", "lt"}:
             # A team-scoped numeric renders a gte/lte pair per perspective, so
             # constraining only one side leaves the other pair blank. An empty
             # bound is "no constraint", not a malformed number -- skip it, the
             # same way _parse_filter_value already does at read time.
             if str(raw_value).strip():
                 _parse_finite_float(raw_value, field=f"ff_value[{key}]")
-        if op == "in":
+        if op in {"in", "not_in"}:
             parts = [part.strip() for part in str(raw_value).split(",") if part.strip()]
             if len(parts) > _MAX_IN_LIST:
                 raise StrictParseError(
@@ -1304,14 +1329,15 @@ def _feature_filters_from_values(values: MultiDict) -> list[dict[str, object]]:
 
 
 def _parse_filter_value(op: str, raw_value: str) -> object | None:
-    if op == "in":
+    # Negated ops carry the same value shape as the op they negate.
+    if op in {"in", "not_in"}:
         parts = [part.strip() for part in raw_value.split(",") if part.strip()]
         return parts if parts else None
-    if op == "eq":
+    if op in {"eq", "not_eq"}:
         if raw_value in {"true", "false"}:
             return raw_value == "true"
         return raw_value if raw_value.strip() else None
-    if op in {"gte", "lte"}:
+    if op in {"gte", "lte", "gt", "lt"}:
         if not raw_value.strip():
             return None
         try:

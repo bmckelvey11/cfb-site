@@ -368,6 +368,12 @@ def matches_system(
         return False
     if system.providers and game.provider not in system.providers:
         return False
+    if system.exclude_seasons and game.season in system.exclude_seasons:
+        return False
+    if system.exclude_weeks and game.week in system.exclude_weeks:
+        return False
+    if system.exclude_providers and game.provider in system.exclude_providers:
+        return False
     # A total bet has no team side, so team/conference filters mean "the game
     # involves ..." — never the vestigial spread-side field.
     if system.teams:
@@ -376,12 +382,34 @@ def matches_system(
                 return False
         elif team not in system.teams:
             return False
+    if system.exclude_teams:
+        if system.bet_type == "total":
+            if game.home_team in system.exclude_teams or game.away_team in system.exclude_teams:
+                return False
+        elif team in system.exclude_teams:
+            return False
     if system.conferences:
         if system.bet_type == "total":
             if game.home_conference not in system.conferences and game.away_conference not in system.conferences:
                 return False
         elif conference not in system.conferences:
             return False
+    # Exclusions fail closed on a missing conference: an unrecorded conference
+    # is "unknown", not "not the excluded one", so it must not slip through.
+    if system.exclude_conferences:
+        if system.bet_type == "total":
+            if game.home_conference is None or game.away_conference is None:
+                return False
+            if (
+                game.home_conference in system.exclude_conferences
+                or game.away_conference in system.exclude_conferences
+            ):
+                return False
+        else:
+            if conference is None:
+                return False
+            if conference in system.exclude_conferences:
+                return False
     if system.home and side != "home":
         return False
     if system.away and side != "away":

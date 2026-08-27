@@ -132,3 +132,78 @@ def _filt(key: str, op: str, value: object, perspective: str = "single") -> _Fil
 
 def _system(side: str = "home", bet_type: str = "spread") -> _System:
     return _System(side=side, bet_type=bet_type)
+
+
+def test_feature_ok_not_eq_matches_other_value():
+    features = {"venue": "Michigan Stadium"}
+    filt = _filt("venue", "not_eq", "Ohio Stadium")
+    system = _system()
+    assert feature_ok(features, filt, system)
+
+
+def test_feature_ok_not_eq_rejects_the_excluded_value():
+    features = {"venue": "Ohio Stadium"}
+    filt = _filt("venue", "not_eq", "Ohio Stadium")
+    system = _system()
+    assert not feature_ok(features, filt, system)
+
+
+def test_feature_ok_not_eq_null_fails_closed():
+    # "not Ohio Stadium" means "has a venue, and it is not Ohio Stadium" --
+    # never "venue unknown". Negation must not turn a missing feature into a
+    # match.
+    features = {}
+    filt = _filt("venue", "not_eq", "Ohio Stadium")
+    system = _system()
+    assert not feature_ok(features, filt, system)
+
+
+def test_feature_ok_not_in_excludes_listed_values():
+    features = {"venue": "Ohio Stadium"}
+    filt = _filt("venue", "not_in", ["Ohio Stadium", "Michigan Stadium"])
+    system = _system()
+    assert not feature_ok(features, filt, system)
+
+
+def test_feature_ok_not_in_null_fails_closed():
+    features = {}
+    filt = _filt("venue", "not_in", ["Ohio Stadium"])
+    system = _system()
+    assert not feature_ok(features, filt, system)
+
+
+def test_feature_ok_gt_is_strict():
+    features = {"weather_temperature": 50.0}
+    system = _system()
+    assert not feature_ok(features, _filt("weather_temperature", "gt", 50.0), system)
+    assert feature_ok(features, _filt("weather_temperature", "gte", 50.0), system)
+
+
+def test_feature_ok_lt_is_strict():
+    features = {"weather_temperature": 50.0}
+    system = _system()
+    assert not feature_ok(features, _filt("weather_temperature", "lt", 50.0), system)
+    assert feature_ok(features, _filt("weather_temperature", "lte", 50.0), system)
+
+
+def test_feature_ok_gt_lt_null_fails_closed():
+    features = {}
+    system = _system()
+    assert not feature_ok(features, _filt("weather_temperature", "gt", 50.0), system)
+    assert not feature_ok(features, _filt("weather_temperature", "lt", 50.0), system)
+
+
+def test_feature_ok_either_negated_ignores_null_side():
+    # The null side must not satisfy a negated op. Only the present side is
+    # eligible, and here it is excluded, so the filter fails closed.
+    features = {"home_returning_ppa": 0.7, "away_returning_ppa": None}
+    filt = _filt("returning_ppa", "not_eq", 0.7, perspective="either")
+    system = _system(bet_type="total")
+    assert not feature_ok(features, filt, system)
+
+
+def test_feature_ok_either_negated_matches_on_present_side():
+    features = {"home_returning_ppa": 0.2, "away_returning_ppa": None}
+    filt = _filt("returning_ppa", "not_eq", 0.7, perspective="either")
+    system = _system(bet_type="total")
+    assert feature_ok(features, filt, system)

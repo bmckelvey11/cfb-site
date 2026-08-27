@@ -65,9 +65,9 @@ def group_is_renderable(filts: list[FeatureFilter], control: str) -> bool:
         ops = [filt.op for filt in filts]
         return all(op in ("gte", "lte") for op in ops) and len(ops) == len(set(ops))
     if control == "bool":
-        return len(filts) == 1 and filts[0].op == "eq"
+        return len(filts) == 1 and filts[0].op in ("eq", "not_eq")
     if control == "categorical":
-        return len(filts) == 1 and filts[0].op in ("eq", "in")
+        return len(filts) == 1 and filts[0].op in ("eq", "not_eq", "in", "not_in")
     return False
 
 
@@ -75,8 +75,18 @@ def _feature_group_sentence(filts: list[FeatureFilter]) -> dict[str, object] | N
     key = filts[0].key
     perspective = filts[0].perspective
     feature = FEATURE_BY_KEY.get(key)
+    # Sentence key carries the perspective so each (key, perspective) group gets
+    # its own Edit/Remove: a system can constrain the bet-side team and its
+    # opponent on the SAME stat, and those must be independently removable.
+    # "single" stays bare for backward compatibility with existing links.
+    sentence_key = f"ff:{key}"
     if feature is None:
-        return {"text": f'Unknown filter "{key}" is unavailable', "key": f"ff:{key}"}
+        return {"text": f'Unknown filter "{key}" is unavailable', "key": sentence_key}
+    # Only team-scoped features can carry more than one perspective group, so
+    # only they need a per-perspective sentence key. Everything else keeps the
+    # bare "ff:{key}" it has always had.
+    if feature.team_scoped and perspective != "single":
+        sentence_key = f"ff:{key}@{perspective}"
 
     if feature.team_scoped and perspective in _PERSPECTIVE_PREFIX:
         label = f"{_PERSPECTIVE_PREFIX[perspective]} {feature.label}"
@@ -87,15 +97,21 @@ def _feature_group_sentence(filts: list[FeatureFilter]) -> dict[str, object] | N
         if feature.control == "numeric":
             gte = next((float(filt.value) for filt in filts if filt.op == "gte"), None)
             lte = next((float(filt.value) for filt in filts if filt.op == "lte"), None)
-            return _labeled_range_sentence(gte, lte, label=label, key=f"ff:{key}")
+            return _labeled_range_sentence(gte, lte, label=label, key=sentence_key)
         filt = filts[0]
         if filt.op == "eq" and feature.control == "bool":
             text = f"{label} is {'Yes' if filt.value else 'No'}"
+        elif filt.op == "not_eq" and feature.control == "bool":
+            text = f"{label} is not {'Yes' if filt.value else 'No'}"
         elif filt.op == "eq" and feature.control == "categorical":
             text = f"{label} is {filt.value}"
+        elif filt.op == "not_eq" and feature.control == "categorical":
+            text = f"{label} is not {filt.value}"
+        elif filt.op == "not_in" and feature.control == "categorical":
+            text = f"{label} is not one of {', '.join(filt.value)}"
         else:  # op == "in" and feature.control == "categorical"
             text = f"{label} is one of {', '.join(filt.value)}"
-        return {"text": text, "key": f"ff:{key}"}
+        return {"text": text, "key": sentence_key}
 
     # Fallback: the group doesn't match a shape the branches above can
     # round-trip (uncovered op/control combo, or multiple filters that would
@@ -103,7 +119,7 @@ def _feature_group_sentence(filts: list[FeatureFilter]) -> dict[str, object] | N
     # without dropping one). Deliberately distinct wording (never blends in)
     # and joins every filter's value so nothing in the group vanishes.
     values = ", ".join(repr(filt.value) for filt in filts)
-    return {"text": f"{label} filter applied (value: {values})", "key": f"ff:{key}"}
+    return {"text": f"{label} filter applied (value: {values})", "key": sentence_key}
 
 
 def describe(system: SystemFilter) -> list[dict[str, object]]:
@@ -139,6 +155,17 @@ def describe(system: SystemFilter) -> list[dict[str, object]]:
         if values:
             joined = ", ".join(str(v) for v in sorted(values))
             sentences.append({"text": f"the {noun} is {joined}", "key": key})
+
+    for values, noun, key in (
+        (system.exclude_seasons, "season", "exclude_seasons"),
+        (system.exclude_weeks, "week", "exclude_weeks"),
+        (system.exclude_teams, "team", "exclude_teams"),
+        (system.exclude_conferences, "conference", "exclude_conferences"),
+        (system.exclude_providers, "provider", "exclude_providers"),
+    ):
+        if values:
+            joined = ", ".join(str(v) for v in sorted(values))
+            sentences.append({"text": f"the {noun} is not {joined}", "key": key})
 
     groups: OrderedDict[tuple[str, str], list[FeatureFilter]] = OrderedDict()
     for filt in system.feature_filters:

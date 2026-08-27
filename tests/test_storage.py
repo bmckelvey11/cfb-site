@@ -4,15 +4,17 @@ from datetime import datetime
 import pytest
 
 from cfb_system_maker.features import FEATURE_REGISTRY
-from cfb_system_maker.models import GameRecord
+from cfb_system_maker.models import FeatureFilter, GameRecord, SystemFilter
 from cfb_system_maker.storage import (
     _safe_system_name,
     list_examples,
     load_example_system,
     load_processed_games,
     load_raw_json,
+    load_system,
     save_processed_games,
     save_raw_json,
+    save_system,
 )
 
 
@@ -249,3 +251,57 @@ def test_save_search_run_rejects_unsafe_name(tmp_path):
     )
     with pytest.raises(ValueError):
         save_search_run("../escape", run, tmp_path)
+
+
+def test_save_load_round_trips_exclusions_and_negated_ops(tmp_path):
+    system = SystemFilter(
+        side="home",
+        exclude_teams={"Michigan"},
+        exclude_conferences={"Big Ten"},
+        exclude_seasons={2020},
+        exclude_weeks={1},
+        exclude_providers={"consensus"},
+        feature_filters=(
+            FeatureFilter(key="venue", op="not_eq", value="Ohio Stadium"),
+            FeatureFilter(key="weather_temperature", op="gt", value=50.0),
+        ),
+    )
+    save_system("negation-round-trip", system, tmp_path)
+    loaded = load_system("negation-round-trip", tmp_path)
+    assert loaded.exclude_teams == {"Michigan"}
+    assert loaded.exclude_conferences == {"Big Ten"}
+    assert loaded.exclude_seasons == {2020}
+    assert loaded.exclude_weeks == {1}
+    assert loaded.exclude_providers == {"consensus"}
+    assert loaded.feature_filters[0].op == "not_eq"
+    assert loaded.feature_filters[1].op == "gt"
+    assert loaded == system
+
+
+def test_legacy_system_without_exclusions_loads_with_empty_defaults(tmp_path):
+    # A system saved before exclusions existed has no exclude_* keys at all.
+    systems_dir = tmp_path / "systems"
+    systems_dir.mkdir(parents=True)
+    (systems_dir / "legacy.json").write_text(
+        json.dumps(
+            {
+                "name": "legacy",
+                "saved_at": "2026-01-01T00:00:00+00:00",
+                "system": {
+                    "bet_type": "spread",
+                    "side": "home",
+                    "favorite": True,
+                    "seasons": [2023],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = load_system("legacy", tmp_path)
+    assert loaded.exclude_teams == set()
+    assert loaded.exclude_conferences == set()
+    assert loaded.exclude_seasons == set()
+    assert loaded.exclude_weeks == set()
+    assert loaded.exclude_providers == set()
+    assert loaded.seasons == {2023}
+    assert loaded.favorite is True

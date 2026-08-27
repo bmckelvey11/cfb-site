@@ -42,6 +42,13 @@ class SystemFilter:
     away: bool = False
     fade: bool = False
     providers: set[str] = field(default_factory=set)
+    # Exclusions are separate additive fields rather than an operator on the
+    # include sets, so systems saved before exclusions existed still load.
+    exclude_seasons: set[int] = field(default_factory=set)
+    exclude_weeks: set[int] = field(default_factory=set)
+    exclude_teams: set[str] = field(default_factory=set)
+    exclude_conferences: set[str] = field(default_factory=set)
+    exclude_providers: set[str] = field(default_factory=set)
     min_spread: float | None = None
     max_spread: float | None = None
     min_total: float | None = None
