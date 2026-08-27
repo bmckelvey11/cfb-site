@@ -4,17 +4,17 @@ milestone: v1.1
 milestone_name: Season Readiness
 current_phase: 7
 current_phase_name: Integrity Fixes
-status: executing
-stopped_at: Completed 07-01-PLAN.md and 07-03-PLAN.md (wave 1)
-last_updated: "2026-08-27T02:32:04.710Z"
+status: verifying
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-08-27T02:51:44.502Z"
 last_activity: 2026-08-27
-last_activity_desc: Completed 07-01 (describe() fallback sentence, FIX-01) and 07-03 (PROJECT.md Out of Scope closure, FIX-03) — wave 1 done, wave 2 (07-02) next
+last_activity_desc: Completed 07-01 (describe() fallback sentence, FIX-01) and 07-03 (PROJECT.md Out of Scope closure, FIX-03)
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 25
+  completed_plans: 4
+  percent: 50
 ---
 
 # Project State
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-07-20)
 
 Phase: 7 (Integrity Fixes) — EXECUTING
 Plan: 3 of 3 (wave 1 complete: 07-01, 07-03; wave 2 next: 07-02)
-Status: Executing Phase 7
+Status: Phase complete — ready for verification
 Last activity: 2026-08-27 — Completed 07-01 (describe() fallback sentence, FIX-01) and 07-03 (PROJECT.md Out of Scope closure, FIX-03)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 **Note:** Phase 6 was executed directly (git merge + directory audit) rather than through the plan-phase/execute-phase pipeline — no PLAN.md/SUMMARY.md artifacts exist for it. Both requirements (MERGE-01, MERGE-02) are satisfied and verified (test suite + directory listing), recorded here for traceability.
 
@@ -88,6 +88,7 @@ Progress: [█████░░░░░] 50%
 | Phase 05 P05 | ~50m | 2 tasks | 6 files |
 | Phase 05-dashboard-current-matches P06 | ~60 min | 3 tasks | 4 files |
 | Phase 07 P01 | 25min | 2 tasks | 4 files |
+| Phase 07 P02 | 20min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 05-06: TBD kickoffs render date-only (correctness fix over UI-SPEC date-and-time) — no fabricated clock time
 - [Phase ?]: Fallback sentence text uses filt.value!r (Python repr) per D-locked wording, not a reformatted/joined value
 - [Phase ?]: Phase 7: edit_metadata_for_sentence gates on explicit (op,control) renderable shapes before building Edit metadata, mirroring describe()'s 4 hand-written combos
+- [Phase ?]: matched_game_ids populated inside aggregate_filter_value_rows's existing loop (post resolve_candidate_value-None skip) as the exact bucket denominator, exposed via /filter-detail as matched_games
+- [Phase ?]: Reconciliation caption in renderValueTable() references only state.matchedGames, never the Record chip, per UI-SPEC's no-third-number rule
 
 ### Pending Todos
 
@@ -172,8 +175,8 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-20:
 
 ## Session Continuity
 
-Last session: 2026-08-27T02:32:04.670Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-08-27T02:51:44.479Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
