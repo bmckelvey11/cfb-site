@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
@@ -400,6 +401,9 @@ def _search(args: argparse.Namespace) -> int:
 
 def _web(args: argparse.Namespace) -> int:
     from cfb_system_maker.web import create_app
+
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO,
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     app = create_app(data_dir=args.data_dir)
     if args.debug:

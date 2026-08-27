@@ -40,6 +40,9 @@
           </nav>
 
           {% if tab == 'examples' %}
+            {% if request.args.get('copy_error') %}
+              <p class="banner banner-error">Could not copy the example system. See the server log.</p>
+            {% endif %}
             <p class="examples-note">Bundled examples that demonstrate what the tool can filter on. They are not betting recommendations.</p>
           {% endif %}
 

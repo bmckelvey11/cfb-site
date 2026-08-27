@@ -627,6 +627,19 @@ code {
   margin: 0.25rem 0 0;
 }
 
+.banner {
+  font-size: 0.85rem;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.banner-error {
+  background: #fee;
+  border: 1px solid var(--loss);
+  color: var(--loss);
+}
+
 .coverage {
   font-size: 0.85rem;
   margin: 12px 0;
@@ -1491,4 +1504,20 @@ code {
 
 .trend-empty {
   color: var(--muted);
+}
+
+.error-page {
+  max-width: 480px;
+  margin: 15vh auto 0;
+  padding: 32px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.error-page p {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.5;
 }

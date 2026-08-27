@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
+import time as _time
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
-from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from cfb_system_maker.backtest import (
@@ -65,6 +67,9 @@ _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
 }
 
 _ALLOWED_PERSPECTIVES = frozenset({"single", "home", "away", "bet_side", "opponent", "either"})
+
+_NARRATE_COOLDOWN_S = 30.0
+_NARRATE_LAST: dict[str, float] = {"t": 0.0}
 _ALLOWED_OPS = frozenset({"eq", "in", "gte", "lte"})
 _MAX_IN_LIST = 256
 _CHART_POINTS_CAP = 60
@@ -137,6 +142,9 @@ CORE_FILTER_META: dict[str, dict[str, str]] = {
         "param": "min_total,max_total",
     },
 }
+
+
+logger = logging.getLogger(__name__)
 
 
 class StrictParseError(Exception):
@@ -447,6 +455,21 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             abort(403)
         return None
 
+    @app.before_request
+    def _start_timer():
+        g.request_start = _time.perf_counter()
+
+    @app.after_request
+    def _access_log(response):
+        start = g.get("request_start")
+        elapsed_ms = (_time.perf_counter() - start) * 1000 if start is not None else 0.0
+        logger.info("%s %s %s %.0fms", request.method, request.full_path.rstrip("?"), response.status_code, elapsed_ms)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("Content-Security-Policy", "default-src 'self'")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        return response
+
     @app.get("/")
     def dashboard():
         if _wants_editor(request.args):
@@ -500,7 +523,8 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             example = load_example_system(name, EXAMPLES_DIR)
             save_system(name, example.system, app.config["DATA_DIR"], theory=example.theory)
         except (ValueError, OSError, json.JSONDecodeError):
-            pass
+            logger.exception("copy_example failed for %r", name)
+            return redirect("/?tab=examples&copy_error=1")
         return redirect("/?tab=examples")
 
     @app.get("/system")
@@ -700,6 +724,11 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         except (ValueError, FileNotFoundError):
             abort(404)
 
+        now = _time.monotonic()
+        if now - _NARRATE_LAST["t"] < _NARRATE_COOLDOWN_S:
+            return jsonify({"error": "rate_limited"}), 429
+        _NARRATE_LAST["t"] = now
+
         try:
             text = narrate_run(run)
         except NarrationError:
@@ -794,6 +823,17 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     @app.get("/favicon.ico")
     def favicon():
         return "", 204
+
+    @app.errorhandler(404)
+    def _not_found(err):
+        return render_template("error.html", title="Page not found",
+                               message="That page does not exist."), 404
+
+    @app.errorhandler(500)
+    def _server_error(err):
+        logger.exception("unhandled error on %s %s", request.method, request.path)
+        return render_template("error.html", title="Something went wrong",
+                               message="An internal error occurred. Details are in the server log."), 500
 
     return app
 

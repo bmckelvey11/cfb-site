@@ -1533,6 +1533,16 @@ def test_copy_example_rejects_an_unknown_name(tmp_path):
     assert list_systems(tmp_path) == []
 
 
+def test_copy_example_failure_redirects_with_error_flag(tmp_path, monkeypatch):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    monkeypatch.setattr("cfb_system_maker.web.save_system",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("disk")))
+    resp = client.post("/copy-example", data={"name": "spread-home-favorites"})
+    assert resp.status_code == 302
+    assert "copy_error=1" in resp.headers["Location"]
+
+
 def test_example_systems_tab_escapes_name_and_theory(tmp_path, monkeypatch):
     app, _ = _dashboard_app(tmp_path)
     hostile = tmp_path / "hostile-examples"
@@ -1974,6 +1984,7 @@ def test_narrate_route_returns_text_on_success(tmp_path, monkeypatch):
     save_search_run("r1", run, tmp_path)
 
     monkeypatch.setattr(web_module, "narrate_run", lambda run, **kwargs: "A short summary.")
+    monkeypatch.setattr(web_module, "_NARRATE_LAST", {"t": 0.0})
 
     app = web_module.create_app(str(tmp_path))
     client = app.test_client()
@@ -1999,6 +2010,7 @@ def test_narrate_route_returns_502_on_narration_error(tmp_path, monkeypatch):
         raise NarrationError("boom")
 
     monkeypatch.setattr(web_module, "narrate_run", _raise)
+    monkeypatch.setattr(web_module, "_NARRATE_LAST", {"t": 0.0})
 
     app = web_module.create_app(str(tmp_path))
     client = app.test_client()
@@ -2016,3 +2028,78 @@ def test_narrate_route_missing_run_returns_404(tmp_path):
     response = client.post("/search-runs/does-not-exist/narrate")
 
     assert response.status_code == 404
+
+
+def test_narrate_is_rate_limited(tmp_path, monkeypatch):
+    from cfb_system_maker.models import SearchRun
+    from cfb_system_maker.storage import save_search_run
+    import cfb_system_maker.web as web_module
+
+    run = SearchRun(
+        name="r3", saved_at="2026-07-31T00:00:00+00:00", candidates_tested=10,
+        finalists_graded=0, effective_params={}, finalists=(),
+    )
+    save_search_run("r3", run, tmp_path)
+
+    monkeypatch.setattr(web_module, "narrate_run", lambda run, **kwargs: "text")
+    monkeypatch.setattr(web_module, "_NARRATE_LAST", {"t": 0.0})  # reset the module-level cooldown state before this test
+
+    app = web_module.create_app(str(tmp_path))
+    client = app.test_client()
+
+    first = client.post("/search-runs/r3/narrate")
+    assert first.status_code == 200
+
+    second = client.post("/search-runs/r3/narrate")
+    assert second.status_code == 429
+    assert second.get_json()["error"] == "rate_limited"
+
+
+def test_requests_emit_one_access_log_line(tmp_path, caplog):
+    import logging
+
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+
+    with caplog.at_level(logging.INFO, logger="cfb_system_maker.web"):
+        client.get("/")
+
+    lines = [r for r in caplog.records if "GET /" in r.getMessage()]
+    assert len(lines) == 1
+    assert "200" in lines[0].getMessage()
+
+
+def test_404_renders_branded_error_page(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+    resp = client.get("/definitely-not-a-route")
+    assert resp.status_code == 404
+    assert b"Page not found" in resp.data
+    assert b"styles.css" in resp.data  # branded, not werkzeug default
+
+
+def test_500_renders_branded_error_page(tmp_path):
+    app = create_app(data_dir=tmp_path)
+
+    @app.route("/boom")
+    def boom():
+        raise RuntimeError("kaboom")
+
+    app.config["PROPAGATE_EXCEPTIONS"] = False
+    app.config["TESTING"] = False  # TESTING=True makes Flask re-raise instead of using the errorhandler
+    client = app.test_client()
+    resp = client.get("/boom")
+    assert resp.status_code == 500
+    assert b"Something went wrong" in resp.data
+    assert b"kaboom" not in resp.data  # no leak
+
+
+def test_security_headers_present_on_all_pages(tmp_path):
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+    for path in ("/", "/system", "/compare"):
+        resp = client.get(path)
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+        assert resp.headers["Referrer-Policy"] == "same-origin"
+        assert resp.headers["Content-Security-Policy"] == "default-src 'self'"
+        assert resp.headers["X-Frame-Options"] == "DENY"
