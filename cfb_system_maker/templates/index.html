@@ -49,8 +49,6 @@
             <div class="check-grid">
               <label class="check"><input type="checkbox" name="favorite" {% if form.favorite %}checked{% endif %}> Favorite</label>
               <label class="check"><input type="checkbox" name="underdog" {% if form.underdog %}checked{% endif %}> Underdog</label>
-              <label class="check"><input type="checkbox" name="home" {% if form.home %}checked{% endif %}> Home only</label>
-              <label class="check"><input type="checkbox" name="away" {% if form.away %}checked{% endif %}> Away only</label>
             </div>
           </fieldset>
 
@@ -221,7 +219,16 @@
                           </div>
                           <div class="feature-row" data-numeric-bound="max">
                             {% if feature.team_scoped %}
-                              <input type="hidden" name="ff_perspective" value="{{ perspective }}">
+                              <select name="ff_perspective" class="feature-row-perspective-mirror" aria-label="Perspective (max)">
+                                <option value="home" {% if perspective == 'home' %}selected{% endif %}>Home</option>
+                                <option value="away" {% if perspective == 'away' %}selected{% endif %}>Away</option>
+                                {% if form.bet_type == "spread" %}
+                                  <option value="bet_side" {% if perspective == 'bet_side' %}selected{% endif %}>Bet-side</option>
+                                  <option value="opponent" {% if perspective == 'opponent' %}selected{% endif %}>Opponent</option>
+                                {% else %}
+                                  <option value="either" {% if perspective == 'either' %}selected{% endif %}>Either</option>
+                                {% endif %}
+                              </select>
                             {% else %}
                               <input type="hidden" name="ff_perspective" value="single">
                             {% endif %}
@@ -327,6 +334,10 @@
             </div>
             <label class="check"><input type="checkbox" name="fade" form="filters-form" {% if form.fade %}checked{% endif %}> Fade System</label>
           </header>
+
+          {% if parse_warning %}
+          <p class="save-error">Some filter values in the URL couldn't be read and were ignored — check the active filters below.</p>
+          {% endif %}
 
           <section class="metrics stat-chips" aria-label="Backtest metrics">
             <article><span>Record</span><strong>{{ result.wins }}-{{ result.losses }}-{{ result.pushes }}, {{ "%.1f"|format(result.hit_rate * 100) }}%</strong></article>

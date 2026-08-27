@@ -462,6 +462,19 @@ def get_nested(row: dict[str, Any], path: str) -> Any:
     return current
 
 
+def effective_perspective(bet_type: str, perspective: str) -> str:
+    """bet_side/opponent need a spread's home/away side; a total bet has none.
+
+    On total systems those perspectives used to fall through to the vestigial
+    SystemFilter.side default and silently resolve to a fixed home/away side.
+    They collapse to "either" instead, which describe() discloses as
+    "Either team's ...".
+    """
+    if bet_type == "total" and perspective in {"bet_side", "opponent"}:
+        return "either"
+    return perspective
+
+
 def resolve_storage_key(feature: FeatureDef, perspective: str) -> str:
     if not feature.team_scoped or perspective in {"single", ""}:
         return feature.key

@@ -69,6 +69,7 @@ silent error:
 | `talent` | 2012-2014 |
 | `returning_production` | 2012-2013 |
 | `adjusted_player_passing`, `adjusted_player_rushing`, `player_usage`, `ppa_players_season`, `player_success_season`, `pregame_win_prob` | 2012 |
+| `win_probability` (PER_GAME) | 2012-2013 |
 
 `ppa_players_games` and `player_success_game` are each missing all 15 weeks of
 2012 for the same reason (no file is written for an empty week), so their
@@ -77,6 +78,34 @@ complete counts are 195, not 210.
 This matters for automation: a "wait until N files exist" gate can never be
 satisfied for a `SEASON_WEEK` endpoint with an empty season. Gate on the scrape
 process finishing, or on no new file appearing, rather than a target count.
+
+`advanced_box_score` has **no** such floor — 2012 and 2013 return full team and
+player content, so both seasons are scraped. Do not assume one PER_GAME
+endpoint's floor applies to another; check each.
+
+One 2012 game (`322872655`) returns a **persistent HTTP 500** upstream: three
+retries with 5/10/20s backoff still fail. Such games are skipped and counted
+rather than aborting the season (see `_scrape_per_game`). Expect per-game
+coverage to be a game or two short of the seed count in some seasons; the count
+is printed at the end of the run.
+
+Measured skip rate: `advanced_box_score` 2012 wrote **790 of 805** seeded games
+(15 permanently failing), while 2013 and 2020 wrote every game. Before the skip
+was added, that one dead game meant 2012 produced **nothing at all**.
+
+**Network failures are retried** (as of `fe4832b`). `_call` originally matched
+only `"429"` and 5xx codes in `str(exc)`, so a DNS blip raised immediately and
+discarded the in-progress season — this cost `win_probability` 2025 on
+2026-08-26, with the host resolving normally minutes later. Network errors are
+now matched by *type* (`urllib3.exceptions.HTTPError`, the common base for
+`MaxRetryError` / `NameResolutionError` / `ProtocolError` / timeouts) and get a
+longer 15/30s backoff than HTTP's 5/10/20s.
+
+`win_probability` is worth calling out separately: it returns **zero rows for
+every 2012 and 2013 game**, so those seasons write no file. Because PER_GAME
+fans out per game, the scraper still spends ~1,600 calls (~50 min) discovering
+that before it reaches real data in 2014. Seeding a floor year per PER_GAME
+endpoint would skip that, but the current runner has no such notion.
 
 Do **not** `--force` these. Scattered gaps would be suspicious; leading runs are
 the upstream floor. Betting lines floor at 2013 independently.
@@ -111,4 +140,22 @@ a partially-played season interacts with the no-lookahead rule in `running_stats
 
 `PER_GAME` endpoints write one file per season, only *after* every game in that
 season finishes. Resume is per-season, so interrupting mid-season discards that
-season's calls. Budget accordingly: FBS-only is ~850 calls (~15 min) per season.
+season's calls.
+
+Budget from the measured `_call` path, not from `--delay` alone. Three estimates,
+each measured a different way, and only the last is trustworthy:
+
+| Method | Per call | 2 endpoints x 11,556 games |
+|---|---|---|
+| `calls x --delay` (naive) | 1.0s | ~3.2h |
+| bare API call, warm connection | 0.16s + 1s sleep | ~3.7h |
+| `_call` sampled across a full season | **~2.3s** | **~7.5h** |
+
+The naive estimate is roughly 2x optimistic. A bare call benchmarked at the front
+of a season reuses one warm HTTP connection and hits the smallest payloads;
+sampling across the whole season (games 0/200/400/600/800) gives ~2.3s/call, so
+**~30 min per season per endpoint**. Note that measuring while a scrape is
+already running inflates both, since the probes share the rate limiter.
+
+Practical consequence: `advanced_box_score` alone is ~3.7h for 2012-2025, and the
+runner finishes all 14 of its seasons before `win_probability` starts.

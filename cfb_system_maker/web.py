@@ -30,6 +30,7 @@ from cfb_system_maker.features import (
     FEATURE_BY_KEY,
     FEATURE_REGISTRY,
     FeatureDef,
+    effective_perspective,
     registry_version,
     resolve_feature_value,
 )
@@ -96,13 +97,21 @@ CORE_FILTER_META: dict[str, dict[str, str]] = {
     "core:team": {
         "label": "Team",
         "control": "categorical",
-        "description": "Restrict bets to games involving the selected team on the bet side.",
+        "description": (
+            "Restrict bets to games with the selected team on the bet side. "
+            "Over/under systems have no bet side, so there the filter matches games "
+            "involving the team on either side."
+        ),
         "param": "filter_teams",
     },
     "core:conference": {
         "label": "Conference",
         "control": "categorical",
-        "description": "Restrict bets to the selected conference on the bet side.",
+        "description": (
+            "Restrict bets to the selected conference on the bet side. "
+            "Over/under systems have no bet side, so there the filter matches games "
+            "involving the conference on either side."
+        ),
         "param": "filter_conferences",
     },
     "core:provider": {
@@ -115,8 +124,9 @@ CORE_FILTER_META: dict[str, dict[str, str]] = {
         "label": "Spread Range",
         "control": "numeric",
         "description": (
-            "Restrict bets to a home-spread range (min/max). Spread is always the home spread; "
-            "negative means home favored."
+            "Restrict bets to a spread range (min/max) on the side you're betting. "
+            "Negative means that side is favored. For an away bet this is the home "
+            "spread negated, not the raw home-spread number."
         ),
         "param": "min_spread,max_spread",
     },
@@ -201,8 +211,12 @@ def resolve_candidate_value(
     if candidate_id == "core:provider":
         return game.provider
     if candidate_id == "core:team":
+        if system.bet_type == "total":
+            return (game.home_team, game.away_team)
         return game.home_team if system.side.lower() == "home" else game.away_team
     if candidate_id == "core:conference":
+        if system.bet_type == "total":
+            return (game.home_conference, game.away_conference)
         return game.home_conference if system.side.lower() == "home" else game.away_conference
     if candidate_id == "core:spread_range":
         if game.spread is None:
@@ -316,17 +330,27 @@ def downsample_chart_points(
     *,
     cap: int = _CHART_POINTS_CAP,
 ) -> list[dict[str, object]]:
-    """Deterministic visual downsample of exact numeric rows (D-09). Domain bounds stay on rows."""
+    """Deterministic visual downsample of exact numeric rows (D-09). Domain bounds stay on rows.
+
+    Scatter of value (x) vs ROI (y) so a value-ROI correlation is visible at a glance.
+    """
     if not rows:
         return []
-    items = [(float(row["value"]), float(row["money"])) for row in rows]  # type: ignore[arg-type]
+    items = [
+        (float(row["value"]), float(row["roi"]), float(row["money"]))  # type: ignore[arg-type]
+        for row in rows
+    ]
     if len(items) > cap:
         step = max(1, len(items) // cap)
         items = items[::step]
         if len(items) > cap:
             items = items[:cap]
         # Always keep the last observed extreme when stride skips it
-        last = (float(rows[-1]["value"]), float(rows[-1]["money"]))  # type: ignore[arg-type]
+        last = (
+            float(rows[-1]["value"]),  # type: ignore[arg-type]
+            float(rows[-1]["roi"]),  # type: ignore[arg-type]
+            float(rows[-1]["money"]),  # type: ignore[arg-type]
+        )
         if items[-1][0] != last[0]:
             if len(items) >= cap:
                 items[-1] = last
@@ -337,18 +361,23 @@ def downsample_chart_points(
     height = 150
     pad_x = 28
     pad_y = 18
-    values = [money for _, money in items] + [0.0]
-    min_money = min(values)
-    max_money = max(values)
-    span = max_money - min_money or 1.0
+    values = [value for value, _, _ in items]
+    min_value = min(values)
+    max_value = max(values)
+    value_span = max_value - min_value or 1.0
+    rois = [roi for _, roi, _ in items] + [0.0]
+    min_roi = min(rois)
+    max_roi = max(rois)
+    roi_span = max_roi - min_roi or 1.0
 
     points: list[dict[str, object]] = []
-    for index, (value, money) in enumerate(items):
-        x = pad_x if len(items) == 1 else pad_x + (width - pad_x * 2) * index / (len(items) - 1)
-        y = height - pad_y - ((money - min_money) / span) * (height - pad_y * 2)
+    for value, roi, money in items:
+        x = pad_x + (width - pad_x * 2) * (value - min_value) / value_span
+        y = height - pad_y - ((roi - min_roi) / roi_span) * (height - pad_y * 2)
         points.append(
             {
                 "value": value,
+                "roi": roi,
                 "money": money,
                 "x": round(x, 2),
                 "y": round(y, 2),
@@ -485,6 +514,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 features_enabled=False,
                 saved_systems=[],
                 load_error=None,
+                parse_warning=False,
                 loaded_system="",
                 stale_registry=False,
                 core_filters=CORE_FILTER_META,
@@ -494,6 +524,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         stale_registry = bool(meta and meta.get("registry_version") != registry_version())
         loaded_name = request.args.get("load_system", "")
         load_error = None
+        parse_warning = False
         if loaded_name:
             try:
                 saved = load_saved_system(loaded_name, app.config["DATA_DIR"])
@@ -505,6 +536,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
                 system = _system_from_form(form)
                 loaded_name = ""
         else:
+            parse_warning = _has_unparseable_input(request.args)
             form = _form_values()
             system = _system_from_form(form)
 
@@ -520,6 +552,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             "index.html",
             error=None,
             load_error=load_error,
+            parse_warning=parse_warning,
             loaded_system=loaded_name,
             form=form,
             enabled_feature_keys=_enabled_feature_keys(form.get("feature_filters", [])),
@@ -724,6 +757,15 @@ def create_app(data_dir: str | Path = "data") -> Flask:
         domain_values = [row["value"] for row in rows]
         is_numeric = descriptor["control"] == "numeric"
         chart_points = downsample_chart_points(rows) if is_numeric else []
+        # A game with two distinct values (either-perspective home != away, or
+        # a total system's team/conference filter on a cross-{team,conference}
+        # game) contributes its outcome to more than one row. Each row is a
+        # correct standalone Record/ROI, but a window SUM across rows (Max ROI)
+        # would double-count that game -- overlapping_rows tells the client to
+        # fall back to a single best bucket instead of a summed window.
+        overlapping_rows = perspective == "either" or (
+            candidate_id in ("core:team", "core:conference") and system.bet_type == "total"
+        )
         return {
             "candidate_id": candidate_id,
             "label": descriptor["label"],
@@ -733,6 +775,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             "team_scoped": team_scoped,
             "perspective": perspective,
             "allowed_perspectives": allowed,
+            "overlapping_rows": overlapping_rows,
             "domain": {
                 "values": domain_values,
                 "min": min(domain_values) if domain_values and is_numeric else None,
@@ -842,7 +885,11 @@ def edit_metadata_for_sentence(
 def _allowed_perspectives_for_system(system: SystemFilter) -> list[str]:
     # Modal primary set is Bet-side / Opponent / Either (D-14 / UI-SPEC).
     # home/away remain valid for committed edits and progressive-enhancement fallbacks.
-    return ["bet_side", "opponent", "either", "home", "away"]
+    # bet_side/opponent resolve via system.side, which only means something for a
+    # spread bet; either checks both teams regardless of bet_type, so it's always valid.
+    if system.bet_type == "spread":
+        return ["bet_side", "opponent", "either", "home", "away"]
+    return ["either", "home", "away"]
 
 
 def _feature_coverage(
@@ -985,6 +1032,34 @@ def _valid_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
     return value if value in allowed else default
 
 
+def _has_unparseable_input(args: MultiDict) -> bool:
+    """True if any raw query value would be silently dropped by the lenient
+    HTML-path parsers (_optional_float / _int_set), e.g. a typo'd min_spread.
+
+    The /system page never 400s on bad input (it must stay usable without
+    JS/strict validation), so this only powers a visible "some values were
+    ignored" notice -- it never blocks parsing. This intentionally duplicates
+    the shape of _validate_int_list_fields_strict's per-part int() parsing
+    (different failure mode: warn here, 400 there for /api/backtest) -- do not
+    unify them into one function, or /system would start 400ing on bad input.
+    """
+    for field in ("min_spread", "max_spread", "min_total", "max_total"):
+        raw = str(args.get(field, "")).strip()
+        if raw and _optional_float(raw) is None:
+            return True
+    for field, legacy in (("filter_seasons", "season"), ("filter_weeks", "week")):
+        raw = str(args.get(field, args.get(legacy, ""))).strip()
+        for part in raw.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                int(part)
+            except ValueError:
+                return True
+    return False
+
+
 def _form_values() -> dict[str, object]:
     return _form_values_from_args(request.args)
 
@@ -1021,6 +1096,7 @@ def _validate_feature_filters_strict(values: MultiDict) -> None:
     ops = values.getlist("ff_op")
     raw_values = values.getlist("ff_value")
     perspectives = values.getlist("ff_perspective")
+    bet_type = values.get("bet_type", "spread")
     for index, key in enumerate(keys):
         if not key or key not in enabled:
             continue
@@ -1034,6 +1110,13 @@ def _validate_feature_filters_strict(values: MultiDict) -> None:
         perspective = perspectives[index] if index < len(perspectives) else "single"
         if perspective not in _ALLOWED_PERSPECTIVES:
             raise StrictParseError("invalid_perspective", f"Illegal perspective: {perspective}")
+        if bet_type == "total" and perspective in {"bet_side", "opponent"}:
+            # Same rule /filter-detail enforces (a1e6e19): a total bet has no
+            # team side for these perspectives to resolve against.
+            raise StrictParseError(
+                "invalid_perspective",
+                f"Perspective {perspective} is not valid for total systems",
+            )
         raw_value = raw_values[index] if index < len(raw_values) else ""
         if op in {"gte", "lte"}:
             _parse_finite_float(raw_value, field=f"ff_value[{key}]")
@@ -1177,12 +1260,13 @@ def _parse_filter_value(op: str, raw_value: str) -> object | None:
 
 
 def _system_from_form(form: dict[str, object]) -> SystemFilter:
+    bet_type = str(form["bet_type"])
     feature_filters = tuple(
         FeatureFilter(
             key=str(row["key"]),
             op=str(row["op"]),
             value=row["value"],
-            perspective=str(row.get("perspective", "single")),
+            perspective=effective_perspective(bet_type, str(row.get("perspective", "single"))),
         )
         for row in form.get("feature_filters", [])
         if row.get("key")

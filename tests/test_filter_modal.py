@@ -118,6 +118,52 @@ def test_api_backtest_unknown_feature_key_is_400(tmp_path):
     assert "message" in payload
 
 
+def test_api_backtest_rejects_bet_side_perspective_for_total_system(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+    for perspective in ("bet_side", "opponent"):
+        response = app.test_client().get(
+            "/api/backtest?bet_type=total&total_side=over"
+            "&ff_enable=running_win_pct&ff_key=running_win_pct"
+            f"&ff_op=gte&ff_value=0.8&ff_perspective={perspective}"
+        )
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "invalid_perspective"
+
+    # Spread systems still accept bet_side.
+    response = app.test_client().get(
+        "/api/backtest?bet_type=spread&side=home"
+        "&ff_enable=running_win_pct&ff_key=running_win_pct"
+        "&ff_op=gte&ff_value=0.8&ff_perspective=bet_side"
+    )
+    assert response.status_code == 200
+
+
+def test_form_parse_normalizes_bet_side_to_either_on_totals():
+    from werkzeug.datastructures import MultiDict
+
+    from cfb_system_maker.web import _form_values_from_args, _system_from_form
+
+    args = MultiDict([
+        ("bet_type", "total"),
+        ("total_side", "over"),
+        ("ff_enable", "running_win_pct"),
+        ("ff_key", "running_win_pct"),
+        ("ff_op", "gte"),
+        ("ff_value", "0.8"),
+        ("ff_perspective", "bet_side"),
+    ])
+    system = _system_from_form(_form_values_from_args(args))
+    assert system.feature_filters[0].perspective == "either"
+
+    args_spread = MultiDict([("bet_type", "spread"), ("side", "home")] + [
+        item for item in args.items(multi=True) if item[0].startswith("ff_")
+    ])
+    system_spread = _system_from_form(_form_values_from_args(args_spread))
+    assert system_spread.feature_filters[0].perspective == "bet_side"
+
+
 def test_api_backtest_missing_data_is_503(tmp_path):
     app = create_app(data_dir=tmp_path)
     response = app.test_client().get("/api/backtest?side=home")
@@ -166,6 +212,48 @@ def test_cancel_leaves_form_untouched_contract():
     assert "writeFeatureToForm" not in discard_block
     assert "filtersForm.submit" not in discard_block
     assert "requestSubmit" not in discard_block
+
+
+def test_numeric_feature_save_clears_domain_edge_bounds_contract():
+    """Full-domain feature bounds are NOT "no filter" (nulls fail closed), so
+    Save must clear edge bounds like core ranges do — and the live draft query
+    must drop them the same way or the preview chips diverge from the commit."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+
+    write_block = source.split("function writeNumericToForm")[1].split("function ")[0]
+    assert "atDomainMin" in write_block and "atDomainMax" in write_block
+    assert 'atDomainMin ? ""' in write_block
+    assert 'atDomainMax ? ""' in write_block
+    assert "enable.checked = !(atDomainMin && atDomainMax)" in write_block
+
+    draft_block = source.split("function draftQuery")[1].split("function ")[0]
+    assert "atDomainMin" in draft_block and "atDomainMax" in draft_block
+    assert "!atDomainMin || !atDomainMax" in draft_block
+
+
+def test_max_roi_uses_single_bucket_when_rows_overlap_contract():
+    """A window SUM across numeric buckets assumes each game contributes to at
+    most one bucket. Either-perspective (and total-system team/conference)
+    rows can put one game in two buckets, so Max ROI must fall back to a
+    single bucket -- never a summed window -- when the server flags
+    overlapping_rows, or it silently double-counts games."""
+    from pathlib import Path
+
+    source = Path("cfb_system_maker/static/filter_modal.js").read_text(encoding="utf-8")
+    assert "function bestSingleNumericBucket" in source
+
+    apply_block = source.split("function applyMaxRoi")[1].split("function ")[0]
+    assert "state.overlappingRows" in apply_block
+    assert "bestSingleNumericBucket(state.rows)" in apply_block
+    assert "bestRoiWindow(state.rows)" in apply_block
+
+    assert "state.overlappingRows = Boolean(payload.overlapping_rows);" in source
+    # Disclosed in the About panel (not statusEl -- refreshLive's setUpdating
+    # clears statusEl on every keystroke, so a transient status message here
+    # would never survive to be read).
+    assert "Max ROI picks the single best value" in source
 
 
 def test_save_serializes_seasons_contract():
@@ -237,6 +325,74 @@ def test_aggregate_filter_value_rows_boolean_yes_no():
         assert "record" in row and "roi" in row and "money" in row
         assert isinstance(row["money"], (int, float))
         assert isinstance(row["record"], str)
+
+
+def test_aggregate_filter_value_rows_team_on_total_buckets_both_sides():
+    games = [_game(1), _game(2)]  # Alpha home, Beta away in both
+    descriptor = {
+        "id": "core:team",
+        "control": "categorical",
+        "key": "team",
+        "team_scoped": False,
+    }
+    rows = aggregate_filter_value_rows(
+        games,
+        SystemFilter(bet_type="total", side="home", total_side="over"),
+        descriptor,
+        feature_map={},
+        perspective="single",
+    )
+    # Total systems have no bet side: every game buckets under BOTH its teams.
+    assert {row["value"] for row in rows} == {"Alpha", "Beta"}
+    for row in rows:
+        assert row["wins"] + row["losses"] + row["pushes"] == 2
+
+    # Spread systems keep bet-side-only buckets.
+    spread_rows = aggregate_filter_value_rows(
+        games, SystemFilter(side="home"), descriptor, feature_map={}, perspective="single"
+    )
+    assert {row["value"] for row in spread_rows} == {"Alpha"}
+
+
+def test_filter_detail_overlapping_rows_flag(tmp_path):
+    games = [
+        _game(1, season=2023, week=1, home_points=28, away_points=21, spread=-6.5),
+        _game(2, season=2024, week=2, home_points=14, away_points=28, spread=-3.0),
+    ]
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {
+            "1": {"home_running_win_pct": 0.5, "away_running_win_pct": 0.4},
+            "2": {"home_running_win_pct": 0.6, "away_running_win_pct": 0.3},
+        },
+    )
+    app = create_app(data_dir=tmp_path)
+
+    # either perspective (only valid on a total system): a game's home/away
+    # values can land in different rows, so a summed window would double-count it.
+    either_resp = app.test_client().get(
+        "/filter-detail?candidate_id=feature:running_win_pct&bet_type=total&perspective=either"
+    )
+    assert either_resp.status_code == 200
+    assert either_resp.get_json()["overlapping_rows"] is True
+
+    # bet_side/opponent on a spread system: no overlap, single value per game.
+    bet_side_resp = app.test_client().get(
+        "/filter-detail?candidate_id=feature:running_win_pct&perspective=bet_side"
+    )
+    assert bet_side_resp.status_code == 200
+    assert bet_side_resp.get_json()["overlapping_rows"] is False
+
+    # core:team on a total system: Alpha home / Beta away -> overlapping.
+    team_resp = app.test_client().get("/filter-detail?candidate_id=core:team&bet_type=total")
+    assert team_resp.status_code == 200
+    assert team_resp.get_json()["overlapping_rows"] is True
+
+    # core:team on a spread system: bet-side only, no overlap.
+    team_spread_resp = app.test_client().get("/filter-detail?candidate_id=core:team&bet_type=spread")
+    assert team_spread_resp.status_code == 200
+    assert team_spread_resp.get_json()["overlapping_rows"] is False
 
 
 def test_aggregate_filter_value_rows_categorical_sorted():
@@ -593,6 +749,41 @@ def test_default_perspective_spread_bet_side_total_either():
 
     assert default_perspective(SystemFilter(bet_type="spread")) == "bet_side"
     assert default_perspective(SystemFilter(bet_type="total")) == "either"
+
+
+def test_allowed_perspectives_excludes_bet_side_opponent_for_totals():
+    from cfb_system_maker.web import _allowed_perspectives_for_system
+
+    spread_allowed = _allowed_perspectives_for_system(SystemFilter(bet_type="spread"))
+    assert "bet_side" in spread_allowed
+    assert "opponent" in spread_allowed
+
+    total_allowed = _allowed_perspectives_for_system(SystemFilter(bet_type="total"))
+    assert "bet_side" not in total_allowed
+    assert "opponent" not in total_allowed
+    assert "either" in total_allowed
+
+
+def test_filter_detail_rejects_bet_side_perspective_for_total_system(tmp_path):
+    games = [
+        _game(1, season=2023, week=1, home_points=28, away_points=21, spread=-6.5),
+        _game(2, season=2024, week=2, home_points=14, away_points=28, spread=-3.0),
+    ]
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {
+            "1": {"home_running_win_pct": 0.5, "away_running_win_pct": 0.4},
+            "2": {"home_running_win_pct": 0.6, "away_running_win_pct": 0.3},
+        },
+    )
+    app = create_app(data_dir=tmp_path)
+    response = app.test_client().get(
+        "/filter-detail?candidate_id=feature:running_win_pct&bet_type=total&perspective=bet_side"
+    )
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "invalid_perspective"
 
 
 def test_edit_metadata_for_core_and_feature_sentences():

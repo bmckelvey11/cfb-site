@@ -164,6 +164,35 @@ def test_save_and_load_search_run_round_trips(tmp_path):
     assert list_search_runs(tmp_path) == ["my-run"]
 
 
+def test_load_normalizes_bet_side_perspective_on_total_systems(tmp_path):
+    from cfb_system_maker.storage import load_system
+
+    systems_dir = tmp_path / "systems"
+    systems_dir.mkdir()
+    payload = {
+        "name": "legacy-total",
+        "system": {
+            "bet_type": "total",
+            "total_side": "under",
+            "feature_filters": [
+                {"key": "running_win_pct", "op": "gte", "value": 0.8, "perspective": "bet_side"},
+                {"key": "running_ats_pct", "op": "lte", "value": 0.4, "perspective": "opponent"},
+            ],
+        },
+    }
+    (systems_dir / "legacy-total.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    system = load_system("legacy-total", tmp_path)
+    # Legacy saves with side-relative perspectives on totals used to misresolve
+    # to the vestigial side field; they load as "either" now.
+    assert [filt.perspective for filt in system.feature_filters] == ["either", "either"]
+
+    payload["system"]["bet_type"] = "spread"
+    (systems_dir / "legacy-total.json").write_text(json.dumps(payload), encoding="utf-8")
+    spread = load_system("legacy-total", tmp_path)
+    assert [filt.perspective for filt in spread.feature_filters] == ["bet_side", "opponent"]
+
+
 def test_system_from_non_dict_payload_raises_value_error(tmp_path):
     from cfb_system_maker.storage import load_saved_system
 

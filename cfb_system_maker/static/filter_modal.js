@@ -348,10 +348,14 @@
         params.append("ff_perspective", state.perspective || "single");
       }
     } else if (state.kind === "numeric" && boundsAreValid()) {
+      // Domain-edge bounds are cleared on Save (see writeNumericToForm), so the
+      // live preview must drop them too or its chips diverge from the commit.
+      const atDomainMin = state.domainMin != null && Number(state.min) <= Number(state.domainMin);
+      const atDomainMax = state.domainMax != null && Number(state.max) >= Number(state.domainMax);
       const fields = CORE_RANGE_FIELDS[state.candidateId];
       if (fields) {
-        params.set(fields.min, String(state.min));
-        params.set(fields.max, String(state.max));
+        params.set(fields.min, atDomainMin ? "" : String(state.min));
+        params.set(fields.max, atDomainMax ? "" : String(state.max));
       } else if (state.featureKey) {
         const key = state.featureKey;
         const enables = params.getAll("ff_enable").filter((item) => item !== key);
@@ -374,16 +378,21 @@
           params.append("ff_value", values[index] || "");
           params.append("ff_perspective", perspectives[index] || "single");
         });
-        params.append("ff_enable", key);
-        params.append("ff_key", key);
-        params.append("ff_op", "gte");
-        params.append("ff_value", String(state.min));
-        params.append("ff_perspective", state.perspective || "single");
-        params.append("ff_enable", key);
-        params.append("ff_key", key);
-        params.append("ff_op", "lte");
-        params.append("ff_value", String(state.max));
-        params.append("ff_perspective", state.perspective || "single");
+        if (!atDomainMin || !atDomainMax) {
+          params.append("ff_enable", key);
+        }
+        if (!atDomainMin) {
+          params.append("ff_key", key);
+          params.append("ff_op", "gte");
+          params.append("ff_value", String(state.min));
+          params.append("ff_perspective", state.perspective || "single");
+        }
+        if (!atDomainMax) {
+          params.append("ff_key", key);
+          params.append("ff_op", "lte");
+          params.append("ff_value", String(state.max));
+          params.append("ff_perspective", state.perspective || "single");
+        }
       }
     }
     return params;
@@ -557,12 +566,33 @@
     return { min: Number(sorted[bestStart].value), max: Number(sorted[bestEnd].value) };
   }
 
+  // A window SUM across numeric buckets assumes each game contributes to at
+  // most one bucket. Either-perspective rows (and a total system's team/
+  // conference rows) can put one game in two buckets, so a spanning window
+  // would double-count it. A single bucket is never double-counted, so this
+  // is the exact fallback when the server flags overlapping_rows.
+  function bestSingleNumericBucket(rows) {
+    const eligible = rows.filter(
+      (row) => Number(row.wins) + Number(row.losses) >= MAX_ROI_MIN_DECISIONS
+    );
+    const pool = eligible.length ? eligible : rows;
+    let best = pool[0];
+    pool.forEach((row) => {
+      if (Number(row.roi) > Number(best.roi)) {
+        best = row;
+      }
+    });
+    return { min: Number(best.value), max: Number(best.value) };
+  }
+
   function applyMaxRoi() {
     if (!state || !state.rows || !state.rows.length) {
       return;
     }
     if (state.kind === "numeric") {
-      const window = bestRoiWindow(state.rows);
+      const window = state.overlappingRows
+        ? bestSingleNumericBucket(state.rows)
+        : bestRoiWindow(state.rows);
       state.min = window.min;
       state.max = window.max;
       syncBoundInputs();
@@ -656,7 +686,13 @@
     group.className = "filter-modal__perspective";
     group.setAttribute("role", "group");
     group.setAttribute("aria-label", "Perspective");
-    const options = PERSPECTIVE_OPTIONS.slice();
+    // bet_side/opponent only make sense against a spread's home/away side; a
+    // total system's allowedPerspectives (from the server) omits them so the
+    // modal never offers a button that /filter-detail would 400 on.
+    const allowed = state.allowedPerspectives;
+    let options = allowed
+      ? PERSPECTIVE_OPTIONS.filter((opt) => allowed.indexOf(opt.value) !== -1)
+      : PERSPECTIVE_OPTIONS.slice();
     if (state.perspective && !options.some((opt) => opt.value === state.perspective)) {
       const label = state.perspective.charAt(0).toUpperCase() + state.perspective.slice(1);
       options.unshift({ value: state.perspective, label: label });
@@ -723,6 +759,10 @@
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
+        if (payload.allowed_perspectives) {
+          state.allowedPerspectives = payload.allowed_perspectives;
+        }
+        state.overlappingRows = Boolean(payload.overlapping_rows);
         if (state.kind === "numeric") {
           renderNumericControls();
         } else {
@@ -940,6 +980,25 @@
     fill.style.width = Math.max(0, Math.min(100, right - left)) + "%";
   }
 
+  function svgText(x, y, text, className) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    el.setAttribute("x", String(x));
+    el.setAttribute("y", String(y));
+    if (className) {
+      el.setAttribute("class", className);
+    }
+    el.textContent = text;
+    return el;
+  }
+
+  function formatAxisValue(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return "";
+    }
+    return Number.isInteger(num) ? String(num) : num.toFixed(1);
+  }
+
   function renderMoneyChart() {
     if (!exploreEl || !state) {
       return;
@@ -953,25 +1012,63 @@
       exploreEl.appendChild(empty);
       return;
     }
+    // Plot area is the original 520x150/28,18-padded box the server laid points out in;
+    // it's translated into a larger canvas here to make room for axis ticks/labels.
+    const plotW = 520;
+    const plotH = 150;
+    const marginLeft = 54;
+    const marginBottom = 34;
+    const marginTop = 6;
+    const marginRight = 10;
+    const width = plotW + marginLeft + marginRight;
+    const height = plotH + marginTop + marginBottom;
+
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 520 150");
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "Money by value");
+    svg.setAttribute("aria-label", (titleEl.textContent || "Value") + " vs ROI scatter plot");
     svg.classList.add("filter-modal__chart");
 
-    const moneys = points.map((point) => Number(point.money));
-    const minMoney = Math.min(0, ...moneys);
-    const maxMoney = Math.max(0, ...moneys);
-    const span = maxMoney - minMoney || 1;
-    const zeroY = 150 - 18 - ((0 - minMoney) / span) * (150 - 36);
+    const values = points.map((point) => Number(point.value));
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const rois = points.map((point) => Number(point.roi));
+    const minRoi = Math.min(0, ...rois);
+    const maxRoi = Math.max(0, ...rois);
+    const roiSpan = maxRoi - minRoi || 1;
+    const zeroY = plotH - 18 - ((0 - minRoi) / roiSpan) * (plotH - 36);
+
+    // Axis lines
+    svg.appendChild(svgText(10, marginTop + plotH / 2, "ROI", "filter-modal__axis-title filter-modal__axis-title--y"));
+    const xTitle = svgText(marginLeft + plotW / 2, height - 4, titleEl.textContent || "Value", "filter-modal__axis-title");
+    xTitle.setAttribute("text-anchor", "middle");
+    svg.appendChild(xTitle);
+
+    [minRoi, (minRoi + maxRoi) / 2, maxRoi].forEach((roiValue) => {
+      const y = marginTop + plotH - 18 - ((roiValue - minRoi) / roiSpan) * (plotH - 36);
+      const tick = svgText(marginLeft - 6, y + 3, formatRowRoi(roiValue), "filter-modal__axis-tick");
+      tick.setAttribute("text-anchor", "end");
+      svg.appendChild(tick);
+    });
+
+    [minValue, (minValue + maxValue) / 2, maxValue].forEach((tickValue) => {
+      const valueSpan = maxValue - minValue || 1;
+      const x = marginLeft + 28 + (plotW - 28 * 2) * (tickValue - minValue) / valueSpan;
+      const tick = svgText(x, marginTop + plotH + 14, formatAxisValue(tickValue), "filter-modal__axis-tick");
+      tick.setAttribute("text-anchor", "middle");
+      svg.appendChild(tick);
+    });
+
+    const plot = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    plot.setAttribute("transform", "translate(" + marginLeft + "," + marginTop + ")");
 
     const zero = document.createElementNS("http://www.w3.org/2000/svg", "line");
     zero.setAttribute("x1", "28");
-    zero.setAttribute("x2", "492");
+    zero.setAttribute("x2", String(plotW - 28));
     zero.setAttribute("y1", String(zeroY));
     zero.setAttribute("y2", String(zeroY));
     zero.setAttribute("class", "zero-line");
-    svg.appendChild(zero);
+    plot.appendChild(zero);
 
     points.forEach((point) => {
       const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -980,12 +1077,13 @@
       circle.setAttribute("cx", String(x));
       circle.setAttribute("cy", String(y));
       circle.setAttribute("r", "3.5");
-      circle.setAttribute("class", Number(point.money) >= 0 ? "positive" : "negative");
+      circle.setAttribute("class", Number(point.roi) >= 0 ? "positive" : "negative");
       const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-      title.textContent = String(point.value) + ": " + formatRowMoney(point.money);
+      title.textContent = String(point.value) + ": " + formatRowRoi(point.roi) + " ROI (" + formatRowMoney(point.money) + ")";
       circle.appendChild(title);
-      svg.appendChild(circle);
+      plot.appendChild(circle);
     });
+    svg.appendChild(plot);
     exploreEl.appendChild(svg);
   }
 
@@ -1274,17 +1372,23 @@
     if (!fallback) {
       return;
     }
+    // Mirror the core-range behavior above: a bound sitting at the observed
+    // domain edge is cleared instead of committed. Feature values fail closed
+    // on null, so a full-domain gte/lte pair is NOT "no filter" -- it silently
+    // drops every game missing the feature.
+    const atDomainMin = state.domainMin != null && Number(state.min) <= Number(state.domainMin);
+    const atDomainMax = state.domainMax != null && Number(state.max) >= Number(state.domainMax);
     const enable = fallback.querySelector('input[name="ff_enable"]');
     if (enable) {
-      enable.checked = true;
+      enable.checked = !(atDomainMin && atDomainMax);
     }
     const minInput = fallback.querySelector('[data-bound="min"]');
     const maxInput = fallback.querySelector('[data-bound="max"]');
     if (minInput) {
-      minInput.value = String(state.min);
+      minInput.value = atDomainMin ? "" : String(state.min);
     }
     if (maxInput) {
-      maxInput.value = String(state.max);
+      maxInput.value = atDomainMax ? "" : String(state.max);
     }
     fallback.querySelectorAll('[name="ff_perspective"]').forEach((el) => {
       el.value = state.perspective || "single";
@@ -1406,6 +1510,14 @@
         state.domainMax = payload.domain && payload.domain.max != null ? Number(payload.domain.max) : null;
         if (payload.perspective) {
           state.perspective = payload.perspective;
+        }
+        if (payload.allowed_perspectives) {
+          state.allowedPerspectives = payload.allowed_perspectives;
+        }
+        state.overlappingRows = Boolean(payload.overlapping_rows);
+        if (state.overlappingRows) {
+          aboutEl.textContent += (aboutEl.textContent ? "\n\n" : "")
+            + "Either-perspective values can overlap per game, so Max ROI picks the single best value here instead of a range.";
         }
         if (committed && (Number.isFinite(committed.min) || Number.isFinite(committed.max))) {
           state.min = Number.isFinite(committed.min) ? committed.min : state.domainMin;
@@ -1540,6 +1652,10 @@
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
+        if (payload.allowed_perspectives) {
+          state.allowedPerspectives = payload.allowed_perspectives;
+        }
+        state.overlappingRows = Boolean(payload.overlapping_rows);
         renderValueTable();
         const first = controlsEl.querySelector("input, button");
         if (first) {

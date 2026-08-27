@@ -147,12 +147,86 @@ def test_per_game_is_opt_in(tmp_path):
     assert reports[0].rows == 1
 
 
+def test_per_game_skips_permanently_failing_game(tmp_path):
+    """One game that 500s after retries must not discard the whole season."""
+    save_raw_json(tmp_path, "games", 2023, [{"id": 1}, {"id": 2}, {"id": 3}])
+
+    module = _fake_cfbd()
+    games_api = module.GamesApi(None)
+
+    def flaky(id=None):
+        if id == 2:
+            raise RuntimeError("Internal Server Error (500)")
+        return {"gameId": id, "teams": [{"team": "A"}]}
+
+    games_api.get_advanced_box_score = flaky
+    module.GamesApi = lambda client: games_api
+
+    reports = _run({"advanced_box_score"}, tmp_path, include_per_game=True, cfbd_module=module)
+
+    rows = json.loads((tmp_path / "raw" / "advanced_box_score_2023.json").read_text())
+    assert [r["gameId"] for r in rows] == [1, 3]  # game 2 skipped, others kept
+    assert reports[0].rows == 2
+    assert reports[0].error is None  # a skipped game is not an endpoint failure
+
+
 def test_per_game_id_param_alias(tmp_path):
     save_raw_json(tmp_path, "games", 2023, [{"id": 55}])
     _run({"win_probability"}, tmp_path, include_per_game=True)
 
     rows = json.loads((tmp_path / "raw" / "win_probability_2023.json").read_text())
     assert rows[0]["gameId"] == 55  # game_id alias resolved by signature filtering
+
+
+def test_call_retries_network_errors(monkeypatch):
+    """DNS/connection failures are transient — retry them like 5xx, not raise."""
+    import urllib3.exceptions
+
+    from cfb_system_maker import scrapers
+
+    monkeypatch.setattr(scrapers.time, "sleep", lambda _s: None)  # no real backoff
+
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise urllib3.exceptions.MaxRetryError(pool=None, url="/metrics/wp", reason=None)
+        return [{"ok": True}]
+
+    rows = scrapers._call(lambda: flaky(), {}, 0.0)
+    assert rows == [{"ok": True}]
+    assert calls["n"] == 3  # failed twice, succeeded on the third
+
+
+def test_call_gives_up_on_persistent_network_error(monkeypatch):
+    import urllib3.exceptions
+
+    from cfb_system_maker import scrapers
+
+    monkeypatch.setattr(scrapers.time, "sleep", lambda _s: None)
+
+    def always_dead():
+        raise urllib3.exceptions.NameResolutionError("api.collegefootballdata.com", None, None)
+
+    with pytest.raises(urllib3.exceptions.HTTPError):
+        scrapers._call(lambda: always_dead(), {}, 0.0)
+
+
+def test_call_does_not_retry_client_errors(monkeypatch):
+    """A 404 is not transient — raise immediately rather than burning backoff."""
+    from cfb_system_maker import scrapers
+
+    monkeypatch.setattr(scrapers.time, "sleep", lambda _s: None)
+    calls = {"n": 0}
+
+    def not_found():
+        calls["n"] += 1
+        raise RuntimeError("(404) Reason: Not Found")
+
+    with pytest.raises(RuntimeError):
+        scrapers._call(lambda: not_found(), {}, 0.0)
+    assert calls["n"] == 1  # no retries
 
 
 def test_resume_skips_existing_files(tmp_path):

@@ -107,6 +107,29 @@ def test_filters_limit_by_team_conference_week_and_spread_range():
     assert result.bet_details[0].team == "A"
 
 
+def test_total_system_team_and_conference_filters_match_either_side():
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 28, 21, "consensus", -6.5, 49.5),
+        GameRecord(2, 2023, 2, "C", "D", "Big Ten", "MAC", 17, 20, "consensus", -3.0, 39.0),
+    ]
+
+    # Team B is the AWAY team of game 1; a total system must match regardless of
+    # the vestigial spread-side field.
+    for side in ("home", "away"):
+        system = SystemFilter(bet_type="total", side=side, teams={"B"})
+        assert matches_system(games[0], system) is True
+        assert matches_system(games[1], system) is False
+
+        conf = SystemFilter(bet_type="total", side=side, conferences={"SEC"})
+        assert matches_system(games[0], conf) is True
+        assert matches_system(games[1], conf) is False
+
+    # Spread systems keep bet-side-only semantics: side=home never matches the
+    # away team.
+    assert matches_system(games[0], SystemFilter(side="home", teams={"B"})) is False
+    assert matches_system(games[0], SystemFilter(side="away", teams={"B"})) is True
+
+
 def test_over_under_bets_grade_against_total_points():
     games = [
         GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 31, 24, "consensus", -6.5, 52.5),
@@ -537,6 +560,16 @@ def test_count_overfit_filters_follows_d06_counting_rule():
 
     # fade must never be counted as an overfit-relevant filter (D-06)
     assert count_overfit_filters(replace(system, fade=True)) == 10
+
+
+def test_count_overfit_filters_excludes_home_away_flags():
+    # home/away only ever narrow matches_system when paired with the matching
+    # `side`, which already implies the same restriction on its own -- the
+    # flag adds no selection information and must not depress the grade.
+    base = SystemFilter(favorite=True)
+    assert count_overfit_filters(base) == 1
+    assert count_overfit_filters(replace(base, home=True, side="home")) == 1
+    assert count_overfit_filters(replace(base, away=True, side="away")) == 1
 
 
 def _grade_stats(**overrides):

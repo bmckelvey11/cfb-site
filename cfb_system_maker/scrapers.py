@@ -203,22 +203,48 @@ def _run_endpoint(
 def _call(func: Callable[..., Any], kwargs: dict[str, Any], delay: float) -> list[dict[str, Any]]:
     """Call func with rate-limit retry and raw-JSON fallback for model validation errors."""
     time.sleep(delay)
-    for attempt in range(3):
+    last: Exception | None = None
+    for attempt in range(_MAX_ATTEMPTS):
         try:
             return _rows(func(**kwargs))
         except Exception as exc:
-            err = str(exc)
-            # 429 = rate limit; 5xx = transient CFBD/Cloudflare outage. Both are retryable.
-            if "429" in err or any(f"({code})" in err for code in (500, 502, 503, 504)):
-                wait = 5.0 * (2 ** attempt)
-                time.sleep(wait)
-                if attempt < 2:
-                    continue
-            # Pydantic ValidationError or dict conversion error — bypass deserialization
+            # Pydantic ValidationError or dict conversion error — bypass deserialization.
+            # Checked first: a model error is not transient, so retrying cannot help.
             if _is_model_error(exc):
                 return _call_raw(func, kwargs)
-            raise
-    raise RuntimeError("max retries exceeded")
+            backoff = _retry_backoff(exc, attempt)
+            if backoff is None or attempt == _MAX_ATTEMPTS - 1:
+                raise
+            last = exc
+            time.sleep(backoff)
+    raise RuntimeError(f"max retries exceeded: {last}")  # unreachable; guards future edits
+
+
+_MAX_ATTEMPTS = 3
+_HTTP_RETRY_CODES = (500, 502, 503, 504)
+
+
+def _retry_backoff(exc: Exception, attempt: int) -> float | None:
+    """Seconds to wait before retrying ``exc``, or None if it is not retryable."""
+    # Network-layer failure (DNS, connection reset, read timeout). urllib3.HTTPError is
+    # the common base for MaxRetryError/NameResolutionError/ProtocolError/timeouts, and
+    # the generated client lets these propagate unwrapped. A DNS outage can outlast the
+    # HTTP schedule, so back off harder: 15/30s.
+    if isinstance(exc, _urllib3_http_error()):
+        return 15.0 * (2 ** attempt)
+    # 429 = rate limit; 5xx = transient CFBD/Cloudflare outage.
+    err = str(exc)
+    if "429" in err or any(f"({code})" in err for code in _HTTP_RETRY_CODES):
+        return 5.0 * (2 ** attempt)
+    return None
+
+
+def _urllib3_http_error() -> tuple[type[BaseException], ...]:
+    try:
+        import urllib3.exceptions  # noqa: PLC0415
+    except Exception:  # urllib3 always present via the client, but never fail on import
+        return ()
+    return (urllib3.exceptions.HTTPError,)
 
 
 def _is_model_error(exc: Exception) -> bool:
@@ -318,6 +344,7 @@ def _scrape_per_game(
     files = 0
     total = 0
     skipped = 0
+    failed_games = 0
     for season in seasons:
         if resume and _exists(data_dir, f"{endpoint.name}_{season}.json"):
             skipped += 1
@@ -328,12 +355,21 @@ def _scrape_per_game(
             continue
         rows: list[dict[str, Any]] = []
         for game_id in game_ids:
-            rows.extend(_call(func, _accepted(func, {"id": game_id, "game_id": game_id}), delay))
+            # A single game can 500 permanently upstream (retries exhausted). Skip it
+            # rather than discarding every game already collected for this season.
+            try:
+                rows.extend(_call(func, _accepted(func, {"id": game_id, "game_id": game_id}), delay))
+            except Exception:
+                failed_games += 1
         if not rows:
             continue
         save_raw(data_dir, f"{endpoint.name}_{season}.json", rows)
         files += 1
         total += len(rows)
+    if failed_games:
+        # Not an endpoint-level failure: the season still wrote. Surface it so a
+        # silent hole in per-game coverage is never mistaken for complete data.
+        print(f"  {endpoint.name}: skipped {failed_games} game(s) that failed after retries")
     return ScrapeReport(endpoint.name, endpoint.mode, files=files, rows=total, skipped=skipped)
 
 

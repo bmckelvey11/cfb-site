@@ -1,36 +1,35 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Awaiting next milestone
-stopped_at: Completed 05-06-PLAN.md (Current Matches panel)
-last_updated: "2026-07-21T00:41:58.608Z"
-last_activity: 2026-07-20
-last_activity_desc: Milestone v1.0 completed and archived
+milestone: v1.1
+milestone_name: Season Readiness
+status: planning
+last_updated: "2026-08-26T21:58:21.770Z"
+last_activity: 2026-08-26
 progress:
-  total_phases: 5
+  total_phases: 9
   completed_phases: 5
-  total_plans: 21
-  completed_plans: 21
-current_phase: 5
-current_phase_name: Dashboard & Current Matches
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-17)
+See: .planning/PROJECT.md (updated 2026-07-20)
 
 **Core value:** A saved system's main page reads like a Bet Labs system editor (stat chips, cumulative money-won graph, plain-English active filters) and configuring any filter opens a live popup — slider or value table, per-value Record/ROI/Money, before you commit — instead of static inline form fields.
-**Current focus:** Milestone v1.0 complete — all 5 phases delivered
+**Current focus:** v1.1 Season Readiness — Phase 6 (Merge & Stale-Stats Audit)
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-20 — Milestone v1.0 completed and archived
+Phase: 6 of 9 (Merge & Stale-Stats Audit)
+Plan: — (roadmap created, not yet planned)
+Status: Ready to plan
+Last activity: 2026-08-26 — ROADMAP.md created for v1.1 (Phases 6-9)
+
+Progress: [█████░░░░] 5/9 phases (v1.0 complete; v1.1 phases 6-9 not started)
 
 ## Performance Metrics
 
@@ -87,10 +86,12 @@ Last activity: 2026-07-20 — Milestone v1.0 completed and archived
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- Roadmap: v1.1 phase sequencing — Phase 6 (merge) must land first because the review branch touches backtest.py/features.py/storage.py/web.py, the same files Phase 7's fixes touch; Phase 7 (integrity fixes) before Phase 8 (new example) since FIX-01's describe() fallback is a rendering safety net for the new example's filters; Phase 9 (live verification) is calendar-gated, not phase-gated, and runs in parallel once Phase 6 lands.
+- Roadmap: FIX-03 (closing Hide Duplicates as N/A) bundled into Phase 7 alongside FIX-02 (the real bug), not split into a separate phase — research confirmed `run_backtest` is 1:1 on `game_id`, so FIX-03 is a documentation correction that pairs with the real fix rather than standing alone.
 - Roadmap: Grade chip UI slot shipped in Phase 1 (EDIT-02) as placeholder; actual composite grade computation wires in behind it in Phase 2 (INTG-02).
 - Roadmap: Data extension (DATA-01/02) sequenced as Phase 3 — after the UI phases that don't need it (Editor, Integrity), before the UI phases that benefit from it (Modal, Dashboard).
 - Phase 1: All query-href construction (`_query_href`/`_query_href_removing`) and free-text rendering (`theory`) use `urlencode`/Jinja auto-escape exclusively, no `\|safe` — this pattern must be followed by any new href/text-rendering surface added in Phase 2+.
-- Phase 1: T-01-03 accepted risk (`01-SECURITY.md`) — `describe()` silently drops a known-key feature filter whose `(op, control)` combo it doesn't render, though `feature_ok()` still applies it. Revisit if `FEATURE_REGISTRY` grows new op/control combos.
+- Phase 1: T-01-03 accepted risk (`01-SECURITY.md`) — `describe()` silently drops a known-key feature filter whose `(op, control)` combo it doesn't render, though `feature_ok()` still applies it. Scheduled to close in v1.1 Phase 7 (FIX-01).
 - [Phase ?]: Phase 2 Plan 1: Fade toggle checkbox lives outside filters-form's DOM (inside .workspace-header per D-01/UI-SPEC) and associates via HTML5 form="filters-form" attribute, matching favorite/underdog/home/away pattern.
 - [Phase ?]: Phase 2 Plan 1: Fade is read exclusively inside grade_bet/_grade_total_bet, never inside matches_system -- new boolean toggle fields must follow this grading-only pattern to preserve matched-count invariance (D-03).
 - [Phase ?]: Sample-size sub-score uses stats.wilson_low - stats.break_even_rate margin floored by decided<30, per D-04 (supersedes 02-RESEARCH.md's raw-bet-count-only example).
@@ -131,7 +132,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1] T-01-03 accepted risk (`01-SECURITY.md`): describe()'s four hardcoded (op,control) render branches don't cover every combo `feature_ok()` will actually evaluate — a mismatch is reachable via crafted query params, not the normal form UI. Not a blocker for Phase 2, but worth closing before registry op/control combos multiply further.
+- [Phase 7 scheduled] T-01-03 (`01-SECURITY.md`): describe()'s four hardcoded (op,control) render branches don't cover every combo `feature_ok()` will actually evaluate — a mismatch is reachable via crafted query params, not the normal form UI. Scheduled to close in v1.1 Phase 7 (FIX-01).
 
 ## Quick Tasks Completed
 
@@ -142,6 +143,8 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 | 2026-07-20 | numeric-filter-step-intervals | Filter popup numeric controls snap to a span-scaled step (0.5 for spread/total) instead of continuous `step="any"` | complete |
 | 2026-07-20 | filter-group-taxonomy | Split the `pregame` feature group into Matchup / Ratings / Betting Lines / Weather (restored user work quarantined during phase 03) | complete |
 | 2026-07-20 | fix-normalize-select-line-total-drop-fal | `normalize._select_line` picked one line per game; total (over/under) is now backfilled from the first sibling provider that has it when the selected line's total is null — fixes ~93-97% total-null rate in 2013-2016 seasons | complete |
+| 2026-08-26 | total-filter-semantics-fixes | Filter audit findings 1-6 + 5 smaller UX gaps: totals semantics (1-3), description/grade/stats accuracy (4-6), no-JS perspective sync + dead modal buttons + silent parse warnings + Max ROI overlap fix (UX gaps) | complete |
+| 2026-08-26 | register-player-success-rate-endpoints | Registered `player_success_season` and `player_success_game` CFBD endpoints in scraper registry, bringing coverage from 61 to 63 entries | complete |
 
 ## Deferred Items
 
@@ -149,18 +152,18 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-20:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| verification | Phase 05 — live in-season confirmation that Current Matches shows real upcoming (unplayed) games with posted lines (05-VALIDATION.md Manual-Only) | deferred until season start (~2026-08-29) | 2026-07-20 |
-| verification | Phase 05 — live in-season confirmation that a feature-filtered saved system correctly matches upcoming games via computed season-to-date stats | deferred until season start (~2026-08-29) | 2026-07-20 |
-| requirement | DASH-04 (teaser/alternate-line records) — descoped from Phase 5 on 2026-07-20; unscheduled; partial decisions in 05-CONTEXT.md Deferred Ideas | deferred (out of v1.0) | 2026-07-20 |
+| verification | Phase 05 — live in-season confirmation that Current Matches shows real upcoming (unplayed) games with posted lines (05-VALIDATION.md Manual-Only) | scheduled into v1.1 Phase 9 (DATA-02) | 2026-07-20 |
+| verification | Phase 05 — live in-season confirmation that a feature-filtered saved system correctly matches upcoming games via computed season-to-date stats | scheduled into v1.1 Phase 9 (DATA-02), specifically week 3+ | 2026-07-20 |
+| requirement | DASH-04 (teaser/alternate-line records) — descoped from Phase 5 on 2026-07-20; unscheduled; partial decisions in 05-CONTEXT.md Deferred Ideas | deferred (out of v1.0 and v1.1) | 2026-07-20 |
 
-**Note:** Phase 05 verification is `human_needed`, not `gaps_found` — all three DASH requirements are code-verified and the full suite (307 tests) passes. The two verification items above are live-in-season confirmations that cannot execute in the offseason; the visual-layout confirmation was satisfied during this session (editor sidebar layout fix, commit 428f85d). Milestone closed as override_closeout on this basis.
+**Note:** Phase 05 verification is `human_needed`, not `gaps_found` — all three DASH requirements are code-verified and the full suite (307 tests) passes. The two verification items above are live-in-season confirmations that cannot execute in the offseason; the visual-layout confirmation was satisfied during this session (editor sidebar layout fix, commit 428f85d). Milestone closed as override_closeout on this basis. Both items are now scheduled into v1.1 Phase 9 (see ROADMAP.md).
 
 ## Session Continuity
 
-Last session: 2026-07-20T23:33:38.114Z
-Stopped at: Completed 05-06-PLAN.md (Current Matches panel)
+Last session: 2026-08-26T21:58:21.770Z
+Stopped at: ROADMAP.md created for v1.1 Season Readiness (Phases 6-9); REQUIREMENTS.md traceability filled
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review and approve the v1.1 roadmap (.planning/ROADMAP.md), then run `/gsd-plan-phase 6`
