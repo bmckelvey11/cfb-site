@@ -67,6 +67,9 @@ _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
 }
 
 _ALLOWED_PERSPECTIVES = frozenset({"single", "home", "away", "bet_side", "opponent", "either"})
+
+_NARRATE_COOLDOWN_S = 30.0
+_NARRATE_LAST: dict[str, float] = {"t": 0.0}
 _ALLOWED_OPS = frozenset({"eq", "in", "gte", "lte"})
 _MAX_IN_LIST = 256
 _CHART_POINTS_CAP = 60
@@ -716,6 +719,11 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             run = load_search_run(name, app.config["DATA_DIR"])
         except (ValueError, FileNotFoundError):
             abort(404)
+
+        now = _time.monotonic()
+        if now - _NARRATE_LAST["t"] < _NARRATE_COOLDOWN_S:
+            return jsonify({"error": "rate_limited"}), 429
+        _NARRATE_LAST["t"] = now
 
         try:
             text = narrate_run(run)
