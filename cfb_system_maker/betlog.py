@@ -23,7 +23,6 @@ class RawBetRow:
     start_time: str
     game: str
     bet_type: str
-    side: str
     line_taken: float
     odds: int
     result: str
@@ -99,7 +98,6 @@ def parse_betlog_csv(path: str | Path) -> ParsedImport:
                 start_time=row["Start Time"],
                 game=row["Game"],
                 bet_type=bet_type,
-                side=bet_type,  # side derived properly in match_to_game
                 line_taken=line_taken,
                 odds=odds,
                 result=row.get("Result", ""),

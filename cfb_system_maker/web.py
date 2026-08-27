@@ -723,17 +723,24 @@ def create_app(data_dir: str | Path = "data") -> Flask:
     def betlog_page():
         from cfb_system_maker.betlog import load_betlog
         from cfb_system_maker.clv import (
-            compute_clv, compute_clv_by_season, compute_clv_chart, compute_clv_stats, find_closing_line,
+            build_lines_index, compute_clv, compute_clv_by_season, compute_clv_chart,
+            compute_clv_stats, find_closing_line_indexed,
         )
 
         bets = load_betlog(app.config["DATA_DIR"])
         if not bets:
             return render_template("betlog.html", has_bets=False)
 
+        # Load each season's lines_{season}.json once, not once per bet --
+        # see clv.build_lines_index / find_closing_line_indexed (final-review
+        # Finding 1: find_closing_line alone would re-parse the ~1MB raw file
+        # per bet on every page load).
+        lines_index = build_lines_index(app.config["DATA_DIR"], bets)
+
         rows = []
         bets_with_clv = []
         for bet in bets:
-            closing = find_closing_line(bet, app.config["DATA_DIR"])
+            closing = find_closing_line_indexed(bet, lines_index)
             if closing is None:
                 rows.append({"bet": bet, "closing_line": None, "clv": None})
                 continue
@@ -753,6 +760,7 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             stats=stats,
             by_season=by_season,
             chart=chart,
+            total_bets=len(bets),
         )
 
     @app.get("/search-runs/<name>")

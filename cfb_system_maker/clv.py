@@ -74,27 +74,68 @@ def compute_clv_by_season(bets_with_clv: list[tuple[BetLogRecord, float]]) -> li
     ]
 
 
-def find_closing_line(bet: BetLogRecord, data_dir: str | Path) -> float | None:
+LinesIndex = dict[tuple[int, int], list[dict]]
+
+
+def build_lines_index(data_dir: str | Path, bets: list[BetLogRecord]) -> LinesIndex:
+    """Load each season's lines_{season}.json at most once, indexed by
+    (season, game_id) -> that game's raw `lines` list.
+
+    Loads the calendar year of every bet plus the year before it, mirroring
+    betlog._build_games_by_date's January bowl/CFP handling: CFBD files a
+    January bowl game under the prior season, so a bet dated e.g. 2024-01-08
+    needs lines_2023.json, not lines_2024.json. Callers with many bets
+    (web.py's /betlog route) should call this once and reuse the index
+    instead of re-reading raw JSON per bet.
+    """
+    bet_years = {int(bet.date[:4]) for bet in bets}
+    seasons_needed = bet_years | {year - 1 for year in bet_years}
+    index: LinesIndex = {}
+    for season in seasons_needed:
+        try:
+            games = load_raw_json(data_dir, "lines", season)
+        except FileNotFoundError:
+            continue
+        for game in games:
+            game_id = game.get("id")
+            if game_id is not None:
+                index[(season, game_id)] = game.get("lines", [])
+    return index
+
+
+def find_closing_line_indexed(bet: BetLogRecord, lines_index: LinesIndex) -> float | None:
+    """Look up the closing line for `bet` from a pre-built `lines_index`
+    (see build_lines_index) instead of hitting disk -- the batched
+    counterpart to find_closing_line for call sites with many bets.
+    """
     bet_year = int(bet.date[:4])
     field = "overUnder" if bet.bet_type == "total" else "spread"
     # Try the calendar year first (the common case), then fall back to the
     # prior year for January bowl/CFP games, which CFBD files under the
     # prior season -- same pattern as betlog._build_games_by_date.
     for season in (bet_year, bet_year - 1):
-        try:
-            games = load_raw_json(data_dir, "lines", season)
-        except FileNotFoundError:
+        if (season, bet.game_id) not in lines_index:
             continue
-        game = next((g for g in games if g.get("id") == bet.game_id), None)
-        if game is None:
-            continue
-        lines = game.get("lines", [])
+        lines = lines_index[(season, bet.game_id)]
         for provider in _PROVIDER_CASCADE:
             for line in lines:
                 if line.get("provider") == provider and line.get(field) is not None:
                     return line[field]
-        return None  # game found but no usable line from any preferred provider
+        # Game found in this season but no usable line from any provider --
+        # do not fall through to the prior season, since the game itself
+        # was correctly located here.
+        return None
     return None
+
+
+def find_closing_line(bet: BetLogRecord, data_dir: str | Path) -> float | None:
+    """Single-bet lookup. Builds a one-bet lines index and delegates to
+    find_closing_line_indexed so the provider cascade and season-fallback
+    logic live in exactly one place. For many bets, call build_lines_index
+    once and use find_closing_line_indexed directly (see web.py's
+    /betlog route) instead of calling this per bet.
+    """
+    return find_closing_line_indexed(bet, build_lines_index(data_dir, [bet]))
 
 
 def compute_clv_chart(bets_with_clv: list[tuple[BetLogRecord, float]]) -> dict:

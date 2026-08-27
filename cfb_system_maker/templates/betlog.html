@@ -28,6 +28,7 @@
           <article><span>Mean CLV</span><strong>{{ "%.2f"|format(stats.mean_clv) }} pts</strong></article>
           <article><span>t-stat</span><strong>{{ "%.2f"|format(stats.t_stat) }}</strong></article>
         </section>
+        <p class="clv-coverage-note">{{ stats.n }} of {{ total_bets }} bets have a computed CLV; the rest are missing a closing line.</p>
 
         <table class="season-breakdown">
           <thead><tr><th>Season</th><th>N</th><th>Mean CLV</th></tr></thead>

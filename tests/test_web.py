@@ -155,6 +155,57 @@ def test_cumulative_chart_same_season_week_produces_separate_points_by_game_id()
     assert profits == [-1.0, 0.0]
 
 
+def test_betlog_page_loads_each_seasons_lines_json_once_not_per_bet(tmp_path, monkeypatch):
+    """Final-review Finding 1: /betlog must batch the closing-line lookup
+    across all bets in one pass (cfb_system_maker.clv.build_lines_index),
+    not call find_closing_line (and re-parse lines_{season}.json) per bet.
+    """
+    import json
+
+    import cfb_system_maker.clv as clv_module
+    from cfb_system_maker.betlog import BetLogRecord, save_betlog
+
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    (raw_dir / "lines_2023.json").write_text(json.dumps([
+        {"id": 1, "season": 2023, "lines": [{"provider": "consensus", "spread": -4.0, "overUnder": 51.0}]},
+        {"id": 2, "season": 2023, "lines": [{"provider": "consensus", "spread": -2.0, "overUnder": 44.0}]},
+        {"id": 3, "season": 2023, "lines": [{"provider": "consensus", "spread": 1.0, "overUnder": 60.0}]},
+    ]))
+
+    bets = [
+        BetLogRecord(
+            game_id=game_id, date="2023-09-01", home_team="A", away_team="B",
+            bet_type="spread", side="home", line_taken=-3.5, odds=-110,
+            result="win", units_wagered=1.0, units_net=0.91,
+        )
+        for game_id in (1, 2, 3)
+    ]
+    save_betlog(bets, tmp_path)
+
+    calls = []
+    original = clv_module.load_raw_json
+
+    def counting_load(data_dir, name, season):
+        calls.append(season)
+        return original(data_dir, name, season)
+
+    monkeypatch.setattr(clv_module, "load_raw_json", counting_load)
+
+    app = create_app(data_dir=tmp_path)
+    response = app.test_client().get("/betlog")
+
+    assert response.status_code == 200
+    # Three bets, all in the same season (2023) -- the fallback year 2022
+    # is also probed once per distinct season needed (batched), not per bet.
+    # Without batching this would be called 3x per season (once per bet).
+    assert calls.count(2023) == 1
+    assert calls.count(2022) == 1
+
+    html = response.get_data(as_text=True)
+    assert "3 of 3 bets have a computed CLV" in html
+
+
 def test_web_index_loads_filters_and_default_results(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

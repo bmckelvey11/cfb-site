@@ -2,11 +2,13 @@ from cfb_system_maker.betlog import BetLogRecord
 from cfb_system_maker.clv import (
     ClvStats,
     SeasonClv,
+    build_lines_index,
     compute_clv,
     compute_clv_by_season,
     compute_clv_chart,
     compute_clv_stats,
     find_closing_line,
+    find_closing_line_indexed,
 )
 
 
@@ -146,6 +148,70 @@ def test_find_closing_line_falls_back_to_prior_season_for_january_bet(tmp_path):
     bet = _bet(game_id=1, date="2024-01-08", bet_type="spread")
     closing = find_closing_line(bet, tmp_path)
     assert closing == -3.0
+
+
+def test_build_lines_index_and_find_closing_line_indexed_matches_unbatched(tmp_path):
+    import json
+
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    lines_data = [
+        {
+            "id": 1, "season": 2023,
+            "lines": [
+                {"provider": "DraftKings", "spread": -3.5, "overUnder": 50.5},
+                {"provider": "consensus", "spread": -4.0, "overUnder": 51.0},
+            ],
+        }
+    ]
+    (raw_dir / "lines_2023.json").write_text(json.dumps(lines_data))
+    bet = _bet(game_id=1, date="2023-09-01", bet_type="spread")
+
+    lines_index = build_lines_index(tmp_path, [bet])
+    closing = find_closing_line_indexed(bet, lines_index)
+
+    assert closing == -4.0
+    assert closing == find_closing_line(bet, tmp_path)
+
+
+def test_build_lines_index_loads_each_needed_season_only(tmp_path, monkeypatch):
+    import json
+
+    import cfb_system_maker.clv as clv_module
+
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    (raw_dir / "lines_2023.json").write_text(json.dumps(
+        [{"id": 1, "season": 2023, "lines": [{"provider": "consensus", "spread": -4.0, "overUnder": 51.0}]}]
+    ))
+    (raw_dir / "lines_2024.json").write_text(json.dumps(
+        [{"id": 2, "season": 2024, "lines": [{"provider": "consensus", "spread": -2.0, "overUnder": 44.0}]}]
+    ))
+
+    calls = []
+    original = clv_module.load_raw_json
+
+    def counting_load(data_dir, name, season):
+        calls.append(season)
+        return original(data_dir, name, season)
+
+    monkeypatch.setattr(clv_module, "load_raw_json", counting_load)
+
+    bets = [
+        _bet(game_id=1, date="2023-09-01"),
+        _bet(game_id=1, date="2023-09-08"),  # same season -- must not reload
+        _bet(game_id=2, date="2024-09-01"),
+    ]
+    lines_index = build_lines_index(tmp_path, bets)
+
+    # 2023 requested by two bets but loaded once; 2024 loaded once; the
+    # fallback years 2022/2023 (from 2023 bets) and 2023/2024 (from 2024
+    # bets) collapse to the same two files that exist, plus a 2022 miss.
+    assert sorted(set(calls)) == sorted({2022, 2023, 2024})
+    assert calls.count(2023) == 1
+    assert calls.count(2024) == 1
+    assert find_closing_line_indexed(bets[0], lines_index) == -4.0
+    assert find_closing_line_indexed(bets[2], lines_index) == -2.0
 
 
 def test_compute_clv_chart_empty_input_returns_empty_shape():

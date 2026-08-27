@@ -94,13 +94,13 @@ def test_import_betlog_dedupes_on_rerun(tmp_path, monkeypatch):
             in_scope=[
                 RawBetRow(
                     league="ncaaf", start_time="2023-09-01T17:00:00.000Z",
-                    game="NAVY @ ND", bet_type="spread_home", side="spread_home",
+                    game="NAVY @ ND", bet_type="spread_home",
                     line_taken=-3.5, odds=-110, result="win",
                     units_wagered=1.0, units_net=0.91,
                 ),
                 RawBetRow(
                     league="ncaaf", start_time="2023-09-08T17:00:00.000Z",
-                    game="NAVY @ ND", bet_type="spread_home", side="spread_home",
+                    game="NAVY @ ND", bet_type="spread_home",
                     line_taken=-7.0, odds=-110, result="loss",
                     units_wagered=1.0, units_net=-1.0,
                 ),
@@ -167,7 +167,7 @@ def test_build_games_by_date_finds_january_game_in_prior_season_file(tmp_path):
     )
     row = RawBetRow(
         league="ncaaf", start_time="2024-01-08T00:00:00.000Z",
-        game="WASH @ MICH", bet_type="spread_home", side="spread_home",
+        game="WASH @ MICH", bet_type="spread_home",
         line_taken=-4.5, odds=-110, result="win",
         units_wagered=1.0, units_net=0.91,
     )
@@ -197,13 +197,13 @@ def test_import_betlog_counts_intra_batch_collision_as_already_imported(tmp_path
             in_scope=[
                 RawBetRow(
                     league="ncaaf", start_time="2023-09-01T17:00:00.000Z",
-                    game="NAVY @ ND", bet_type="spread_home", side="spread_home",
+                    game="NAVY @ ND", bet_type="spread_home",
                     line_taken=-3.5, odds=-110, result="win",
                     units_wagered=1.0, units_net=0.91,
                 ),
                 RawBetRow(
                     league="ncaaf", start_time="2023-09-01T17:00:00.000Z",
-                    game="NAVY @ ND", bet_type="spread_home", side="spread_home",
+                    game="NAVY @ ND", bet_type="spread_home",
                     line_taken=-3.5, odds=-110, result="win",
                     units_wagered=1.0, units_net=0.91,
                 ),
@@ -247,13 +247,13 @@ def test_import_betlog_reports_unmatched_row_alongside_matched_rows(tmp_path, mo
             in_scope=[
                 RawBetRow(
                     league="ncaaf", start_time="2023-09-01T17:00:00.000Z",
-                    game="NAVY @ ND", bet_type="spread_home", side="spread_home",
+                    game="NAVY @ ND", bet_type="spread_home",
                     line_taken=-3.5, odds=-110, result="win",
                     units_wagered=1.0, units_net=0.91,
                 ),
                 RawBetRow(
                     league="ncaaf", start_time="2023-09-08T12:00:00.000Z",
-                    game="XXX @ YYY", bet_type="spread_home", side="spread_home",
+                    game="XXX @ YYY", bet_type="spread_home",
                     line_taken=-7.0, odds=-110, result="loss",
                     units_wagered=1.0, units_net=-1.0,
                 ),
