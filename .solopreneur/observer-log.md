@@ -204,3 +204,26 @@
 **Alternatives**: Explore more gray areas
 **Context**: Proceed to write CONTEXT.md from these decisions
 ---
+
+## [2026-08-26 23:43:13] - Phase 8: bundle a 4th example system (neutral-site + indoor unders, 63.3% over 109 games, p=0.014). Which areas do you want to discuss?
+**Choice**: ['Theory field disclosure wording (Recommended)', 'Live zero-match week handling (Recommended)']
+**Alternatives**: Theory field disclosure wording (Recommended), Live zero-match week handling (Recommended), None — proceed with research's recommendations
+---
+
+## [2026-08-26 23:43:31] - Theory field wording. The other 3 examples use plain-prose hypothesis style (e.g. 'A total of 55+ implies...'), no numbers. This one needs the n=109/p=0.014 disclosure per success criterion #2. How should it read?
+**Choice**: Prose hypothesis + explicit numbers woven in (Recommended)
+**Alternatives**: Stats-first, terse, You decide
+**Context**: e.g. "Indoor venues eliminate wind/weather as a scoring suppressant, and neutral sites often mean a less-prepared road environment for both teams — a small but real edge (63.3% over 109 historical games, p=0.014). Sample is thin; treat as a lead worth tracking, not a proven system." Matches existing prose style while satisfying the disclosure requirement.
+---
+
+## [2026-08-26 23:44:36] - Live zero-match week handling. Neutral-site indoor games are rare/clustered (Week 0/1, bowls); gameIndoors sources from a sometimes-gated weather endpoint. A normal mid-season week will likely show 0 matches in Current Matches — correct behavior, not a bug. Does Phase 8 need any UI treatment for this, or is it out of scope?
+**Choice**: Out of scope — existing empty state is enough (Recommended)
+**Alternatives**: Add a small caveat to the theory text, You decide
+**Context**: Current Matches already renders a generic empty state for any system with 0 matches this week; no special-casing needed for this specific example. Avoids scope creep into a UI redesign for one system.
+---
+
+## [2026-08-26 23:46:28] - Captured: (1) theory text — prose hypothesis with n=109/p=0.014 woven in, matching existing style; (2) zero-match weeks — out of scope, existing empty state suffices. Any other gray areas for Phase 8?
+**Choice**: I'm ready for context (Recommended)
+**Alternatives**: Explore more gray areas
+**Context**: Proceed to write CONTEXT.md from these decisions
+---

@@ -4,15 +4,15 @@ milestone: v1.1
 milestone_name: Season Readiness
 current_phase: 8
 current_phase_name: Neutral-Site & Indoor Unders Example
-status: planning
+status: executing
 stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-08-27T03:24:56.442Z"
+last_updated: "2026-08-27T03:59:19.231Z"
 last_activity: 2026-08-26
-last_activity_desc: Phase 7 complete, transitioned to Phase 8
+last_activity_desc: Phase 8 execution started
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 4
+  total_plans: 5
   completed_plans: 4
   percent: 50
 ---
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20)
 
 **Core value:** A saved system's main page reads like a Bet Labs system editor (stat chips, cumulative money-won graph, plain-English active filters) and configuring any filter opens a live popup — slider or value table, per-value Record/ROI/Money, before you commit — instead of static inline form fields.
-**Current focus:** Phase 7 — Integrity Fixes
+**Current focus:** Phase 8 — Neutral-Site & Indoor Unders Example
 
 ## Current Position
 
-Phase: 8 — Neutral-Site & Indoor Unders Example
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-26 — Phase 7 complete, transitioned to Phase 8
+Phase: 8 (Neutral-Site & Indoor Unders Example) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 8
+Last activity: 2026-08-26 — Phase 8 execution started
 
 Progress: [██████████] 100%
 
