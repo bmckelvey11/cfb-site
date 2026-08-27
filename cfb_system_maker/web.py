@@ -719,6 +719,42 @@ def create_app(data_dir: str | Path = "data") -> Flask:
             holdout_seasons=holdout_seasons,
         )
 
+    @app.get("/betlog")
+    def betlog_page():
+        from cfb_system_maker.betlog import load_betlog
+        from cfb_system_maker.clv import (
+            compute_clv, compute_clv_by_season, compute_clv_chart, compute_clv_stats, find_closing_line,
+        )
+
+        bets = load_betlog(app.config["DATA_DIR"])
+        if not bets:
+            return render_template("betlog.html", has_bets=False)
+
+        rows = []
+        bets_with_clv = []
+        for bet in bets:
+            closing = find_closing_line(bet, app.config["DATA_DIR"])
+            if closing is None:
+                rows.append({"bet": bet, "closing_line": None, "clv": None})
+                continue
+            clv = compute_clv(bet, closing)
+            rows.append({"bet": bet, "closing_line": closing, "clv": clv})
+            bets_with_clv.append((bet, clv))
+
+        clv_values = [clv for _, clv in bets_with_clv]
+        stats = compute_clv_stats(clv_values)
+        by_season = compute_clv_by_season(bets_with_clv)
+        chart = compute_clv_chart(bets_with_clv)
+
+        return render_template(
+            "betlog.html",
+            has_bets=True,
+            rows=rows,
+            stats=stats,
+            by_season=by_season,
+            chart=chart,
+        )
+
     @app.get("/search-runs/<name>")
     def search_run_view(name: str):
         try:

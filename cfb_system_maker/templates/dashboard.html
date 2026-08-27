@@ -17,7 +17,10 @@
             <h1>My Systems</h1>
           </div>
         </div>
-        <a class="dash-cta" href="{{ url_for('index') }}">New System</a>
+        <div class="dash-actions">
+          <a class="dash-cta" href="{{ url_for('betlog_page') }}">Bet Log</a>
+          <a class="dash-cta" href="{{ url_for('index') }}">New System</a>
+        </div>
       </header>
 
       {% if error == "missing_data" %}

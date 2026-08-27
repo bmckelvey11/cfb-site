@@ -519,6 +519,21 @@ th {
   color: var(--loss);
 }
 
+.betlog-table td.clv-missing {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.chart-zero-line {
+  stroke: var(--border);
+  stroke-dasharray: 4 2;
+}
+
+.chart-line {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -1439,6 +1454,12 @@ code {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 24px;
+}
+
+.dash-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .dash-cta {
