@@ -13,6 +13,116 @@ python scripts/audit_coverage.py --data-dir data       # registry vs disk: is ev
 is the source of truth for per-endpoint file counts. This note records the things
 neither count can tell you — *why* something is absent.
 
+## Season type — `data/raw/` is regular-season only, and 2025 is the inconsistent one
+
+Audited 2026-08-28. Every `scrape` and `fetch` run to date used the default
+`--season-type regular`, so **every bowl, conference championship and CFP game is
+absent from `data/raw/`** for seasons 1992-2024. Count it from disk:
+
+```bash
+python -c "import json,collections; [print(y, collections.Counter(x.get('seasonType') for x in json.load(open(f'data/raw/games_{y}.json',encoding='utf-8')))) for y in (2003,2019,2024,2025)]"
+```
+
+| File family | `regular` | `postseason` |
+|---|---|---|
+| `games_*.json`, 35 seasons 1992-2026 | 52,982 | **86** (2025 only) |
+| `lines_*.json`, 15 seasons 2012-2026 | all | **50** (2025 only) |
+
+2025 is the exception because `upcoming.py` — not `scrape` — last wrote those two files.
+`refresh_upcoming` calls `get_games`/`get_lines` with `season_type="both"` and then
+`save_raw_json`s the **full season** over both dumps (`upcoming.py:93-94`). So the only
+postseason data in `data/raw/` arrived as a side effect of the current-week refresh, and
+only for the season that refresh was pointed at.
+
+### The live bug is the week collision, not the missing bowls
+
+CFBD numbers postseason weeks from 1, and neither `GameRecord` nor `games.csv` carries a
+season type — `normalize.py:30` copies `week` straight through. So in `games.csv`:
+
+```
+2025 week 1 = 177 rows  =  127 regular-season openers  +  50 bowls/CFP games
+```
+
+2013-2024 exclude postseason uniformly, which is at least a statable sample definition.
+2025 breaks that uniformity, and it is the **holdout season** — so `--week 1`, any
+week-derived feature, and any "early season" system mean something different in the
+holdout than in the training seasons, with nothing declaring it.
+
+`running_stats.py` survives this by luck, not by design: it sorts on raw `startDate` and
+only falls back to `f"{season}-w{week:02d}"` when the date is missing
+(`running_stats.py:29`). The dates are present, so all 50 bowls come out with
+`running_games_played` of 10-15, which is correct. Had the fallback fired, week-1 bowls
+would have sorted ahead of every regular-season game and entered with `games_played=0`.
+
+Restoring uniformity is one filter (drop 2025's postseason ids at build time). Carrying
+postseason properly is a `season_type` column on `GameRecord`, which is a deliberate
+`storage.py` migration, not an ad hoc column add.
+
+### 19 endpoints are season-type-scoped, not just `games`
+
+`games` and `lines` are the visible half. Static-parsing `ENDPOINTS` against the vendored
+client shows 19 of the 73 registered endpoints accept `season_type`, and every one of them
+is on disk as regular-only:
+
+`advanced_game_stats`, `drives`, `elo`, `game_havoc_stats`, `game_player_stats`,
+`game_team_stats`, `games`, `lines`, `media`, `play_stats`, `player_season_stats`,
+`player_success_game`, `player_success_season`, `plays`, `ppa_games`, `ppa_players_games`,
+`pregame_win_prob`, `rankings`, `weather`.
+
+`PER_GAME` endpoints inherit the gap a second way: `_seed_game_ids` reads
+`games_{season}.json` (`scrapers.py:441`), so `advanced_box_score` and `win_probability`
+were never called for a bowl either. Their coverage tables above are complete *against a
+regular-season seed*.
+
+### Source of record: `stg.game`, not a postseason pass
+
+Use the GraphQL-fed DuckDB tables for anything that needs full-season coverage.
+`stg.game` carries 112,673 rows with real postseason back to 1901; `stg.games` (the REST
+dump, note the plural) carries 53,068 and inherits the gap exactly. Two apparent anomalies
+in `stg.game` are real season types, not mislabels — checked on dates and classifications:
+
+- 2020's 562 non-regular rows are `spring_regular`/`spring_postseason` — the COVID-shifted
+  spring 2021 FCS/DII/DIII season, played Feb-May 2021. True 2020 `postseason` is 30.
+- 2023's 139 postseason rows span all divisions (FBS 42, DIII 43, DII 29, FCS 25). Filter
+  on `homeClassification`/`awayClassification` or the counts look erratic across seasons.
+
+`scripts/build_prediction_tracker.py` already reads `stg.game` for this reason and is
+correct as written.
+
+**Do not "add a postseason pass" to `scrapers.py`.** `_scrape_season` writes
+`{name}_{season}.json` with no season-type dimension, so a second pass has nowhere to go:
+resume skips the existing file, and `--force` **overwrites the regular-season rows with
+postseason-only rows**. `SeasonType` accepts `both` (`cfbd/models/season_type.py`), which
+is what `upcoming.py` already uses, so the correct shape is a re-scrape of the 19 endpoints
+above with `--season-type both --force` — one superset file per season, no schema change.
+Untested and worth probing first: whether `both` behaves on the `SEASON_WEEK` endpoints,
+where `weeks=range(1,16)` meets a postseason week numbering that restarts at 1.
+
+### Does it matter for backtests
+
+2013-2025 has **515 FBS postseason games, and `stg.gameLines` has a line for all 515.**
+50 of them (2025) are already in `games.csv`; the other 465 are missing, ≈3.4% of the
+13,479-row sample the build would otherwise produce.
+
+3.4% is small, but it is not a random 3.4%. Bowls and CFP games are a distinct population
+— three-to-six week layoffs, opt-outs and portal departures, neutral sites, coaching
+changes, and motivation asymmetry the market prices and simple systems do not. Every
+system in this repo that claims a general edge has never been tested on the games where
+naive systems most often break, and no result here should be described as covering the
+full season.
+
+Other analyses that silently inherit the gap:
+
+| Reader | What it misses |
+|---|---|
+| `cli.py:86` `build` → `normalize` → `games.csv` | the 465 games above; downstream `enrich`, `backtest`, `web`, `/compare`, saved systems, `v1_model` refit |
+| `enrich.py:112` raw-game index | postseason rows never indexed for 2013-2024 |
+| `betlog.py:237` | reads year and year-1 season files precisely to catch January bowls — the comment is right, but the bowls are not in those files, so bowl bets land in `unmatched` rather than erroring |
+| `clv.py:96` (`lines_*`) | no closing-line value on any bowl |
+| `duckdb_load.py` → `raw.games`/`stg.games` | the REST-side game table is regular-only while `stg.game` beside it is not |
+| `scripts/analyze_coach_styles.py:231` | style clusters fit on regular-season games only |
+| `scrapers.py:441` per-game seed | per-game stats for bowls never requested |
+
 ## Every CFBD spec path is now registered but one
 
 The live CFBD REST spec has **74 paths**. The `ENDPOINTS` registry has **73**, and
