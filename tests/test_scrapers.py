@@ -53,6 +53,11 @@ class _MetricsApi:
     def get_win_probability(self, game_id=None):
         return [{"gameId": game_id, "homeWinProbability": 0.5}]
 
+    def get_predicted_points_added_by_player_game(self, year=None, week=None, season_type=None,
+                                                  team=None, position=None, player_id=None,
+                                                  threshold=None, exclude_garbage_time=None):
+        return [{"year": year, "week": week, "excludeGarbageTime": exclude_garbage_time}]
+
 
 class _PlaysApi:
     def __init__(self, client):
@@ -111,8 +116,21 @@ def _run(only, tmp_path, **kwargs):
 
 def test_registry_is_complete_and_unique():
     names = [e.name for e in ENDPOINTS]
-    assert len(names) == 73
-    assert len(set(names)) == 73
+    assert len(set(names)) == len(names)
+
+    # 73 base entries, one per CFBD spec path, plus 9 `_ngt` variants that reuse a
+    # base endpoint's method with `excludeGarbageTime` on. Counting them together
+    # would hide a real duplicate spec path behind the variants.
+    base = [e for e in ENDPOINTS if not e.name.endswith("_ngt")]
+    variants = [e for e in ENDPOINTS if e.name.endswith("_ngt")]
+    assert len(base) == 73
+    assert len(variants) == 9
+
+    # Every variant shadows a registered base endpoint and differs only by the flag.
+    by_method = {(e.api, e.method) for e in base}
+    for variant in variants:
+        assert (variant.api, variant.method) in by_method, variant.name
+        assert variant.fixed == {"exclude_garbage_time": True}, variant.name
 
 
 def test_season_skips_years_before_min_season(tmp_path):
@@ -321,3 +339,17 @@ def test_endpoint_error_is_captured_not_raised(tmp_path):
     assert reports[0].error is not None
     assert "boom" in reports[0].error
     assert reports[0].files == 0
+
+
+def test_season_week_applies_endpoint_fixed_kwargs(tmp_path):
+    """`_ngt` variants are SEASON_WEEK too, and that path once dropped `fixed`.
+
+    Without `| endpoint.fixed` the call goes out *without* `excludeGarbageTime` and the
+    unfiltered rows land under the `_ngt` name — same row count, wrong content, and
+    `resume` protects the bad file on every later run.
+    """
+    _run({"ppa_players_games_ngt"}, tmp_path, seasons=[2024], weeks=range(1, 2),
+         season_type="regular")
+
+    rows = json.loads((tmp_path / "raw" / "ppa_players_games_ngt_2024_wk1.json").read_text())
+    assert rows == [{"year": 2024, "week": 1, "excludeGarbageTime": True}]

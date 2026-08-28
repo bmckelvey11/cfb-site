@@ -38,6 +38,9 @@ class Endpoint:
     min_season: int | None = None  # endpoint has no data before this year; earlier ones are skipped
 
 
+_NO_GARBAGE = {"exclude_garbage_time": True}
+
+
 ENDPOINTS: list[Endpoint] = [
     # Adjusted metrics
     Endpoint("adjusted_player_passing", "AdjustedMetricsApi", "get_adjusted_player_passing_stats", SEASON),
@@ -131,6 +134,30 @@ ENDPOINTS: list[Endpoint] = [
     Endpoint("teams_ats", "TeamsApi", "get_teams_ats", SEASON),
     # Venues
     Endpoint("venues", "VenuesApi", "get_venues", ONCE),
+    # Garbage-time-excluded variants (`_ngt`, "no garbage time").
+    #
+    # `excludeGarbageTime` is not a narrowing filter — it drops the blowout plays that
+    # feed the aggregation, so the numbers on the surviving rows change. That cannot be
+    # reproduced from the unfiltered dumps, which hold the aggregates and not the plays,
+    # so each variant is a second source rather than a correction of the first.
+    #
+    # `name` is the output file prefix, so these land beside their unfiltered twins as
+    # `{name}_ngt_{season}.json` (and `..._wk{w}` / `..._post_wk{w}` for SEASON_WEEK)
+    # and never overwrite them.
+    #
+    # Probed 2024 before registering (2026-08-28): all nine differ from their twin, none
+    # is a no-op. Game/team-level keep every row and move values (`ppa_games` 689 of 1,711
+    # rows differ); player-level *also* drop rows, because a player whose only snaps were
+    # garbage time has no qualifying plays left (`player_usage` 4,131 -> 3,696).
+    Endpoint("ppa_games_ngt", "MetricsApi", "get_predicted_points_added_by_game", SEASON, fixed=_NO_GARBAGE),
+    Endpoint("ppa_teams_ngt", "MetricsApi", "get_predicted_points_added_by_team", SEASON, fixed=_NO_GARBAGE),
+    Endpoint("ppa_players_season_ngt", "MetricsApi", "get_predicted_points_added_by_player_season", SEASON, fixed=_NO_GARBAGE),
+    Endpoint("ppa_players_games_ngt", "MetricsApi", "get_predicted_points_added_by_player_game", SEASON_WEEK, fixed=_NO_GARBAGE),
+    Endpoint("player_usage_ngt", "PlayersApi", "get_player_usage", SEASON, fixed=_NO_GARBAGE),
+    Endpoint("advanced_game_stats_ngt", "StatsApi", "get_advanced_game_stats", SEASON, fixed=_NO_GARBAGE),
+    Endpoint("advanced_season_stats_ngt", "StatsApi", "get_advanced_season_stats", SEASON, fixed=_NO_GARBAGE),
+    Endpoint("player_success_season_ngt", "StatsApi", "get_player_season_success_rates", SEASON, fixed=_NO_GARBAGE),
+    Endpoint("player_success_game_ngt", "StatsApi", "get_player_game_success_rates", SEASON_WEEK, fixed=_NO_GARBAGE),
 ]
 
 
@@ -368,7 +395,7 @@ def _scrape_season_week(
                 if resume and _exists(data_dir, filename):
                     skipped += 1
                     continue
-                kwargs = _accepted(func, {"year": season, "week": week, "season_type": stype})
+                kwargs = _accepted(func, {"year": season, "week": week, "season_type": stype}) | endpoint.fixed
                 rows = _call(func, kwargs, delay)
                 if not rows:
                     continue
