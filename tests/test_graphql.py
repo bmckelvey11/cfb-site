@@ -25,6 +25,7 @@ SCHEMA = {
             "fields": [
                 {"name": "game", "args": _args("limit", "offset", "orderBy", "where"), "type": _list_of("game")},
                 {"name": "conference", "args": [], "type": _list_of("conference")},  # non-paginated view
+                {"name": "gameTeam", "args": _args("limit", "offset", "orderBy"), "type": _list_of("gameTeam")},  # no `id`
                 {"name": "gameAggregate", "args": [], "type": _obj("gameAggregate")},  # no scalars -> ignored
             ]
         },
@@ -34,6 +35,11 @@ SCHEMA = {
                 {"name": "season", "type": _scalar("Int")},
                 {"name": "homeTeam", "type": _scalar()},
                 {"name": "weather", "type": _obj("weather")},  # relation -> must be skipped
+            ]},
+            {"name": "gameTeam", "fields": [
+                {"name": "endElo", "type": _scalar("Int")},
+                {"name": "gameId", "type": _scalar("Int")},
+                {"name": "homeAway", "type": _scalar()},
             ]},
             {"name": "conference", "fields": [
                 {"name": "name", "type": _scalar()},
@@ -90,7 +96,7 @@ def test_only_scalar_columns_selected(tmp_path):
     q = captured["game"]
     assert "id" in q and "season" in q and "homeTeam" in q
     assert "weather" not in q  # relation skipped
-    assert "orderBy: {id: ASC}" in q  # id used as sort key
+    assert "orderBy: [{id: ASC}]" in q  # unique id is already a total order
 
 
 def test_season_filter_only_when_column_exists(tmp_path):
@@ -150,5 +156,16 @@ def test_paginated_query_sorts_by_the_sort_key(tmp_path):
     graphql_scrape(data_dir=tmp_path, post_fn=make_post(data, captured))
 
     # Hasura's arg is `orderBy` and its enum is uppercase; `order_by: {id: asc}` is rejected.
-    assert "orderBy: {id: ASC}" in captured["game"]
+    assert "orderBy: [{id: ASC}]" in captured["game"]
     assert "orderBy" not in captured["conference"]  # root doesn't advertise the arg
+
+
+def test_tables_without_an_id_sort_on_every_scalar_column(tmp_path):
+    """A single non-unique sort key is worse than useless: ties break differently per
+    request, so rows fall between page boundaries. Ordering on every scalar leaves ties
+    only between byte-identical rows, which are interchangeable."""
+    captured = {}
+    data = {"gameTeam": [{"endElo": 1500, "gameId": 1, "homeAway": "home"}]}
+    graphql_scrape(data_dir=tmp_path, tables=["gameTeam"], post_fn=make_post(data, captured))
+
+    assert "orderBy: [{endElo: ASC}, {gameId: ASC}, {homeAway: ASC}]" in captured["gameTeam"]

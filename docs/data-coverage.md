@@ -167,6 +167,32 @@ reason, and the audit reads both rather than keeping its own copy:
 | `gamePlayerStat` | ~6.7M rows, multi-GB; pulled per season with `--tables`/`--season` (2012-2025 shards are on disk) |
 | `scoreboard` | live in-progress games, no historical value |
 
+### The sort key must be a total order
+
+`orderBy` on a single non-unique column is worse than useless. 20 of the 35 defaulted
+tables have no `id`, so the first scalar became the sort key — `gameTeam` by `endElo`,
+`coachSeason` by `games`, `pollRank` by `firstPlaceVotes`. Ties then break differently per
+request and rows fall between page boundaries.
+
+That produced a real loss: after the first `gameTeam` refresh, `pregame_win_prob` fell from
+12,811 non-null games to 12,656 even though the file **gained** 5,576 rows. Game
+`332500030` had lost its `away` row while some other row was duplicated. A row-count check
+cannot see this — the count was right, the rows were not.
+
+Tables with no `id` now sort on **every scalar column**, which leaves ties only between
+byte-identical rows. Re-pulled `gameTeam`: 225,344 rows, 225,344 unique `(gameId, side)`
+pairs, zero duplicates, and `pregame_win_prob` back to 12,812 non-null.
+
+### Some tables cannot be joined as stored
+
+`_paginate` selects scalar columns and skips relations, which for a few tables drops the
+identity entirely. `gameMedia` exposes only `mediaType` and `name` — its `game` link is an
+OBJECT relation, so the 23,907-row dump collapses to 124 distinct rows and cannot be joined
+to anything. `pollRank` is the same (`poll` and `team` are both relations). Nothing in
+`enrich` reads these from GraphQL (it uses the REST `media_*` and `rankings_*` files), so
+this is a known limitation rather than a live bug — but re-pulling those tables does not
+make them usable.
+
 ### Row counts, not just file existence
 
 20 of the 35 defaulted tables expose `{table}Aggregate { aggregate { count } }`, so the
