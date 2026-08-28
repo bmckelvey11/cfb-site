@@ -198,15 +198,85 @@ result, so not passing them is correct; passing them would only fragment the fil
 already span every division — `games_2024.json` carries all 3,747 games, not just the ~800
 FBS ones.
 
-Three groups are genuinely *unused options* rather than gaps, because they ask the API for a
-different computation rather than for more rows:
+`threshold` (4 endpoints — the player PPA and success-rate pairs) is a minimum-sample cut:
+"minimum number of plays" / "minimum credited passing and rushing plays". It drops
+low-volume player rows and leaves the survivors' numbers alone, so it is a narrowing filter
+like the rest — any minimum-plays rule is a client-side `if plays >= n` over the unfiltered
+dump, and applying it at the API would mean re-scraping to change the cutoff.
 
-- `excludeGarbageTime` (9 endpoints) and `threshold` (4) — analytic variants of the same
-  rows. Registering a garbage-time-excluded variant would be a second feature source, not a
-  fix.
+Two groups are genuinely *unused options*, because they ask the API for a different view of
+rows we already hold in full:
+
 - `final` / `latest` / `poll` on `rankings` — views over rows we already pull in full.
 - `competition` / `round` on `games` and `cfp_games` — CFP slicing, already covered by the
   dedicated `cfp_*` endpoints.
+
+### `excludeGarbageTime` — closed 2026-08-28 as a parallel `_ngt` source
+
+Closed by quick task `260828-lvd`. This one is **not** a narrowing filter and not a view: it
+drops the blowout plays that feed the aggregation, so the numbers on the surviving rows
+change. Our dumps store the aggregates and not the plays behind them, so it cannot be
+reproduced client-side — the only way to have it is to ask CFBD for it.
+
+Registered as nine `_ngt` ("no garbage time") variants rather than a flag on the existing
+entries. `Endpoint.name` is the output file prefix, so each variant lands beside its
+unfiltered twin — `ppa_games_ngt_2024.json`, `..._ngt_{season}_wk{w}.json`,
+`..._ngt_{season}_post_wk{w}.json` — and never overwrites it. They are a **second source,
+not a correction of the first**; `enrich.py` reads neither, so no registry feature moved.
+
+Probed 2024 before registering any of them, because a no-op param would write identical
+content that `resume` then protects until someone thinks to `--force`. All nine are real,
+and they split into two behaviours:
+
+| Endpoint | rows (unfiltered → ngt) | rows differing |
+|---|---|---|
+| `ppa_games` | 1,711 → 1,711 | 689 |
+| `ppa_teams` | 134 → 134 | 134 |
+| `advanced_game_stats` | 3,212 → 3,212 | 1,186 |
+| `advanced_season_stats` | 134 → 134 | 134 |
+| `ppa_players_season` | 4,131 → 3,696 | — |
+| `ppa_players_games` (wk1) | 3,250 → 2,887 | — |
+| `player_usage` | 4,131 → 3,696 | — |
+| `player_success_season` | 3,752 → 3,309 | — |
+| `player_success_game` (wk1) | 2,090 → 1,801 | — |
+
+Game- and team-level endpoints keep every row and move values. **Player-level endpoints also
+drop rows**: a player whose only snaps came in garbage time has no qualifying plays left, so
+the row disappears entirely. Any join against an `_ngt` player file must expect a smaller
+population than its twin, not just different numbers.
+
+Pulled 2012-2025: **520 files, 543,288 rows**, 0 endpoints failed.
+
+#### Verified by margin, not by row count
+
+Row counts cannot check this — for four of the nine the rows are the same rows. The check
+that falsifies is that garbage time can only have been excluded from games where it
+occurred, so on `ppa_games` 2024 the change must track final margin:
+
+| Final margin | rows changed | share |
+|---|---|---|
+| 0-7 | 54 / 569 | 9.5% |
+| 8-16 | 35 / 384 | 9.1% |
+| 17-27 | 233 / 389 | 59.9% |
+| 28+ | 367 / 369 | 99.5% |
+
+The 40 biggest blowouts all differ; 228 of 262 one-score games are byte-identical. A flat
+rate in either direction — everything changed, or nothing — would have meant the flag was
+not doing what its name says. The ~9% floor in close games is real and expected: a game can
+be a blowout in the third quarter and finish within a score.
+
+For the two SEASON_WEEK variants the `_ngt` shard set is the **same 211 `(season, week)`
+tuples** as its unfiltered twin, so `audit_coverage.py` reporting 211/232 is the documented
+2012-and-postseason floor those endpoints already have, not something the flag emptied.
+
+#### The trap this exposed
+
+`_scrape_season_week` never applied `endpoint.fixed`, unlike `_scrape_season`. Two of the
+nine are SEASON_WEEK, so the call would have gone out with no flag and written unfiltered
+rows under the `_ngt` name — right row count, wrong content, and `resume` protecting the bad
+file on every later run. No registry entry used `fixed=` before this change, so the fix is
+inert for existing data. `tests/test_scrapers.py::test_season_week_applies_endpoint_fixed_kwargs`
+pins it.
 
 ## Empty files are floors, not failures
 
