@@ -1,6 +1,7 @@
 """Union the Prediction Tracker season CSVs and attach a CFBD game_id to every row.
 
-Source: C:/Users/mckel/dev/cfb/prediction-tracker/ncaa{season}.csv  (2001-2025)
+Source: C:/Users/mckel/dev/cfb/prediction-tracker/ncaa*.csv  (seasons taken from the
+        files present, so a new ncaa{year}.csv is picked up without a code change)
 CFBD:   stg.game in data/cfb.duckdb -- the GraphQL-fed table. data/raw/games_*.json holds
         regular-season rows only, which would drop every bowl (~35/season); games.csv is
         additionally 2013+ only.
@@ -25,7 +26,6 @@ REPO = Path(__file__).resolve().parents[1]
 DEFAULT_SRC = Path("C:/Users/mckel/dev/cfb/prediction-tracker")
 DEFAULT_DB = REPO / "data" / "cfb.duckdb"
 DEFAULT_OUT = REPO / "data" / "raw" / "prediction_tracker_lines.csv"
-SEASONS = range(2001, 2026)
 
 # Prediction Tracker name -> extra CFBD candidates. Each name resolves against that
 # season's own CFBD team set, so era drift (Central Florida -> UCF) resolves itself.
@@ -68,6 +68,12 @@ CFBD_COLUMNS = [
 ]
 
 
+def seasons_on_disk(src):
+    """Seasons taken from the CSVs present, so a new ncaa{year}.csv is picked up."""
+    return sorted(int(m.group(1)) for m in (re.fullmatch(r"ncaa(\d{4})", p.stem)
+                                           for p in src.glob("ncaa*.csv")) if m)
+
+
 def candidates(name):
     """CFBD spellings to try for a Prediction Tracker team name, best guess first."""
     out = [name]
@@ -82,7 +88,7 @@ def candidates(name):
     return uniq
 
 
-def load_cfbd(db_path):
+def load_cfbd(db_path, seasons):
     """{season: (games_by_unordered_pair, team_names)} for every season we care about."""
     import duckdb
 
@@ -93,7 +99,7 @@ def load_cfbd(db_path):
         from stg.game
         where season between ? and ?
         """,
-        [min(SEASONS), max(SEASONS)],
+        [min(seasons), max(seasons)],
     ).fetchall()
     con.close()
 
@@ -183,18 +189,19 @@ def main():
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = ap.parse_args()
 
-    cfbd = load_cfbd(args.db)
+    seasons = seasons_on_disk(args.src)
+    if not seasons:
+        print(f"no ncaa*.csv under {args.src}", file=sys.stderr)
+        return 1
+    cfbd = load_cfbd(args.db, seasons)
     all_rows = []
     columns = ["season"]
     unresolved = defaultdict(int)
     mismatches = []
     per_season = {}
 
-    for season in SEASONS:
+    for season in seasons:
         path = args.src / f"ncaa{season}.csv"
-        if not path.exists():
-            print(f"[warn] missing {path.name}", file=sys.stderr)
-            continue
         rows, header = read_season_csv(path, season)
         for col in header:
             if col not in columns:
