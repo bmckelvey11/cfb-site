@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 
+from cfb_paths import DATA_ROOT
 from cfb_system_maker.backtest import run_backtest, sign_consistency, split_holdout
 from cfb_system_maker.betlog import import_betlog
 from cfb_system_maker.cfbd_client import fetch_games_and_lines
@@ -21,6 +22,8 @@ from cfb_system_maker.duckdb_load import TableLoad, build_duckdb, explode_payloa
 from cfb_system_maker.storage import load_processed_games, load_raw_json, load_system, save_processed_games, save_raw_json, save_system
 from cfb_system_maker.upcoming import build_upcoming
 from cfb_system_maker.v1_model import fit_v1, save_v1_fit
+
+DATA_DIR_DEFAULT = str(DATA_ROOT)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -518,30 +521,30 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     sample = subparsers.add_parser("sample")
-    sample.add_argument("--data-dir", default="data")
+    sample.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
 
     fetch = subparsers.add_parser("fetch")
-    fetch.add_argument("--data-dir", default="data")
+    fetch.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
     fetch.add_argument("--season", dest="seasons", type=int, nargs="+", required=True)
     fetch.add_argument("--season-type", default="both")
     fetch.add_argument("--provider")
 
     build = subparsers.add_parser("build")
-    build.add_argument("--data-dir", default="data")
+    build.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
     build.add_argument("--season", dest="seasons", type=int, nargs="+", required=True)
     build.add_argument("--provider", default="consensus")
 
     enrich = subparsers.add_parser("enrich")
-    enrich.add_argument("--data-dir", default="data")
+    enrich.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
 
     refit_v1 = subparsers.add_parser("refit-v1")
-    refit_v1.add_argument("--data-dir", default="data")
+    refit_v1.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
 
     upcoming = subparsers.add_parser("upcoming")
-    upcoming.add_argument("--data-dir", default="data")
+    upcoming.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
 
     scrape_parser = subparsers.add_parser("scrape")
-    scrape_parser.add_argument("--data-dir", default="data")
+    scrape_parser.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
     scrape_parser.add_argument("--season", dest="seasons", type=int, nargs="+", required=True)
     scrape_parser.add_argument("--season-type", default="both",
                                help="regular | postseason | both. season_week endpoints run one pass "
@@ -555,7 +558,7 @@ def _build_parser() -> argparse.ArgumentParser:
     scrape_parser.add_argument("--fbs-only", action="store_true", help="per-game endpoints: only FBS games")
 
     graphql_parser = subparsers.add_parser("graphql")
-    graphql_parser.add_argument("--data-dir", default="data")
+    graphql_parser.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
     graphql_parser.add_argument("--season", dest="seasons", type=int, nargs="+")
     graphql_parser.add_argument("--only", nargs="+")
     graphql_parser.add_argument("--tables", nargs="+",
@@ -567,7 +570,7 @@ def _build_parser() -> argparse.ArgumentParser:
     graphql_parser.add_argument("--force", action="store_true", help="re-pull even if season file exists")
 
     an = subparsers.add_parser("actionnetwork")
-    an.add_argument("--data-dir", default="data")
+    an.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
     an.add_argument("--season", dest="seasons", type=int, nargs="+", required=True)
     an.add_argument("--season-type", default="reg")
     an.add_argument("--periods", nargs="+", default=["firsthalf", "firstquarter"],
@@ -577,7 +580,7 @@ def _build_parser() -> argparse.ArgumentParser:
     an.add_argument("--force", action="store_true", help="re-scrape even if output file exists")
 
     backtest = subparsers.add_parser("backtest")
-    backtest.add_argument("--data-dir", default="data")
+    backtest.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
     backtest.add_argument("--bet-type", choices=["spread", "total"], default="spread")
     backtest.add_argument("--side", choices=["home", "away"], default="home")
     backtest.add_argument("--total-side", choices=["over", "under"], default="over")
@@ -600,7 +603,7 @@ def _build_parser() -> argparse.ArgumentParser:
     backtest.add_argument("--holdout-season", dest="holdout_seasons", type=int, action="append")
 
     search = subparsers.add_parser("search")
-    search.add_argument("--data-dir", default="data")
+    search.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
     search.add_argument("--holdout-season", type=int, required=True)
     search.add_argument("--season", type=int, action="append")
     search.add_argument("--max-filters", type=int, default=4)
@@ -615,7 +618,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     duckdb_parser = subparsers.add_parser("duckdb", help="load data/raw + data/graphql JSON into a DuckDB file")
-    duckdb_parser.add_argument("--data-dir", default="data")
+    duckdb_parser.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
     duckdb_parser.add_argument("--output", help="DuckDB path (default: {data-dir}/cfb.duckdb)")
     duckdb_parser.add_argument("--only", nargs="+", help="load only these table names")
     duckdb_parser.add_argument(
@@ -643,10 +646,10 @@ def _build_parser() -> argparse.ArgumentParser:
     betlog_subparsers = betlog_parser.add_subparsers(dest="betlog_command", required=True)
     betlog_import_parser = betlog_subparsers.add_parser("import")
     betlog_import_parser.add_argument("--csv", required=True)
-    betlog_import_parser.add_argument("--data-dir", default="data")
+    betlog_import_parser.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
 
     web = subparsers.add_parser("web")
-    web.add_argument("--data-dir", default=os.environ.get("CFB_DATA_DIR", "data"))
+    web.add_argument("--data-dir", default=os.environ.get("CFB_DATA_DIR", DATA_DIR_DEFAULT))
     web.add_argument(
         "--host",
         default=os.environ.get("CFB_WEB_HOST")

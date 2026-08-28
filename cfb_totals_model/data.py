@@ -19,7 +19,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-DEFAULT_DATA_ROOT = Path(__file__).resolve().parents[1] / "data"
+from cfb_paths import DATA_ROOT
+
+DEFAULT_DATA_ROOT = DATA_ROOT
 
 # Per-team-game stats rolled forward into entering-game means.
 _ROLL_COLS = (

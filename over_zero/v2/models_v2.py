@@ -26,6 +26,7 @@ LL-ratio, Kelly) are reproduced here so v2 is self-contained and v1 stays frozen
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,7 +41,10 @@ NORM = stats.norm
 # Shared CFBD raw-lines loader (v2/v3/saturation/monitor drivers; v1 keeps
 # its own frozen copy)
 # ===========================================================================
-RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw"
+_HUB_DATA = Path(os.environ.get(
+    "CFB_DATA_ROOT", Path(__file__).resolve().parents[2] / "data"
+))
+RAW_DIR = _HUB_DATA / "raw"
 
 
 def pick_line(game, provider=None):

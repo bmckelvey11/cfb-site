@@ -10,6 +10,7 @@ Run:  python v1/run_on_project_data.py [--csv path/to/games.csv]
 
 import csv
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -24,8 +25,9 @@ from censoring_bias import (
 )
 
 REPO = Path(__file__).resolve().parents[1]  # over-zero/
+_HUB_DATA = Path(os.environ.get("CFB_DATA_ROOT", REPO.parent / "data"))
 DEFAULT_CSV = REPO / "data" / "processed" / "games.csv"
-RAW_DIR = REPO / "data" / "raw"
+RAW_DIR = _HUB_DATA / "raw"
 
 
 def load_from_raw(seasons, raw_dir=RAW_DIR):

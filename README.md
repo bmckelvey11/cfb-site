@@ -104,7 +104,8 @@ Available filters: `--bet-type`, `--side`, `--total-side`, `--season`, `--week`,
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `CFB_DATA_DIR` | Default `--data-dir` for `web` | `data` |
+| `CFB_DATA_ROOT` | Canonical data folder (`raw/`, `processed/`, `cfb.duckdb`) | `<repo>/data` |
+| `CFB_DATA_DIR` | Default `--data-dir` for `web` (legacy; `CFB_DATA_ROOT` wins via `cfb_paths`) | `data` |
 | `CFB_WEB_HOST` | Default `--host` for `web` | `127.0.0.1` |
 | `CFB_WEB_PORT` | Default `--port` for `web` | `5000` |
 
