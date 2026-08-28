@@ -16,8 +16,9 @@ python monitor/roi_report.py                  # ROI of the deployed filter + fig
 Files: `monitor.py` (per-season/trailing stats, Wilson CIs, slope trend test),
 `run_monitor.py` (decay driver), `run_walkforward.py` (walk-forward backtest),
 `bias_bins.py` (profit by bias bin + threshold sweep), `roi_report.py`
-(ROI of the deployed filter, with intervals). Estimator core imported
-from `../v2`.
+(ROI of the deployed filter, with intervals, plus the raw per-bet CSV),
+`roi_hitrate_doc.py` (hit-rate/ROI splits by season and bias bin). Estimator
+core imported from `../v2`.
 
 ## run_monitor — is the edge decaying?
 
@@ -78,10 +79,14 @@ the decay drivers keep). Same walk-forward protocol; the only addition is a
 season label per bet, which the equity curve and per-season bars need.
 
 ```bash
-python monitor/roi_report.py                        # table + docs/figs/roi_report.png
+python monitor/roi_report.py                        # table + figure + CSV
 python monitor/roi_report.py --threshold 1.0        # compare filters
 python monitor/roi_report.py --self-check           # ROI maths assertions
+python monitor/roi_report.py --no-fig --no-csv      # table only
 ```
+
+**A unit is 1% of bankroll**, so the flat rule stakes exactly 1.00u per bet
+and every stake, profit and drawdown below is on one scale.
 
 Three ROI definitions, ranked as MODEL_GUIDE ranks them:
 
@@ -92,15 +97,58 @@ Three ROI definitions, ranked as MODEL_GUIDE ranks them:
   map, so its interval is bootstrapped (10k resamples).
 - **compounded bankroll** — equity curve only, labelled order-dependent.
 
-Result (2013–2025 data, bet seasons 2016–2025, run 2026-08-26):
+Result (2013–2025 data, bet seasons 2016–2025, run 2026-08-28):
 
 | metric | value | 95% interval |
 |--------|-------|--------------|
 | record | 151–83 (64.53%) over N=234 | win [58.21%, 70.38%] |
 | flat-stake ROI @ −110 | **+23.19%** per unit risked | [+11.13%, +34.36%] |
+| flat profit | **+54.27u** on 234u risked | — |
 | ¼-Kelly ROI | +23.58% per unit staked | [+11.45%, +35.77%] (boot) |
+| ¼-Kelly profit | +310.36u on 1,316u staked | — |
 | ROI @ −120 | +18.30% | planning bound +6.72% |
-| max drawdown | 680 units risked | — |
+| max drawdown | 6.18u flat / 35.4u Kelly | — |
+
+### Kelly in units — why flat is what ships
+
+The two ROI percentages look interchangeable (+23.19% vs +23.58%) and are
+not: flat's denominator is units *risked*, Kelly's is units *staked*, and
+Kelly's turnover is **5.6× larger**. Converting to units makes the
+distinction visible, and makes the stake sizes visible with it:
+
+| ¼-Kelly stake | min | median | mean | max |
+|---|---|---|---|---|
+| units (= % of bankroll) | 1.37u | 5.25u | 5.63u | **11.20u** |
+
+Quarter-Kelly wants **11% of bankroll on a single game**, and 5% on the
+median one. That is what Kelly says when it is sized off a point-estimate
+win probability with no allowance for estimation error — at p ≈ 0.65 and
+b = 0.909, full Kelly is ~26% of bankroll and the quarter is ~6.6%. Add that
+a college slate settles simultaneously (several 5u bets live at once, which
+sequential Kelly does not model) and the realised drawdown is 35u against
+flat's 6u for the same 151–83.
+
+Flat 1u per qualifying bet is the deployable rule. The Kelly column is there
+to show the edge is big enough that a stake rule *could* exploit it harder,
+not as a recommendation.
+
+### Raw backtest CSV
+
+`docs/data/backtest_bets.csv` — one row per graded walk-forward game, **all
+10,255 of them**, not just the 234 clearing the filter, so the bias-bin table
+in [ROI_HITRATE.md](../docs/ROI_HITRATE.md) is reproducible from the file
+alone. Columns: game identity (`game_id`, `season`, `week`, `date`, teams),
+the inputs (`spread`, `total`, `fav_pts`, `dog_pts`, `actual_total`), the
+out-of-sample model output (`bias`, `model_prob`), the result (`over`), and
+the stake ledger (`passes_filter`, `flat_units_risked`, `flat_units_pnl`,
+`kelly_units`, `kelly_units_pnl`).
+
+Pushes are absent — `walk_forward_bets` drops them, and matching the analysis
+exactly matters more than being literally every game. Rows are aligned to the
+model arrays *by construction* (built inside the walk-forward loop, sliced by
+the same mask), and every run re-reads the file and asserts the re-derived
+record, flat ROI and Kelly ROI equal the in-memory headline before reporting
+success.
 
 **Plan on the lower bound, not the point estimate.** The 1.75 threshold was
 chosen partly on this data, so +23% is inflated by selection; +11% is the

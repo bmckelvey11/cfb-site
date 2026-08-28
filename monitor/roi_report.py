@@ -28,6 +28,8 @@ planning number, per README/MODEL_GUIDE.
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 import subprocess
 import sys
 from datetime import date
@@ -40,14 +42,21 @@ from monitor import _wilson, load_from_raw  # noqa: E402
 from run_walkforward import HURDLE, fit_train  # noqa: E402
 from bias_bins import KELLY_FRACTION, kelly_fraction  # noqa: E402
 from models_v2 import (  # noqa: E402
+    RAW_DIR,
     censoring_bias,
     implied_team_points,
     log_likelihood_ratio,
+    pick_line,
 )
 
 RISK, PAYOUT = 110.0, 100.0
 BOOT = 10_000
 SEED = 20260826
+
+# A unit is 1% of bankroll, so the flat rule stakes exactly 1u per bet and
+# every stake, profit and drawdown below is on one scale. Turning the raw
+# 110-per-bet arithmetic into units is a divide by RISK.
+UNIT_PCT = 0.01
 
 # American prices swept in the sensitivity panel. -110 is the backtest price;
 # README's operational rule says "-120 or better", so the band matters.
@@ -73,14 +82,53 @@ def unit_roi(win_rate, price=-110):
     return win_rate * (payout / risk) - (1.0 - win_rate)
 
 
-def walk_forward_bets(data, years, min_train):
+def game_meta(season, raw_dir=RAW_DIR, provider=None):
+    """Per-game identity for one season, in load_raw_seasons' row order.
+
+    Replays that loader's iteration and its three drop conditions (no final
+    score, no book with both lines, pick'em) so row i here is row i of
+    data[season]. Only the identity fields are kept -- the numbers come from
+    the loader itself, never from this replay. Callers must assert the lengths
+    match per season; a global check can hide two seasons off by compensating
+    amounts.
+    """
+    path = Path(raw_dir) / f"lines_{season}.json"
+    if not path.exists():
+        return []
+    rows = []
+    for g in json.loads(path.read_text(encoding="utf-8")):
+        hp, ap = g.get("homeScore"), g.get("awayScore")
+        if hp is None or ap is None:
+            continue
+        picked = pick_line(g, provider)
+        if picked is None or picked[0] == 0:
+            continue
+        spread = picked[0]
+        # Favourite is the negative-spread side, matching load_raw_seasons.
+        fav, dog = ((g.get("homeTeam"), g.get("awayTeam")) if spread < 0
+                    else (g.get("awayTeam"), g.get("homeTeam")))
+        rows.append({
+            "game_id": g.get("id"), "week": g.get("week"),
+            "date": (g.get("startDate") or "")[:10],
+            "home_team": g.get("homeTeam"), "away_team": g.get("awayTeam"),
+            "fav_team": fav, "dog_team": dog,
+        })
+    return rows
+
+
+def walk_forward_bets(data, years, min_train, with_meta=False):
     """Every out-of-sample game with its season label, chronological.
 
     Mirrors bias_bins.walk_forward but keeps the season so the bets can be
     ordered and grouped in time. Pushes (exact totals) are dropped: no bet
     resolves on them.
+
+    with_meta appends a 5th return: one dict per surviving row carrying game
+    identity and the inputs, built inside this loop and sliced by the same
+    `keep` mask, so CSV rows line up with the arrays by construction rather
+    than by a reconciliation after the fact.
     """
-    season, bias_all, over_all, prob_all = [], [], [], []
+    season, bias_all, over_all, prob_all, meta = [], [], [], [], []
     for t in years[min_train:]:
         tr = [y for y in years if y < t]
         se, te, fp, dp = (np.concatenate([data[y][k] for y in tr])
@@ -97,8 +145,22 @@ def walk_forward_bets(data, years, min_train):
         over_all.append((nu_t[keep] > 0).astype(float))
         prob_all.append(probit.win_prob(bias_t)[keep])
         season.append(np.full(int(keep.sum()), t))
-    return (np.concatenate(season), np.concatenate(bias_all),
-            np.concatenate(over_all), np.concatenate(prob_all))
+
+        if with_meta:
+            ids = game_meta(t)
+            if len(ids) != se_t.size:
+                raise AssertionError(
+                    f"{t}: identity replay has {len(ids)} rows, loader has "
+                    f"{se_t.size} -- the drop conditions have diverged.")
+            for i in np.flatnonzero(keep):
+                meta.append({**ids[i], "season": int(t),
+                             "spread": float(se_t[i]), "total": float(te_t[i]),
+                             "fav_pts": float(fp_t[i]),
+                             "dog_pts": float(dp_t[i]),
+                             "actual_total": float(fp_t[i] + dp_t[i])})
+    out = (np.concatenate(season), np.concatenate(bias_all),
+           np.concatenate(over_all), np.concatenate(prob_all))
+    return out + (meta,) if with_meta else out
 
 
 def wilson_roi(wins, n, price=-110):
@@ -107,20 +169,34 @@ def wilson_roi(wins, n, price=-110):
     return unit_roi(lo, price), unit_roi(hi, price)
 
 
-def kelly_roi(over, prob, fraction=KELLY_FRACTION, price=-110):
-    """Quarter-Kelly profit per unit staked, flat bankroll (order-independent).
+def kelly_units(prob, fraction=KELLY_FRACTION, price=-110):
+    """Per-bet quarter-Kelly stake in UNITS, where 1 unit = 1% of bankroll.
 
-    Kelly skips any game the model prices at or below breakeven, so `staked`
-    can be smaller than len(over).
+    The only place a Kelly stake is defined. kelly_fraction returns a share of
+    bankroll, so dividing by UNIT_PCT puts it on the same scale as the flat
+    rule's 1u: a bet the model likes twice as much as break-even-plus-a-hair
+    shows up as 2u, and one it prices below break-even shows up as 0u.
+    """
+    risk, payout = american_to_risk_payout(price)
+    return kelly_fraction(prob, fraction, risk=risk, payout=payout) / UNIT_PCT
+
+
+def kelly_roi(over, prob, fraction=KELLY_FRACTION, price=-110):
+    """Quarter-Kelly return per unit staked, flat bankroll (order-independent).
+
+    Returns (roi, units_staked, n_staked). Kelly skips any game the model
+    prices at or below breakeven, so both `units_staked` and `n_staked` can be
+    well below len(over) -- and units_staked is the denominator that makes
+    Kelly's ROI% incomparable with flat's until you multiply back out.
     """
     risk, payout = american_to_risk_payout(price)
     b = payout / risk
-    f = kelly_fraction(prob, fraction, risk=risk, payout=payout)
-    staked = float(f.sum())
+    u = kelly_units(prob, fraction, price)
+    staked = float(u.sum())
     if staked <= 0:
         return float("nan"), 0.0, 0
-    profit = float(np.sum(np.where(over > 0, f * b, -f)))
-    return profit / staked, staked, int((f > 0).sum())
+    profit = float(np.sum(np.where(over > 0, u * b, -u)))
+    return profit / staked, staked, int((u > 0).sum())
 
 
 def boot_kelly_ci(over, prob, rng, n_boot=BOOT, fraction=KELLY_FRACTION):
@@ -147,14 +223,16 @@ def boot_equity_bands(over, rng, n_boot=BOOT, price=-110):
     risk, payout = american_to_risk_payout(price)
     n = over.size
     paths = np.empty((n_boot, n))
-    per_bet = np.where(over > 0, payout, -risk)
+    # In units: risk 1u, win payout/risk. Same shape as the raw 110/100 path,
+    # on the scale the stake rules are quoted in.
+    per_bet = np.where(over > 0, payout / risk, -1.0)
     for i in range(n_boot):
         paths[i] = np.cumsum(rng.permutation(per_bet))
     return (np.percentile(paths, 5, axis=0), np.percentile(paths, 95, axis=0))
 
 
 def max_drawdown(equity):
-    """Peak-to-trough drop of a cumulative-profit path, in units risked."""
+    """Peak-to-trough drop of a cumulative-profit path, in units."""
     peak = np.maximum.accumulate(np.concatenate([[0.0], equity]))
     return float(np.max(peak - np.concatenate([[0.0], equity])))
 
@@ -171,6 +249,84 @@ def season_rows(season, over, prob, price=-110):
                      "roi": unit_roi(w, price) if n else float("nan"),
                      "lo": lo, "hi": hi})
     return rows
+
+
+CSV_COLUMNS = [
+    "game_id", "season", "week", "date", "away_team", "home_team",
+    "fav_team", "dog_team", "spread", "total", "fav_pts", "dog_pts",
+    "actual_total", "bias", "model_prob", "over", "passes_filter",
+    "flat_units_risked", "flat_units_pnl", "kelly_units", "kelly_units_pnl",
+]
+
+
+def _g(x):
+    """Full float precision in the CSV. 4dp would round the Kelly stakes
+    enough that reading the file back no longer reproduces the ROI."""
+    v = float(x)
+    return f"{0.0 if v == 0 else v:.10g}"     # no "-0" on the skipped rows
+
+
+def write_bets_csv(path, meta, bias, over, prob, threshold, price=-110):
+    """One row per graded walk-forward game -- ALL of them, not just the ones
+    clearing the filter, so the bias-bin table is reproducible from this file
+    too. Pushes are absent: walk_forward_bets drops them, and matching the
+    analysis exactly matters more than being literally every game.
+
+    Stakes and P&L are in units (1 unit = 1% of bankroll): the flat rule risks
+    1u on a qualifying game, Kelly risks kelly_units(prob).
+    """
+    _, payout = american_to_risk_payout(price)
+    b = payout / abs(price) if price < 0 else payout / 100.0
+    sel = bias > threshold
+    ku = kelly_units(prob, price=price)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=CSV_COLUMNS)
+        w.writeheader()
+        for i, m in enumerate(meta):
+            won = over[i] > 0
+            flat_risk = 1.0 if sel[i] else 0.0
+            w.writerow({
+                **{k: m[k] for k in (
+                    "game_id", "season", "week", "date", "away_team",
+                    "home_team", "fav_team", "dog_team")},
+                "spread": _g(m["spread"]), "total": _g(m["total"]),
+                "fav_pts": _g(m["fav_pts"]), "dog_pts": _g(m["dog_pts"]),
+                "actual_total": _g(m["actual_total"]),
+                "bias": _g(bias[i]), "model_prob": _g(prob[i]),
+                "over": int(won), "passes_filter": int(sel[i]),
+                "flat_units_risked": _g(flat_risk),
+                "flat_units_pnl": _g(flat_risk * (b if won else -1.0)),
+                "kelly_units": _g(ku[i]),
+                "kelly_units_pnl": _g(ku[i] * (b if won else -1.0)),
+            })
+    return len(meta)
+
+
+def reconcile_csv(path, expect, price=-110):
+    """Read the file back and re-derive the headline. This is the check that
+    matters: it catches meta/array misalignment, a wrong filter mask and
+    lost precision at once, none of which the arithmetic self-checks see.
+    """
+    n = wins = 0
+    flat_pnl = kelly_pnl = kelly_staked = 0.0
+    with open(path, newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if row["passes_filter"] != "1":
+                continue
+            # Kelly is sized on the filtered bets, same as kelly_roi() -- the
+            # unfiltered rows are in the file for the bin table, not to stake.
+            kelly_staked += float(row["kelly_units"])
+            kelly_pnl += float(row["kelly_units_pnl"])
+            n += 1
+            wins += int(row["over"])
+            flat_pnl += float(row["flat_units_pnl"])
+    assert n == expect["n"], (n, expect["n"])
+    assert wins == expect["wins"], (wins, expect["wins"])
+    assert abs(flat_pnl / n - expect["roi"]) < 1e-9, (flat_pnl / n, expect["roi"])
+    assert abs(kelly_pnl / kelly_staked - expect["kelly"]) < 1e-9
+    assert abs(kelly_staked - expect["kelly_staked"]) < 1e-6
+    return n, flat_pnl, kelly_staked, kelly_pnl
 
 
 def _provenance(years, min_train, threshold, n):
@@ -341,13 +497,13 @@ def make_figure(stats, path):
             ax.text(b, y_lab, f" {t}", fontsize=6.8, color=MUTED,
                     rotation=90, va="top")
             last_lab = b
-    ax.annotate(f"terminal +{eq[-1]:,.0f} units risked\n"
-                f"max drawdown −{stats['mdd']:,.0f}",
+    ax.annotate(f"terminal +{eq[-1]:,.1f}u\n"
+                f"max drawdown −{stats['mdd']:,.1f}u",
                 (eq.size, eq[-1]), textcoords="offset points",
                 xytext=(-8, -34), ha="right", fontsize=8.5, color=INK,
                 fontweight="bold")
     ax.set_xlabel("bet number (chronological)")
-    ax.set_ylabel("cumulative profit (units risked, flat $110)")
+    ax.set_ylabel("cumulative profit (units; 1u = 1% of bankroll)")
     ax.set_title("Realised equity vs. sequencing luck\n"
                  "band re-orders the same wins and losses; endpoint fixed "
                  "by construction", loc="left")
@@ -356,8 +512,9 @@ def make_figure(stats, path):
     # --- Panel 5: Kelly vs flat, with bootstrap ---------------------------
     ax = fig.add_subplot(gs[1, 2])
     _style(ax)
-    labels = ["flat stake\n(headline)",
-              f"{KELLY_FRACTION:g}-Kelly\nper unit staked"]
+    labels = [f"flat stake\n1.00u/bet → {stats['flat_profit_u']:+.0f}u",
+              f"{KELLY_FRACTION:g}-Kelly\n{stats['k_u_mean']:.2f}u avg "
+              f"→ {stats['kelly_profit_u']:+.0f}u"]
     vals = [roi * 100, stats["kelly"] * 100]
     lo_e = [(roi - roi_lo) * 100, (stats["kelly"] - stats["kelly_lo"]) * 100]
     hi_e = [(roi_hi - roi) * 100, (stats["kelly_hi"] - stats["kelly"]) * 100]
@@ -375,9 +532,12 @@ def make_figure(stats, path):
                 fontsize=7.5, color=GOLD, fontweight="bold", zorder=6)
     ax.set_ylim(0, max(v + h for v, h in zip(vals, hi_e)) * 1.18)
     ax.set_ylabel("return per unit staked (%)")
+    # Near-equal bars, 6x different profit: the ROI% hides the turnover, and
+    # the stake range is the reason flat is the rule that ships.
     ax.set_title("Two stake rules, two intervals\n"
-                 "flat = exact Wilson map; Kelly = "
-                 f"{BOOT//1000}k bootstrap", loc="left")
+                 f"Kelly stakes {stats['k_u_min']:.1f}–{stats['k_u_max']:.1f}u"
+                 f" per game — same edge, {stats['kelly_staked']/n:.1f}x the "
+                 "turnover", loc="left")
 
     # --- Panel 6 (wide): per-season ROI, honest error bars -----------------
     ax = fig.add_subplot(gs[2, :2])
@@ -499,6 +659,19 @@ def _self_check():
     # Kelly stakes nothing when the model prices every game at breakeven.
     r, staked, nb = kelly_roi(np.ones(3), np.full(3, HURDLE))
     assert staked == 0.0 and nb == 0 and np.isnan(r)
+    # Units: 1u = 1% of bankroll, so a stake is its bankroll fraction x100,
+    # nothing at or below breakeven, and full Kelly on a sure thing is 100u.
+    assert abs(kelly_units(np.array([HURDLE]))[0]) < 1e-12
+    assert abs(kelly_units(np.array([1.0]), fraction=1.0)[0] - 100.0) < 1e-9
+    assert np.allclose(kelly_units(np.array([0.62])),
+                       kelly_fraction(np.array([0.62])) * 100.0)
+    # Equity is in units now: a win adds payout/risk, a loss costs exactly 1u.
+    assert abs(unit_roi(1.0) - PAYOUT / RISK) < 1e-12
+    # ROI x n is total profit in units, which is what the two stake rules are
+    # compared on -- Kelly's turnover base differs, its percentage doesn't say.
+    o = np.array([1.0, 1.0, 0.0])
+    assert abs(unit_roi(o.mean()) * o.size
+               - (2 * PAYOUT / RISK - 1.0)) < 1e-9
     print("self-check OK")
 
 
@@ -510,6 +683,9 @@ def main():
     ap.add_argument("--threshold", type=float, default=1.75)
     ap.add_argument("--fig", default="docs/figs/roi_report.png")
     ap.add_argument("--no-fig", action="store_true")
+    ap.add_argument("--csv", default="docs/data/backtest_bets.csv",
+                    help="per-bet walk-forward rows (all graded games)")
+    ap.add_argument("--no-csv", action="store_true")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
 
@@ -523,7 +699,8 @@ def main():
     if len(years) <= args.min_train:
         sys.exit(f"Need > {args.min_train} seasons; have {len(years)}.")
 
-    season, bias, over, prob = walk_forward_bets(data, years, args.min_train)
+    season, bias, over, prob, meta = walk_forward_bets(
+        data, years, args.min_train, with_meta=True)
     sel = bias > args.threshold
     s_b, o_b, p_b = season[sel], over[sel], prob[sel]
     n, wins = int(sel.sum()), int(o_b.sum())
@@ -535,8 +712,14 @@ def main():
 
     k_roi, k_staked, k_n = kelly_roi(o_b, p_b)
     k_lo, k_hi = boot_kelly_ci(o_b, p_b, rng)
+    k_u = kelly_units(p_b)
+    # ROI% is per unit STAKED for Kelly and per unit RISKED for flat, so the
+    # two percentages are not comparable until multiplied back out. Total
+    # profit in units is, and is the number a bankroll actually sees.
+    flat_profit_u, kelly_profit_u = roi * n, k_roi * k_staked
 
-    equity = np.cumsum(np.where(o_b > 0, PAYOUT, -RISK))
+    equity = np.cumsum(np.where(o_b > 0, PAYOUT / RISK, -1.0))
+    k_equity = np.cumsum(np.where(o_b > 0, k_u * PAYOUT / RISK, -k_u))
     eq_lo, eq_hi = boot_equity_bands(o_b, rng)
     marks = [(int(np.argmax(s_b == t)) + 1, int(t))
              for t in sorted(set(s_b.tolist()))]
@@ -565,6 +748,10 @@ def main():
         "roi": roi, "roi_lo": roi_lo, "roi_hi": roi_hi,
         "kelly": k_roi, "kelly_lo": k_lo, "kelly_hi": k_hi,
         "kelly_staked": k_staked, "kelly_n": k_n,
+        "flat_profit_u": flat_profit_u, "kelly_profit_u": kelly_profit_u,
+        "k_u_min": float(k_u.min()), "k_u_med": float(np.median(k_u)),
+        "k_u_mean": float(k_u.mean()), "k_u_max": float(k_u.max()),
+        "k_equity": k_equity, "k_mdd": max_drawdown(k_equity),
         "equity": equity, "eq_lo": eq_lo, "eq_hi": eq_hi,
         "mdd": max_drawdown(equity), "season_marks": marks,
         "seasons": rows, "pos_seasons": sum(1 for r in rows if r["roi"] > 0),
@@ -586,8 +773,28 @@ def main():
     print(f"  {KELLY_FRACTION:g}-KELLY ROI  = {k_roi*100:+.2f}% per unit "
           f"staked (boot95 [{k_lo*100:+.2f}, {k_hi*100:+.2f}], "
           f"{k_n}/{n} games staked)")
-    print(f"  equity: terminal {equity[-1]:+,.0f} units risked, "
-          f"max drawdown {stats['mdd']:,.0f}")
+    print(f"\n  STAKES IN UNITS (1 unit = 1% of bankroll; flat = 1.00u/bet)")
+    print(f"    {KELLY_FRACTION:g}-Kelly stake: min {stats['k_u_min']:.2f}u  "
+          f"median {stats['k_u_med']:.2f}u  mean {stats['k_u_mean']:.2f}u  "
+          f"max {stats['k_u_max']:.2f}u")
+    print(f"    flat  staked {n:>7.1f}u -> profit {flat_profit_u:+.2f}u "
+          f"({roi*100:+.2f}% of turnover)")
+    print(f"    Kelly staked {k_staked:>7.1f}u -> profit "
+          f"{kelly_profit_u:+.2f}u ({k_roi*100:+.2f}% of turnover)")
+    print(f"    -> Kelly's higher ROI% is on a "
+          f"{k_staked/n:.2f}x turnover base; compare the unit profits, not "
+          f"the percentages.")
+    print(f"  equity: terminal {equity[-1]:+,.2f}u, "
+          f"max drawdown {stats['mdd']:,.2f}u  |  Kelly path: "
+          f"{stats['k_equity'][-1]:+,.1f}u, max drawdown "
+          f"{stats['k_mdd']:,.1f}u")
+    if stats["k_u_max"] > 3.0:
+        print(f"    WARNING: {KELLY_FRACTION:g}-Kelly's largest stake is "
+              f"{stats['k_u_max']:.1f}% of bankroll on one game. It is sized "
+              f"off the model's own\n    win probability with no allowance "
+              f"for estimation error, and college slates settle at the same\n"
+              f"    time, so several {stats['k_u_med']:.1f}u bets are live "
+              f"together. Flat 1u is the deployable rule.")
     print(f"  seasons profitable: {stats['pos_seasons']}/{len(rows)}  "
           f"({stats['n_min']}-{stats['n_max']} bets/season; "
           f"{recent_share*100:.0f}% of bets from {recent_from}+)")
@@ -610,6 +817,14 @@ def main():
         print(f"    {p:>5}  break-even {breakeven(p)*100:5.2f}%  "
               f"ROI {unit_roi(win, p)*100:+6.2f}%  "
               f"planning {unit_roi(win_lo, p)*100:+6.2f}%")
+
+    if not args.no_csv:
+        rows = write_bets_csv(args.csv, meta, bias, over, prob, args.threshold)
+        cn, cflat, ckstake, ckpnl = reconcile_csv(args.csv, stats)
+        print(f"\nWrote {args.csv} — {rows} graded games "
+              f"({cn} clear the filter). Read back: {cflat:+.2f}u flat, "
+              f"{ckpnl:+.2f}u Kelly on {ckstake:.1f}u staked — "
+              f"reconciles with the headline above.")
 
     if not args.no_fig:
         make_figure(stats, args.fig)

@@ -302,6 +302,14 @@ Two things worth naming rather than leaving for the reader to find:
 - Wilson intervals assume independent bets. Games on the same slate are not
   fully independent, so the true intervals are somewhat wider than shown.
 
+## Reproducing these tables
+
+Every row above comes out of `data/backtest_bets.csv` — one line per graded
+walk-forward game, all of them, not just the ones clearing the filter. Group
+by `season` (filtering `passes_filter == 1`) for the first table, bucket
+`bias` on the bin edges for the second. Regenerate both file and doc with
+`python monitor/roi_report.py && python monitor/roi_hitrate_doc.py`.
+
 ---
 
 {pooled['provenance']}

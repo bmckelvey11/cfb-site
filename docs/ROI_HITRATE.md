@@ -61,6 +61,14 @@ Note the bins are disjoint, so the 1.00–1.75 row is the band *excluded* by the
 - Wilson intervals assume independent bets. Games on the same slate are not
   fully independent, so the true intervals are somewhat wider than shown.
 
+## Reproducing these tables
+
+Every row above comes out of `data/backtest_bets.csv` — one line per graded
+walk-forward game, all of them, not just the ones clearing the filter. Group
+by `season` (filtering `passes_filter == 1`) for the first table, bucket
+`bias` on the bin edges for the second. Regenerate both file and doc with
+`python monitor/roi_report.py && python monitor/roi_hitrate_doc.py`.
+
 ---
 
-Walk-forward: train on seasons < t, bet season t  |  data 2013–2025, bet seasons 2016–2025 (min-train=3)  |  filter: expected censoring bias > 1.75 → bet the full-game OVER  |  N=234 graded bets (pushes dropped)  |  CFBD lines, consensus provider  |  commit 77dbc1c  |  generated 2026-08-26
+Walk-forward: train on seasons < t, bet season t  |  data 2013–2025, bet seasons 2016–2025 (min-train=3)  |  filter: expected censoring bias > 1.75 → bet the full-game OVER  |  N=234 graded bets (pushes dropped)  |  CFBD lines, consensus provider  |  commit 5ab698d  |  generated 2026-08-28
