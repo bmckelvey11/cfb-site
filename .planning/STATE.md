@@ -162,6 +162,7 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 
 | Date | Slug | What | Status |
 |------|------|------|--------|
+| 2026-08-28 | registry-features-for-new-endpoints | 5 features off the new endpoints (prior_core_overall/offense/defense, prior_srs_rating, conference_change); ratings lagged one season since core/SRS are season-final; registry 59 -> 64 features | complete |
 | 2026-08-28 | bump-cfbd-client-register-10-endpoints | Vendored cfbd-python 034cd17 -> 52f2bbf; registered the last 10 spec paths (CFP x3, core ratings, expanded SRS, coach profile/seasons/tenures, conference affiliations/changes); audit now 73+1+0=74; new Endpoint.min_season; 2012-2025 scraped, 0 failed | complete |
 | 2026-08-28 | cfbd-endpoint-completeness-audit | `scripts/audit_endpoints.py` diffs the live CFBD spec (74 paths) against the vendored client and `ENDPOINTS`; partition closes at 63 registered + 1 deliberate + 10 client-blocked, zero drift | complete |
 | 2026-07-20 | numeric-filter-step-intervals | Filter popup numeric controls snap to a span-scaled step (0.5 for spread/total) instead of continuous `step="any"` | complete |
