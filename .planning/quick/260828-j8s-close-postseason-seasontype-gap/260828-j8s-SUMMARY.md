@@ -3,7 +3,7 @@ id: 260828-j8s
 slug: close-postseason-seasontype-gap
 date: 2026-08-28
 status: complete
-commits: [cf5fe68]
+commits: [cf5fe68, 70fcdc2]
 ---
 
 # Summary — postseason is in the dataset
@@ -46,6 +46,9 @@ regular row, which a `both` bug cannot do.
 Feature gate: 381 of 13,014 pre-existing games moved, all attributable to upstream churn in
 re-scraped files. `running_games_played` — the one field that can only change if a game
 entered a prior-game window — moved **nowhere**, so no bowl contaminated any regular game.
+
+`upcoming.py` was checked and is unaffected: it already passed `season_type=_BOTH`
+explicitly rather than relying on the default.
 
 ## Two things to carry forward
 

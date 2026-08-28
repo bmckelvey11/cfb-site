@@ -140,6 +140,13 @@ regular-season game untouched. 381 of 13,014 moved. All of it attributes to upst
 in the re-scraped files — `raw_weather` (470 values), `raw_conferences` (306), `raw_havoc`
 (230), `raw_teams` (152), `raw_pregame_wp` (47), `raw_lines` (12).
 
+246 of those drift on a source kind whose own file was *not* re-scraped
+(`raw_teams`, `raw_conferences`, `raw_team_season`, `raw_prior_team_season`). Every one of
+the 246 turns out to have a team-name or conference rename in `games.csv`: `games` was
+re-scraped, upstream renamed teams and conferences, and the rename changes the lookup key
+into those unchanged files. Indirect, but still upstream churn — 246/246, no unexplained
+remainder.
+
 The decisive field is `running_games_played`, which can only change if a game **entered**
 some prior-game window. It moved **nowhere**, and neither did `running_win_pct`,
 `running_ats_pct`, `running_streak` or `running_ats_streak`. The 510 `computed_running`
