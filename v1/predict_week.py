@@ -8,6 +8,7 @@ Run:  python v1/predict_week.py --fit-seasons 2015 2016 ... 2025 \
 import argparse
 import csv
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from run_on_project_data import DEFAULT_CSV, load
 
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_OUT_CSV = REPO / "data" / "processed" / "predictions.csv"
+DEFAULT_SNAPSHOT_DIR = REPO / "data" / "predictions"
 CFBD_LINES_URL = "https://api.collegefootballdata.com/lines"
 CSV_COLUMNS = [
     "run_at", "source", "book", "game_id", "game_date", "week",
@@ -110,6 +112,14 @@ def append_csv(path, rows, run_at, source, book, dog_est, bias_totals,
             })
 
 
+def snapshot_name(run_at, raw_stem, book):
+    """Filename for one run's immutable snapshot. run_at is already UTC and
+    second-resolution, so two runs never collide."""
+    stamp = re.sub(r"[:\-]", "", run_at).replace("Z", "")
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{raw_stem}_{book}")
+    return f"{stamp}_{safe}.csv"
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Fit on historical seasons, predict a future week's overs")
@@ -136,6 +146,9 @@ def main():
     ap.add_argument("--csv", default=str(DEFAULT_OUT_CSV),
                      help="append every scored game to this CSV "
                           "(--csv '' to disable)")
+    ap.add_argument("--snapshot-dir", default=str(DEFAULT_SNAPSHOT_DIR),
+                     help="also write an immutable per-run snapshot CSV here "
+                          "(--snapshot-dir '' to disable)")
     args = ap.parse_args()
 
     if args.fetch:
@@ -178,11 +191,17 @@ def main():
               f"{bias:>6.2f} {p*100:>7.2f}% {pick}")
     print(f"\n{picks}/{len(rows)} games clear bias > {args.threshold}")
 
+    run_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     if args.csv:
-        run_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         append_csv(args.csv, rows, run_at, Path(args.raw).name, args.book,
                    dog_est, bias_totals, win_probs, args.threshold)
         print(f"Appended {len(rows)} rows to {args.csv}")
+    if args.snapshot_dir:
+        snap = Path(args.snapshot_dir) / snapshot_name(
+            run_at, Path(args.raw).stem, args.book)
+        append_csv(snap, rows, run_at, Path(args.raw).name, args.book,
+                   dog_est, bias_totals, win_probs, args.threshold)
+        print(f"Wrote snapshot {snap}")
 
 
 if __name__ == "__main__":
