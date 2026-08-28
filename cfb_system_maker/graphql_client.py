@@ -23,7 +23,7 @@ GRAPHQL_URL = "https://graphql.collegefootballdata.com/v1/graphql"
 # discovered by introspection. Large tables (gamePlayerStat, athlete) honor --season
 # where the table has a season/year column.
 GQL_DEFAULT_TABLES: list[str] = [
-    "game", "gameLines", "gameTeam", "gameMedia", "gameWeather",
+    "game", "gameLines", "gameTeam", "gameWeather",
     "recruit", "recruitingTeam", "ratings", "teamTalent",
     "athlete", "athleteTeam", "coach", "coachSeason", "transfer",
     "adjustedPlayerMetrics", "adjustedTeamMetrics", "draftPicks",
@@ -37,12 +37,28 @@ GQL_DEFAULT_TABLES: list[str] = [
     "weatherCondition",
 ]
 
+# Tables whose scalar columns do not identify a row: the identity lives in a to-one
+# relation. For each, the relation and the few columns lifted from it — enough to join,
+# not the whole related row. Selected AND sorted on, since a table like pollRank has only
+# (rank, points, firstPlaceVotes) as scalars and would otherwise paginate on heavy ties.
+GQL_RELATION_KEYS: dict[str, dict[str, list[str]]] = {
+    "pollRank": {
+        # `pollType` separates the AP and Coaches polls, which otherwise produce
+        # byte-identical rows whenever both rank a team the same in the same week.
+        "poll": ["season", "seasonType", "week", "pollType.name"],
+        "team": ["school", "conference", "classification"],
+    },
+}
+
 # Introspected tables deliberately kept OUT of the default pull, and why. Lives here rather
 # than in the audit script so the rationale sits next to the list it modifies; the audit
 # reads both. Mirrors DELIBERATE on the REST side.
 GQL_EXCLUDED: dict[str, str] = {
     "gamePlayerStat": "~6.7M rows, multi-GB; pull per season with --tables/--season",
     "scoreboard": "live in-progress games, no historical value",
+    "gameMedia": "no join key exists on this root — GameMedia is reachable only as "
+                 "game.mediaInfo, so a dump of it cannot be tied back to a game; the REST "
+                 "media_{season}.json files carry gameId and are what enrich reads",
 }
 
 Poster = Callable[[str, dict[str, Any]], dict[str, Any]]
@@ -137,7 +153,9 @@ def _paginate(
     page_size: int,
     seasons: list[int] | None,
 ) -> tuple[list[dict[str, Any]], int]:
-    fields = " ".join(table.scalars)
+    relations = GQL_RELATION_KEYS.get(table.root, {})
+    blocks = [f"{rel} {{ {_selection(cols)} }}" for rel, cols in relations.items()]
+    fields = " ".join([*table.scalars, *blocks])
     # Hasura names this arg `orderBy` and takes an UPPERCASE enum; `order_by: {x: asc}` is
     # rejected on both counts. The docs warn that `offset` without `orderBy` has no stable
     # row order, so an unsorted paginated pull can skip or repeat rows between pages.
@@ -149,9 +167,18 @@ def _paginate(
     # rows, which are interchangeable. Measured at 0.3s for a gameTeam page.
     order = ""
     if "orderBy" in table.args:
-        keys = ["id"] if "id" in table.scalars else table.scalars
-        clause = ", ".join(f"{{{key}: ASC}}" for key in keys)
-        order = f"orderBy: [{clause}]"
+        if "id" in table.scalars:
+            clauses = ["{id: ASC}"]
+        else:
+            # Relation keys come first: they are what actually separates rows on a table
+            # whose own scalars repeat (pollRank has three, all small integers).
+            clauses = [
+                _order_clause(f"{rel}.{col}")
+                for rel, cols in relations.items()
+                for col in cols
+            ]
+            clauses += [f"{{{col}: ASC}}" for col in table.scalars]
+        order = f"orderBy: [{', '.join(clauses)}]"
     where = ""
     if seasons and table.season_col and "where" in table.args:
         where = f"where: {{{table.season_col}: {{_in: [{', '.join(str(s) for s in seasons)}]}}}}"
@@ -236,6 +263,26 @@ def pull_game_player_stats(
         except Exception as exc:
             reports.append(GqlReport(name, 0, 0, error=f"{type(exc).__name__}: {exc}"))
     return reports
+
+
+def _selection(cols: list[str]) -> str:
+    """Render relation columns, nesting dotted paths: `pollType.name` -> `pollType { name }`."""
+    plain = [c for c in cols if "." not in c]
+    nested: dict[str, list[str]] = {}
+    for col in cols:
+        if "." in col:
+            head, _, tail = col.partition(".")
+            nested.setdefault(head, []).append(tail)
+    blocks = [f"{head} {{ {_selection(tail)} }}" for head, tail in nested.items()]
+    return " ".join([*plain, *blocks])
+
+
+def _order_clause(path: str) -> str:
+    """`poll.pollType.name` -> `{poll: {pollType: {name: ASC}}}` (Hasura orders through
+    relations, and a key that only appears in the selection cannot break a tie)."""
+    head, _, tail = path.partition(".")
+    inner = _order_clause(tail) if tail else "ASC"
+    return f"{{{head}: {inner}}}"
 
 
 def _unwrap(type_ref: dict[str, Any]) -> tuple[str, str | None]:

@@ -169,3 +169,31 @@ def test_tables_without_an_id_sort_on_every_scalar_column(tmp_path):
     graphql_scrape(data_dir=tmp_path, tables=["gameTeam"], post_fn=make_post(data, captured))
 
     assert "orderBy: [{endElo: ASC}, {gameId: ASC}, {homeAway: ASC}]" in captured["gameTeam"]
+
+
+def test_relation_keys_are_selected_and_sorted_through(tmp_path, monkeypatch):
+    """A table whose own scalars don't identify a row needs its relation key in BOTH the
+    selection (or the dump can't be joined) and the sort (or ties break per request)."""
+    from cfb_system_maker import graphql_client
+
+    monkeypatch.setitem(
+        graphql_client.GQL_RELATION_KEYS, "gameTeam",
+        {"game": ["season", "pollType.name"]},
+    )
+    captured = {}
+    data = {"gameTeam": [{"endElo": 1, "gameId": 1, "homeAway": "home"}]}
+    graphql_scrape(data_dir=tmp_path, tables=["gameTeam"], post_fn=make_post(data, captured))
+    q = captured["gameTeam"]
+
+    assert "game { season pollType { name } }" in q          # dotted path nests
+    assert "{game: {season: ASC}}" in q                       # relation key orders first
+    assert "{game: {pollType: {name: ASC}}}" in q             # and does so through two hops
+    assert q.index("{game: {season: ASC}}") < q.index("{endElo: ASC}")
+
+
+def test_selection_and_order_clause_render_nested_paths():
+    from cfb_system_maker.graphql_client import _order_clause, _selection
+
+    assert _selection(["season", "pollType.name"]) == "season pollType { name }"
+    assert _order_clause("poll.pollType.name") == "{poll: {pollType: {name: ASC}}}"
+    assert _order_clause("rank") == "{rank: ASC}"

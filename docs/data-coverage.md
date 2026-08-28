@@ -183,15 +183,27 @@ Tables with no `id` now sort on **every scalar column**, which leaves ties only 
 byte-identical rows. Re-pulled `gameTeam`: 225,344 rows, 225,344 unique `(gameId, side)`
 pairs, zero duplicates, and `pregame_win_prob` back to 12,812 non-null.
 
-### Some tables cannot be joined as stored
+### Relation-keyed tables select their join key
 
-`_paginate` selects scalar columns and skips relations, which for a few tables drops the
-identity entirely. `gameMedia` exposes only `mediaType` and `name` — its `game` link is an
-OBJECT relation, so the 23,907-row dump collapses to 124 distinct rows and cannot be joined
-to anything. `pollRank` is the same (`poll` and `team` are both relations). Nothing in
-`enrich` reads these from GraphQL (it uses the REST `media_*` and `rankings_*` files), so
-this is a known limitation rather than a live bug — but re-pulling those tables does not
-make them usable.
+`_paginate` selects scalar columns and skips relations, which for a few tables dropped the
+identity entirely. `GQL_RELATION_KEYS` names, per table, the relation and the handful of
+columns to lift from it — enough to join, not the whole related row. Those columns are put
+in the **selection and the sort**: a table like `pollRank` has only `rank`, `points` and
+`firstPlaceVotes` as scalars, so without the relation key it also paginates on heavy ties.
+Dotted paths nest (`pollType.name` selects `pollType { name }` and orders as
+`{poll: {pollType: {name: ASC}}}`, since Hasura orders through relations).
+
+`pollRank` now carries `poll` (season, seasonType, week, pollType.name) and `team` (school,
+conference, classification) — 49,948 rows, joinable, and stable: the same multiset comes
+back at page sizes 1,000 and 5,000. 152 rows are byte-identical duplicates **upstream**
+(e.g. two FCS Coaches Poll 2022 wk 6 rows), not a pagination artifact — the page-size
+invariance is what separates the two. 291 rows have `team: null`: the relation points at
+`currentTeams`, and 1930s-era programs aren't in it.
+
+`gameMedia` **cannot** be fixed this way and moved to `GQL_EXCLUDED`. Its type has exactly
+two fields, `mediaType` and `name`; the link is one-directional (`game.mediaInfo`), so there
+is no join key on that root to select. The REST `media_{season}.json` files carry `gameId`
+and are what `enrich` reads, so nothing is lost.
 
 ### Row counts, not just file existence
 
