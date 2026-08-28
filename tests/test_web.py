@@ -250,6 +250,35 @@ def test_web_filters_apply_to_results(tmp_path):
     assert '<strong class="negative">' + _money_won_text(expected.profit) + "</strong>" in metrics_html
 
 
+def test_web_past_matches_shows_final_score(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/system?side=away&underdog=on&min_spread=3&tab=matches")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "<th>Score</th>" in html
+    assert "<td>14-30</td>" in html
+    assert "<td>17-31</td>" in html
+
+
+def test_web_past_matches_shows_combined_score_for_totals(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    response = app.test_client().get("/system?bet_type=total&total_side=over&tab=matches")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "<th>Score</th>" in html
+    assert "<td>44</td>" in html
+    assert "<td>48</td>" in html
+    assert "<td>20</td>" in html
+
+
 def test_web_malformed_choice_params_fall_back_to_defaults_instead_of_500(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

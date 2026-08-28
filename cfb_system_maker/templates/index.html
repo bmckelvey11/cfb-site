@@ -16,7 +16,7 @@
           <div>
             <h1>CFB System Maker</h1>
             <p>{{ options.seasons|length and (options.seasons[0] ~ "-" ~ options.seasons[-1]) or "No data" }}</p>
-            <p><a class="dash-cta" href="{{ url_for('dashboard') }}">&larr; My Systems</a></p>
+            <p><a class="dash-cta" href="{{ url_for('dashboard') }}">My Systems</a></p>
           </div>
         </div>
 
@@ -587,6 +587,7 @@
                   <th>Week</th>
                   <th>Team</th>
                   <th>Opponent</th>
+                  <th>Score</th>
                   <th>Side</th>
                   <th>Spread</th>
                   <th>Total</th>
@@ -601,6 +602,7 @@
                     <td>{{ bet.week }}</td>
                     <td>{{ bet.team }}</td>
                     <td>{{ bet.opponent }}</td>
+                    <td>{% if bet.team_points is not none and bet.opponent_points is not none %}{{ bet.team_points }}-{{ bet.opponent_points }}{% elif bet.team_points is not none %}{{ bet.team_points }}{% else %}&mdash;{% endif %}</td>
                     <td>{{ bet.side }}</td>
                     <td>{{ "%.1f"|format(bet.line) }}</td>
                     <td>{{ "%.1f"|format(bet.total) if bet.total is not none else "-" }}</td>
@@ -608,7 +610,7 @@
                     <td class="{{ 'positive' if bet.profit > 0 else 'negative' if bet.profit < 0 else '' }}">{{ "%.4f"|format(bet.profit) }}</td>
                   </tr>
                 {% else %}
-                  <tr><td colspan="9" class="no-results">No bets matched these filters.</td></tr>
+                  <tr><td colspan="10" class="no-results">No bets matched these filters.</td></tr>
                 {% endfor %}
               </tbody>
             </table>

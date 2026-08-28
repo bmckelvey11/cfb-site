@@ -550,6 +550,8 @@ def grade_bet(
         result=result,
         profit=round(profit, 4),
         margin=round(cover_margin, 4),
+        team_points=team_points,
+        opponent_points=opponent_points,
     )
 
 
@@ -598,6 +600,8 @@ def _grade_total_bet(
         line=game.total,
         result=result,
         profit=round(profit, 4),
+        team_points=points,
+        opponent_points=None,
     )
 
 

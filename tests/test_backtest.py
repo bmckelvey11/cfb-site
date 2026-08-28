@@ -53,6 +53,8 @@ def test_home_favorite_cover_wins_at_minus_110():
     assert round(result.roi, 4) == 0.9091
     assert result.bet_details[0].margin == 1.5
     assert result.average_margin == 1.5
+    assert result.bet_details[0].team_points == 30
+    assert result.bet_details[0].opponent_points == 14
 
 
 def test_away_underdog_push_counts_no_profit_or_loss():
@@ -144,6 +146,9 @@ def test_over_under_bets_grade_against_total_points():
     assert over.pushes == 1
     assert over.bet_details[0].team == "Over"
     assert over.bet_details[0].line == 52.5
+    assert over.bet_details[0].team_points == 55
+    assert over.bet_details[0].opponent_points is None
+    assert over.bet_details[1].team_points == 37
     assert under.losses == 1
     assert under.pushes == 1
 

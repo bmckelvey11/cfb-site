@@ -66,7 +66,7 @@
                     <th>Money Won</th>
                     <th>ROI</th>
                     <th>Trend</th>
-                    {% if tab != 'examples' %}<th class="actions-col"><span class="sr-only">Actions</span></th>{% endif %}
+                    <th class="actions-col{% if tab == 'examples' %} actions-col--copy{% endif %}"><span class="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -77,10 +77,6 @@
                         {% if tab == 'examples' %}
                           <span class="system-name">{{ row.name }}</span>
                           {% if row.theory %}<p class="example-theory">{{ row.theory }}</p>{% endif %}
-                          <form class="example-copy" method="post" action="{{ url_for('copy_example') }}">
-                            <input type="hidden" name="name" value="{{ row.example_name }}">
-                            <button type="submit" class="example-copy__button">Copy to My Systems</button>
-                          </form>
                         {% else %}
                           <a class="system-link" href="{{ url_for('index') }}?load_system={{ row.name|urlencode }}">{{ row.name }}</a>
                           {% if row.source == 'search' %}<span class="badge-search">Search</span>{% endif %}
@@ -93,8 +89,13 @@
                       <td class="{{ 'positive' if fig.profit > 0 else 'negative' if fig.profit < 0 else '' }}">{{ money(fig.profit) }}</td>
                       <td class="{{ 'positive' if fig.roi > 0 else 'negative' if fig.roi < 0 else '' }}">{{ "%.2f%%"|format(fig.roi * 100) }}</td>
                       <td class="trend-cell">{% if row.sparkline.empty %}<span class="trend-empty">&mdash;</span>{% else %}<svg class="sparkline" viewBox="0 0 96 24" width="96" height="24" preserveAspectRatio="none" role="img" aria-label="{{ row.sparkline.label }}"><polyline class="{{ row.sparkline.sign_class }}" points="{{ row.sparkline.polyline }}" /></svg>{% endif %}</td>
-                      {% if tab != 'examples' %}
-                      <td class="actions-cell">
+                      <td class="actions-cell{% if tab == 'examples' %} actions-cell--copy{% endif %}">
+                        {% if tab == 'examples' %}
+                          <form class="example-copy" method="post" action="{{ url_for('copy_example') }}">
+                            <input type="hidden" name="name" value="{{ row.example_name }}">
+                            <button type="submit" class="example-copy__button">Copy to My Systems</button>
+                          </form>
+                        {% else %}
                         <details class="row-menu">
                           <summary aria-label="Actions for {{ row.name }}">&hellip;</summary>
                           <div class="row-menu__pop">
@@ -108,8 +109,8 @@
                             </form>
                           </div>
                         </details>
+                        {% endif %}
                       </td>
-                      {% endif %}
                     </tr>
                   {% endfor %}
                 </tbody>

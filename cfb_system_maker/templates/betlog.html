@@ -14,7 +14,7 @@
           <span class="brand-mark">CFB</span>
           <div><h1>Bet Log</h1></div>
         </div>
-        <a class="dash-cta" href="{{ url_for('dashboard') }}">&larr; My Systems</a>
+        <a class="dash-cta" href="{{ url_for('dashboard') }}">My Systems</a>
       </header>
 
       {% if not has_bets %}
@@ -30,17 +30,20 @@
         </section>
         <p class="clv-coverage-note">{{ stats.n }} of {{ total_bets }} bets have a computed CLV; the rest are missing a closing line.</p>
 
-        <table class="season-breakdown">
-          <thead><tr><th>Season</th><th>N</th><th>Mean CLV</th></tr></thead>
-          <tbody>
-            {% for row in by_season %}
-              <tr><td>{{ row.season }}</td><td>{{ row.n }}</td><td>{{ "%.2f"|format(row.mean_clv) }}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table class="season-breakdown">
+            <thead><tr><th>Season</th><th>N</th><th>Mean CLV</th></tr></thead>
+            <tbody>
+              {% for row in by_season %}
+                <tr><td>{{ row.season }}</td><td>{{ row.n }}</td><td>{{ "%.2f"|format(row.mean_clv) }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
 
-        <section class="betlog-chart" aria-label="CLV over time">
-          <svg viewBox="0 0 520 150" width="520" height="150" role="img" aria-label="Cumulative CLV over time">
+        <section class="cumulative-chart chart-card betlog-chart" aria-label="CLV over time">
+          <h3>CLV over time</h3>
+          <svg viewBox="0 0 520 150" role="img" preserveAspectRatio="none" aria-label="Cumulative CLV over time">
             <line x1="0" y1="{{ chart.zero_y }}" x2="520" y2="{{ chart.zero_y }}" class="chart-zero-line" />
             {% if chart.polyline %}
               <polyline points="{{ chart.polyline }}" class="chart-line" fill="none" />
@@ -48,27 +51,29 @@
           </svg>
         </section>
 
-        <table class="betlog-table">
-          <thead>
-            <tr><th>Date</th><th>Matchup</th><th>Bet</th><th>Line Taken</th><th>Closing</th><th>CLV</th></tr>
-          </thead>
-          <tbody>
-            {% for row in rows %}
-              <tr>
-                <td>{{ row.bet.date }}</td>
-                <td>{{ row.bet.away_team }} @ {{ row.bet.home_team }}</td>
-                <td>{{ row.bet.bet_type }} {{ row.bet.side }}</td>
-                <td>{{ row.bet.line_taken }}</td>
-                {% if row.clv is none %}
-                  <td colspan="2" class="clv-missing">CLV not available (no closing line found)</td>
-                {% else %}
-                  <td>{{ row.closing_line }}</td>
-                  <td class="{{ 'positive' if row.clv > 0 else 'negative' if row.clv < 0 else '' }}">{{ "%.1f"|format(row.clv) }}</td>
-                {% endif %}
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table class="betlog-table">
+            <thead>
+              <tr><th>Date</th><th>Matchup</th><th>Bet</th><th>Line Taken</th><th>Closing</th><th>CLV</th></tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+                <tr>
+                  <td>{{ row.bet.date }}</td>
+                  <td>{{ row.bet.away_team }} @ {{ row.bet.home_team }}</td>
+                  <td>{{ row.bet.bet_type }} {{ row.bet.side }}</td>
+                  <td>{{ row.bet.line_taken }}</td>
+                  {% if row.clv is none %}
+                    <td colspan="2" class="clv-missing">CLV not available (no closing line found)</td>
+                  {% else %}
+                    <td>{{ row.closing_line }}</td>
+                    <td class="{{ 'positive' if row.clv > 0 else 'negative' if row.clv < 0 else '' }}">{{ "%.1f"|format(row.clv) }}</td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       {% endif %}
     </div>
     {% include "_footer.html" %}

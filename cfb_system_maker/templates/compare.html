@@ -9,14 +9,16 @@
   </head>
   <body>
     {% from "_macros.html" import money %}
-    <main class="app-shell compare-page">
-      <section class="workspace">
-        <header class="workspace-header">
-          <div>
-            <h2>Compare Systems</h2>
-            <p><a href="{{ url_for('index') }}">&larr; Back to backtester</a></p>
-          </div>
-        </header>
+    <div class="dash-shell compare-page">
+      <header class="dash-header">
+        <div class="brand">
+          <span class="brand-mark">CFB</span>
+          <div><h1>Compare Systems</h1></div>
+        </div>
+        <div class="dash-actions">
+          <a class="dash-cta" href="{{ url_for('index') }}">System Editor</a>
+        </div>
+      </header>
 
         {% if error == "missing_data" %}
           <div class="empty-state">
@@ -30,7 +32,10 @@
                 <input type="checkbox" name="system" value="{{ name }}" {% if name in selected %}checked{% endif %}> {{ name }}{% if saved_system_meta.get(name, {}).source == 'search' %} <span class="badge-search">Search</span>{% endif %}
               </label>
             {% else %}
-              <p class="no-saved-systems">No saved systems yet - save one from the backtester first.</p>
+              <div class="empty-state">
+                <h2>No saved systems yet</h2>
+                <p>Save one from the System Editor first.</p>
+              </div>
             {% endfor %}
             {% if saved_systems %}
             <label>Holdout season(s)
@@ -70,8 +75,7 @@
           </section>
           {% endif %}
         {% endif %}
-      </section>
-    </main>
+    </div>
     {% include "_footer.html" %}
   </body>
 </html>

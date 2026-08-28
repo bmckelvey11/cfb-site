@@ -12,7 +12,14 @@
   --win-bg: #e6f4ee;
   --loss-bg: #fee8e5;
   --push-bg: #eef2f7;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 * {
@@ -21,22 +28,25 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .app-shell {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
-  min-height: 100vh;
+  flex: 1 0 auto;
 }
 
 .filter-panel {
-  align-self: start;
+  align-self: stretch;
   position: sticky;
   top: 0;
-  height: 100vh;
+  max-height: 100dvh;
   overflow: auto;
   background: var(--panel);
   border-right: 1px solid var(--border);
@@ -47,7 +57,7 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .brand-mark {
@@ -64,6 +74,7 @@ body {
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -77,6 +88,10 @@ h2 {
   font-size: 24px;
 }
 
+.brand p:has(.dash-cta) {
+  margin-top: 8px;
+}
+
 .brand p,
 .workspace-header p {
   color: var(--muted);
@@ -86,7 +101,7 @@ h2 {
 
 .filters {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 fieldset {
@@ -144,7 +159,7 @@ label {
 .field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .field-grid .full-width {
@@ -185,7 +200,7 @@ input[type="checkbox"] {
 }
 
 button {
-  min-height: 42px;
+  min-height: 40px;
   border: 0;
   border-radius: 6px;
   background: var(--accent);
@@ -267,32 +282,39 @@ button:hover {
 
 .workspace {
   min-width: 0;
-  padding: 28px;
+  padding: 24px;
 }
 
-.workspace-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 18px;
+.workspace-header a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.workspace-header a:hover {
+  text-decoration: underline;
 }
 
 .metrics {
   display: grid;
   grid-template-columns: repeat(6, minmax(120px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .metrics.stat-chips {
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.metrics.stats-panel {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .metrics article {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 14px;
+  padding: 16px;
 }
 
 .metrics span {
@@ -312,7 +334,7 @@ button:hover {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -327,7 +349,7 @@ button:hover {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 16px;
-  margin: -8px 0 18px;
+  margin: 0 0 16px;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
@@ -346,7 +368,7 @@ button:hover {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .active-filters {
@@ -388,11 +410,15 @@ button:hover {
 .tabs {
   display: flex;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+}
+
+.tabs + .tabs {
+  margin-top: -8px;
 }
 
 .tabs a {
-  padding: 8px 12px;
+  padding: 8px 16px;
   color: var(--muted);
   text-decoration: none;
   font-size: 13px;
@@ -406,7 +432,7 @@ button:hover {
 }
 
 .filter-detail {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .cumulative-chart {
@@ -414,7 +440,7 @@ button:hover {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .cumulative-chart h3 {
@@ -447,7 +473,7 @@ button:hover {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 14px;
+  padding: 16px;
 }
 
 .range-chart h3 {
@@ -489,6 +515,18 @@ button:hover {
   overflow: auto;
 }
 
+.table-wrap > h3 {
+  padding: 16px 16px 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.table-wrap > p {
+  padding: 0 16px 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -508,6 +546,8 @@ th {
   background: var(--panel-strong);
   color: var(--muted);
   font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -573,11 +613,15 @@ th {
 }
 
 .empty-state {
-  padding: 32px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: auto;
+  padding: 24px;
 }
 
 .empty-state p {
-  margin-top: 10px;
+  margin-top: 8px;
   color: var(--muted);
   line-height: 1.5;
 }
@@ -592,7 +636,7 @@ code {
 .no-results {
   color: var(--muted);
   text-align: center;
-  padding: 28px;
+  padding: 24px;
 }
 
 @media (max-width: 900px) {
@@ -601,6 +645,9 @@ code {
   }
 
   .filter-panel {
+    position: static;
+    height: auto;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
@@ -618,7 +665,7 @@ code {
   background: #fff4e5;
   border: 1px solid #f0b429;
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 8px 16px;
   font-size: 0.85rem;
 }
 
@@ -628,7 +675,7 @@ code {
   font-weight: 700;
   letter-spacing: -0.01em;
   padding-bottom: 8px;
-  margin-top: 20px;
+  margin-top: 16px;
 }
 
 .feature-group:first-of-type > legend {
@@ -662,19 +709,28 @@ code {
 
 .feature-group__toggle {
   float: right;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
   min-width: 24px;
-  padding: 0 6px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
   background: none;
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text);
+  font-size: 14px;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: 1;
 }
 
 /* Collapse goes inert while a search term is active, so a collapsed group still
    reveals its matching rows -- search overrides collapse. */
-.feature-filters:not(.is-searching) .feature-group.is-collapsed .filter-launch-row {
+.feature-filters:not(.is-searching)
+  .feature-group.is-collapsed
+  .filter-launch-row {
   display: none;
 }
 
@@ -703,7 +759,11 @@ code {
 }
 .coverage ul {
   margin: 4px 0 0;
-  padding-left: 18px;
+  padding-left: 16px;
+}
+
+.compare-page.app-shell {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .compare-page .workspace {
@@ -712,9 +772,13 @@ code {
 .compare-picker {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
   margin-bottom: 16px;
+}
+
+.compare-picker .empty-state {
+  flex: 1 1 100%;
 }
 .compare-table th,
 .compare-table td {
@@ -744,13 +808,13 @@ code {
 }
 
 .saved-systems {
-  margin-top: 20px;
+  margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 
 .saved-systems h3 {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
@@ -1012,10 +1076,10 @@ code {
 .filter-modal__close {
   position: absolute;
   top: 16px;
-  right: 20px;
+  right: 16px;
   min-height: 36px;
   min-width: 36px;
-  padding: 0 10px;
+  padding: 0 8px;
   background: transparent;
   color: var(--loss);
   font-size: 16px;
@@ -1358,8 +1422,8 @@ code {
 }
 
 .filter-modal__secondary {
-  margin-top: 18px;
-  padding-top: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 
@@ -1444,16 +1508,27 @@ code {
 
 .dash-shell {
   max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
   padding: 24px;
+  flex: 1 0 auto;
+}
+
+.dash-shell .workspace {
+  padding: 0;
 }
 
 .dash-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.dash-header .brand {
+  margin-bottom: 0;
 }
 
 .dash-actions {
@@ -1648,25 +1723,30 @@ code {
 }
 
 .example-theory {
-  margin: 6px 0 0;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: var(--panel-strong);
-  color: var(--text);
-  font-size: 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 8px 0 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 400;
   line-height: 1.45;
   white-space: normal;
-  overflow-wrap: anywhere;
 }
 
 .example-copy {
-  margin: 8px 0 0;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0;
 }
 
 .example-copy__button {
   min-height: 28px;
   padding: 2px 10px;
+  white-space: nowrap;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--panel);
@@ -1685,6 +1765,7 @@ code {
 .dash-shell a:focus-visible,
 .dash-shell button:focus-visible {
   outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 900px) {
@@ -1700,6 +1781,12 @@ code {
 .timeframe-tabs {
   overflow-x: auto;
   flex-wrap: nowrap;
+  scrollbar-width: none;
+}
+
+.timeframe-tabs::-webkit-scrollbar {
+  height: 0;
+  display: none;
 }
 
 .timeframe-tabs a {
@@ -1746,19 +1833,20 @@ code {
 }
 
 .site-footer {
-  margin-top: 40px;
+  flex-shrink: 0;
+  margin-top: 32px;
   padding: 24px;
   border-top: 1px solid var(--border);
   text-align: center;
 }
 
 .site-footer p {
+  max-width: 72ch;
+  margin: 0 auto;
   font-size: 12px;
   color: var(--muted);
   line-height: 1.5;
-  margin: 0;
 }
-
 
 /* ---- Dashboard: systems table fits its column ------------------------- */
 
@@ -1774,6 +1862,7 @@ code {
 .systems-table th,
 .systems-table td {
   white-space: nowrap;
+  vertical-align: top;
 }
 
 .systems-table .system-cell {
@@ -1800,6 +1889,16 @@ code {
 .systems-table .actions-cell {
   width: 44px;
   text-align: right;
+}
+
+.systems-table .actions-col--copy,
+.systems-table .actions-cell--copy {
+  width: 168px;
+  white-space: nowrap;
+}
+
+.systems-table .actions-cell--copy {
+  vertical-align: bottom;
 }
 
 .sr-only {
@@ -1880,14 +1979,13 @@ code {
   color: #fff;
 }
 
-
 /* ---- Charts ------------------------------------------------------------ */
 
 .chart-card {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px 18px 12px;
+  padding: 16px;
 }
 
 .money-chart {
@@ -1951,8 +2049,8 @@ code {
 /* ---- Current Matches --------------------------------------------------- */
 
 .match-row {
-  padding: 14px;
-  margin-top: 10px;
+  padding: 16px;
+  margin-top: 8px;
   border-top: none;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -2004,4 +2102,21 @@ code {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
+}
+
+.table-wrap {
+  margin-bottom: 16px;
+}
+
+.clv-coverage-note {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.betlog-chart svg {
+  display: block;
+  width: 100%;
+  height: 150px;
 }

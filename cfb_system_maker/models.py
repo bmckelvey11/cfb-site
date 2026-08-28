@@ -105,6 +105,8 @@ class BetDetail:
     profit: float
     margin: float = 0.0
     season_type: str = "regular"
+    team_points: int | None = None
+    opponent_points: int | None = None
 
 
 @dataclass(frozen=True)
