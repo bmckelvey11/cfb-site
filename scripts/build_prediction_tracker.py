@@ -7,6 +7,9 @@ CFBD:   stg.game in data/cfb.duckdb -- the GraphQL-fed table. data/raw/games_*.j
         additionally 2013+ only.
 Out:    data/raw/prediction_tracker_lines.csv
 
+Spreads are negated on the way in: Prediction Tracker writes them positive when the home
+team is favored, the opposite of GameRecord.spread everywhere else in this repo.
+
 Join key is (season, {home, away}) as an unordered pair -- deliberately not week, because
 CFBD numbers postseason weeks from 1 while Prediction Tracker keeps counting regular weeks
 (19, 20), and not oriented, because neutral-site home/road designations disagree. Rematches
@@ -57,28 +60,29 @@ ALIASES = {
     "Western Mich.": ["Western Michigan"],
 }
 
-# Output columns, in blocks. Every Prediction Tracker column keeps its upstream name, so
-# this file reads the same as the source CSVs; the columns added from CFBD carry a cfbd_
-# prefix where the name would otherwise collide.
+# Output columns, in blocks. CFBD owns the unprefixed names because it is the
+# authoritative side; Prediction Tracker columns keep their upstream spelling except for
+# the one that collides, week, which becomes pt_week.
 IDENTITY = [
     "game_id",
     "season",
-    "cfbd_week",
-    "cfbd_season_type",
-    "cfbd_home_team",
-    "cfbd_away_team",
+    "week",
+    "season_type",
+    "home_team",
+    "away_team",
     "home_points",
     "away_points",
     "orientation_flipped",
     "match_status",
 ]
+PT_RENAMES = {"week": "pt_week"}
 # Prediction Tracker's own game meta -- kept for traceability, but CFBD is authoritative
 # where the two disagree (see match_status). hscore/vscore are PT's scores, actual is the
 # home margin, total the combined points, ph* PT's cover/win probabilities.
 PT_META = [
     "home",
     "road",
-    "week",
+    "pt_week",
     "date",
     "hscore",
     "vscore",
@@ -92,7 +96,12 @@ CONSENSUS = ["lineavg", "linemedian", "linestd"]  # PT's own aggregates over the
 # Score-like columns are integers; every other line* column is a spread. Non-numeric
 # cells are blanked -- the source carries a few (a team name in linecoll, NUL bytes in
 # lineanderson, and one 2006 row whose whole tail is shifted by a column).
-INT_COLUMNS = ["week", "hscore", "vscore", "actual", "total"]
+INT_COLUMNS = ["pt_week", "hscore", "vscore", "actual", "total"]
+# Prediction Tracker writes spreads positive when the home team is favored; this repo's
+# GameRecord.spread is negative when the home team is favored. Every line* column is
+# negated on the way in so the two agree -- except linestd, which is a dispersion across
+# the models rather than a spread and has no side.
+UNSIGNED_LINES = {"linestd"}
 
 
 def seasons_on_disk(src):
@@ -160,7 +169,7 @@ def read_season_csv(path, season):
     """
     with path.open(newline="", encoding="utf-8-sig") as fh:
         reader = csv.reader(fh)
-        header = [c.strip().lower() for c in next(reader)]
+        header = [PT_RENAMES.get(h, h) for h in (c.strip().lower() for c in next(reader))]
         rows = []
         for raw in reader:
             if not any(c.strip() for c in raw):
@@ -183,18 +192,29 @@ def as_int(value):
         return None
 
 
+def flip_sign(text):
+    """Negate a numeric string without reformatting it. '9.5' -> '-9.5', '0' -> '0'."""
+    if float(text) == 0:
+        return text
+    return text[1:] if text.startswith("-") else "-" + text
+
+
 def clean_cells(row):
-    """Blank cells that aren't the number the column is supposed to hold."""
+    """Blank cells that aren't the number the column should hold, and flip spread signs."""
     for col in INT_COLUMNS:
         value = row.get(col)
         if value and not re.fullmatch(r"-?\d+", value):
             row[col] = ""
     for col, value in list(row.items()):
-        if col.startswith("line") and value:
-            try:
-                float(value)
-            except ValueError:
-                row[col] = ""
+        if not col.startswith("line") or not value:
+            continue
+        try:
+            float(value)
+        except ValueError:
+            row[col] = ""
+            continue
+        if col not in UNSIGNED_LINES:
+            row[col] = flip_sign(value)
     return row
 
 
@@ -298,7 +318,7 @@ def main():
                 home,
                 as_int(row.get("hscore")),
                 as_int(row.get("vscore")),
-                as_int(row.get("week")),
+                as_int(row.get("pt_week")),
             )
             counts[status] += 1
             row["match_status"] = status
@@ -307,10 +327,10 @@ def main():
                 continue
 
             row["game_id"] = game["game_id"]
-            row["cfbd_home_team"] = game["home"]
-            row["cfbd_away_team"] = game["away"]
-            row["cfbd_week"] = game["week"]
-            row["cfbd_season_type"] = game["season_type"]
+            row["home_team"] = game["home"]
+            row["away_team"] = game["away"]
+            row["week"] = game["week"]
+            row["season_type"] = game["season_type"]
             row["home_points"] = game["home_points"]
             row["away_points"] = game["away_points"]
             row["orientation_flipped"] = "1" if flipped else "0"

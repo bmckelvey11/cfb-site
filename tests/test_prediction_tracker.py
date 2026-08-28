@@ -59,15 +59,23 @@ def test_unsplittable_rematch_is_ambiguous_not_guessed():
 def test_read_season_csv_folds_header_and_drops_ruler_rows(tmp_path):
     path = tmp_path / "ncaa2001.csv"
     path.write_text(
-        "HOME,ROAD,LINESAG,HSCORE\n"
-        "1234567890123456,0123456789012345,7890.12,2349.2\n"
-        "BYU,Tulane,11.56,70\n",
+        "HOME,ROAD,WEEK,LINESAG,HSCORE\n"
+        "1234567890123456,0123456789012345,1,7890.12,2349.2\n"
+        "BYU,Tulane,1,11.56,70\n",
         encoding="utf-8",
     )
     rows, header = pt.read_season_csv(path, 2001)
-    assert header == ["home", "road", "linesag", "hscore"]
+    # week is the only PT column renamed -- CFBD owns the plain "week" in the output
+    assert header == ["home", "road", "pt_week", "linesag", "hscore"]
     assert rows == [
-        {"home": "BYU", "road": "Tulane", "linesag": "11.56", "hscore": "70", "season": "2001"}
+        {
+            "home": "BYU",
+            "road": "Tulane",
+            "pt_week": "1",
+            "linesag": "-11.56",
+            "hscore": "70",
+            "season": "2001",
+        }
     ]
 
 
@@ -80,7 +88,18 @@ def test_clean_cells_blanks_junk_the_source_ships():
             "linesag": "-3.5",
         }
     )
-    assert row == {"hscore": "", "vscore": "21", "linecoll": "", "linesag": "-3.5"}
+    assert row == {"hscore": "", "vscore": "21", "linecoll": "", "linesag": "3.5"}
+
+
+def test_spreads_flip_to_the_repo_sign_convention():
+    """PT writes spreads positive when home is favored; GameRecord.spread is negative."""
+    row = pt.clean_cells({"line": "9.5", "lineopen": "-3", "linesag": "0", "linestd": "6.77"})
+    assert row == {
+        "line": "-9.5",
+        "lineopen": "3",
+        "linesag": "0",  # no -0
+        "linestd": "6.77",  # a dispersion across the models, not a spread -- never flipped
+    }
 
 
 def test_order_columns_groups_by_block_and_ranks_models_by_coverage():

@@ -16,10 +16,10 @@ spread for that game.
 Columns are grouped, and within the model block ranked by how many rows they cover, so
 the usable models come first and the long tail of one-season modelers sits at the end.
 
-Prediction Tracker columns keep their upstream names, so this file reads the same as the
-source CSVs. The columns added from CFBD take a `cfbd_` prefix only where the name would
-otherwise collide — `cfbd_week` against PT's `week`, `cfbd_home_team` against `home`.
-`home_points`/`away_points` need no prefix because PT calls its scores `hscore`/`vscore`.
+CFBD owns the unprefixed names, because it is the authoritative side. Prediction Tracker
+columns keep their upstream spelling except for the one that collides: PT's `week` becomes
+`pt_week`. Everything else PT ships — `home`, `road`, `hscore`, `vscore`, `actual`,
+`total`, `phcover`, `phwin` — reads exactly as it does in the source CSVs.
 
 ### Identity (10) — CFBD, authoritative
 
@@ -27,11 +27,11 @@ otherwise collide — `cfbd_week` against PT's `week`, `cfbd_home_team` against 
 |---|---|
 | `game_id` | CFBD game id. Null only on the single unmatched row. |
 | `season` | From the source filename. |
-| `cfbd_week` | CFBD's week. Postseason weeks restart at 1 — use `cfbd_season_type` to read it. |
-| `cfbd_season_type` | `regular` or `postseason`. 815 rows are postseason. |
-| `cfbd_home_team`, `cfbd_away_team` | CFBD's canonical names for the season in question. |
+| `week` | CFBD's week. Postseason weeks restart at 1 — read it with `season_type`. |
+| `season_type` | `regular` or `postseason`. 815 rows are postseason. |
+| `home_team`, `away_team` | CFBD's canonical names for the season in question. |
 | `home_points`, `away_points` | CFBD final score, oriented to *CFBD's* home/away. |
-| `orientation_flipped` | `1` when PT's home team is CFBD's away team — 409 rows, neutral sites and bowls. **When this is 1, `home` is `cfbd_away_team` and `hscore` is `away_points`.** |
+| `orientation_flipped` | `1` when PT's home team is CFBD's away team — 409 rows, neutral sites and bowls. **When this is 1, `home` is `away_team` and `hscore` is `away_points`.** |
 | `match_status` | `matched` (17,731), `matched_score_mismatch` (23), `ambiguous` (1). |
 
 ### Prediction Tracker meta (10)
@@ -40,8 +40,8 @@ Upstream names, unchanged. Kept for traceability — CFBD wins wherever the two 
 
 | Column | Notes |
 |---|---|
-| `home`, `road` | PT's team names, e.g. `Fresno St.`, `Miami (Fla.)`. Some are truncated to 16 chars (`Louisiana-Lafaye`). Not the same field as `cfbd_home_team` on the 409 flipped rows. |
-| `week` | PT numbers bowls 19/20 rather than restarting, so this differs from `cfbd_week`. |
+| `home`, `road` | PT's team names, e.g. `Fresno St.`, `Miami (Fla.)`. Some are truncated to 16 chars (`Louisiana-Lafaye`). Not the same field as `home_team` on the 409 flipped rows. |
+| `pt_week` | PT's own week numbering — the only PT column renamed, since CFBD owns `week`. It is not redundant: it disagrees with `week` on 30% of regular-season rows (almost always by 1), and PT numbers bowls 19/20 where CFBD restarts postseason at 1. |
 | `date` | 2001–2002 only (7.6% fill); PT dropped the column afterwards. |
 | `hscore`, `vscore` | PT's final score, home and visitor. See the caveat below. |
 | `actual` | Home margin, `hscore - vscore`. |
@@ -50,23 +50,35 @@ Upstream names, unchanged. Kept for traceability — CFBD wins wherever the two 
 
 ### Market (2)
 
-`line` — the market spread. **Positive means the home team is favored by that many**,
-which is the opposite sign convention from `GameRecord.spread` elsewhere in this repo
-(where the home spread is negative when the home team is favored). Negate before comparing
-the two. `lineopen` is the opening spread, same convention. Every model column below uses
-this convention too.
+`line` is the market spread and `lineopen` the opening spread.
+
+**Signs are flipped from the source.** Prediction Tracker writes spreads positive when the
+home team is favored; this file negates them so they match `GameRecord.spread` elsewhere in
+the repo, where a favored home team gets a negative number. Every `line*` column is
+negated on the way in except `linestd`. Verified after the build: mean `line` −4.75
+against mean home margin +4.53, the same shape as `games.csv` (−6.66 / +6.65).
+
+**Orientation is still PT's, not CFBD's.** Spreads are relative to `home`/`road`, so on
+the 409 rows where `orientation_flipped` is 1, `line` refers to `away_team`, not
+`home_team`. Negate again on those rows to get a CFBD-home-oriented spread.
 
 ### Consensus (3)
 
 `lineavg`, `linemedian`, `linestd` — PT's own aggregates *over the model columns in that
-row*, not models themselves. Verified: `linemedian` reproduces the median of the model
-columns exactly; `lineavg` and `linestd` track the mean and stdev within rounding.
+row*, not models themselves. Verified against the source: `linemedian` reproduces the
+median of the model columns exactly; `lineavg` and `linestd` track the mean and stdev
+within rounding.
+
+`linestd` is a dispersion, not a spread, so it is **not** sign-flipped. One cell in the
+source carries a negative standard deviation, which is impossible; it is passed through
+rather than special-cased.
 
 ### Models (154)
 
-Every remaining `line*` column is one modeler's predicted home spread. The names are PT's
-own shorthand for the modeler, and upstream is the only place they are defined — this file
-does not carry a name-to-modeler key.
+Every remaining `line*` column is one modeler's predicted spread, negated to the repo's
+sign convention along with `line` (see Market above). The names are PT's own shorthand for
+the modeler, and upstream is the only place they are defined — this file does not carry a
+name-to-modeler key.
 
 Coverage is wildly uneven. Four models cover ~100% of rows (`linesag`, `linepfz`,
 `linehow`, `lineelo`); the bottom of the block includes `linemaxy` at 50 rows and a dozen
