@@ -16,13 +16,13 @@ absence. No code changed, nothing was re-scraped, and
 ## What the audit found
 
 **The gap.** 52,982 `regular` rows and 86 `postseason` rows across all 35
-`games_*.json`; the 86 are 2025 alone. `lines_*.json` matches: postseason lines exist for
-2025 only (50). So bowls, conference championships and CFP games are missing for
+`games_*.json`; the 86 are 2025 alone. `lines_*.json` matches across all 15 files: postseason lines exist
+for 2025 only (50). So bowls, conference championships and CFP games are missing for
 1992-2024 on both sides of the join — even if games had been pulled, there would have
 been no lines to grade them with.
 
 **2025 is not the good season, it's the inconsistent one.** Its postseason rows arrived
-from `upcoming.py:93-94`, which calls CFBD with `season_type="both"` and then overwrites
+from `upcoming.py:94-95`, which calls CFBD with `season_type="both"` and then overwrites
 the whole `games_{season}.json` / `lines_{season}.json` pair. Because CFBD numbers
 postseason weeks from 1 and `GameRecord` has no season-type field, those 50 bowls sit in
 `games.csv` labelled **week 1**, indistinguishable from the 127 regular-season openers in
@@ -56,8 +56,10 @@ file per season, no schema change. Flagged as untested: `both` on the `SEASON_WE
 endpoints, where `weeks=range(1,16)` meets postseason week numbering that restarts at 1.
 
 **Backtest impact, quantified.** 515 FBS postseason games 2013-2025, and `stg.gameLines`
-has a line for all 515. 50 are already in `games.csv`; 465 are missing, ≈3.4% of the
-13,479-row sample `build` would otherwise produce. Small, but not a random 3.4% — bowls
+has a line for all 515. 46 are already in `games.csv`; **469 are missing**, ≈3.5% of the
+13,483-row sample `build` would otherwise produce. (`games.csv` holds 50 postseason rows,
+not 46 — it is line-gated, not FBS-gated, and picks up 4 lower-division bowls.) Small, but
+not a random 3.5% — bowls
 are a distinct population (long layoffs, opt-outs, neutral sites, coaching changes), so no
 system in the repo has been tested where naive systems most often break.
 
