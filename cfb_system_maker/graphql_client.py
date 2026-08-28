@@ -29,9 +29,21 @@ GQL_DEFAULT_TABLES: list[str] = [
     "adjustedPlayerMetrics", "adjustedTeamMetrics", "draftPicks",
     "poll", "pollRank", "calendar", "conference", "currentTeams",
     "historicalTeam", "predictedPoints",
+    # Small lookup tables (2.5 KB - 2.2 MB each). They were reachable only via --tables
+    # until scripts/audit_endpoints.py made introspection the universe and showed them
+    # sitting outside the default pull.
+    "draftPosition", "draftTeam", "hometown", "linesProvider", "playerStatCategory",
+    "playerStatType", "pollType", "position", "recruitPosition", "recruitSchool",
+    "weatherCondition",
 ]
-# Excluded from defaults — pull explicitly with --only if needed:
-#   gamePlayerStat (~6.7M rows, multi-GB flat dump)
+
+# Introspected tables deliberately kept OUT of the default pull, and why. Lives here rather
+# than in the audit script so the rationale sits next to the list it modifies; the audit
+# reads both. Mirrors DELIBERATE on the REST side.
+GQL_EXCLUDED: dict[str, str] = {
+    "gamePlayerStat": "~6.7M rows, multi-GB; pull per season with --tables/--season",
+    "scoreboard": "live in-progress games, no historical value",
+}
 
 Poster = Callable[[str, dict[str, Any]], dict[str, Any]]
 

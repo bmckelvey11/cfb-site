@@ -145,16 +145,32 @@ the upstream floor. Betting lines floor at 2013 independently.
 
 ## GraphQL
 
-`GQL_DEFAULT_TABLES` lists 24 tables. Introspection finds **37** real data tables
-(excluding `*Aggregate` / `*ByPk` wrappers). Nine small lookup tables were
-outside the default list *and* unreachable from the CLI until `--tables` was
-added; they are now pulled: `draftPosition`, `draftTeam`, `hometown`,
-`playerStatCategory`, `playerStatType`, `pollType`, `position`,
-`recruitPosition`, `recruitSchool`.
+`scripts/audit_endpoints.py` audits GraphQL the same way it audits REST: the
+universe is the **live introspected schema**, not the hand-kept list. Live today:
+38 root fields carry scalar columns, one (`athleteByPk`) is a Hasura per-key
+wrapper, leaving **37 real tables**. The script prints what the wrapper filter
+dropped, so a schema shape change surfaces as a diff rather than a quietly
+different denominator.
 
-Still not pulled: `scoreboard` (live endpoint, no historical value) and
-`gamePlayerStat` beyond the partial 2012-2016/2023 files already on disk
-(~6.7M rows, multi-GB — deferred).
+The partition closes at **35 in the default pull + 2 documented exclusions = 37**,
+with every defaulted table on disk. `GQL_DEFAULT_TABLES` grew 24 → 35 on
+2026-08-28: eleven small lookup tables (`draftPosition`, `draftTeam`, `hometown`,
+`linesProvider`, `playerStatCategory`, `playerStatType`, `pollType`, `position`,
+`recruitPosition`, `recruitSchool`, `weatherCondition`) were on disk but reachable
+only via `--tables`, so a fresh pull would have missed them.
+
+The two exclusions live in `GQL_EXCLUDED` beside the default list, each with its
+reason, and the audit reads both rather than keeping its own copy:
+
+| Table | Why not in the default pull |
+|---|---|
+| `gamePlayerStat` | ~6.7M rows, multi-GB; pulled per season with `--tables`/`--season` (2012-2025 shards are on disk) |
+| `scoreboard` | live in-progress games, no historical value |
+
+The GraphQL half needs a Patreon Tier 3 token. Not having one prints a note and is
+never a failure — the REST partition runs offline from a saved spec and is not held
+hostage to a paid tier. Only a table that is reached but is neither defaulted nor
+documented exits non-zero.
 
 Reach a non-default table with:
 

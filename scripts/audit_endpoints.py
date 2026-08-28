@@ -4,10 +4,16 @@
 universe is the registry. This one answers "does the registry cover every endpoint
 CFBD publishes", so its universe is the live OpenAPI spec.
 
-    python scripts/audit_endpoints.py                  # fetch the live spec
-    python scripts/audit_endpoints.py --spec spec.json # offline, from a saved copy
+    python scripts/audit_endpoints.py                    # REST spec + GraphQL schema
+    python scripts/audit_endpoints.py --spec spec.json   # offline REST audit only
+    python scripts/audit_endpoints.py --no-graphql       # skip the Tier 3 schema pull
 
-Exits 1 if any spec path is unclassified or any registry entry has drifted.
+The GraphQL half needs a Patreon Tier 3 token. Not having one is a printed note, never a
+failure — otherwise the REST partition, which runs offline from a saved spec, would be held
+hostage to a paid tier.
+
+Exits 1 if a spec path is unclassified, a registry entry has drifted, or an introspected
+GraphQL table is neither in the default pull nor a documented exclusion.
 """
 from __future__ import annotations
 
@@ -19,7 +25,14 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # run as `python scripts/...`
+from cfb_system_maker.cfbd_client import find_cfbd_token  # noqa: E402
 from cfb_system_maker.scrapers import ENDPOINTS  # noqa: E402
+from cfb_system_maker.graphql_client import (  # noqa: E402
+    GQL_DEFAULT_TABLES,
+    GQL_EXCLUDED,
+    _introspect,
+    _make_poster,
+)
 
 SPEC_URL = "https://api.collegefootballdata.com/api-docs.json"
 CLIENT_API_DIR = Path(__file__).resolve().parent.parent / "cfbd-python" / "cfbd" / "api"
@@ -71,6 +84,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--spec", default=SPEC_URL, help="spec URL or local api-docs.json")
     ap.add_argument("--quiet", action="store_true", help="only print the summary")
+    ap.add_argument("--no-graphql", action="store_true", help="skip the GraphQL schema audit")
     args = ap.parse_args()
 
     spec = load_spec(args.spec)
@@ -133,6 +147,10 @@ def main() -> int:
         for name, why in drift:
             print(f"  {name}: {why}")
 
+    gql_unaccounted: list[str] = []
+    if not args.no_graphql:
+        gql_unaccounted = _audit_graphql(Path("data") / "graphql", quiet=args.quiet)
+
     total = len(registered) + len(client_only) + len(no_client)
     print(f"\n{len(registered)} registered + {len(client_only)} client-only"
           f" + {len(no_client)} no-client = {total} of {len(paths)} spec paths")
@@ -140,7 +158,70 @@ def main() -> int:
         print(f"UNCLASSIFIED: {len(paths) - total} path(s) fell through — fix the mapping.")
     if drift:
         print(f"DRIFT: {len(drift)} registry entr(y/ies) no longer resolve.")
-    return 1 if drift or total != len(paths) else 0
+    return 1 if drift or total != len(paths) or gql_unaccounted else 0
+
+
+def _audit_graphql(gql_dir: Path, *, quiet: bool) -> list[str]:
+    """Partition the introspected GraphQL tables. Returns the unaccounted-for ones.
+
+    Universe is the live schema, not `GQL_DEFAULT_TABLES` — the same reason this script
+    exists for REST. A table is accounted for if it is in the default pull or carries a
+    documented reason in GQL_EXCLUDED.
+    """
+    try:
+        schema = _introspect(_make_poster(find_cfbd_token()))
+    except Exception as exc:  # no Tier 3, no token, offline — a note, not a failure
+        print(f"\nGRAPHQL: schema not reached ({type(exc).__name__}); section skipped")
+        return []
+
+    roots = sorted(schema)
+    # Hasura exposes per-key wrappers alongside the table roots. Print what was filtered:
+    # a schema shape change then shows up as a diff, not a silently different denominator.
+    wrappers = [r for r in roots if r.endswith(("Aggregate", "ByPk", "_aggregate", "_by_pk"))]
+    tables = [r for r in roots if r not in set(wrappers)]
+
+    on_disk = _graphql_files(gql_dir)
+    in_defaults = [t for t in tables if t in GQL_DEFAULT_TABLES]
+    excluded = [t for t in tables if t not in GQL_DEFAULT_TABLES and t in GQL_EXCLUDED]
+    unaccounted = [t for t in tables if t not in GQL_DEFAULT_TABLES and t not in GQL_EXCLUDED]
+    missing = [t for t in in_defaults if t not in on_disk]
+    orphans = sorted(set(on_disk) - set(tables))
+
+    print(f"\nGRAPHQL: {len(roots)} root field(s) with scalars"
+          f" - {len(wrappers)} wrapper(s) {wrappers} = {len(tables)} table(s)")
+    if not quiet:
+        print("  IN DEFAULT PULL (%d)" % len(in_defaults))
+        for table in in_defaults:
+            files = on_disk.get(table, 0)
+            mark = f"{files} file(s)" if files else "NOT ON DISK"
+            print(f"    {table:24} {mark}")
+        print("  DOCUMENTED EXCLUSION (%d)" % len(excluded))
+        for table in excluded:
+            files = on_disk.get(table, 0)
+            seen = f"{files} file(s) on disk" if files else "not pulled"
+            print(f"    {table:24} {seen} — {GQL_EXCLUDED[table]}")
+
+    print(f"  {len(in_defaults)} in defaults + {len(excluded)} excluded"
+          f" = {len(in_defaults) + len(excluded)} of {len(tables)} introspected tables")
+    if missing:
+        print(f"  MISSING FROM DISK: {', '.join(missing)} — in the default pull, never scraped.")
+    if orphans:
+        print(f"  ON DISK, NOT IN SCHEMA: {', '.join(orphans)}")
+    if unaccounted:
+        print(f"  UNACCOUNTED: {', '.join(unaccounted)}"
+              " — add to GQL_DEFAULT_TABLES or give a reason in GQL_EXCLUDED.")
+    return unaccounted
+
+
+def _graphql_files(gql_dir: Path) -> dict[str, int]:
+    """Map table -> file count, folding `{table}_{season}.json` shards into their base."""
+    counts: dict[str, int] = {}
+    for path in gql_dir.glob("*.json"):
+        stem = path.stem
+        base, sep, tail = stem.rpartition("_")
+        table = base if sep and tail.isdigit() and len(tail) == 4 else stem
+        counts[table] = counts.get(table, 0) + 1
+    return counts
 
 
 if __name__ == "__main__":
