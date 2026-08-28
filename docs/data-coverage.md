@@ -68,6 +68,65 @@ started. See also the `gamePlayerStat` GraphQL pull, deferred for the same reaso
 lookup-by-key endpoints with no meaningful bulk form. Registered so the runner
 knows about them; skipped in bulk runs.
 
+## Spec-level gaps: parameters, not endpoints
+
+Audited 2026-08-28 against a downloaded copy of the OpenAPI document
+(`cfbd-openapi (1).json`). It is **identical to the live spec** — same title and version
+(College Football Data API 5.24.2), same 74 paths, GET-only, no path in one and not the
+other. So there is no endpoint-level gap left to find; `scripts/audit_endpoints.py` already
+partitions all 74. The gaps that remain are at the *parameter* level, and one of them is
+serious.
+
+### `seasonType` — every dump on disk is regular season only
+
+`SeasonType` is an enum of `regular`, `postseason`, `both`, `allstar`, `spring_regular`,
+`spring_postseason`, and it has **no default in the spec** — omit it and CFBD returns
+`both`. Our code does not omit it: `--season-type` defaults to `regular` on both `fetch`
+([cli.py:526](../cfb_system_maker/cli.py#L526)) and `scrape`
+([cli.py:546](../cfb_system_maker/cli.py#L546)), as do
+[`fetch_games_and_lines`](../cfb_system_maker/cfbd_client.py#L12) and
+[`scrape`](../cfb_system_maker/scrapers.py#L151). Our default is therefore **narrower than
+the API's own**, and nothing on disk carries a postseason row:
+
+| 2024 | games | lines |
+|---|---|---|
+| `season_type=regular` (what we pull) | 3,747 | 1,523 |
+| `season_type=postseason` | 54 | 50 |
+| `season_type=both` (API default) | 3,801 | 1,573 |
+
+`games_2024.json` holds 3,747 rows, all `seasonType: "regular"`; `lines_2024.json` likewise.
+Across 2012-2025 that is roughly **700 games and 650 priced lines missing** — every bowl and
+every playoff game. Bowls are a distinct betting regime (long layoffs, opt-outs, motivation
+edges), so their absence is a real limit on what the backtests can say, not a rounding
+error.
+
+Blast radius: **19 registered endpoints accept `seasonType`** — `games`, `lines`, `drives`,
+`plays`, `play_stats`, `media`, `weather`, `elo`, `rankings`, `pregame_win_prob`,
+`ppa_games`, `ppa_players_games`, `advanced_game_stats`, `game_havoc_stats`,
+`game_player_stats`, `game_team_stats`, `player_season_stats`, `player_success_game`,
+`player_success_season`. Closing the gap means re-scraping those with `both`, then
+`build` + `enrich`.
+
+### Parameters we skip on purpose
+
+Most unused query parameters are **narrowing filters** — `team`, `conference`, `opponent`,
+`position`, `startWeek`/`endWeek`, `minYear`/`maxYear`. A bulk dump wants the unfiltered
+result, so not passing them is correct; passing them would only fragment the files.
+
+`classification` (`fbs`, `fcs`, `ii`, `ii/iii`, `iii`) also has no default, so our dumps
+already span every division — `games_2024.json` carries all 3,747 games, not just the ~800
+FBS ones.
+
+Three groups are genuinely *unused options* rather than gaps, because they ask the API for a
+different computation rather than for more rows:
+
+- `excludeGarbageTime` (9 endpoints) and `threshold` (4) — analytic variants of the same
+  rows. Registering a garbage-time-excluded variant would be a second feature source, not a
+  fix.
+- `final` / `latest` / `poll` on `rankings` — views over rows we already pull in full.
+- `competition` / `round` on `games` and `cfp_games` — CFP slicing, already covered by the
+  dedicated `cfp_*` endpoints.
+
 ## Empty files are floors, not failures
 
 31 `[]` payloads sit in `data/raw/`. Every one is a **contiguous run starting at
