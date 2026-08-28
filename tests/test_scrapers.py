@@ -72,6 +72,16 @@ class _BoomApi:
         raise RuntimeError("boom")
 
 
+class _PlayoffsApi:
+    def __init__(self, client):
+        pass
+
+    def get_cfp_playoff(self, year=None):
+        if year < 2014:  # matches the live API: pre-CFP seasons raise, they don't return []
+            raise ValueError(f"no playoff in {year}")
+        return [{"season": year, "teamCount": 4}]
+
+
 def _fake_cfbd():
     return SimpleNamespace(
         Configuration=_Config,
@@ -80,12 +90,13 @@ def _fake_cfbd():
         GamesApi=_GamesApi,
         MetricsApi=_MetricsApi,
         PlaysApi=_PlaysApi,
+        PlayoffsApi=_PlayoffsApi,
     )
 
 
 def _run(only, tmp_path, **kwargs):
     return scrape(
-        [2022, 2023],
+        kwargs.pop("seasons", [2022, 2023]),
         data_dir=tmp_path,
         token="test",
         cfbd_module=kwargs.pop("cfbd_module", _fake_cfbd()),
@@ -97,8 +108,18 @@ def _run(only, tmp_path, **kwargs):
 
 def test_registry_is_complete_and_unique():
     names = [e.name for e in ENDPOINTS]
-    assert len(names) == 63
-    assert len(set(names)) == 63
+    assert len(names) == 73
+    assert len(set(names)) == 73
+
+
+def test_season_skips_years_before_min_season(tmp_path):
+    """CFP endpoints error (not empty) before 2014, and one error kills the whole endpoint."""
+    reports = _run({"cfp_playoff"}, tmp_path, seasons=[2013, 2014])
+
+    assert not (tmp_path / "raw" / "cfp_playoff_2013.json").exists()
+    assert (tmp_path / "raw" / "cfp_playoff_2014.json").exists()
+    assert reports[0].files == 1 and reports[0].skipped == 1
+    assert reports[0].error is None
 
 
 def test_once_writes_single_file(tmp_path):

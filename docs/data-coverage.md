@@ -9,37 +9,46 @@ python scripts/audit_coverage.py --data-dir data       # registry vs disk: is ev
 
 `audit_endpoints.py` reads the live REST spec (`/api-docs.json`) and partitions all
 74 paths into registered / in-client-but-unregistered / no-client-method, so the
-74-63-10-1 breakdown below is generated rather than hand-counted. `audit_coverage.py`
+74-73-1 breakdown below is generated rather than hand-counted. `audit_coverage.py`
 is the source of truth for per-endpoint file counts. This note records the things
 neither count can tell you — *why* something is absent.
 
-## The ceiling is the vendored client, not the registry
+## Every CFBD spec path is now registered but one
 
-The live CFBD REST spec has **74 paths**. The `ENDPOINTS` registry has **63**,
-and every one resolves to a real spec path. The gap is not an oversight in the
-registry — it's that `cfbd-python/` (vendored at `034cd17`) has no client method
-for those paths. The clone is **11 commits behind upstream `main`**, and that is
-exactly where the missing endpoints landed.
+The live CFBD REST spec has **74 paths**. The `ENDPOINTS` registry has **73**, and
+every one resolves to a real spec path. The single unregistered path is deliberate
+(below).
 
-### Not scraped — blocked on a client bump (10 paths)
+Until 2026-08-28 the ceiling was the vendored client, not the registry: 10 paths had
+no client method because `cfbd-python/` sat at `034cd17`, 11 commits behind upstream
+`main`, and that is exactly where those endpoints landed. The client is now vendored
+at `52f2bbf` and all 10 are registered:
 
-| Spec path | What it is |
-|---|---|
-| `/playoffs/cfp` | CFP bracket |
-| `/playoffs/cfp/games` | CFP games |
-| `/playoffs/cfp/participants` | CFP participants |
-| `/ratings/core` | core ratings rollout |
-| `/ratings/srs/expanded` | SRS expanded to FCS |
-| `/coaches/profile` | coach profile |
-| `/coaches/seasons` | coach seasons |
-| `/coaches/tenures` | coach tenures |
-| `/conferences/affiliations` | team↔conference affiliations |
-| `/conferences/changes` | realignment history |
+| Spec path | Registry name | Mode |
+|---|---|---|
+| `/playoffs/cfp` | `cfp_playoff` | `season`, 2014+ |
+| `/playoffs/cfp/games` | `cfp_games` | `season`, 2014+ |
+| `/playoffs/cfp/participants` | `cfp_participants` | `season`, 2014+ |
+| `/ratings/core` | `core_ratings` | `season` |
+| `/ratings/srs/expanded` | `srs_expanded` | `season` |
+| `/coaches/profile` | `coach_profile` | `on_demand` (needs `coach_id`) |
+| `/coaches/seasons` | `coach_seasons` | `season` |
+| `/coaches/tenures` | `coach_tenures` | `on_demand` (400s without `team`/`coach_id`) |
+| `/conferences/affiliations` | `conference_affiliations` | `once` (full history, 3,604 rows) |
+| `/conferences/changes` | `conference_changes` | `season` |
 
-To unblock: bump `cfbd-python` to upstream `main`, re-run the spec diff, register
-what the new client exposes. The bump has its own regression surface (the vendored
-client is pydantic v1 and is loaded by path injection), so it is a deliberate
-separate change, not a drive-by.
+### Season floors are enforced, not discovered at runtime
+
+`Endpoint.min_season` skips seasons before an endpoint existed. The CFP endpoints need
+it: pre-2014 they **raise** rather than return `[]`, and one raised season aborts every
+remaining season of that endpoint (`_run_endpoint` catches per endpoint, not per season).
+
+Two more data floors, both real and both scraped as empty `[]` rather than errors:
+
+- `core_ratings` — nothing before **2016** (2012-2015 return zero rows).
+- `srs_expanded` — **2020 only** is empty upstream; 2012-2019 and 2021-2025 all have
+  rows. 2019/2021 raise a pydantic `ValidationError` on a null `classification` and
+  come back through the `_call_raw` fallback, so their files are complete.
 
 ### Not scraped — deliberate (1 path)
 

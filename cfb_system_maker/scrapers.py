@@ -35,6 +35,7 @@ class Endpoint:
     method: str           # method on that class
     mode: str
     fixed: dict[str, Any] = field(default_factory=dict)  # constant kwargs
+    min_season: int | None = None  # endpoint has no data before this year; earlier ones are skipped
 
 
 ENDPOINTS: list[Endpoint] = [
@@ -47,8 +48,14 @@ ENDPOINTS: list[Endpoint] = [
     Endpoint("lines", "BettingApi", "get_lines", SEASON),
     # Coaches
     Endpoint("coaches", "CoachesApi", "get_coaches", SEASON),
+    Endpoint("coach_seasons", "CoachesApi", "get_coach_seasons", SEASON),  # 400s unfiltered
+    Endpoint("coach_profile", "CoachesApi", "get_coach_profile", ON_DEMAND),   # requires coach_id
+    Endpoint("coach_tenures", "CoachesApi", "get_coach_tenures", ON_DEMAND),   # 400s without team/coach_id
     # Conferences
     Endpoint("conferences", "ConferencesApi", "get_conferences", ONCE),
+    # Full affiliation history in one call (3.6k rows); per-season would just duplicate spans.
+    Endpoint("conference_affiliations", "ConferencesApi", "get_team_conference_affiliations", ONCE),
+    Endpoint("conference_changes", "ConferencesApi", "get_team_conference_changes", SEASON),
     # Draft
     Endpoint("draft_picks", "DraftApi", "get_draft_picks", SEASON),
     Endpoint("draft_positions", "DraftApi", "get_draft_positions", ONCE),
@@ -88,6 +95,10 @@ ENDPOINTS: list[Endpoint] = [
     Endpoint("play_stats", "PlaysApi", "get_play_stats", SEASON_WEEK),  # requires week or team
     Endpoint("play_types", "PlaysApi", "get_play_types", ONCE),
     Endpoint("plays", "PlaysApi", "get_plays", SEASON_WEEK),
+    # Playoffs (CFP began in 2014; earlier seasons error rather than returning empty)
+    Endpoint("cfp_playoff", "PlayoffsApi", "get_cfp_playoff", SEASON, min_season=2014),
+    Endpoint("cfp_games", "PlayoffsApi", "get_cfp_games", SEASON, min_season=2014),
+    Endpoint("cfp_participants", "PlayoffsApi", "get_cfp_participants", SEASON, min_season=2014),
     # Rankings
     Endpoint("rankings", "RankingsApi", "get_rankings", SEASON),
     # Ratings
@@ -96,6 +107,8 @@ ENDPOINTS: list[Endpoint] = [
     Endpoint("fpi", "RatingsApi", "get_fpi", SEASON),
     Endpoint("sp", "RatingsApi", "get_sp", SEASON),
     Endpoint("srs", "RatingsApi", "get_srs", SEASON),
+    Endpoint("core_ratings", "RatingsApi", "get_core", SEASON),      # empty before the rollout
+    Endpoint("srs_expanded", "RatingsApi", "get_expanded_srs", SEASON),  # FCS included
     # Recruiting
     Endpoint("recruiting_groups", "RecruitingApi", "get_aggregated_team_recruiting_ratings", ONCE),
     Endpoint("recruits", "RecruitingApi", "get_recruits", SEASON),
@@ -282,6 +295,11 @@ def _scrape_season(
     total = 0
     skipped = 0
     for season in seasons:
+        # A season before the endpoint existed isn't an empty payload — CFBD errors, and
+        # that error aborts every remaining season of this endpoint (see _run_endpoint).
+        if endpoint.min_season is not None and season < endpoint.min_season:
+            skipped += 1
+            continue
         if resume and _exists(data_dir, f"{endpoint.name}_{season}.json"):
             skipped += 1
             continue
@@ -346,6 +364,11 @@ def _scrape_per_game(
     skipped = 0
     failed_games = 0
     for season in seasons:
+        # A season before the endpoint existed isn't an empty payload — CFBD errors, and
+        # that error aborts every remaining season of this endpoint (see _run_endpoint).
+        if endpoint.min_season is not None and season < endpoint.min_season:
+            skipped += 1
+            continue
         if resume and _exists(data_dir, f"{endpoint.name}_{season}.json"):
             skipped += 1
             continue
@@ -385,6 +408,11 @@ def _scrape_per_player(
     total = 0
     skipped = 0
     for season in seasons:
+        # A season before the endpoint existed isn't an empty payload — CFBD errors, and
+        # that error aborts every remaining season of this endpoint (see _run_endpoint).
+        if endpoint.min_season is not None and season < endpoint.min_season:
+            skipped += 1
+            continue
         if resume and _exists(data_dir, f"{endpoint.name}_{season}.json"):
             skipped += 1
             continue

@@ -24,7 +24,8 @@ def expected_files(ep, seasons: list[int], weeks: range) -> list[str]:
     if ep.mode in (ONCE, GRID):
         return [f"{ep.name}.json"]
     if ep.mode in (SEASON, PER_GAME, PER_PLAYER):
-        return [f"{ep.name}_{s}.json" for s in seasons]
+        floor = ep.min_season or 0
+        return [f"{ep.name}_{s}.json" for s in seasons if s >= floor]
     if ep.mode == SEASON_WEEK:
         return [f"{ep.name}_{s}_wk{w}.json" for s in seasons for w in weeks]
     return []  # ON_DEMAND: never bulk-scraped
