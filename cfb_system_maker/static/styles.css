@@ -728,9 +728,7 @@ code {
 
 /* Collapse goes inert while a search term is active, so a collapsed group still
    reveals its matching rows -- search overrides collapse. */
-.feature-filters:not(.is-searching)
-  .feature-group.is-collapsed
-  .filter-launch-row {
+.feature-filters:not(.is-searching) .feature-group.is-collapsed .filter-launch-row {
   display: none;
 }
 
