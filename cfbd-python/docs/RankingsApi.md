@@ -8,11 +8,11 @@ Method | HTTP request | Description
 
 
 # **get_rankings**
-> List[PollWeek] get_rankings(year, season_type=season_type, week=week)
+> List[PollWeek] get_rankings(year, season_type=season_type, week=week, poll=poll, latest=latest, final=final)
 
 
 
-Retrieves historical poll data
+Returns historical poll rankings.
 
 ### Example
 
@@ -22,6 +22,7 @@ import time
 import os
 import cfbd
 from cfbd.models.poll_week import PollWeek
+from cfbd.models.ranking_poll import RankingPoll
 from cfbd.models.season_type import SeasonType
 from cfbd.rest import ApiException
 from pprint import pprint
@@ -46,12 +47,15 @@ configuration = cfbd.Configuration(
 with cfbd.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = cfbd.RankingsApi(api_client)
-    year = 56 # int | Required year filter
-    season_type = cfbd.SeasonType() # SeasonType | Optional season type filter (optional)
-    week = 3.4 # float | Optional week filter (optional)
+    year = 56 # int | Season year.
+    season_type = cfbd.SeasonType() # SeasonType | Season type. (optional)
+    week = 3.4 # float | Poll week. (optional)
+    poll = cfbd.RankingPoll() # RankingPoll | Poll name. (optional)
+    latest = True # bool | Returns the latest CFP snapshot when `true`, preferring the snapshot marked as final. Requires `poll=cfp` and cannot be combined with `final`. (optional)
+    final = True # bool | Returns the CFP snapshot marked as final when `true`. Requires `poll=cfp` and cannot be combined with `latest`. (optional)
 
     try:
-        api_response = api_instance.get_rankings(year, season_type=season_type, week=week)
+        api_response = api_instance.get_rankings(year, season_type=season_type, week=week, poll=poll, latest=latest, final=final)
         print("The response of RankingsApi->get_rankings:\n")
         pprint(api_response)
     except Exception as e:
@@ -64,9 +68,12 @@ with cfbd.ApiClient(configuration) as api_client:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **year** | **int**| Required year filter | 
- **season_type** | [**SeasonType**](.md)| Optional season type filter | [optional] 
- **week** | **float**| Optional week filter | [optional] 
+ **year** | **int**| Season year. | 
+ **season_type** | [**SeasonType**](.md)| Season type. | [optional] 
+ **week** | **float**| Poll week. | [optional] 
+ **poll** | [**RankingPoll**](.md)| Poll name. | [optional] 
+ **latest** | **bool**| Returns the latest CFP snapshot when &#x60;true&#x60;, preferring the snapshot marked as final. Requires &#x60;poll&#x3D;cfp&#x60; and cannot be combined with &#x60;final&#x60;. | [optional] 
+ **final** | **bool**| Returns the CFP snapshot marked as final when &#x60;true&#x60;. Requires &#x60;poll&#x3D;cfp&#x60; and cannot be combined with &#x60;latest&#x60;. | [optional] 
 
 ### Return type
 
@@ -85,6 +92,7 @@ Name | Type | Description  | Notes
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **200** | Ok |  -  |
+**400** | Validation error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

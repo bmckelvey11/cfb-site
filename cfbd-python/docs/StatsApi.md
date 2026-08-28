@@ -19,7 +19,7 @@ Method | HTTP request | Description
 
 
 
-Retrieves advanced statistics aggregated by game
+Returns advanced team statistics aggregated by game.
 
 ### Example
 
@@ -53,12 +53,12 @@ configuration = cfbd.Configuration(
 with cfbd.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = cfbd.StatsApi(api_client)
-    year = 56 # int | Year filter, required if team not specified (optional)
-    team = 'team_example' # str | Team filter, required if year not specified (optional)
-    week = 3.4 # float | Optional week filter (optional)
-    opponent = 'opponent_example' # str | Optional opponent filter (optional)
-    exclude_garbage_time = True # bool | Garbage time exclusion filter, defaults to false (optional)
-    season_type = cfbd.SeasonType() # SeasonType | Optional season type filter (optional)
+    year = 56 # int | Season year. Required unless `team` is specified. (optional)
+    team = 'team_example' # str | Team name. Required unless `year` is specified. (optional)
+    week = 3.4 # float | Week number. (optional)
+    opponent = 'opponent_example' # str | Opponent team name. (optional)
+    exclude_garbage_time = True # bool | Excludes garbage-time plays when `true`. Defaults to `false`. (optional)
+    season_type = cfbd.SeasonType() # SeasonType | Season type. (optional)
 
     try:
         api_response = api_instance.get_advanced_game_stats(year=year, team=team, week=week, opponent=opponent, exclude_garbage_time=exclude_garbage_time, season_type=season_type)
@@ -74,12 +74,12 @@ with cfbd.ApiClient(configuration) as api_client:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **year** | **int**| Year filter, required if team not specified | [optional] 
- **team** | **str**| Team filter, required if year not specified | [optional] 
- **week** | **float**| Optional week filter | [optional] 
- **opponent** | **str**| Optional opponent filter | [optional] 
- **exclude_garbage_time** | **bool**| Garbage time exclusion filter, defaults to false | [optional] 
- **season_type** | [**SeasonType**](.md)| Optional season type filter | [optional] 
+ **year** | **int**| Season year. Required unless &#x60;team&#x60; is specified. | [optional] 
+ **team** | **str**| Team name. Required unless &#x60;year&#x60; is specified. | [optional] 
+ **week** | **float**| Week number. | [optional] 
+ **opponent** | **str**| Opponent team name. | [optional] 
+ **exclude_garbage_time** | **bool**| Excludes garbage-time plays when &#x60;true&#x60;. Defaults to &#x60;false&#x60;. | [optional] 
+ **season_type** | [**SeasonType**](.md)| Season type. | [optional] 
 
 ### Return type
 
@@ -102,11 +102,11 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **get_advanced_season_stats**
-> List[AdvancedSeasonStat] get_advanced_season_stats(year=year, team=team, exclude_garbage_time=exclude_garbage_time, start_week=start_week, end_week=end_week)
+> List[AdvancedSeasonStat] get_advanced_season_stats(year=year, team=team, exclude_garbage_time=exclude_garbage_time, start_week=start_week, end_week=end_week, classification=classification)
 
 
 
-Retrieves advanced season statistics for teams
+Returns advanced team statistics aggregated by season.
 
 ### Example
 
@@ -116,6 +116,7 @@ import time
 import os
 import cfbd
 from cfbd.models.advanced_season_stat import AdvancedSeasonStat
+from cfbd.models.division_classification import DivisionClassification
 from cfbd.rest import ApiException
 from pprint import pprint
 
@@ -139,14 +140,15 @@ configuration = cfbd.Configuration(
 with cfbd.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = cfbd.StatsApi(api_client)
-    year = 56 # int | Year filter, required if team not specified (optional)
-    team = 'team_example' # str | Team filter, required if year not specified (optional)
-    exclude_garbage_time = True # bool | Garbage time exclusion filter, defaults to false (optional)
-    start_week = 56 # int | Optional start week range filter (optional)
-    end_week = 56 # int | Optional end week range filter (optional)
+    year = 56 # int | Season year. Required unless `team` is specified. (optional)
+    team = 'team_example' # str | Team name. Required unless `year` is specified. (optional)
+    exclude_garbage_time = True # bool | Excludes garbage-time plays when `true`. Defaults to `false`. (optional)
+    start_week = 56 # int | Earliest week to include. (optional)
+    end_week = 56 # int | Latest week to include. (optional)
+    classification = cfbd.DivisionClassification() # DivisionClassification | Division classification. Defaults to `fbs`. (optional)
 
     try:
-        api_response = api_instance.get_advanced_season_stats(year=year, team=team, exclude_garbage_time=exclude_garbage_time, start_week=start_week, end_week=end_week)
+        api_response = api_instance.get_advanced_season_stats(year=year, team=team, exclude_garbage_time=exclude_garbage_time, start_week=start_week, end_week=end_week, classification=classification)
         print("The response of StatsApi->get_advanced_season_stats:\n")
         pprint(api_response)
     except Exception as e:
@@ -159,11 +161,12 @@ with cfbd.ApiClient(configuration) as api_client:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **year** | **int**| Year filter, required if team not specified | [optional] 
- **team** | **str**| Team filter, required if year not specified | [optional] 
- **exclude_garbage_time** | **bool**| Garbage time exclusion filter, defaults to false | [optional] 
- **start_week** | **int**| Optional start week range filter | [optional] 
- **end_week** | **int**| Optional end week range filter | [optional] 
+ **year** | **int**| Season year. Required unless &#x60;team&#x60; is specified. | [optional] 
+ **team** | **str**| Team name. Required unless &#x60;year&#x60; is specified. | [optional] 
+ **exclude_garbage_time** | **bool**| Excludes garbage-time plays when &#x60;true&#x60;. Defaults to &#x60;false&#x60;. | [optional] 
+ **start_week** | **int**| Earliest week to include. | [optional] 
+ **end_week** | **int**| Latest week to include. | [optional] 
+ **classification** | [**DivisionClassification**](.md)| Division classification. Defaults to &#x60;fbs&#x60;. | [optional] 
 
 ### Return type
 
@@ -190,7 +193,7 @@ Name | Type | Description  | Notes
 
 
 
-Gets team statistical categories
+Returns the available team statistical categories.
 
 ### Example
 
@@ -261,7 +264,7 @@ This endpoint does not need any parameter.
 
 
 
-Retrieves havoc statistics aggregated by game
+Returns team havoc statistics aggregated by game.
 
 ### Example
 
@@ -295,11 +298,11 @@ configuration = cfbd.Configuration(
 with cfbd.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = cfbd.StatsApi(api_client)
-    year = 56 # int | Year filter, required if team not specified (optional)
-    team = 'team_example' # str | Team filter, required if year not specified (optional)
-    week = 3.4 # float | Optional week filter (optional)
-    opponent = 'opponent_example' # str | Optional opponent filter (optional)
-    season_type = cfbd.SeasonType() # SeasonType | Optional season type filter (optional)
+    year = 56 # int | Season year. Required unless `team` is specified. (optional)
+    team = 'team_example' # str | Team name. Required unless `year` is specified. (optional)
+    week = 3.4 # float | Week number. (optional)
+    opponent = 'opponent_example' # str | Opponent team name. (optional)
+    season_type = cfbd.SeasonType() # SeasonType | Season type. (optional)
 
     try:
         api_response = api_instance.get_game_havoc_stats(year=year, team=team, week=week, opponent=opponent, season_type=season_type)
@@ -315,11 +318,11 @@ with cfbd.ApiClient(configuration) as api_client:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **year** | **int**| Year filter, required if team not specified | [optional] 
- **team** | **str**| Team filter, required if year not specified | [optional] 
- **week** | **float**| Optional week filter | [optional] 
- **opponent** | **str**| Optional opponent filter | [optional] 
- **season_type** | [**SeasonType**](.md)| Optional season type filter | [optional] 
+ **year** | **int**| Season year. Required unless &#x60;team&#x60; is specified. | [optional] 
+ **team** | **str**| Team name. Required unless &#x60;year&#x60; is specified. | [optional] 
+ **week** | **float**| Week number. | [optional] 
+ **opponent** | **str**| Opponent team name. | [optional] 
+ **season_type** | [**SeasonType**](.md)| Season type. | [optional] 
 
 ### Return type
 
@@ -346,7 +349,7 @@ Name | Type | Description  | Notes
 
 
 
-Retrieves player passing and rushing success rates by game
+Returns player passing and rushing success rates by game.
 
 ### Example
 
@@ -380,14 +383,14 @@ configuration = cfbd.Configuration(
 with cfbd.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = cfbd.StatsApi(api_client)
-    year = 56 # int | Required year filter
-    week = 56 # int | Week filter, required if team and playerId not specified (optional)
-    season_type = cfbd.SeasonType() # SeasonType | Optional season type filter (optional)
-    conference = 'conference_example' # str | Optional conference abbreviation filter (optional)
-    team = 'team_example' # str | Optional team filter (optional)
-    player_id = 56 # int | Optional player ID filter (optional)
-    threshold = 56 # int | Optional minimum credited passing plus rushing plays (optional)
-    exclude_garbage_time = True # bool | Optional flag to exclude garbage time plays (optional)
+    year = 56 # int | Season year.
+    week = 56 # int | Week number. Required unless `team` or `playerId` is specified. (optional)
+    season_type = cfbd.SeasonType() # SeasonType | Season type. (optional)
+    conference = 'conference_example' # str | Conference abbreviation. (optional)
+    team = 'team_example' # str | Team name. (optional)
+    player_id = 56 # int | Player ID. (optional)
+    threshold = 56 # int | Minimum credited passing and rushing plays. (optional)
+    exclude_garbage_time = True # bool | Excludes garbage-time plays when `true`. (optional)
 
     try:
         api_response = api_instance.get_player_game_success_rates(year, week=week, season_type=season_type, conference=conference, team=team, player_id=player_id, threshold=threshold, exclude_garbage_time=exclude_garbage_time)
@@ -403,14 +406,14 @@ with cfbd.ApiClient(configuration) as api_client:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **year** | **int**| Required year filter | 
- **week** | **int**| Week filter, required if team and playerId not specified | [optional] 
- **season_type** | [**SeasonType**](.md)| Optional season type filter | [optional] 
- **conference** | **str**| Optional conference abbreviation filter | [optional] 
- **team** | **str**| Optional team filter | [optional] 
- **player_id** | **int**| Optional player ID filter | [optional] 
- **threshold** | **int**| Optional minimum credited passing plus rushing plays | [optional] 
- **exclude_garbage_time** | **bool**| Optional flag to exclude garbage time plays | [optional] 
+ **year** | **int**| Season year. | 
+ **week** | **int**| Week number. Required unless &#x60;team&#x60; or &#x60;playerId&#x60; is specified. | [optional] 
+ **season_type** | [**SeasonType**](.md)| Season type. | [optional] 
+ **conference** | **str**| Conference abbreviation. | [optional] 
+ **team** | **str**| Team name. | [optional] 
+ **player_id** | **int**| Player ID. | [optional] 
+ **threshold** | **int**| Minimum credited passing and rushing plays. | [optional] 
+ **exclude_garbage_time** | **bool**| Excludes garbage-time plays when &#x60;true&#x60;. | [optional] 
 
 ### Return type
 
@@ -437,7 +440,7 @@ Name | Type | Description  | Notes
 
 
 
-Retrieves aggregated player statistics for a given season
+Returns player statistics aggregated by season.
 
 ### Example
 
@@ -471,13 +474,13 @@ configuration = cfbd.Configuration(
 with cfbd.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = cfbd.StatsApi(api_client)
-    year = 56 # int | Required year filter
-    conference = 'conference_example' # str | Optional conference filter (optional)
-    team = 'team_example' # str | Optional team filter (optional)
-    start_week = 56 # int | Optional starting week range (optional)
-    end_week = 56 # int | Optional ending week range (optional)
-    season_type = cfbd.SeasonType() # SeasonType | Optional season type filter (optional)
-    category = 'category_example' # str | Optional category filter (optional)
+    year = 56 # int | Season year.
+    conference = 'conference_example' # str | Conference name or abbreviation. (optional)
+    team = 'team_example' # str | Team name. (optional)
+    start_week = 56 # int | Earliest week to include. (optional)
+    end_week = 56 # int | Latest week to include. (optional)
+    season_type = cfbd.SeasonType() # SeasonType | Season type. (optional)
+    category = 'category_example' # str | Statistical category. (optional)
 
     try:
         api_response = api_instance.get_player_season_stats(year, conference=conference, team=team, start_week=start_week, end_week=end_week, season_type=season_type, category=category)
@@ -493,13 +496,13 @@ with cfbd.ApiClient(configuration) as api_client:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **year** | **int**| Required year filter | 
- **conference** | **str**| Optional conference filter | [optional] 
- **team** | **str**| Optional team filter | [optional] 
- **start_week** | **int**| Optional starting week range | [optional] 
- **end_week** | **int**| Optional ending week range | [optional] 
- **season_type** | [**SeasonType**](.md)| Optional season type filter | [optional] 
- **category** | **str**| Optional category filter | [optional] 
+ **year** | **int**| Season year. | 
+ **conference** | **str**| Conference name or abbreviation. | [optional] 
+ **team** | **str**| Team name. | [optional] 
+ **start_week** | **int**| Earliest week to include. | [optional] 
+ **end_week** | **int**| Latest week to include. | [optional] 
+ **season_type** | [**SeasonType**](.md)| Season type. | [optional] 
+ **category** | **str**| Statistical category. | [optional] 
 
 ### Return type
 
@@ -526,7 +529,7 @@ Name | Type | Description  | Notes
 
 
 
-Retrieves player passing and rushing success rates by season
+Returns player passing and rushing success rates by season.
 
 ### Example
 
@@ -560,15 +563,15 @@ configuration = cfbd.Configuration(
 with cfbd.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = cfbd.StatsApi(api_client)
-    year = 56 # int | Year filter, required if playerId not specified (optional)
-    conference = 'conference_example' # str | Optional conference abbreviation filter (optional)
-    team = 'team_example' # str | Optional team filter (optional)
-    player_id = 56 # int | Player ID filter, required if year not specified (optional)
-    season_type = cfbd.SeasonType() # SeasonType | Optional season type filter (optional)
-    start_week = 56 # int | Optional starting week range (optional)
-    end_week = 56 # int | Optional ending week range (optional)
-    threshold = 56 # int | Optional minimum credited passing plus rushing plays (optional)
-    exclude_garbage_time = True # bool | Optional flag to exclude garbage time plays (optional)
+    year = 56 # int | Season year. Required unless `playerId` is specified. (optional)
+    conference = 'conference_example' # str | Conference abbreviation. (optional)
+    team = 'team_example' # str | Team name. (optional)
+    player_id = 56 # int | Player ID. Required unless `year` is specified. (optional)
+    season_type = cfbd.SeasonType() # SeasonType | Season type. (optional)
+    start_week = 56 # int | Earliest week to include. (optional)
+    end_week = 56 # int | Latest week to include. (optional)
+    threshold = 56 # int | Minimum credited passing and rushing plays. (optional)
+    exclude_garbage_time = True # bool | Excludes garbage-time plays when `true`. (optional)
 
     try:
         api_response = api_instance.get_player_season_success_rates(year=year, conference=conference, team=team, player_id=player_id, season_type=season_type, start_week=start_week, end_week=end_week, threshold=threshold, exclude_garbage_time=exclude_garbage_time)
@@ -584,15 +587,15 @@ with cfbd.ApiClient(configuration) as api_client:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **year** | **int**| Year filter, required if playerId not specified | [optional] 
- **conference** | **str**| Optional conference abbreviation filter | [optional] 
- **team** | **str**| Optional team filter | [optional] 
- **player_id** | **int**| Player ID filter, required if year not specified | [optional] 
- **season_type** | [**SeasonType**](.md)| Optional season type filter | [optional] 
- **start_week** | **int**| Optional starting week range | [optional] 
- **end_week** | **int**| Optional ending week range | [optional] 
- **threshold** | **int**| Optional minimum credited passing plus rushing plays | [optional] 
- **exclude_garbage_time** | **bool**| Optional flag to exclude garbage time plays | [optional] 
+ **year** | **int**| Season year. Required unless &#x60;playerId&#x60; is specified. | [optional] 
+ **conference** | **str**| Conference abbreviation. | [optional] 
+ **team** | **str**| Team name. | [optional] 
+ **player_id** | **int**| Player ID. Required unless &#x60;year&#x60; is specified. | [optional] 
+ **season_type** | [**SeasonType**](.md)| Season type. | [optional] 
+ **start_week** | **int**| Earliest week to include. | [optional] 
+ **end_week** | **int**| Latest week to include. | [optional] 
+ **threshold** | **int**| Minimum credited passing and rushing plays. | [optional] 
+ **exclude_garbage_time** | **bool**| Excludes garbage-time plays when &#x60;true&#x60;. | [optional] 
 
 ### Return type
 
@@ -615,11 +618,11 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **get_team_stats**
-> List[TeamStat] get_team_stats(year=year, team=team, conference=conference, start_week=start_week, end_week=end_week)
+> List[TeamStat] get_team_stats(year=year, team=team, conference=conference, start_week=start_week, end_week=end_week, classification=classification)
 
 
 
-Retrieves aggregated team season statistics
+Returns team statistics aggregated by season.
 
 ### Example
 
@@ -628,6 +631,7 @@ Retrieves aggregated team season statistics
 import time
 import os
 import cfbd
+from cfbd.models.division_classification import DivisionClassification
 from cfbd.models.team_stat import TeamStat
 from cfbd.rest import ApiException
 from pprint import pprint
@@ -652,14 +656,15 @@ configuration = cfbd.Configuration(
 with cfbd.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = cfbd.StatsApi(api_client)
-    year = 56 # int | Year filter, required if team not specified (optional)
-    team = 'team_example' # str | Team filter, required if year not specified (optional)
-    conference = 'conference_example' # str | Optional conference filter (optional)
-    start_week = 56 # int | Optional week start range filter (optional)
-    end_week = 56 # int | Optional week end range filter (optional)
+    year = 56 # int | Season year. Required unless `team` is specified. (optional)
+    team = 'team_example' # str | Team name. Required unless `year` is specified. (optional)
+    conference = 'conference_example' # str | Conference name or abbreviation. (optional)
+    start_week = 56 # int | Earliest week to include. (optional)
+    end_week = 56 # int | Latest week to include. (optional)
+    classification = cfbd.DivisionClassification() # DivisionClassification | Division classification. Defaults to `fbs`. (optional)
 
     try:
-        api_response = api_instance.get_team_stats(year=year, team=team, conference=conference, start_week=start_week, end_week=end_week)
+        api_response = api_instance.get_team_stats(year=year, team=team, conference=conference, start_week=start_week, end_week=end_week, classification=classification)
         print("The response of StatsApi->get_team_stats:\n")
         pprint(api_response)
     except Exception as e:
@@ -672,11 +677,12 @@ with cfbd.ApiClient(configuration) as api_client:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **year** | **int**| Year filter, required if team not specified | [optional] 
- **team** | **str**| Team filter, required if year not specified | [optional] 
- **conference** | **str**| Optional conference filter | [optional] 
- **start_week** | **int**| Optional week start range filter | [optional] 
- **end_week** | **int**| Optional week end range filter | [optional] 
+ **year** | **int**| Season year. Required unless &#x60;team&#x60; is specified. | [optional] 
+ **team** | **str**| Team name. Required unless &#x60;year&#x60; is specified. | [optional] 
+ **conference** | **str**| Conference name or abbreviation. | [optional] 
+ **start_week** | **int**| Earliest week to include. | [optional] 
+ **end_week** | **int**| Latest week to include. | [optional] 
+ **classification** | [**DivisionClassification**](.md)| Division classification. Defaults to &#x60;fbs&#x60;. | [optional] 
 
 ### Return type
 
