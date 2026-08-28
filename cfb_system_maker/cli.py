@@ -523,7 +523,7 @@ def _build_parser() -> argparse.ArgumentParser:
     fetch = subparsers.add_parser("fetch")
     fetch.add_argument("--data-dir", default="data")
     fetch.add_argument("--season", dest="seasons", type=int, nargs="+", required=True)
-    fetch.add_argument("--season-type", default="regular")
+    fetch.add_argument("--season-type", default="both")
     fetch.add_argument("--provider")
 
     build = subparsers.add_parser("build")
@@ -543,7 +543,7 @@ def _build_parser() -> argparse.ArgumentParser:
     scrape_parser = subparsers.add_parser("scrape")
     scrape_parser.add_argument("--data-dir", default="data")
     scrape_parser.add_argument("--season", dest="seasons", type=int, nargs="+", required=True)
-    scrape_parser.add_argument("--season-type", default="regular")
+    scrape_parser.add_argument("--season-type", default="both")
     scrape_parser.add_argument("--include-per-game", action="store_true")
     scrape_parser.add_argument("--include-per-player", action="store_true")
     scrape_parser.add_argument("--only", nargs="+")

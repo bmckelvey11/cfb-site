@@ -148,7 +148,7 @@ def scrape(
     seasons: list[int],
     *,
     data_dir: str | Path = "data",
-    season_type: str = "regular",
+    season_type: str = "both",
     weeks: range = range(1, 16),
     include_per_game: bool = False,
     include_per_player: bool = False,
@@ -201,7 +201,7 @@ def _run_endpoint(
         if endpoint.mode == SEASON:
             return _scrape_season(endpoint, func, seasons, data_dir, season_type, delay, resume)
         if endpoint.mode == SEASON_WEEK:
-            return _scrape_season_week(endpoint, func, seasons, data_dir, season_type, weeks, delay, resume)
+            return _scrape_season_week(endpoint, func, seasons, data_dir, weeks, delay, resume)
         if endpoint.mode == GRID:
             return _scrape_grid(endpoint, func, data_dir, delay, resume)
         if endpoint.mode == PER_GAME:
@@ -316,11 +316,20 @@ def _scrape_season_week(
     func: Callable[..., Any],
     seasons: list[int],
     data_dir: str | Path,
-    season_type: str,
     weeks: range,
     delay: float,
     resume: bool,
 ) -> ScrapeReport:
+    """Regular season only, deliberately — `both` conflates two week axes.
+
+    Postseason week numbering restarts at 1, so `season_type="both"` with `week=1`
+    returns regular week 1 merged with postseason week 1 (probed 2026-08-28:
+    game_team_stats 2024 wk1 gave regular=137, postseason=50, both=187). The filename
+    `{name}_{season}_wk{week}.json` has no season-type axis to separate them, so `both`
+    here would corrupt the files rather than extend them. Adding postseason needs a
+    second pass writing `{name}_{season}_post_wk{week}.json`; until then this path
+    ignores the caller's season_type and stays on `regular`.
+    """
     files = 0
     total = 0
     skipped = 0
@@ -329,7 +338,7 @@ def _scrape_season_week(
             if resume and _exists(data_dir, f"{endpoint.name}_{season}_wk{week}.json"):
                 skipped += 1
                 continue
-            kwargs = _accepted(func, {"year": season, "week": week, "season_type": season_type})
+            kwargs = _accepted(func, {"year": season, "week": week, "season_type": "regular"})
             rows = _call(func, kwargs, delay)
             if not rows:
                 continue

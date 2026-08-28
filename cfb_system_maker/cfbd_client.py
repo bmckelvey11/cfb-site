@@ -9,7 +9,7 @@ from typing import Any
 def fetch_games_and_lines(
     seasons: list[int],
     *,
-    season_type: str = "regular",
+    season_type: str = "both",
     provider: str | None = None,
     token: str | None = None,
 ) -> dict[int, dict[str, list[dict[str, Any]]]]:

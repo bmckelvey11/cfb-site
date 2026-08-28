@@ -61,7 +61,7 @@ class _PlaysApi:
     def get_plays(self, year=None, week=None, team=None, season_type=None, **rest):
         if week > 2:
             return []
-        return [{"id": f"{year}-{week}", "year": year, "week": week}]
+        return [{"id": f"{year}-{week}", "year": year, "week": week, "season_type": season_type}]
 
 
 class _BoomApi:
@@ -146,6 +146,18 @@ def test_season_week_skips_empty_weeks(tmp_path):
     assert (tmp_path / "raw" / "plays_2022_wk2.json").exists()
     assert not (tmp_path / "raw" / "plays_2022_wk3.json").exists()  # empty -> not written
     assert reports[0].files == 4  # 2 seasons x 2 non-empty weeks
+
+
+def test_season_week_ignores_season_type_and_stays_regular(tmp_path):
+    """`both` conflates regular and postseason week 1 into one `_wk1` file.
+
+    Postseason weeks restart at 1 and the filename has no season-type axis, so the
+    week path pins `regular` regardless of what the caller asked for.
+    """
+    _run({"plays"}, tmp_path, season_type="both")
+
+    rows = json.loads((tmp_path / "raw" / "plays_2022_wk1.json").read_text())
+    assert rows[0]["season_type"] == "regular"
 
 
 def test_grid_writes_down_distance_matrix(tmp_path):
