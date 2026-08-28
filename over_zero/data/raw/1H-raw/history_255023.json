@@ -1,0 +1,2496 @@
+{
+  "15": {
+    "firsthalf": {
+      "core_bet_type_6_team_score": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713758",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011368641",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713757",
+          "odds": -145,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011368635",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713758",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011368642",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713757",
+          "odds": 114,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011368636",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        }
+      ],
+      "moneyline": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709806",
+          "odds": -180,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006897160",
+          "period": "firsthalf",
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709806",
+          "odds": 150,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006897157",
+          "period": "firsthalf",
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709807",
+          "odds": -120,
+          "odds_coefficient_score": -10000,
+          "outcome_id": "2006897170",
+          "period": "firsthalf",
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 3.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709807",
+          "odds": 102,
+          "odds_coefficient_score": -10000,
+          "outcome_id": "2006897173",
+          "period": "firsthalf",
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -3.5
+        }
+      ],
+      "total": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692125",
+          "odds": -102,
+          "odds_coefficient_score": -10000,
+          "outcome_id": "2006897119",
+          "period": "firsthalf",
+          "side": "over",
+          "type": "total",
+          "value": 24.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692125",
+          "odds": -118,
+          "odds_coefficient_score": -10000,
+          "outcome_id": "2006897118",
+          "period": "firsthalf",
+          "side": "under",
+          "type": "total",
+          "value": 24.5
+        }
+      ]
+    },
+    "firstquarter": {
+      "core_bet_type_6_team_score": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15730121",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011773798",
+          "period": "firstquarter",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 6.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15730123",
+          "odds": -130,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011773820",
+          "period": "firstquarter",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 0.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15730123",
+          "odds": -100,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011773823",
+          "period": "firstquarter",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 0.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15730121",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011773803",
+          "period": "firstquarter",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 6.5
+        }
+      ],
+      "moneyline": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15712163",
+          "odds": -185,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906559",
+          "period": "firstquarter",
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15712163",
+          "odds": 145,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906558",
+          "period": "firstquarter",
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709992",
+          "odds": -130,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906506",
+          "period": "firstquarter",
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 1.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709992",
+          "odds": 106,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906507",
+          "period": "firstquarter",
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -1.5
+        }
+      ],
+      "total": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692126",
+          "odds": -140,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906389",
+          "period": "firstquarter",
+          "side": "over",
+          "type": "total",
+          "value": 9.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 15,
+          "deeplink_id": "",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692126",
+          "odds": 112,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906387",
+          "period": "firstquarter",
+          "side": "under",
+          "type": "total",
+          "value": 9.5
+        }
+      ]
+    }
+  },
+  "30": {
+    "firsthalf": {
+      "core_bet_type_6_team_score": [
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15713758",
+          "odds": 102,
+          "option_type_id": 2,
+          "outcome_id": "2011368641",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "under",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15713757",
+          "odds": -120,
+          "option_type_id": 2,
+          "outcome_id": "2011368635",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "under",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15713758",
+          "odds": -136,
+          "option_type_id": 1,
+          "outcome_id": "2011368642",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "over",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15713757",
+          "odds": -110,
+          "option_type_id": 1,
+          "outcome_id": "2011368636",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "over",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        }
+      ],
+      "moneyline": [
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15709806",
+          "odds": -155,
+          "option_type_id": 0,
+          "outcome_id": "2006897160",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15709806",
+          "odds": 130,
+          "option_type_id": 0,
+          "outcome_id": "2006897157",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15709807",
+          "odds": -108,
+          "option_type_id": 0,
+          "outcome_id": "2006897170",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 2.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15709807",
+          "odds": -112,
+          "option_type_id": 0,
+          "outcome_id": "2006897173",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -2.5
+        }
+      ],
+      "total": [
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15692125",
+          "odds": -130,
+          "option_type_id": 0,
+          "outcome_id": "2006897118",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "under",
+          "team_id": null,
+          "type": "total",
+          "value": 24.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15692125",
+          "odds": 110,
+          "option_type_id": 0,
+          "outcome_id": "2006897119",
+          "period": "firsthalf",
+          "player_id": null,
+          "side": "over",
+          "team_id": null,
+          "type": "total",
+          "value": 24.5
+        }
+      ]
+    },
+    "firstquarter": {
+      "core_bet_type_6_team_score": [
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15730123",
+          "odds": -135,
+          "option_type_id": 1,
+          "outcome_id": "2011773823",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "over",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 2.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15730123",
+          "odds": 105,
+          "option_type_id": 2,
+          "outcome_id": "2011773820",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "under",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 2.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15730121",
+          "odds": -110,
+          "option_type_id": 2,
+          "outcome_id": "2011773798",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "under",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 6.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15730121",
+          "odds": -120,
+          "option_type_id": 1,
+          "outcome_id": "2011773803",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "over",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 6.5
+        }
+      ],
+      "moneyline": [
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15712163",
+          "odds": -154,
+          "option_type_id": 0,
+          "outcome_id": "2006906559",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15712163",
+          "odds": 120,
+          "option_type_id": 0,
+          "outcome_id": "2006906558",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15709992",
+          "odds": -140,
+          "option_type_id": 0,
+          "outcome_id": "2006906506",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 0.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15709992",
+          "odds": 110,
+          "option_type_id": 0,
+          "outcome_id": "2006906507",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -0.5
+        }
+      ],
+      "total": [
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15692126",
+          "odds": 110,
+          "option_type_id": 0,
+          "outcome_id": "2006906387",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "under",
+          "team_id": null,
+          "type": "total",
+          "value": 9.5
+        },
+        {
+          "book_id": 30,
+          "competitor_id": null,
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "market_id": "15692126",
+          "odds": -140,
+          "option_type_id": 0,
+          "outcome_id": "2006906389",
+          "period": "firstquarter",
+          "player_id": null,
+          "side": "over",
+          "team_id": null,
+          "type": "total",
+          "value": 9.5
+        }
+      ]
+    }
+  },
+  "68": {
+    "firsthalf": {
+      "core_bet_type_6_team_score": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2011774239",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713757",
+          "odds": -145,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011774239",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2011774238",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713757",
+          "odds": 114,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011774238",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2011774231",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713758",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011774231",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2011774233",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713758",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011774233",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        }
+      ],
+      "moneyline": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006897593",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709806",
+          "odds": 150,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006897593",
+          "period": "firsthalf",
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006897592",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709806",
+          "odds": -180,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006897592",
+          "period": "firsthalf",
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006897596",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709807",
+          "odds": -120,
+          "odds_coefficient_score": 0.427097,
+          "outcome_id": "2006897596",
+          "period": "firsthalf",
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 3.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006897595",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709807",
+          "odds": 102,
+          "odds_coefficient_score": 0.613408,
+          "outcome_id": "2006897595",
+          "period": "firsthalf",
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -3.5
+        }
+      ],
+      "total": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006897597",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692125",
+          "odds": -102,
+          "odds_coefficient_score": 0.103123,
+          "outcome_id": "2006897597",
+          "period": "firsthalf",
+          "side": "over",
+          "type": "total",
+          "value": 24.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006897598",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692125",
+          "odds": -118,
+          "odds_coefficient_score": -0.14936,
+          "outcome_id": "2006897598",
+          "period": "firsthalf",
+          "side": "under",
+          "type": "total",
+          "value": 24.5
+        }
+      ]
+    },
+    "firstquarter": {
+      "core_bet_type_6_team_score": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2011774236",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15730121",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011774236",
+          "period": "firstquarter",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 6.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2011774245",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15730123",
+          "odds": -130,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011774245",
+          "period": "firstquarter",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 0.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2011774242",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15730123",
+          "odds": 100,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011774242",
+          "period": "firstquarter",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 0.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2011774237",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15730121",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011774237",
+          "period": "firstquarter",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 6.5
+        }
+      ],
+      "moneyline": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006906655",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15712163",
+          "odds": -188,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906655",
+          "period": "firstquarter",
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006906656",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15712163",
+          "odds": 145,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906656",
+          "period": "firstquarter",
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006906658",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709992",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906658",
+          "period": "firstquarter",
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -2.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006906659",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709992",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906659",
+          "period": "firstquarter",
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 2.5
+        }
+      ],
+      "total": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006906664",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692126",
+          "odds": 105,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906664",
+          "period": "firstquarter",
+          "side": "under",
+          "type": "total",
+          "value": 9.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 68,
+          "deeplink_id": "ML2006906663",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692126",
+          "odds": -135,
+          "odds_coefficient_score": null,
+          "outcome_id": "2006906663",
+          "period": "firstquarter",
+          "side": "over",
+          "type": "total",
+          "value": 9.5
+        }
+      ]
+    }
+  },
+  "69": {
+    "firsthalf": {
+      "core_bet_type_6_team_score": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011368213",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713758",
+          "odds": 112,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011368213",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011368209",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713757",
+          "odds": 114,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011368209",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011368212",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713758",
+          "odds": -144,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2011368212",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011368210",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713757",
+          "odds": -148,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2011368210",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        }
+      ],
+      "moneyline": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367634",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709806",
+          "odds": 154,
+          "odds_coefficient_score": null,
+          "outcome_id": "2011367634",
+          "period": "firsthalf",
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367635",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709806",
+          "odds": -192,
+          "odds_coefficient_score": null,
+          "outcome_id": "2011367635",
+          "period": "firsthalf",
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367657",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709807",
+          "odds": -110,
+          "odds_coefficient_score": 0.405452,
+          "outcome_id": "2011367657",
+          "period": "firsthalf",
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 3.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367659",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709807",
+          "odds": -110,
+          "odds_coefficient_score": 0.642168,
+          "outcome_id": "2011367659",
+          "period": "firsthalf",
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -3.5
+        }
+      ],
+      "total": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367632",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692125",
+          "odds": 104,
+          "odds_coefficient_score": 0.117878,
+          "outcome_id": "2011367632",
+          "period": "firsthalf",
+          "side": "over",
+          "type": "total",
+          "value": 24.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367633",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692125",
+          "odds": -130,
+          "odds_coefficient_score": -0.17329,
+          "outcome_id": "2011367633",
+          "period": "firsthalf",
+          "side": "under",
+          "type": "total",
+          "value": 24.5
+        }
+      ]
+    },
+    "firstquarter": {
+      "moneyline": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367664",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15712163",
+          "odds": 134,
+          "odds_coefficient_score": null,
+          "outcome_id": "2011367664",
+          "period": "firstquarter",
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367666",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15712163",
+          "odds": -172,
+          "odds_coefficient_score": null,
+          "outcome_id": "2011367666",
+          "period": "firstquarter",
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011368207",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709992",
+          "odds": 106,
+          "odds_coefficient_score": null,
+          "outcome_id": "2011368207",
+          "period": "firstquarter",
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -1.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011368205",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709992",
+          "odds": -130,
+          "odds_coefficient_score": null,
+          "outcome_id": "2011368205",
+          "period": "firstquarter",
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 1.5
+        }
+      ],
+      "total": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367631",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692126",
+          "odds": 112,
+          "odds_coefficient_score": null,
+          "outcome_id": "2011367631",
+          "period": "firstquarter",
+          "side": "under",
+          "type": "total",
+          "value": 9.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 69,
+          "deeplink_id": "ML2011367630",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692126",
+          "odds": -140,
+          "odds_coefficient_score": null,
+          "outcome_id": "2011367630",
+          "period": "firstquarter",
+          "side": "over",
+          "type": "total",
+          "value": 9.5
+        }
+      ]
+    }
+  },
+  "71": {
+    "firsthalf": {
+      "core_bet_type_6_team_score": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614829",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713757",
+          "odds": 112,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2012614829",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614831",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713757",
+          "odds": -155,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2012614831",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 312,
+          "type": "core_bet_type_6_team_score",
+          "value": 10.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614783",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713758",
+          "odds": -121,
+          "odds_coefficient_score": null,
+          "option_type_id": 1,
+          "outcome_id": "2012614783",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "over",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614786",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15713758",
+          "odds": -115,
+          "odds_coefficient_score": null,
+          "option_type_id": 2,
+          "outcome_id": "2012614786",
+          "period": "firsthalf",
+          "prop_type_id": 166,
+          "side": "under",
+          "team_id": 309,
+          "type": "core_bet_type_6_team_score",
+          "value": 13.5
+        }
+      ],
+      "moneyline": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614766",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709806",
+          "odds": -175,
+          "odds_coefficient_score": null,
+          "outcome_id": "2012614766",
+          "period": "firsthalf",
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614768",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709806",
+          "odds": 132,
+          "odds_coefficient_score": null,
+          "outcome_id": "2012614768",
+          "period": "firsthalf",
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614697",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709807",
+          "odds": -104,
+          "odds_coefficient_score": 0.43647,
+          "outcome_id": "2012614697",
+          "period": "firsthalf",
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 2.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614694",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709807",
+          "odds": -120,
+          "odds_coefficient_score": 0.618789,
+          "outcome_id": "2012614694",
+          "period": "firsthalf",
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -2.5
+        }
+      ],
+      "total": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614791",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692125",
+          "odds": -132,
+          "odds_coefficient_score": 0.069512,
+          "outcome_id": "2012614791",
+          "period": "firsthalf",
+          "side": "over",
+          "type": "total",
+          "value": 23.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614794",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692125",
+          "odds": 102,
+          "odds_coefficient_score": -0.13353,
+          "outcome_id": "2012614794",
+          "period": "firsthalf",
+          "side": "under",
+          "type": "total",
+          "value": 23.5
+        }
+      ]
+    },
+    "firstquarter": {
+      "moneyline": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614757",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15712163",
+          "odds": -136,
+          "odds_coefficient_score": null,
+          "outcome_id": "2012614757",
+          "period": "firstquarter",
+          "side": "home",
+          "team_id": 309,
+          "type": "moneyline",
+          "value": 0
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614759",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15712163",
+          "odds": 104,
+          "odds_coefficient_score": null,
+          "outcome_id": "2012614759",
+          "period": "firstquarter",
+          "side": "away",
+          "team_id": 312,
+          "type": "moneyline",
+          "value": 0
+        }
+      ],
+      "spread": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614742",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709992",
+          "odds": 110,
+          "odds_coefficient_score": null,
+          "outcome_id": "2012614742",
+          "period": "firstquarter",
+          "side": "home",
+          "team_id": 309,
+          "type": "spread",
+          "value": -1.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614746",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15709992",
+          "odds": -150,
+          "odds_coefficient_score": null,
+          "outcome_id": "2012614746",
+          "period": "firstquarter",
+          "side": "away",
+          "team_id": 312,
+          "type": "spread",
+          "value": 1.5
+        }
+      ],
+      "total": [
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614727",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692126",
+          "odds": 115,
+          "odds_coefficient_score": null,
+          "outcome_id": "2012614727",
+          "period": "firstquarter",
+          "side": "over",
+          "type": "total",
+          "value": 10.5
+        },
+        {
+          "bet_info": {
+            "money": {
+              "percent": 0,
+              "value": 0
+            },
+            "tickets": {
+              "percent": 0,
+              "value": 0
+            }
+          },
+          "book_id": 71,
+          "deeplink_id": "ML2012614731",
+          "event_id": 255023,
+          "event_type": "game",
+          "history": [],
+          "is_live": false,
+          "line_status": "normal",
+          "market_id": "15692126",
+          "odds": -150,
+          "odds_coefficient_score": null,
+          "outcome_id": "2012614731",
+          "period": "firstquarter",
+          "side": "under",
+          "type": "total",
+          "value": 10.5
+        }
+      ]
+    }
+  }
+}
