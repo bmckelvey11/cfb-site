@@ -178,6 +178,9 @@ def _row_to_game(row: dict[str, str]) -> GameRecord:
         provider=_none_if_blank(row["provider"]),
         spread=_optional_float(row["spread"]),
         total=_optional_float(row["total"]),
+        # .get: games.csv files written before season_type existed have no such
+        # column, and every row in them is regular season by construction.
+        season_type=row.get("season_type") or "regular",
     )
 
 

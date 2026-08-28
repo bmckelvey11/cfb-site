@@ -17,6 +17,12 @@ class GameRecord:
     provider: str | None
     spread: float | None
     total: float | None
+    # Appended, not inserted: field order is the games.csv read/write contract, so a
+    # new column goes on the end and `_row_to_game` defaults it for CSVs written
+    # before it existed. Postseason week numbers restart at 1 and collide with
+    # regular-season weeks (531 bowls sit at week 1), so week alone no longer
+    # identifies a slate — season_type is what separates them.
+    season_type: str = "regular"
 
 
 @dataclass(frozen=True)
@@ -49,6 +55,12 @@ class SystemFilter:
     exclude_teams: set[str] = field(default_factory=set)
     exclude_conferences: set[str] = field(default_factory=set)
     exclude_providers: set[str] = field(default_factory=set)
+    # Week numbers repeat across season types -- postseason restarts at week 1,
+    # so 531 bowls share week 1 with the season openers. An empty set means
+    # "every season type", which is what every system saved before this existed
+    # meant, so they keep matching exactly what they used to.
+    season_types: set[str] = field(default_factory=set)
+    exclude_season_types: set[str] = field(default_factory=set)
     min_spread: float | None = None
     max_spread: float | None = None
     min_total: float | None = None
@@ -92,6 +104,7 @@ class BetDetail:
     result: str
     profit: float
     margin: float = 0.0
+    season_type: str = "regular"
 
 
 @dataclass(frozen=True)

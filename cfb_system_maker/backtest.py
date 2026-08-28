@@ -370,6 +370,10 @@ def matches_system(
         return False
     if system.exclude_seasons and game.season in system.exclude_seasons:
         return False
+    if system.season_types and game.season_type not in system.season_types:
+        return False
+    if system.exclude_season_types and game.season_type in system.exclude_season_types:
+        return False
     if system.exclude_weeks and game.week in system.exclude_weeks:
         return False
     if system.exclude_providers and game.provider in system.exclude_providers:
@@ -536,6 +540,7 @@ def grade_bet(
         game_id=game.game_id,
         season=game.season,
         week=game.week,
+        season_type=game.season_type,
         team=team,
         opponent=opponent,
         side=normalized_side,
@@ -584,6 +589,7 @@ def _grade_total_bet(
         game_id=game.game_id,
         season=game.season,
         week=game.week,
+        season_type=game.season_type,
         team=effective_total_side.title(),
         opponent=f"{game.away_team} at {game.home_team}",
         side=effective_total_side,
@@ -794,13 +800,17 @@ def _inverse_norm_cdf(p: float) -> float:
         ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
 
 
-def _cluster_key(bet: BetDetail) -> tuple[int, int]:
+def _cluster_key(bet: BetDetail) -> tuple[int, str, int]:
     # (season, week) is the only dependence dimension populated for both bet
     # types -- BetDetail.team is a real team for spread bets but "Over"/"Under"
     # for total bets, so team-level clustering silently degenerates to 2
     # clusters there. Season/week captures shared market and weather shocks
     # instead and is always meaningful.
-    return (bet.season, bet.week)
+    #
+    # season_type is part of the key because postseason week numbering restarts
+    # at 1: without it a January bowl and an August opener land in the same
+    # cluster, which is not one shared shock and quietly corrupts ICC and DEFF.
+    return (bet.season, bet.season_type, bet.week)
 
 
 def cluster_dependence_stats(

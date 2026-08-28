@@ -37,6 +37,9 @@ def normalize_games(
                 provider=_first(selected_line, "provider"),
                 spread=_optional_float(_first(selected_line, "spread")),
                 total=_optional_float(_first(_select_total(betting_game.get("lines", []), selected_line), "overUnder", "over_under", "total")),
+                season_type=str(_first(game, "seasonType", "season_type",
+                                       fallback=_first(betting_game, "seasonType", "season_type",
+                                                       fallback="regular"))),
             )
         )
 

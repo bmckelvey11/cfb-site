@@ -1222,3 +1222,42 @@ def test_existing_system_unchanged_when_exclusions_default_empty():
     assert result.bets == 2
     assert result.wins == 1
     assert result.losses == 1
+
+def test_week_filter_alone_cannot_separate_bowls_from_openers():
+    """Postseason week numbering restarts at 1, so week 1 holds both.
+
+    In the real table 531 bowl and playoff games sit at week 1 alongside 1,132
+    season openers. A weeks={1} system therefore matches both unless the system
+    also says which season type it wants.
+    """
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 28, 21, "consensus", -6.5, 49.5),
+        GameRecord(2, 2023, 1, "C", "D", "ACC", "SEC", 31, 10, "consensus", -6.5, 49.5,
+                   season_type="postseason"),
+    ]
+
+    both = run_backtest(games, SystemFilter(weeks={1}))
+    assert both.bets == 2  # the collision is real
+
+    openers = run_backtest(games, SystemFilter(weeks={1}, season_types={"regular"}))
+    assert openers.bets == 1
+    assert openers.bet_details[0].game_id == 1
+
+    no_bowls = run_backtest(games, SystemFilter(weeks={1}, exclude_season_types={"postseason"}))
+    assert no_bowls.bets == 1
+
+
+def test_bowls_and_openers_are_not_one_cluster():
+    """A January bowl and an August opener share a week number, not a shock.
+
+    Clustering on (season, week) alone would pool them and understate the
+    dependence correction; season_type is part of the key so it cannot.
+    """
+    games = [
+        GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 28, 21, "consensus", -6.5, 49.5),
+        GameRecord(2, 2023, 1, "C", "D", "ACC", "SEC", 31, 10, "consensus", -6.5, 49.5,
+                   season_type="postseason"),
+    ]
+
+    result = run_backtest(games, SystemFilter())
+    assert result.stats.cluster_count == 2
