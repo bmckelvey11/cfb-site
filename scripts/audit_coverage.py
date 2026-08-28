@@ -20,15 +20,37 @@ from cfb_system_maker.scrapers import (  # noqa: E402
 BULK_MODES = {ONCE, SEASON, SEASON_WEEK, GRID}
 
 
-def expected_files(ep, seasons: list[int], weeks: range) -> list[str]:
+def expected_files(ep, seasons: list[int], weeks: range, raw: Path | None = None) -> list[str]:
     if ep.mode in (ONCE, GRID):
         return [f"{ep.name}.json"]
     if ep.mode in (SEASON, PER_GAME, PER_PLAYER):
         floor = ep.min_season or 0
         return [f"{ep.name}_{s}.json" for s in seasons if s >= floor]
     if ep.mode == SEASON_WEEK:
-        return [f"{ep.name}_{s}_wk{w}.json" for s in seasons for w in weeks]
+        want = [f"{ep.name}_{s}_wk{w}.json" for s in seasons for w in weeks]
+        # Postseason lands in its own `_post_wk` files because postseason week numbering
+        # restarts at 1. Which weeks those are is data, not a range: 2025 has postseason
+        # in weeks 1, 13 and 14, and at least one season has week 15. Read them off the
+        # same games seed the scraper uses, so a missing postseason pull is visible here
+        # rather than silently absent.
+        for s in seasons:
+            want += [f"{ep.name}_{s}_post_wk{w}.json" for w in _postseason_weeks(raw, s)]
+        return want
     return []  # ON_DEMAND: never bulk-scraped
+
+
+def _postseason_weeks(raw: Path | None, season: int) -> list[int]:
+    if raw is None:
+        return []
+    path = raw / f"games_{season}.json"
+    if not path.exists():
+        return []
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    return sorted({
+        row["week"] for row in rows
+        if (row.get("seasonType") or row.get("season_type")) == "postseason"
+        and row.get("week") is not None
+    })
 
 
 def main() -> None:
@@ -55,7 +77,7 @@ def main() -> None:
     empties: dict[str, list[str]] = {}
 
     for ep in ENDPOINTS:
-        want = expected_files(ep, seasons, weeks)
+        want = expected_files(ep, seasons, weeks, raw)
         if not want:
             totals["ondemand"] += 1
             print(f"{ep.mode:12} {ep.name:28} {'-':>6} {'-':>6}  (on-demand, not bulk)")

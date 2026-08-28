@@ -107,10 +107,35 @@ exactly the `seasonType`-accepting files `enrich.py` reads. Result: **+501 games
 `games.csv` (13,014 → 13,515) and postseason rows in every endpoint — 751 games, 586 lines,
 936 media, 639 weather, 1,178 advanced-stat, 1,100 PPA, 922 havoc, 14,804 drives.
 
-**Still `regular` only (6, SEASON_WEEK mode).** `plays`, `play_stats`, `ppa_players_games`,
-`game_player_stats`, `game_team_stats`, `player_success_game`. None feed `build`/`enrich`,
-so nothing downstream is short today. Closing them needs a second pass writing
-`{name}_{season}_post_wk{week}.json`, not a flag change.
+**Also closed, via a second pass (6, SEASON_WEEK mode).** `plays`, `play_stats`,
+`ppa_players_games`, `game_player_stats`, `game_team_stats`, `player_success_game`
+(quick task `260828-l60`). `_scrape_season_week` runs one pass per season type: regular
+keeps `{name}_{season}_wk{week}.json`, postseason writes
+`{name}_{season}_post_wk{week}.json`. `--season-type` is meaningful for them again and
+symmetric — `regular` runs only regular, `postseason` only postseason, `both` runs both.
+Pulled 2012–2025: 100 files, 153,164 rows (plays 106,543; play_stats 29,120;
+ppa_players_games 10,358; player_success_game 5,961; game_player_stats 592;
+game_team_stats 590).
+
+**The postseason week list is data, not a range.** Postseason is week 1 in most seasons,
+but 2020 also has week 20, 2023 has weeks 11–15, and 2025 has weeks 13–14 — the
+Division II/III playoff rounds that begin in mid-November. `_postseason_weeks` reads them
+off the `games_{season}.json` seed, so the scraper cannot miss a week nobody thought to
+look for. A hardcoded `week=1` would have silently dropped 32 games in 2025 alone.
+
+Verified by disjointness, not by counts: for every `(endpoint, season, week)` the row sets
+in `_wk{w}.json` and `_post_wk{w}.json` share nothing (whole-row identity, not an id
+field), and for `game_team_stats` 2024 wk1 their union equals the live
+`season_type="both"` result exactly — 137 + 50 = 187 ids.
+
+`scripts/audit_coverage.py` now expects the postseason files too, derived from the same
+seed. Without that a missing postseason pull would be invisible, which is the blindness
+that hid the original `seasonType` gap. It reports five expected-but-absent files per
+endpoint — `(2020, 20)`, `(2023, 11)`, `(2023, 12)`, `(2025, 13)`, `(2025, 14)` — and all
+five are **upstream empties, not misses**: the schedule lists those lower-division playoff
+rounds but CFBD returns zero rows for them, while the neighbouring `(2023, 13)` returns 8
+team-stat rows and 1,120 plays. Same floor-not-failure shape as the empty `[]` payloads
+below.
 
 #### What the re-scrape verified, and what it exposed
 
