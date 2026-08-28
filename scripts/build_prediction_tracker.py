@@ -57,9 +57,9 @@ ALIASES = {
     "Western Mich.": ["Western Michigan"],
 }
 
-# Output columns, in blocks. Everything Prediction Tracker owns keeps a pt_ prefix so it
-# is never confused with the CFBD side; model columns keep their upstream line* names,
-# which are the modeler's identity on thepredictiontracker.com.
+# Output columns, in blocks. Every Prediction Tracker column keeps its upstream name, so
+# this file reads the same as the source CSVs; the columns added from CFBD carry a cfbd_
+# prefix where the name would otherwise collide.
 IDENTITY = [
     "game_id",
     "season",
@@ -73,26 +73,26 @@ IDENTITY = [
     "match_status",
 ]
 # Prediction Tracker's own game meta -- kept for traceability, but CFBD is authoritative
-# where the two disagree (see match_status).
-PT_RENAMES = {
-    "home": "pt_home",
-    "road": "pt_away",
-    "week": "pt_week",
-    "date": "pt_date",
-    "hscore": "pt_home_points",
-    "vscore": "pt_away_points",
-    "actual": "pt_margin",
-    "total": "pt_total",
-    "phcover": "pt_prob_home_cover",
-    "phwin": "pt_prob_home_win",
-}
-PT_META = list(PT_RENAMES.values())
+# where the two disagree (see match_status). hscore/vscore are PT's scores, actual is the
+# home margin, total the combined points, ph* PT's cover/win probabilities.
+PT_META = [
+    "home",
+    "road",
+    "week",
+    "date",
+    "hscore",
+    "vscore",
+    "actual",
+    "total",
+    "phcover",
+    "phwin",
+]
 MARKET = ["line", "lineopen"]  # closing and opening market spread
 CONSENSUS = ["lineavg", "linemedian", "linestd"]  # PT's own aggregates over the models
 # Score-like columns are integers; every other line* column is a spread. Non-numeric
 # cells are blanked -- the source carries a few (a team name in linecoll, NUL bytes in
 # lineanderson, and one 2006 row whose whole tail is shifted by a column).
-INT_COLUMNS = ["pt_week", "pt_home_points", "pt_away_points", "pt_margin", "pt_total"]
+INT_COLUMNS = ["week", "hscore", "vscore", "actual", "total"]
 
 
 def seasons_on_disk(src):
@@ -152,7 +152,7 @@ def load_cfbd(db_path, seasons):
 
 
 def read_season_csv(path, season):
-    """Rows keyed by case-folded, renamed header; ruler rows dropped, season attached.
+    """Rows keyed by the case-folded header; ruler rows dropped, season attached.
 
     Headers are only case-folded (2001 ships HOME/LINESAG, later years Home/linesag) --
     model names are never fuzzy-merged, because linemore and linemoore may well be
@@ -160,14 +160,14 @@ def read_season_csv(path, season):
     """
     with path.open(newline="", encoding="utf-8-sig") as fh:
         reader = csv.reader(fh)
-        header = [PT_RENAMES.get(h, h) for h in (c.strip().lower() for c in next(reader))]
+        header = [c.strip().lower() for c in next(reader)]
         rows = []
         for raw in reader:
             if not any(c.strip() for c in raw):
                 continue
             row = dict(zip(header, (c.strip().replace("\x00", "") for c in raw)))
             # ruler rows: the home cell is a run of digits (e.g. 1234567890123456)
-            if re.fullmatch(r"\d+", row.get("pt_home", "")):
+            if re.fullmatch(r"\d+", row.get("home", "")):
                 continue
             row["season"] = str(season)
             rows.append(clean_cells(row))
@@ -275,7 +275,7 @@ def main():
 
         counts = defaultdict(int)
         for row in rows:
-            home_pt, away_pt = row.get("pt_home", ""), row.get("pt_away", "")
+            home_pt, away_pt = row.get("home", ""), row.get("road", "")
             home, away = resolve(home_pt), resolve(away_pt)
             if home is None or away is None:
                 for pt, res in ((home_pt, home), (away_pt, away)):
@@ -296,9 +296,9 @@ def main():
             game, flipped, status = pick_game(
                 hits,
                 home,
-                as_int(row.get("pt_home_points")),
-                as_int(row.get("pt_away_points")),
-                as_int(row.get("pt_week")),
+                as_int(row.get("hscore")),
+                as_int(row.get("vscore")),
+                as_int(row.get("week")),
             )
             counts[status] += 1
             row["match_status"] = status
@@ -318,7 +318,7 @@ def main():
             if status == "matched_score_mismatch":
                 mismatches.append(
                     f"{season} {game['game_id']}: PT {home_pt} "
-                    f"{row.get('pt_home_points') or '?'}-{row.get('pt_away_points') or '?'} {away_pt} | CFBD "
+                    f"{row.get('hscore') or '?'}-{row.get('vscore') or '?'} {away_pt} | CFBD "
                     f"{game['home']} {game['home_points']}-{game['away_points']} {game['away']}"
                 )
             all_rows.append(row)

@@ -56,7 +56,7 @@ def test_unsplittable_rematch_is_ambiguous_not_guessed():
     assert game is None and status == "ambiguous"
 
 
-def test_read_season_csv_folds_header_renames_meta_and_drops_ruler_rows(tmp_path):
+def test_read_season_csv_folds_header_and_drops_ruler_rows(tmp_path):
     path = tmp_path / "ncaa2001.csv"
     path.write_text(
         "HOME,ROAD,LINESAG,HSCORE\n"
@@ -65,33 +65,22 @@ def test_read_season_csv_folds_header_renames_meta_and_drops_ruler_rows(tmp_path
         encoding="utf-8",
     )
     rows, header = pt.read_season_csv(path, 2001)
-    assert header == ["pt_home", "pt_away", "linesag", "pt_home_points"]
+    assert header == ["home", "road", "linesag", "hscore"]
     assert rows == [
-        {
-            "pt_home": "BYU",
-            "pt_away": "Tulane",
-            "linesag": "11.56",
-            "pt_home_points": "70",
-            "season": "2001",
-        }
+        {"home": "BYU", "road": "Tulane", "linesag": "11.56", "hscore": "70", "season": "2001"}
     ]
 
 
 def test_clean_cells_blanks_junk_the_source_ships():
     row = pt.clean_cells(
         {
-            "pt_home_points": "-18.95",  # 2006 row whose tail is shifted a column
-            "pt_away_points": "21",
+            "hscore": "-18.95",  # 2006 row whose tail is shifted a column
+            "vscore": "21",
             "linecoll": "USC",  # a team name in a spread column
             "linesag": "-3.5",
         }
     )
-    assert row == {
-        "pt_home_points": "",
-        "pt_away_points": "21",
-        "linecoll": "",
-        "linesag": "-3.5",
-    }
+    assert row == {"hscore": "", "vscore": "21", "linecoll": "", "linesag": "-3.5"}
 
 
 def test_order_columns_groups_by_block_and_ranks_models_by_coverage():
@@ -103,4 +92,4 @@ def test_order_columns_groups_by_block_and_ranks_models_by_coverage():
     assert models == ["linesag", "linerare"]  # linegone is empty and drops out
     assert fieldnames[: len(pt.IDENTITY)] == pt.IDENTITY
     assert fieldnames[-2:] == ["linesag", "linerare"]
-    assert fieldnames[len(pt.IDENTITY) : len(pt.IDENTITY) + 2] == ["pt_home", "pt_away"]
+    assert fieldnames[len(pt.IDENTITY) : len(pt.IDENTITY) + 2] == ["home", "road"]
