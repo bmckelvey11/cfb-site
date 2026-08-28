@@ -167,6 +167,21 @@ reason, and the audit reads both rather than keeping its own copy:
 | `gamePlayerStat` | ~6.7M rows, multi-GB; pulled per season with `--tables`/`--season` (2012-2025 shards are on disk) |
 | `scoreboard` | live in-progress games, no historical value |
 
+### Row counts, not just file existence
+
+20 of the 35 defaulted tables expose `{table}Aggregate { aggregate { count } }`, so the
+audit compares each dump's row count to the source's own total. Counting does **not** parse
+the files (`game.json` is 103 MB) — `_write` dumps with `indent=2`, so every top-level row
+starts on a line that is exactly `  {`. Drift is reported but never fails the run: a stale
+dump is a re-pull decision, not a wiring bug. The other 15 tables (`gameTeam`, `poll`,
+`ratings`, `transfer`, …) have no aggregate variant and stay file-existence only, which the
+output states rather than implying they were checked.
+
+As of 2026-08-28 twelve tables trail the source, several by a lot — `coachSeason` 1,937 vs
+12,564, `recruit` 50,820 vs 93,363, `recruitingTeam` 2,963 vs 4,578. Fresh ordered pulls of
+`coachSeason` and `recruitingTeam` match the source exactly, so the shortfall is in the
+dumps on disk (June/July pulls), not in the current client.
+
 The GraphQL half needs a Patreon Tier 3 token. Not having one prints a note and is
 never a failure — the REST partition runs offline from a saved spec and is not held
 hostage to a paid tier. Only a table that is reached but is neither defaulted nor

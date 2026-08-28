@@ -169,7 +169,8 @@ def _audit_graphql(gql_dir: Path, *, quiet: bool) -> list[str]:
     documented reason in GQL_EXCLUDED.
     """
     try:
-        schema = _introspect(_make_poster(find_cfbd_token()))
+        post = _make_poster(find_cfbd_token())
+        schema = _introspect(post)
     except Exception as exc:  # no Tier 3, no token, offline — a note, not a failure
         print(f"\nGRAPHQL: schema not reached ({type(exc).__name__}); section skipped")
         return []
@@ -203,6 +204,10 @@ def _audit_graphql(gql_dir: Path, *, quiet: bool) -> list[str]:
 
     print(f"  {len(in_defaults)} in defaults + {len(excluded)} excluded"
           f" = {len(in_defaults) + len(excluded)} of {len(tables)} introspected tables")
+
+    # `roots` holds only tables with scalar columns; `*Aggregate` roots return
+    # {aggregate, nodes} and are filtered out upstream, so ask the schema for every root.
+    _report_row_counts(post, _all_root_names(post), in_defaults, gql_dir, quiet=quiet)
     if missing:
         print(f"  MISSING FROM DISK: {', '.join(missing)} — in the default pull, never scraped.")
     if orphans:
@@ -211,6 +216,61 @@ def _audit_graphql(gql_dir: Path, *, quiet: bool) -> list[str]:
         print(f"  UNACCOUNTED: {', '.join(unaccounted)}"
               " — add to GQL_DEFAULT_TABLES or give a reason in GQL_EXCLUDED.")
     return unaccounted
+
+
+def _all_root_names(post) -> set[str]:
+    query = "{ __schema { queryType { fields { name } } } }"
+    try:
+        data = post(query, {})
+    except Exception:
+        return set()
+    return {f["name"] for f in data["__schema"]["queryType"]["fields"]}
+
+
+def _report_row_counts(post, roots: set[str], tables: list[str], gql_dir: Path, *, quiet: bool) -> None:
+    """Compare on-disk row counts to `{table}Aggregate.count` — the source's own total.
+
+    Only some tables expose an aggregate variant; the rest can only be checked for file
+    existence, and this says so rather than implying they were verified. Drift is a REFRESH
+    decision, not a wiring bug, so it never changes the exit code.
+    """
+    checkable = [t for t in tables if f"{t}Aggregate" in roots]
+    drift: list[tuple[str, int, int]] = []
+    for table in checkable:
+        path = gql_dir / f"{table}.json"
+        if not path.exists():
+            continue
+        try:
+            remote = post("{ %sAggregate { aggregate { count } } }" % table, {})
+            remote_n = remote[f"{table}Aggregate"]["aggregate"]["count"]
+        except Exception:
+            continue
+        local_n = _count_rows(path)
+        if local_n != remote_n:
+            drift.append((table, local_n, remote_n))
+
+    print(f"  ROW COUNTS: {len(checkable)}/{len(tables)} table(s) expose an aggregate variant"
+          f" — the other {len(tables) - len(checkable)} are file-existence only")
+    if drift:
+        print("  BEHIND THE SOURCE (re-pull to close; not a failure):")
+        for table, local_n, remote_n in drift:
+            print(f"    {table:24} disk {local_n:>8}  source {remote_n:>8}  ({local_n - remote_n:+})")
+    elif not quiet:
+        print("    every checkable table matches its source count")
+
+
+def _count_rows(path: Path) -> int:
+    """Row count without parsing the file — `game.json` alone is 103 MB.
+
+    `graphql_client._write` dumps `json.dumps(rows, indent=2)`, so every top-level row
+    begins on a line that is exactly two spaces and an opening brace.
+    """
+    count = 0
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.rstrip("\n") == "  {":
+                count += 1
+    return count
 
 
 def _graphql_files(gql_dir: Path) -> dict[str, int]:

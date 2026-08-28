@@ -23,7 +23,7 @@ SCHEMA = {
     "__schema": {
         "queryType": {
             "fields": [
-                {"name": "game", "args": _args("limit", "offset", "order_by", "where"), "type": _list_of("game")},
+                {"name": "game", "args": _args("limit", "offset", "orderBy", "where"), "type": _list_of("game")},
                 {"name": "conference", "args": [], "type": _list_of("conference")},  # non-paginated view
                 {"name": "gameAggregate", "args": [], "type": _obj("gameAggregate")},  # no scalars -> ignored
             ]
@@ -90,7 +90,7 @@ def test_only_scalar_columns_selected(tmp_path):
     q = captured["game"]
     assert "id" in q and "season" in q and "homeTeam" in q
     assert "weather" not in q  # relation skipped
-    assert "order_by: {id: asc}" in q  # id used as sort key
+    assert "orderBy: {id: ASC}" in q  # id used as sort key
 
 
 def test_season_filter_only_when_column_exists(tmp_path):
@@ -141,3 +141,14 @@ def test_player_stats_resume_skips_existing(tmp_path):
     reports = pull_game_player_stats([2023], data_dir=tmp_path, post_fn=make_player_stat_post(data))
 
     assert reports[0].skipped is True
+
+
+def test_paginated_query_sorts_by_the_sort_key(tmp_path):
+    """Unsorted limit/offset has no stable row order — pages can skip or repeat rows."""
+    captured = {}
+    data = {"game": [{"id": 1, "season": 2023}], "conference": [{"name": "SEC"}]}
+    graphql_scrape(data_dir=tmp_path, post_fn=make_post(data, captured))
+
+    # Hasura's arg is `orderBy` and its enum is uppercase; `order_by: {id: asc}` is rejected.
+    assert "orderBy: {id: ASC}" in captured["game"]
+    assert "orderBy" not in captured["conference"]  # root doesn't advertise the arg

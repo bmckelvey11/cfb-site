@@ -71,3 +71,28 @@ def test_graphql_section_degrades_to_a_note_when_the_schema_is_unreachable(tmp_p
     # hostage to a paid tier.
     assert audit_endpoints._audit_graphql(tmp_path, quiet=True) == []
     assert "schema not reached (RuntimeError)" in capsys.readouterr().out
+
+
+def test_row_count_check_reports_drift_without_failing(tmp_path, capsys):
+    (tmp_path / "coachSeason.json").write_text('[\n  {\n    "a": 1\n  }\n]')
+    (tmp_path / "coach.json").write_text('[\n  {\n    "a": 1\n  },\n  {\n    "a": 2\n  }\n]')
+
+    def post(query, variables):
+        table = query.split("{ ")[1].split("Aggregate")[0]
+        counts = {"coachSeason": 12564, "coach": 2}
+        return {f"{table}Aggregate": {"aggregate": {"count": counts[table]}}}
+
+    audit_endpoints._report_row_counts(
+        post,
+        {"coachSeason", "coachSeasonAggregate", "coach", "coachAggregate", "poll"},
+        ["coachSeason", "coach", "poll"],
+        tmp_path,
+        quiet=False,
+    )
+    out = capsys.readouterr().out
+
+    assert "2/3 table(s) expose an aggregate variant" in out   # poll has none -> not checked
+    assert "coachSeason" in out and "disk        1  source    12564  (-12563)" in out
+    listed = [l.split()[0] for l in out.split("BEHIND THE SOURCE")[1].splitlines() if "disk" in l]
+    assert listed == ["coachSeason"]                           # the matching table isn't listed
+    # Staleness is a refresh decision, not a wiring bug: nothing here touches the exit code.

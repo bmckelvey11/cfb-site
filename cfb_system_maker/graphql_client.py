@@ -138,7 +138,10 @@ def _paginate(
     seasons: list[int] | None,
 ) -> tuple[list[dict[str, Any]], int]:
     fields = " ".join(table.scalars)
-    order = f"order_by: {{{table.sort_key}: asc}}" if "order_by" in table.args else ""
+    # Hasura names this arg `orderBy` and takes an UPPERCASE enum; `order_by: {x: asc}` is
+    # rejected on both counts. The docs warn that `offset` without `orderBy` has no stable
+    # row order, so an unsorted paginated pull can skip or repeat rows between pages.
+    order = f"orderBy: {{{table.sort_key}: ASC}}" if "orderBy" in table.args else ""
     where = ""
     if seasons and table.season_col and "where" in table.args:
         where = f"where: {{{table.season_col}: {{_in: [{', '.join(str(s) for s in seasons)}]}}}}"
