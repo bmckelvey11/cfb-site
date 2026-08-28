@@ -59,6 +59,9 @@ class _PlaysApi:
         pass
 
     def get_plays(self, year=None, week=None, team=None, season_type=None, **rest):
+        if season_type == "postseason":
+            return [{"id": f"{year}-post-{week}", "year": year, "week": week,
+                     "season_type": "postseason"}]
         if week > 2:
             return []
         return [{"id": f"{year}-{week}", "year": year, "week": week, "season_type": season_type}]
@@ -148,16 +151,44 @@ def test_season_week_skips_empty_weeks(tmp_path):
     assert reports[0].files == 4  # 2 seasons x 2 non-empty weeks
 
 
-def test_season_week_ignores_season_type_and_stays_regular(tmp_path):
-    """`both` conflates regular and postseason week 1 into one `_wk1` file.
+def test_season_week_keeps_the_two_season_types_in_separate_files(tmp_path):
+    """Postseason weeks restart at 1, so the two types must never share a file.
 
-    Postseason weeks restart at 1 and the filename has no season-type axis, so the
-    week path pins `regular` regardless of what the caller asked for.
+    A single `season_type="both"` call would merge regular week 1 with postseason
+    week 1 (live: game_team_stats 2024 wk1 gave regular=137, postseason=50, both=187).
+    Each pass therefore asks for one type and postseason gets its own `_post_wk` name.
     """
+    save_raw_json(tmp_path, "games", 2022, [
+        {"id": 1, "week": 1, "seasonType": "regular"},
+        {"id": 2, "week": 1, "seasonType": "postseason"},
+    ])
+    save_raw_json(tmp_path, "games", 2023, [{"id": 3, "week": 1, "seasonType": "postseason"}])
+
     _run({"plays"}, tmp_path, season_type="both")
 
-    rows = json.loads((tmp_path / "raw" / "plays_2022_wk1.json").read_text())
-    assert rows[0]["season_type"] == "regular"
+    regular = json.loads((tmp_path / "raw" / "plays_2022_wk1.json").read_text())
+    assert [r["season_type"] for r in regular] == ["regular"]
+
+    post = json.loads((tmp_path / "raw" / "plays_2022_post_wk1.json").read_text())
+    assert [r["season_type"] for r in post] == ["postseason"]
+    assert {r["id"] for r in regular}.isdisjoint({r["id"] for r in post})
+
+
+def test_season_week_postseason_weeks_come_from_the_games_seed(tmp_path):
+    """2025 has postseason in weeks 1, 13 and 14 — week 1 cannot be assumed."""
+    save_raw_json(tmp_path, "games", 2022, [
+        {"id": 1, "week": 1, "seasonType": "postseason"},
+        {"id": 2, "week": 13, "seasonType": "postseason"},
+        {"id": 3, "week": 7, "seasonType": "regular"},  # must not become a postseason pass
+    ])
+
+    _run({"plays"}, tmp_path, seasons=[2022], season_type="postseason")
+
+    raw = tmp_path / "raw"
+    assert (raw / "plays_2022_post_wk1.json").exists()
+    assert (raw / "plays_2022_post_wk13.json").exists()
+    assert not (raw / "plays_2022_post_wk7.json").exists()
+    assert not (raw / "plays_2022_wk1.json").exists()  # postseason only: no regular pass
 
 
 def test_grid_writes_down_distance_matrix(tmp_path):

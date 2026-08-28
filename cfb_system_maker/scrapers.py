@@ -201,7 +201,7 @@ def _run_endpoint(
         if endpoint.mode == SEASON:
             return _scrape_season(endpoint, func, seasons, data_dir, season_type, delay, resume)
         if endpoint.mode == SEASON_WEEK:
-            return _scrape_season_week(endpoint, func, seasons, data_dir, weeks, delay, resume)
+            return _scrape_season_week(endpoint, func, seasons, data_dir, season_type, weeks, delay, resume)
         if endpoint.mode == GRID:
             return _scrape_grid(endpoint, func, data_dir, delay, resume)
         if endpoint.mode == PER_GAME:
@@ -311,40 +311,70 @@ def _scrape_season(
     return ScrapeReport(endpoint.name, endpoint.mode, files=files, rows=total, skipped=skipped)
 
 
+def _postseason_weeks(data_dir: str | Path, season: int) -> list[int]:
+    """Weeks that actually hold postseason games, read off the scraped games seed.
+
+    Postseason is week 1 in most seasons, but not all: 2025 also has weeks 13 and 14
+    (Division II/III playoffs begin in mid-November). Hardcoding week 1 would silently
+    drop those 32 games, so the weeks come from the data rather than an assumption.
+    Seasons whose seed file is missing get no postseason pass, the same way `per_game`
+    skips a season with no game-id seed.
+    """
+    path = Path(data_dir) / "raw" / f"games_{season}.json"
+    if not path.exists():
+        return []
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    return sorted({
+        row["week"] for row in rows
+        if (row.get("seasonType") or row.get("season_type")) == "postseason"
+        and row.get("week") is not None
+    })
+
+
+# Filename prefix per season type. Regular keeps the original `_wk{n}` name so existing
+# files stay valid; everything else gets its own axis and can never collide with it.
+_WEEK_PREFIX = {"regular": "", "postseason": "post_"}
+
+
 def _scrape_season_week(
     endpoint: Endpoint,
     func: Callable[..., Any],
     seasons: list[int],
     data_dir: str | Path,
+    season_type: str,
     weeks: range,
     delay: float,
     resume: bool,
 ) -> ScrapeReport:
-    """Regular season only, deliberately — `both` conflates two week axes.
+    """One pass per season type, each writing its own file — never the same one.
 
-    Postseason week numbering restarts at 1, so `season_type="both"` with `week=1`
+    Postseason week numbering restarts at 1, so a single `season_type="both"` call
     returns regular week 1 merged with postseason week 1 (probed 2026-08-28:
-    game_team_stats 2024 wk1 gave regular=137, postseason=50, both=187). The filename
-    `{name}_{season}_wk{week}.json` has no season-type axis to separate them, so `both`
-    here would corrupt the files rather than extend them. Adding postseason needs a
-    second pass writing `{name}_{season}_post_wk{week}.json`; until then this path
-    ignores the caller's season_type and stays on `regular`.
+    game_team_stats 2024 wk1 gave regular=137, postseason=50, both=187, the union
+    exactly). `{name}_{season}_wk{week}.json` has no season-type axis to hold them
+    apart, so each pass asks for one type and postseason lands in
+    `{name}_{season}_post_wk{week}.json` instead.
     """
+    passes = ["regular", "postseason"] if season_type == "both" else [season_type]
     files = 0
     total = 0
     skipped = 0
     for season in seasons:
-        for week in weeks:
-            if resume and _exists(data_dir, f"{endpoint.name}_{season}_wk{week}.json"):
-                skipped += 1
-                continue
-            kwargs = _accepted(func, {"year": season, "week": week, "season_type": "regular"})
-            rows = _call(func, kwargs, delay)
-            if not rows:
-                continue
-            save_raw(data_dir, f"{endpoint.name}_{season}_wk{week}.json", rows)
-            files += 1
-            total += len(rows)
+        for stype in passes:
+            prefix = _WEEK_PREFIX.get(stype, f"{stype}_")
+            week_list = _postseason_weeks(data_dir, season) if stype == "postseason" else weeks
+            for week in week_list:
+                filename = f"{endpoint.name}_{season}_{prefix}wk{week}.json"
+                if resume and _exists(data_dir, filename):
+                    skipped += 1
+                    continue
+                kwargs = _accepted(func, {"year": season, "week": week, "season_type": stype})
+                rows = _call(func, kwargs, delay)
+                if not rows:
+                    continue
+                save_raw(data_dir, filename, rows)
+                files += 1
+                total += len(rows)
     return ScrapeReport(endpoint.name, endpoint.mode, files=files, rows=total, skipped=skipped)
 
 

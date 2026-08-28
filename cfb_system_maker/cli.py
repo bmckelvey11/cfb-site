@@ -544,9 +544,9 @@ def _build_parser() -> argparse.ArgumentParser:
     scrape_parser.add_argument("--data-dir", default="data")
     scrape_parser.add_argument("--season", dest="seasons", type=int, nargs="+", required=True)
     scrape_parser.add_argument("--season-type", default="both",
-                               help="does not reach the season_week endpoints (plays, play_stats, "
-                                    "ppa_players_games, game_player_stats, game_team_stats, "
-                                    "player_success_game) — those stay regular, see _scrape_season_week")
+                               help="regular | postseason | both. season_week endpoints run one pass "
+                                    "per type, postseason into {name}_{season}_post_wk{week}.json, "
+                                    "because postseason week numbering restarts at 1")
     scrape_parser.add_argument("--include-per-game", action="store_true")
     scrape_parser.add_argument("--include-per-player", action="store_true")
     scrape_parser.add_argument("--only", nargs="+")
