@@ -31,6 +31,7 @@ postseason=50, both=187, and `both` == `regular | postseason` id-for-id). The fi
 `{name}_{season}_wk{week}.json` cannot hold them apart. Six endpoints would have been
 overwritten with conflated content. None of them feed `build`/`enrich`, so they are
 deferred at zero cost; closing them needs a `_post_wk` filename axis.
+**Superseded the same day by `260828-l60`, which added that axis and pulled them.**
 
 ## Verification
 

@@ -77,7 +77,7 @@ other. So there is no endpoint-level gap left to find; `scripts/audit_endpoints.
 partitions all 74. The gaps that remain are at the *parameter* level, and one of them is
 serious.
 
-### `seasonType` — closed for the 13 SEASON-mode endpoints, deferred for the 6 week-mode ones
+### `seasonType` — closed for all 19 endpoints that accept it
 
 Closed 2026-08-28 (quick task `260828-j8s`). `SeasonType` has **no default in the spec** —
 omit it and CFBD returns `both`. Our code did not omit it: `--season-type` defaulted to
@@ -98,7 +98,8 @@ week 1 — `game_team_stats` 2024 wk1 gave regular=137, postseason=50, both=187,
 `both` id set equals `regular | postseason` exactly. The filename
 `{name}_{season}_wk{week}.json` has no season-type axis to hold them apart, so `both` there
 would overwrite six correct endpoints with week-conflated content.
-`_scrape_season_week` therefore ignores its caller's `season_type` and stays on `regular`.
+`_scrape_season_week` therefore runs **one pass per season type** rather than asking for
+both at once — see the week-mode section below, closed the same day by `260828-l60`.
 
 **Re-scraped with `both` (13, SEASON mode).** `games`, `lines`, `drives`, `media`,
 `weather`, `elo`, `rankings`, `pregame_win_prob`, `ppa_games`, `advanced_game_stats`,
