@@ -1,3 +1,10 @@
+# Floor Bias / over-zero
+
+Merged into cfb-site from the `over-zero` repo on 2026-08-28. **Run every
+command in this folder** (`over_zero/`), not from the hub repo root. The CFBD
+token comes from `CFBD_API_KEY` (or `CFBD-API` / `BEARER_TOKEN`); do not add a
+second `env.env` here.
+
 # paper_models — Arscott (2022) censoring-bias recreation
 
 Recreation of *"Market efficiency and censoring bias in college football
@@ -48,8 +55,8 @@ python monitor/bias_bins.py                 # reproduce the threshold evidence
 ```
 
 Live-line scoring (`v1/predict_week.py --fetch`) needs a free
-[CFBD](https://collegefootballdata.com/) API key in `env.env`
-(`CFBD-API = <key>`).
+[CFBD](https://collegefootballdata.com/) API key in `CFBD_API_KEY`
+(or `CFBD-API` / `BEARER_TOKEN`). Do not keep a second `env.env` in this folder.
 
 **This is research, not financial advice.** A few dozen bets a year, a
 losing season 4–35% of the time even if the edge is fully real, and the edge

@@ -154,6 +154,12 @@ The browser smoke test requires a built `data/` directory (`python -m cfb_system
 sample --data-dir data` is enough) — it skips itself if `data/processed/games.csv` is
 missing.
 
+## over_zero
+
+Floor Bias / Arscott (2022) research, merged from the `over-zero` repo. Run its
+commands from [`over_zero/`](over_zero/README.md), not from this repo root.
+Score a game: `python over_zero/monitor/score_game.py 28 40.5` (cwd `over_zero/`).
+
 ## Disclaimer
 
 CFB System Maker is a historical research tool. It does not accept, place, or facilitate
