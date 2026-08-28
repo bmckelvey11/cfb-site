@@ -38,6 +38,13 @@ includes FCS, is 37 points higher.
 stored as a per-season **set**, so a team absent from a season file that did load resolves
 to `False` rather than `None` — "did not change conferences" is an answer, not missing data.
 
+That design has one failure mode: an **empty** season file would load an empty set and turn
+every team in that season into a confident `False` instead of `None`. Checked — no season is
+empty (9-60 rows each, 2012-2025), so the case does not arise today. Per-season home-side
+`True` counts track real history: 2013 = 150 (Big East/AAC split), 2023 = 210 (Pac-12
+collapse), 2024 = 133. 2019 shows **0** despite a 13-row file because every 2019 mover was a
+D-II/D-III/FCS program that never hosts a game in the built set — correct, not a gap.
+
 ## Verified end-to-end, not just unit-tested
 
 Ohio State's 2025 games read `prior_core_overall` 37.25 and `prior_srs_rating` 24.6 —
