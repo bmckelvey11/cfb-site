@@ -254,9 +254,22 @@ def season_rows(season, over, prob, price=-110):
 CSV_COLUMNS = [
     "game_id", "season", "week", "date", "away_team", "home_team",
     "fav_team", "dog_team", "spread", "total", "fav_pts", "dog_pts",
-    "actual_total", "bias", "model_prob", "over", "passes_filter",
-    "flat_units_risked", "flat_units_pnl", "kelly_units", "kelly_units_pnl",
+    "actual_total", "bias", "model_prob", "over", "threshold",
+    "passes_filter", "flat_units_risked", "flat_units_pnl", "kelly_units",
+    "kelly_units_pnl",
 ]
+
+DEPLOYED_THRESHOLD = 1.75
+
+
+def default_csv_path(threshold):
+    """The deployed file has a fixed name; anything else gets its own, so an
+    exploratory `--threshold 1.0` run cannot quietly overwrite the committed
+    234-bet ledger with a 681-bet one that looks identical.
+    """
+    if threshold == DEPLOYED_THRESHOLD:
+        return "docs/data/backtest_bets.csv"
+    return f"docs/data/backtest_bets_bias{threshold:g}.csv"
 
 
 def _g(x):
@@ -273,10 +286,12 @@ def write_bets_csv(path, meta, bias, over, prob, threshold, price=-110):
     analysis exactly matters more than being literally every game.
 
     Stakes and P&L are in units (1 unit = 1% of bankroll): the flat rule risks
-    1u on a qualifying game, Kelly risks kelly_units(prob).
+    1u on a qualifying game, Kelly risks kelly_units(prob). Both ledgers are
+    live only where passes_filter == 1; on the other rows they are the
+    counterfactual "what the rule would have staked", not money wagered.
     """
-    _, payout = american_to_risk_payout(price)
-    b = payout / abs(price) if price < 0 else payout / 100.0
+    risk, payout = american_to_risk_payout(price)
+    b = payout / risk
     sel = bias > threshold
     ku = kelly_units(prob, price=price)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -294,7 +309,8 @@ def write_bets_csv(path, meta, bias, over, prob, threshold, price=-110):
                 "fav_pts": _g(m["fav_pts"]), "dog_pts": _g(m["dog_pts"]),
                 "actual_total": _g(m["actual_total"]),
                 "bias": _g(bias[i]), "model_prob": _g(prob[i]),
-                "over": int(won), "passes_filter": int(sel[i]),
+                "over": int(won), "threshold": _g(threshold),
+                "passes_filter": int(sel[i]),
                 "flat_units_risked": _g(flat_risk),
                 "flat_units_pnl": _g(flat_risk * (b if won else -1.0)),
                 "kelly_units": _g(ku[i]),
@@ -312,6 +328,9 @@ def reconcile_csv(path, expect, price=-110):
     flat_pnl = kelly_pnl = kelly_staked = 0.0
     with open(path, newline="", encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
+            # The file says which filter it was written under, so a stale or
+            # mismatched ledger fails here instead of quietly reconciling.
+            assert float(row["threshold"]) == expect["threshold"], row["threshold"]
             if row["passes_filter"] != "1":
                 continue
             # Kelly is sized on the filtered bets, same as kelly_roi() -- the
@@ -683,8 +702,9 @@ def main():
     ap.add_argument("--threshold", type=float, default=1.75)
     ap.add_argument("--fig", default="docs/figs/roi_report.png")
     ap.add_argument("--no-fig", action="store_true")
-    ap.add_argument("--csv", default="docs/data/backtest_bets.csv",
-                    help="per-bet walk-forward rows (all graded games)")
+    ap.add_argument("--csv", default=None,
+                    help="per-bet walk-forward rows (all graded games); "
+                         "defaults to a path named for the threshold")
     ap.add_argument("--no-csv", action="store_true")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
@@ -819,9 +839,10 @@ def main():
               f"planning {unit_roi(win_lo, p)*100:+6.2f}%")
 
     if not args.no_csv:
-        rows = write_bets_csv(args.csv, meta, bias, over, prob, args.threshold)
-        cn, cflat, ckstake, ckpnl = reconcile_csv(args.csv, stats)
-        print(f"\nWrote {args.csv} — {rows} graded games "
+        csv_path = args.csv or default_csv_path(args.threshold)
+        rows = write_bets_csv(csv_path, meta, bias, over, prob, args.threshold)
+        cn, cflat, ckstake, ckpnl = reconcile_csv(csv_path, stats)
+        print(f"\nWrote {csv_path} — {rows} graded games "
               f"({cn} clear the filter). Read back: {cflat:+.2f}u flat, "
               f"{ckpnl:+.2f}u Kelly on {ckstake:.1f}u staked — "
               f"reconciles with the headline above.")

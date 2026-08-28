@@ -140,8 +140,18 @@ in [ROI_HITRATE.md](../docs/ROI_HITRATE.md) is reproducible from the file
 alone. Columns: game identity (`game_id`, `season`, `week`, `date`, teams),
 the inputs (`spread`, `total`, `fav_pts`, `dog_pts`, `actual_total`), the
 out-of-sample model output (`bias`, `model_prob`), the result (`over`), and
-the stake ledger (`passes_filter`, `flat_units_risked`, `flat_units_pnl`,
-`kelly_units`, `kelly_units_pnl`).
+the stake ledger (`threshold`, `passes_filter`, `flat_units_risked`,
+`flat_units_pnl`, `kelly_units`, `kelly_units_pnl`).
+
+**Both stake ledgers are live only where `passes_filter == 1`.** On the other
+9,000-odd rows they are the counterfactual — what the rule *would* have
+staked — not money wagered. Summing `kelly_units_pnl` across a bias bin that
+was never bet gives a number the strategy never earned.
+
+`threshold` is constant per file and records the filter that produced it, so
+`--threshold 1.0` writes `backtest_bets_bias1.csv` rather than overwriting
+the deployed ledger, and `reconcile_csv` fails on a mismatched file instead
+of quietly agreeing with it.
 
 Pushes are absent — `walk_forward_bets` drops them, and matching the analysis
 exactly matters more than being literally every game. Rows are aligned to the

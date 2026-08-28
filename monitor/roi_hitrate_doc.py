@@ -307,8 +307,13 @@ Two things worth naming rather than leaving for the reader to find:
 Every row above comes out of `data/backtest_bets.csv` — one line per graded
 walk-forward game, all of them, not just the ones clearing the filter. Group
 by `season` (filtering `passes_filter == 1`) for the first table, bucket
-`bias` on the bin edges for the second. Regenerate both file and doc with
+`bias` on the bin edges for the second. The file's `threshold` column records
+which filter produced it. Regenerate both file and doc with
 `python monitor/roi_report.py && python monitor/roi_hitrate_doc.py`.
+
+The `kelly_units` / `kelly_units_pnl` columns are live only on rows where
+`passes_filter == 1`; elsewhere they are what Kelly would have staked, not
+money wagered, so don't sum them across the excluded bins.
 
 ---
 

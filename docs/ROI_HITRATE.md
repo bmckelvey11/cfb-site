@@ -66,9 +66,14 @@ Note the bins are disjoint, so the 1.00–1.75 row is the band *excluded* by the
 Every row above comes out of `data/backtest_bets.csv` — one line per graded
 walk-forward game, all of them, not just the ones clearing the filter. Group
 by `season` (filtering `passes_filter == 1`) for the first table, bucket
-`bias` on the bin edges for the second. Regenerate both file and doc with
+`bias` on the bin edges for the second. The file's `threshold` column records
+which filter produced it. Regenerate both file and doc with
 `python monitor/roi_report.py && python monitor/roi_hitrate_doc.py`.
+
+The `kelly_units` / `kelly_units_pnl` columns are live only on rows where
+`passes_filter == 1`; elsewhere they are what Kelly would have staked, not
+money wagered, so don't sum them across the excluded bins.
 
 ---
 
-Walk-forward: train on seasons < t, bet season t  |  data 2013–2025, bet seasons 2016–2025 (min-train=3)  |  filter: expected censoring bias > 1.75 → bet the full-game OVER  |  N=234 graded bets (pushes dropped)  |  CFBD lines, consensus provider  |  commit 5ab698d  |  generated 2026-08-28
+Walk-forward: train on seasons < t, bet season t  |  data 2013–2025, bet seasons 2016–2025 (min-train=3)  |  filter: expected censoring bias > 1.75 → bet the full-game OVER  |  N=234 graded bets (pushes dropped)  |  CFBD lines, consensus provider  |  commit 2a82c87  |  generated 2026-08-28
