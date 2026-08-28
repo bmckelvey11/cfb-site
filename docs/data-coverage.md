@@ -77,35 +77,83 @@ other. So there is no endpoint-level gap left to find; `scripts/audit_endpoints.
 partitions all 74. The gaps that remain are at the *parameter* level, and one of them is
 serious.
 
-### `seasonType` — every dump on disk is regular season only
+### `seasonType` — closed for the 13 SEASON-mode endpoints, deferred for the 6 week-mode ones
 
-`SeasonType` is an enum of `regular`, `postseason`, `both`, `allstar`, `spring_regular`,
-`spring_postseason`, and it has **no default in the spec** — omit it and CFBD returns
-`both`. Our code does not omit it: `--season-type` defaults to `regular` on both `fetch`
-([cli.py:526](../cfb_system_maker/cli.py#L526)) and `scrape`
-([cli.py:546](../cfb_system_maker/cli.py#L546)), as do
-[`fetch_games_and_lines`](../cfb_system_maker/cfbd_client.py#L12) and
-[`scrape`](../cfb_system_maker/scrapers.py#L151). Our default is therefore **narrower than
-the API's own**, and nothing on disk carries a postseason row:
+Closed 2026-08-28 (quick task `260828-j8s`). `SeasonType` has **no default in the spec** —
+omit it and CFBD returns `both`. Our code did not omit it: `--season-type` defaulted to
+`regular` on `fetch` and `scrape`, a default **narrower than the API's own**, so nothing on
+disk carried a postseason row for 2012–2024. The defaults are now `both`.
+
+Probed before the change, and the two modes behave differently:
 
 | 2024 | games | lines |
 |---|---|---|
-| `season_type=regular` (what we pull) | 3,747 | 1,523 |
+| `season_type=regular` | 3,747 | 1,523 |
 | `season_type=postseason` | 54 | 50 |
-| `season_type=both` (API default) | 3,801 | 1,573 |
+| `season_type=both` | 3,801 | 1,573 |
 
-`games_2024.json` holds 3,747 rows, all `seasonType: "regular"`; `lines_2024.json` likewise.
-Across 2012-2025 that is roughly **700 games and 650 priced lines missing** — every bowl and
-every playoff game. Bowls are a distinct betting regime (long layoffs, opt-outs, motivation
-edges), so their absence is a real limit on what the backtests can say, not a rounding
-error.
+SEASON mode is an exact superset. **SEASON_WEEK mode is not**: postseason week numbering
+restarts at 1, so `both` with `week=1` returns regular week 1 *merged with* postseason
+week 1 — `game_team_stats` 2024 wk1 gave regular=137, postseason=50, both=187, and the
+`both` id set equals `regular | postseason` exactly. The filename
+`{name}_{season}_wk{week}.json` has no season-type axis to hold them apart, so `both` there
+would overwrite six correct endpoints with week-conflated content.
+`_scrape_season_week` therefore ignores its caller's `season_type` and stays on `regular`.
 
-Blast radius: **19 registered endpoints accept `seasonType`** — `games`, `lines`, `drives`,
-`plays`, `play_stats`, `media`, `weather`, `elo`, `rankings`, `pregame_win_prob`,
-`ppa_games`, `ppa_players_games`, `advanced_game_stats`, `game_havoc_stats`,
-`game_player_stats`, `game_team_stats`, `player_season_stats`, `player_success_game`,
-`player_success_season`. Closing the gap means re-scraping those with `both`, then
-`build` + `enrich`.
+**Re-scraped with `both` (13, SEASON mode).** `games`, `lines`, `drives`, `media`,
+`weather`, `elo`, `rankings`, `pregame_win_prob`, `ppa_games`, `advanced_game_stats`,
+`game_havoc_stats`, `player_season_stats`, `player_success_season`. The first eight are
+exactly the `seasonType`-accepting files `enrich.py` reads. Result: **+501 games** into
+`games.csv` (13,014 → 13,515) and postseason rows in every endpoint — 751 games, 586 lines,
+936 media, 639 weather, 1,178 advanced-stat, 1,100 PPA, 922 havoc, 14,804 drives.
+
+**Still `regular` only (6, SEASON_WEEK mode).** `plays`, `play_stats`, `ppa_players_games`,
+`game_player_stats`, `game_team_stats`, `player_success_game`. None feed `build`/`enrich`,
+so nothing downstream is short today. Closing them needs a second pass writing
+`{name}_{season}_post_wk{week}.json`, not a flag change.
+
+#### What the re-scrape verified, and what it exposed
+
+Row counts cannot verify this. The check was per endpoint per season: the count of
+`seasonType == "regular"` rows must be **unchanged**, and postseason rows must be present.
+Nine endpoints carry `seasonType` per row and passed. Three came back short — 
+`game_havoc_stats` (−8 across 2021–2023), `advanced_game_stats` (−2 in 2024) and `drives`
+(−9, but **+1** in 2024). Re-asking the API `regular` on the spot returned the *new* lower
+count, and `both`'s regular subset matched it id-for-id, so this is **upstream reprocessing
+between scrapes, not loss caused by `both`**. A `both` bug cannot add a regular row.
+
+Two things the baseline itself got wrong, both worth remembering:
+
+- **2025 `games`/`lines` already held postseason** (86 and 50 rows) before this change, so
+  "every dump is regular only" was true for 2012–2024, not 2025. A verification that
+  compares a regular count against a file *total* silently fails on that season.
+- `elo`, `player_season_stats` and `player_success_season` carry no per-row season type,
+  and they are **season aggregates**: with `both` their existing rows *change meaning*
+  (totals now include bowls) rather than merely gaining rows (+20,772 player-season rows).
+  None feeds `enrich`, so no lookahead enters the feature registry, but any future feature
+  reading them same-season must lag to S−1 the way `_index_prior_player_agg` does.
+
+#### No lookahead entered the features
+
+Bowls are terminal within a season, so `enrich` should leave every pre-existing
+regular-season game untouched. 381 of 13,014 moved. All of it attributes to upstream churn
+in the re-scraped files — `raw_weather` (470 values), `raw_conferences` (306), `raw_havoc`
+(230), `raw_teams` (152), `raw_pregame_wp` (47), `raw_lines` (12).
+
+The decisive field is `running_games_played`, which can only change if a game **entered**
+some prior-game window. It moved **nowhere**, and neither did `running_win_pct`,
+`running_ats_pct`, `running_streak` or `running_ats_streak`. The 510 `computed_running`
+values that did move are only the `ppa_*`/`success_*`/`explosiveness_*` families — the ones
+averaged from `ppa_games` and `advanced_game_stats`, whose per-game inputs drifted upstream.
+
+One latent hazard found while checking this. `running_stats.compute_running_stats` sorts a
+team's season by `startDate` and falls back to `f"{season}-w{week:02d}"` when a game has no
+date. Postseason weeks restart at 1, so a dated-less bowl would sort to the **front** of the
+season and contaminate every regular game after it. Today **0 postseason games lack a
+`startDate`**, so the vector is dormant — but it is one missing field away from live.
+Separately, 34 team-seasons do have a postseason game genuinely earlier in wall-clock time
+than a later regular game (Division II/III playoffs begin in mid-November). Using those is
+chronologically correct, not lookahead.
 
 ### Parameters we skip on purpose
 
