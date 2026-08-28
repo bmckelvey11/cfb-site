@@ -527,3 +527,68 @@ def test_line_move_none_when_no_open_values_present(tmp_path):
     assert row["spread_move"] is None
     assert row["total_open"] is None
     assert row["total_move"] is None
+
+
+def test_enrich_prior_core_rating_uses_prior_season_only(tmp_path):
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+
+    # Prior season (2022) is the only season a 2023 game may read.
+    (raw_dir / "core_ratings_2022.json").write_text(
+        json.dumps([{"team": "Alpha", "year": 2022, "overall": 12.5, "offense": 20.0, "defense": -7.5}]),
+        encoding="utf-8",
+    )
+    # Same season (2023): season-FINAL ratings; sentinel that must never surface.
+    (raw_dir / "core_ratings_2023.json").write_text(
+        json.dumps([{"team": "Alpha", "year": 2023, "overall": 99.0, "offense": 99.0, "defense": 99.0}]),
+        encoding="utf-8",
+    )
+    (raw_dir / "srs_expanded_2022.json").write_text(
+        json.dumps([{"team": "Alpha", "year": 2022, "rating": 8.25, "classification": "fbs"}]),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, 2023, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    row = enrich_games(tmp_path, games)["1"]
+
+    assert row["home_prior_core_overall"] == 12.5
+    assert row["home_prior_core_offense"] == 20.0
+    assert row["home_prior_core_defense"] == -7.5
+    assert row["home_prior_srs_rating"] == 8.25
+    assert row["home_prior_core_overall"] != 99.0  # 2023's own season never leaks
+    assert row["away_prior_core_overall"] is None  # Beta absent from 2022 -> fails closed
+
+
+def test_enrich_prior_core_rating_none_when_prior_file_absent(tmp_path):
+    (tmp_path / "raw").mkdir(parents=True)
+
+    games = [GameRecord(1, 2021, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    row = enrich_games(tmp_path, games)["1"]
+
+    assert row["home_prior_core_overall"] is None
+    assert row["home_prior_srs_rating"] is None
+
+
+def test_enrich_conference_change_is_false_for_teams_in_a_loaded_season(tmp_path):
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / "conference_changes_2024.json").write_text(
+        json.dumps([{"team": "Alpha", "effectiveYear": 2024, "fromConference": "Pac-12", "toConference": "Big 12"}]),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, 2024, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    row = enrich_games(tmp_path, games)["1"]
+
+    assert row["home_conference_change"] is True
+    # Beta is absent from a season file that DID load: a real "no", not missing data.
+    assert row["away_conference_change"] is False
+
+
+def test_enrich_conference_change_none_when_season_file_absent(tmp_path):
+    (tmp_path / "raw").mkdir(parents=True)
+
+    games = [GameRecord(1, 2019, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    row = enrich_games(tmp_path, games)["1"]
+
+    assert row["home_conference_change"] is None

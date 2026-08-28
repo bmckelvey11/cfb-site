@@ -100,6 +100,8 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         "raw_conferences": {},
         "raw_pregame_wp": {},
         "raw_player_agg": {},
+        "raw_prior_team_season": {},
+        "raw_conference_change": {},
         "graphql_game": {},
         "graphql_weather": {},
         "graphql_lines": {},
@@ -119,6 +121,9 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         _index_havoc(indexes["raw_havoc"], data_dir / "raw" / f"game_havoc_stats_{season}.json")
         _index_raw_file(indexes["raw_pregame_wp"], data_dir / "raw" / f"pregame_win_prob_{season}.json", "gameId")
         _index_prior_player_agg(indexes["raw_player_agg"], data_dir / "raw" / f"adjusted_player_passing_{season - 1}.json", season)
+        _index_prior_team_season(indexes["raw_prior_team_season"], data_dir / "raw" / f"core_ratings_{season - 1}.json", "core_ratings", season)
+        _index_prior_team_season(indexes["raw_prior_team_season"], data_dir / "raw" / f"srs_expanded_{season - 1}.json", "srs_expanded", season)
+        _index_conference_change(indexes["raw_conference_change"], data_dir / "raw" / f"conference_changes_{season}.json", season)
 
     _index_raw_file(indexes["raw_venues"], data_dir / "raw" / "venues.json", "id")
     _index_conferences(indexes["raw_conferences"], data_dir / "raw" / "conferences.json")
@@ -372,6 +377,15 @@ def _lookup_team_scoped(feature: FeatureDef, team: str, season: int, indexes: di
         record = bucket.get((team, season)) if bucket else None
         return _field_value(record, feature.field) if record else None
 
+    if feature.source_kind == "raw_prior_team_season":
+        bucket = indexes["raw_prior_team_season"].get(feature.source_file or "")
+        record = bucket.get((team, season)) if bucket else None
+        return _field_value(record, feature.field) if record else None
+
+    if feature.source_kind == "raw_conference_change":
+        teams = indexes["raw_conference_change"].get(season)
+        return None if teams is None else team in teams
+
     if feature.source_kind == "raw_player_agg":
         record = indexes["raw_player_agg"].get((team, season))
         return record.get(feature.field) if record else None
@@ -453,6 +467,44 @@ def _index_prior_player_agg(bucket: dict[tuple[str, int], dict[str, Any]], path:
         sums[str(team)] = sums.get(str(team), 0.0) + float(wepa)
     for team, total in sums.items():
         bucket[(team, season)] = {"prior_off_wepa": total}
+
+
+def _index_prior_team_season(
+    bucket: dict[str, dict[tuple[str, int], dict[str, Any]]],
+    path: Path,
+    name: str,
+    season: int,
+) -> None:
+    """Index a season S-1 team-season file under key S, so season-S games read S-1 only.
+
+    Same no-lookahead shape as `_index_prior_player_agg`: core ratings and expanded SRS are
+    season-FINAL values (core rows carry `throughSeasonType: postseason`), so the current
+    season's row would contain the result of the game being bet. A missing file or team
+    yields None, which fails closed as a filter.
+    """
+    if not path.exists():
+        return
+    store = bucket.setdefault(name, {})
+    for row in json.loads(path.read_text(encoding="utf-8")):
+        team = row.get("team") or row.get("school")
+        if team is not None:
+            store[(str(team), season)] = row
+
+
+def _index_conference_change(bucket: dict[int, set[str]], path: Path, season: int) -> None:
+    """Teams whose conference move takes effect in `season`.
+
+    Current-season on purpose: realignment is public before kickoff, so it is not lookahead.
+    Stored per season as a set so a team absent from a *loaded* season resolves to False
+    rather than None — "did not change conferences" is a real answer, not missing data.
+    """
+    if not path.exists():
+        return
+    teams = bucket.setdefault(season, set())
+    for row in json.loads(path.read_text(encoding="utf-8")):
+        team = row.get("team")
+        if team is not None:
+            teams.add(str(team))
 
 
 def _index_team_name_file(bucket: dict[tuple[str, int], dict[str, Any]], path: Path) -> None:

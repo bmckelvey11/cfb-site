@@ -29,6 +29,8 @@ SourceKind = Literal[
     "raw_conferences",
     "raw_pregame_wp",
     "raw_player_agg",
+    "raw_prior_team_season",
+    "raw_conference_change",
     "computed_running",
     "computed_v1",
     "computed_line_move",
@@ -283,6 +285,80 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         description=(
             "Team recruiting class points. Higher means a stronger class. "
             "Team-scoped; use perspective to pick which team. Preseason score."
+        ),
+    ),
+    FeatureDef(
+        "prior_core_overall",
+        "Prior-Season Core Rating",
+        "team_preseason",
+        "raw_prior_team_season",
+        "overall",
+        "team_season",
+        "numeric",
+        team_scoped=True,
+        source_file="core_ratings",
+        description=(
+            "CFBD core rating (overall) from the PREVIOUS season. Higher is stronger. Core ratings "
+            "are season-final values, so the prior season is used to keep the feature pregame."
+        ),
+    ),
+    FeatureDef(
+        "prior_core_offense",
+        "Prior-Season Core Offense",
+        "team_preseason",
+        "raw_prior_team_season",
+        "offense",
+        "team_season",
+        "numeric",
+        team_scoped=True,
+        source_file="core_ratings",
+        description=(
+            "CFBD core offense rating from the PREVIOUS season. Higher is a better offense. "
+            "Season-final value, lagged one year to stay pregame."
+        ),
+    ),
+    FeatureDef(
+        "prior_core_defense",
+        "Prior-Season Core Defense",
+        "team_preseason",
+        "raw_prior_team_season",
+        "defense",
+        "team_season",
+        "numeric",
+        team_scoped=True,
+        source_file="core_ratings",
+        description=(
+            "CFBD core defense rating from the PREVIOUS season. Lower (more negative) is a better "
+            "defense. Season-final value, lagged one year to stay pregame."
+        ),
+    ),
+    FeatureDef(
+        "prior_srs_rating",
+        "Prior-Season SRS",
+        "team_preseason",
+        "raw_prior_team_season",
+        "rating",
+        "team_season",
+        "numeric",
+        team_scoped=True,
+        source_file="srs_expanded",
+        description=(
+            "Simple Rating System value from the PREVIOUS season, expanded to cover FCS teams as "
+            "well as FBS. Season-final value, lagged one year to stay pregame."
+        ),
+    ),
+    FeatureDef(
+        "conference_change",
+        "First Year In New Conference",
+        "team_preseason",
+        "raw_conference_change",
+        "changed",
+        "team_season",
+        "bool",
+        team_scoped=True,
+        description=(
+            "Whether this is the team's first season in a conference it just moved to "
+            "(realignment). Known before kickoff, so it reads the current season."
         ),
     ),
     FeatureDef(
