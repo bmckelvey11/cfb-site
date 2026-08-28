@@ -1,13 +1,17 @@
 # CFBD data coverage — what we have, and what we don't
 
-Audited 2026-08-26. Re-check any time with:
+Audited 2026-08-26. Two re-runnable scripts answer the two different questions:
 
 ```bash
-python scripts/audit_coverage.py --data-dir data
+python scripts/audit_endpoints.py                      # spec vs code: is every CFBD endpoint covered?
+python scripts/audit_coverage.py --data-dir data       # registry vs disk: is every expected file scraped?
 ```
 
-That script is the source of truth for per-endpoint file counts; this note
-records the things a file count can't tell you — *why* something is absent.
+`audit_endpoints.py` reads the live REST spec (`/api-docs.json`) and partitions all
+74 paths into registered / in-client-but-unregistered / no-client-method, so the
+74-63-10-1 breakdown below is generated rather than hand-counted. `audit_coverage.py`
+is the source of truth for per-endpoint file counts. This note records the things
+neither count can tell you — *why* something is absent.
 
 ## The ceiling is the vendored client, not the registry
 

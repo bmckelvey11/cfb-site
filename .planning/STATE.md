@@ -162,6 +162,7 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 
 | Date | Slug | What | Status |
 |------|------|------|--------|
+| 2026-08-28 | cfbd-endpoint-completeness-audit | `scripts/audit_endpoints.py` diffs the live CFBD spec (74 paths) against the vendored client and `ENDPOINTS`; partition closes at 63 registered + 1 deliberate + 10 client-blocked, zero drift | complete |
 | 2026-07-20 | numeric-filter-step-intervals | Filter popup numeric controls snap to a span-scaled step (0.5 for spread/total) instead of continuous `step="any"` | complete |
 | 2026-07-20 | filter-group-taxonomy | Split the `pregame` feature group into Matchup / Ratings / Betting Lines / Weather (restored user work quarantined during phase 03) | complete |
 | 2026-07-20 | fix-normalize-select-line-total-drop-fal | `normalize._select_line` picked one line per game; total (over/under) is now backfilled from the first sibling provider that has it when the selected line's total is null — fixes ~93-97% total-null rate in 2013-2016 seasons | complete |
