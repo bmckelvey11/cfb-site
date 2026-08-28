@@ -26,11 +26,16 @@ python -c "import json,collections; [print(y, collections.Counter(x.get('seasonT
 | File family | `regular` | `postseason` |
 |---|---|---|
 | `games_*.json`, 35 seasons 1992-2026 | 52,982 | **86** (2025 only) |
-| `lines_*.json`, 15 seasons 2012-2026 | all | **50** (2025 only) |
+| `lines_*.json`, 15 seasons 2012-2026 | 13,751 | **50** (2025 only) |
+
+Neither audit script can see this. `audit_endpoints.py` partitions spec paths and
+`audit_coverage.py` counts files; both are blind to what is *inside* a file, so a run that
+reports full coverage is still reporting on a regular-season-only corpus. The count above
+is the check — re-run it, not the audits.
 
 2025 is the exception because `upcoming.py` — not `scrape` — last wrote those two files.
 `refresh_upcoming` calls `get_games`/`get_lines` with `season_type="both"` and then
-`save_raw_json`s the **full season** over both dumps (`upcoming.py:93-94`). So the only
+`save_raw_json`s the **full season** over both dumps (`upcoming.py:94-95`). So the only
 postseason data in `data/raw/` arrived as a side effect of the current-week refresh, and
 only for the season that refresh was pointed at.
 
@@ -101,10 +106,12 @@ where `weeks=range(1,16)` meets a postseason week numbering that restarts at 1.
 ### Does it matter for backtests
 
 2013-2025 has **515 FBS postseason games, and `stg.gameLines` has a line for all 515.**
-50 of them (2025) are already in `games.csv`; the other 465 are missing, ≈3.4% of the
-13,479-row sample the build would otherwise produce.
+`games.csv` already holds 46 of them (2025), so **469 are missing** — ≈3.5% of the
+13,483-row sample the build would otherwise produce. Mind the two filters: `games.csv`
+carries 50 postseason rows, not 46, because it is line-gated rather than FBS-gated and
+picks up 4 lower-division bowls; 515/469 are the FBS-filtered counts.
 
-3.4% is small, but it is not a random 3.4%. Bowls and CFP games are a distinct population
+3.5% is small, but it is not a random 3.5%. Bowls and CFP games are a distinct population
 — three-to-six week layoffs, opt-outs and portal departures, neutral sites, coaching
 changes, and motivation asymmetry the market prices and simple systems do not. Every
 system in this repo that claims a general edge has never been tested on the games where
@@ -115,7 +122,7 @@ Other analyses that silently inherit the gap:
 
 | Reader | What it misses |
 |---|---|
-| `cli.py:86` `build` → `normalize` → `games.csv` | the 465 games above; downstream `enrich`, `backtest`, `web`, `/compare`, saved systems, `v1_model` refit |
+| `cli.py:86` `build` → `normalize` → `games.csv` | the 469 games above; downstream `enrich`, `backtest`, `web`, `/compare`, saved systems, `v1_model` refit |
 | `enrich.py:112` raw-game index | postseason rows never indexed for 2013-2024 |
 | `betlog.py:237` | reads year and year-1 season files precisely to catch January bowls — the comment is right, but the bowls are not in those files, so bowl bets land in `unmatched` rather than erroring |
 | `clv.py:96` (`lines_*`) | no closing-line value on any bowl |
