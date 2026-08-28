@@ -27,4 +27,5 @@ def test_unknown_spec_path_is_reported_as_missing_a_client_method(tmp_path, caps
     assert audit_endpoints.main() == 1
     out = capsys.readouterr().out
     assert "/not/in/client" in out
+    assert "REGISTRY DRIFT" in out  # the exit-1 came from drift, not only the no-client bucket
     assert "1 registered + 0 client-only + 1 no-client = 2 of 2 spec paths" in out

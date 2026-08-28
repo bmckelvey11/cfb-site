@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from cfb_system_maker.scrapers import (
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # run as `python scripts/...`
+from cfb_system_maker.scrapers import (  # noqa: E402
     ENDPOINTS, ONCE, SEASON, SEASON_WEEK, GRID, PER_GAME, PER_PLAYER, ON_DEMAND,
 )
 
