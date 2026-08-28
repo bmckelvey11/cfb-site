@@ -6,9 +6,9 @@ current_phase: 9
 current_phase_name: Live In-Season Verification
 status: executing
 stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-08-27T09:34:04.282Z"
-last_activity: 2026-08-27
-last_activity_desc: "Quick task 260827-8or: Feature Filters sidebar search and collapsible groups"
+last_updated: "2026-08-28T19:34:00.000Z"
+last_activity: 2026-08-28
+last_activity_desc: "Quick task 260828-qrn: DuckDB rebuild design spec (docs/duckdb-rebuild-spec.md)"
 progress:
   total_phases: 4
   completed_phases: 3
@@ -182,6 +182,7 @@ Ad-hoc tasks run via `/gsd-quick` — tracked here, not in ROADMAP.md:
 | 2026-08-27 | coach-style-cluster-feature | `coach_style_cluster` registry feature: k=5 k-means coach playstyle labels (option_ground / attack_defense / bend_dont_break / pass_first_efficient / balanced_spread) from quality-stripped 2016-2024 advanced stats; embedded 189-coach dict in `coach_style.py` + generator `scripts/build_coach_style_clusters.py`; quarantined as `result_lookahead` (career-level label) | complete |
 | 2026-08-27 | add-line-movement-registry-features-spre | `spread_open`/`spread_move`/`total_open`/`total_move` registry features (Betting System Builder Phase A): book-matched open vs. close from CFBD `lines_{season}.json`, computed in `enrich.py` (`computed_line_move` source kind), no `GameRecord`/CSV change; excluded from automated search (`search.py` `_LOW_COVERAGE_KEYS`) since only ~18% of games have a book-matched open, a non-random 2023-2025 slice — available for manual system building. Coverage: 2,317/13,014 spread_open, 1,379/13,014 total_open, 0 before 2021 (`3f1d9aa`) | complete |
 | 2026-08-28 | coach-playstyle-analysis-note | `docs/coach-playstyle-analysis.md` + `scripts/analyze_coach_styles.py` + 8 charts in `docs/img/`: validity study behind `coach_style_cluster`. Key results — season-to-career stability 45.6% vs 22.5% chance (label is a tendency, not an identity), `balanced_spread` is a residual bucket not a style, style vs conference tier χ²=135.3 p≈2e-25 (confounds every outcome comparison), and a walk-forward market test (2019-2024, labels fit on prior seasons only) finds no edge — 0 of 10 tests survive Holm, min adjusted p 0.093 | complete |
+| 2026-08-28 | duckdb-rebuild-spec | `docs/duckdb-rebuild-spec.md`: reviewed-before-implementation spec for rebuilding `data/cfb.duckdb` clean. Established the current file is unreproducible (catalog holds 97 raw + 99 stg tables but `meta.load_report` only accounts for 61 raw + 36 graphql, and the GraphQL schema's contents now sit in `raw`) and stale (132 `_post_wk` + 520 `_ngt` files scraped since the last build aren't loaded). Documented CLI surface (7 flags), rebuild semantics (full rebuild, atomic `.building` replace, resume/`--force` live in `scrapers.py` not the loader, `--only` is destructive not incremental), raw vs stg explode/flatten passes, and flagged `_post_wk` postseason files as a parsing gap (`parse_dump_stem` returns no season for them, so postseason rows go invisible to a season filter) — proposed fix left as a review decision, not implemented, since it changes table identity | complete |
 
 ## Deferred Items
 
