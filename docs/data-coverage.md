@@ -225,8 +225,11 @@ unfiltered twin — `ppa_games_ngt_2024.json`, `..._ngt_{season}_wk{w}.json`,
 not a correction of the first**; `enrich.py` reads neither, so no registry feature moved.
 
 Probed 2024 before registering any of them, because a no-op param would write identical
-content that `resume` then protects until someone thinks to `--force`. All nine are real,
-and they split into two behaviours:
+content that `resume` then protects until someone thinks to `--force`. The probe omitted
+`seasonType`, so both sides of every pair are `both` — the numbers below will not match a
+naive diff against an on-disk file for an endpoint that was never re-scraped with `both`
+(`player_usage_2024.json` holds 4,129 regular-season rows, not the 4,131 here). All nine
+are real, and they split into two behaviours:
 
 | Endpoint | rows (unfiltered → ngt) | rows differing |
 |---|---|---|
@@ -245,6 +248,13 @@ drop rows**: a player whose only snaps came in garbage time has no qualifying pl
 the row disappears entirely. Any join against an `_ngt` player file must expect a smaller
 population than its twin, not just different numbers.
 
+`player_usage` and `ppa_players_season` agreeing to the row (4,131 → 3,696 both times, and
+41,892 rows each across 2012-2025) is a **property, not a copy-paste bug** — they are
+separate methods on separate APIs (`PlayersApi.get_player_usage`,
+`MetricsApi.get_predicted_points_added_by_player_season`) whose payloads differ (`usage` vs
+`averagePPA`/`totalPPA`); they simply share CFBD's qualifying-player universe, so the same
+players qualify and the same players drop.
+
 Pulled 2012-2025: **520 files, 543,288 rows**, 0 endpoints failed.
 
 #### Verified by margin, not by row count
@@ -262,8 +272,9 @@ occurred, so on `ppa_games` 2024 the change must track final margin:
 
 The 40 biggest blowouts all differ; 228 of 262 one-score games are byte-identical. A flat
 rate in either direction — everything changed, or nothing — would have meant the flag was
-not doing what its name says. The ~9% floor in close games is real and expected: a game can
-be a blowout in the third quarter and finish within a score.
+not doing what its name says. The ~9% floor in close games is consistent with a game that
+was a blowout earlier and finished within a score, since the rule reads in-game state rather
+than the final margin — but that mechanism was **not** probed, only the gradient was.
 
 For the two SEASON_WEEK variants the `_ngt` shard set is the **same 211 `(season, week)`
 tuples** as its unfiltered twin, so `audit_coverage.py` reporting 211/232 is the documented
