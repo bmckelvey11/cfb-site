@@ -57,15 +57,42 @@ ALIASES = {
     "Western Mich.": ["Western Michigan"],
 }
 
-CFBD_COLUMNS = [
+# Output columns, in blocks. Everything Prediction Tracker owns keeps a pt_ prefix so it
+# is never confused with the CFBD side; model columns keep their upstream line* names,
+# which are the modeler's identity on thepredictiontracker.com.
+IDENTITY = [
     "game_id",
-    "cfbd_home_team",
-    "cfbd_away_team",
+    "season",
     "cfbd_week",
     "cfbd_season_type",
+    "cfbd_home_team",
+    "cfbd_away_team",
+    "home_points",
+    "away_points",
     "orientation_flipped",
     "match_status",
 ]
+# Prediction Tracker's own game meta -- kept for traceability, but CFBD is authoritative
+# where the two disagree (see match_status).
+PT_RENAMES = {
+    "home": "pt_home",
+    "road": "pt_away",
+    "week": "pt_week",
+    "date": "pt_date",
+    "hscore": "pt_home_points",
+    "vscore": "pt_away_points",
+    "actual": "pt_margin",
+    "total": "pt_total",
+    "phcover": "pt_prob_home_cover",
+    "phwin": "pt_prob_home_win",
+}
+PT_META = list(PT_RENAMES.values())
+MARKET = ["line", "lineopen"]  # closing and opening market spread
+CONSENSUS = ["lineavg", "linemedian", "linestd"]  # PT's own aggregates over the models
+# Score-like columns are integers; every other line* column is a spread. Non-numeric
+# cells are blanked -- the source carries a few (a team name in linecoll, NUL bytes in
+# lineanderson, and one 2006 row whose whole tail is shifted by a column).
+INT_COLUMNS = ["pt_week", "pt_home_points", "pt_away_points", "pt_margin", "pt_total"]
 
 
 def seasons_on_disk(src):
@@ -125,20 +152,25 @@ def load_cfbd(db_path, seasons):
 
 
 def read_season_csv(path, season):
-    """Rows with case-folded header keys, ruler rows dropped, season attached."""
+    """Rows keyed by case-folded, renamed header; ruler rows dropped, season attached.
+
+    Headers are only case-folded (2001 ships HOME/LINESAG, later years Home/linesag) --
+    model names are never fuzzy-merged, because linemore and linemoore may well be
+    different modelers.
+    """
     with path.open(newline="", encoding="utf-8-sig") as fh:
         reader = csv.reader(fh)
-        header = [h.strip().lower() for h in next(reader)]
+        header = [PT_RENAMES.get(h, h) for h in (c.strip().lower() for c in next(reader))]
         rows = []
         for raw in reader:
             if not any(c.strip() for c in raw):
                 continue
-            row = dict(zip(header, (c.strip() for c in raw)))
+            row = dict(zip(header, (c.strip().replace("\x00", "") for c in raw)))
             # ruler rows: the home cell is a run of digits (e.g. 1234567890123456)
-            if re.fullmatch(r"\d+", row.get("home", "")):
+            if re.fullmatch(r"\d+", row.get("pt_home", "")):
                 continue
             row["season"] = str(season)
-            rows.append(row)
+            rows.append(clean_cells(row))
     return rows, header
 
 
@@ -149,6 +181,32 @@ def as_int(value):
         return int(float(value))
     except (TypeError, ValueError):
         return None
+
+
+def clean_cells(row):
+    """Blank cells that aren't the number the column is supposed to hold."""
+    for col in INT_COLUMNS:
+        value = row.get(col)
+        if value and not re.fullmatch(r"-?\d+", value):
+            row[col] = ""
+    for col, value in list(row.items()):
+        if col.startswith("line") and value:
+            try:
+                float(value)
+            except ValueError:
+                row[col] = ""
+    return row
+
+
+def order_columns(rows, model_columns):
+    """Identity, then Prediction Tracker meta, market, consensus, then models.
+
+    Models sort by how many rows they cover, descending, so the ones worth using come
+    first and the long tail of one-season modelers sits at the end. Empty columns drop.
+    """
+    fill = {c: sum(1 for r in rows if r.get(c)) for c in model_columns}
+    models = sorted((c for c in model_columns if fill[c]), key=lambda c: (-fill[c], c))
+    return IDENTITY + PT_META + MARKET + CONSENSUS + models, models
 
 
 def pick_game(hits, home, pt_home, pt_away, week):
@@ -217,7 +275,7 @@ def main():
 
         counts = defaultdict(int)
         for row in rows:
-            home_pt, away_pt = row.get("home", ""), row.get("road", "")
+            home_pt, away_pt = row.get("pt_home", ""), row.get("pt_away", "")
             home, away = resolve(home_pt), resolve(away_pt)
             if home is None or away is None:
                 for pt, res in ((home_pt, home), (away_pt, away)):
@@ -238,9 +296,9 @@ def main():
             game, flipped, status = pick_game(
                 hits,
                 home,
-                as_int(row.get("hscore")),
-                as_int(row.get("vscore")),
-                as_int(row.get("week")),
+                as_int(row.get("pt_home_points")),
+                as_int(row.get("pt_away_points")),
+                as_int(row.get("pt_week")),
             )
             counts[status] += 1
             row["match_status"] = status
@@ -253,18 +311,22 @@ def main():
             row["cfbd_away_team"] = game["away"]
             row["cfbd_week"] = game["week"]
             row["cfbd_season_type"] = game["season_type"]
+            row["home_points"] = game["home_points"]
+            row["away_points"] = game["away_points"]
             row["orientation_flipped"] = "1" if flipped else "0"
             counts["flipped"] += int(flipped)
             if status == "matched_score_mismatch":
                 mismatches.append(
                     f"{season} {game['game_id']}: PT {home_pt} "
-                    f"{row.get('hscore')}-{row.get('vscore')} {away_pt} | CFBD "
+                    f"{row.get('pt_home_points') or '?'}-{row.get('pt_away_points') or '?'} {away_pt} | CFBD "
                     f"{game['home']} {game['home_points']}-{game['away_points']} {game['away']}"
                 )
             all_rows.append(row)
         per_season[season] = counts
 
-    fieldnames = CFBD_COLUMNS + [c for c in columns if c not in CFBD_COLUMNS]
+    known = set(IDENTITY) | set(PT_META) | set(MARKET) | set(CONSENSUS)
+    fieldnames, models = order_columns(all_rows, [c for c in columns if c not in known])
+    dropped = [c for c in columns if c not in known and c not in models]
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
@@ -275,7 +337,13 @@ def main():
     total = len(all_rows)
     got_id = sum(c["matched"] + c["matched_score_mismatch"] for c in per_season.values())
     clean = sum(c["matched"] for c in per_season.values())
-    print(f"wrote {args.out} -- {total} rows, {len(fieldnames)} columns")
+    print(
+        f"wrote {args.out} -- {total} rows, {len(fieldnames)} columns "
+        f"({len(IDENTITY)} identity + {len(PT_META)} pt meta + {len(MARKET)} market + "
+        f"{len(CONSENSUS)} consensus + {len(models)} models)"
+    )
+    if dropped:
+        print(f"dropped {len(dropped)} column(s) with no data: {', '.join(dropped)}")
     print(f"game_id attached: {got_id}/{total} ({got_id / total:.1%})")
     print(f"  of those, scores agree with CFBD: {clean}/{got_id} ({clean / got_id:.2%})")
     print(f"  orientation-flipped: {sum(c['flipped'] for c in per_season.values())}")
