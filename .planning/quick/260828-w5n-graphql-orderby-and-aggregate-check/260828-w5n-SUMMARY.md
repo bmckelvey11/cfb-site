@@ -34,7 +34,7 @@ file-existence only rather than silently implied to be checked.
 Drift never changes the exit code. A stale dump is a re-pull decision; only a
 reached-but-unaccounted table is a wiring bug.
 
-## What the check found — twelve tables behind the source
+## What the check found — 14 tables behind the source (all re-pulled)
 
 | Table | Disk | Source | Δ |
 |---|---|---|---|

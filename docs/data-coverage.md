@@ -177,10 +177,17 @@ dump is a re-pull decision, not a wiring bug. The other 15 tables (`gameTeam`, `
 `ratings`, `transfer`, …) have no aggregate variant and stay file-existence only, which the
 output states rather than implying they were checked.
 
-As of 2026-08-28 twelve tables trail the source, several by a lot — `coachSeason` 1,937 vs
-12,564, `recruit` 50,820 vs 93,363, `recruitingTeam` 2,963 vs 4,578. Fresh ordered pulls of
-`coachSeason` and `recruitingTeam` match the source exactly, so the shortfall is in the
-dumps on disk (June/July pulls), not in the current client.
+When this check first ran (2026-08-28) **14** tables trailed the source, several badly —
+`recruit` 50,820 vs 93,363, `coachSeason` 1,937 vs 12,564, `athlete` 151,049 vs 158,932.
+All 14 were re-pulled the same day (+64,855 rows net) and **every checkable table now matches
+its source count**. Two of the 14 had *more* rows on disk than the source (`athleteTeam`
++311, `game` +1); those resolved to exact matches on re-pull, which is what stale or
+duplicated rows from the pre-`orderBy` unsorted pulls look like.
+
+Re-running `enrich` after the refresh changed **zero** features on all 13,014 games: the only
+GraphQL-sourced registry feature is `pregame_win_prob` (from `gameTeam`, which has no
+aggregate variant and was not part of the refresh), and the added `game`/`gameLines` rows
+fall outside the built game set.
 
 The GraphQL half needs a Patreon Tier 3 token. Not having one prints a note and is
 never a failure — the REST partition runs offline from a saved spec and is not held
