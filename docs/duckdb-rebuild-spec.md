@@ -213,3 +213,110 @@ message and exit code 1 if `{db}` does not already exist.
 --explode-only          explode payloads in an existing DuckDB file; do not reload JSON
 --flatten-nested        flatten leftover STRUCT columns on existing stg.* tables
 ```
+
+## Known gaps the rebuild will surface
+
+### `_post_wk` files do not parse — postseason rows go missing from a season filter
+
+`_scrape_season_week`'s postseason pass (`docs/data-coverage.md`, closed by quick task
+`260828-l60`) writes `{name}_{season}_post_wk{week}.json`. The loader's stem parser does not
+know that shape:
+
+```bash
+python -c "
+from cfb_system_maker.duckdb_load import parse_dump_stem
+print(parse_dump_stem('game_team_stats_2024_post_wk1'))
+"
+```
+
+`parse_dump_stem('game_team_stats_2024_post_wk1') -> ('game_team_stats_2024_post_wk1', None,
+None)` — `_SEASON_WEEK_RE` requires `_{season}_wk{n}` with nothing between `{season}` and
+`wk`, and `_post_wk1` does not match it (nor does the plain `_SEASON_RE`), so the whole stem
+survives as the table name instead of being grouped with its regular-season siblings.
+
+The in-SQL filename regex used to populate the `season`/`week` columns (`_insert_json_file`)
+disagrees with the stem parser on the same file — it extracts `season=None` (its year regex
+also expects `_wk` or end-of-string right after the year) but `week=1` (its week regex only
+needs a trailing `_wk\d+.json`, which `_post_wk1.json` does match). So today's rebuild will
+mint **~132 single-file tables**, one per `_post_wk` file, each with a NULL `season` column
+and a populated `week` column:
+
+```bash
+python -c "
+import glob
+print(len(glob.glob('data/raw/*_post_wk*.json')))
+"
+```
+
+**Blast radius:** any query filtering `WHERE season = 2024` on the regular table (e.g.
+`raw.game_team_stats`) silently excludes every postseason row for that season, because those
+rows never entered the regular table at all — they are sitting in ~132 separate
+`raw.game_team_stats_2024_post_wk1`-style tables that nothing joins against.
+`tests/test_duckdb_load.py` has no test case for the `_post_wk` filename shape, which is why
+nothing caught this before now.
+
+**`_ngt` files interact the same way when they are also postseason.** Plain `_ngt` files
+parse correctly (`ppa_games_ngt_2024` → `('ppa_games_ngt', 2024, None)`), but a postseason
+`_ngt` file hits the identical gap:
+
+```bash
+python -c "
+from cfb_system_maker.duckdb_load import parse_dump_stem
+print(parse_dump_stem('ppa_players_games_ngt_2024_post_wk3'))
+"
+```
+
+`('ppa_players_games_ngt_2024_post_wk3', None, None)` — same failure mode, same fix needed.
+
+**Proposed fix — a decision for review, not an implementation.** Add an optional `_post`
+segment to `_SEASON_WEEK_RE` (and the matching in-SQL filename regex), and add a
+`season_type` column so a rebuilt `raw.game_team_stats` can distinguish a regular-week-1 row
+from a postseason-week-1 row instead of merging their week numbers. This is flagged as a
+rebuild-time decision rather than an auto-fix because **it changes table identity**: today
+`game_team_stats_2024_wk1.json` and `game_team_stats_2024_post_wk1.json` produce different
+table names (one grouped, one standalone); after the fix they would both load into
+`raw.game_team_stats` with `week=1` and different `season_type` values, which is a schema
+change for every consumer of that table, not just a bugfix.
+
+### `--only` is destructive, and `meta.load_report` omits the `stg` pass
+
+Both already covered under `## Rebuild semantics` and `## Schema` above — repeated here
+because both are exactly the kind of thing a rebuild run "surfaces" if the operator isn't
+already holding them in mind: `--only <table>` against an existing multi-table database
+replaces it with a one-table database, and `meta.load_report` after a full rebuild with
+`--explode` will show `raw`/`graphql` rows but no `stg` rows, so it cannot be used to confirm
+the explode pass ran.
+
+## Adding a new endpoint
+
+The true answer is short, and does not touch this file: register the `Endpoint` in
+`scrapers.py`'s `ENDPOINTS` (or add the table name to `GQL_DEFAULT_TABLES` for a GraphQL
+table), scrape it, then rebuild. `_plan_loads` groups files purely by filename glob
+(`data/raw/*.json`, `data/graphql/*.json`) and stem, so a new endpoint's dumps are picked up
+automatically the next time `duckdb` runs — no registration step inside `duckdb_load.py`.
+
+`duckdb_load.py` only needs changing when a new **filename shape** appears — not a new
+endpoint under an existing shape. `_post_wk` (above) is exactly that case: it wasn't a new
+endpoint, it was an existing endpoint writing a filename pattern the stem parser had never
+seen. Any future filename convention (a new suffix, a new separator) would need the same kind
+of `_SEASON_WEEK_RE`/`_SEASON_RE` update before a rebuild groups it correctly.
+
+## MotherDuck mirror
+
+`md:cfb` — referenced in `consolidation.md` as "a MotherDuck mirror (same pattern as
+Greenview), not a local folder" if cross-machine sharing is ever needed — is a **manual,
+out-of-band step**. There is no code for it anywhere in this repo:
+
+```bash
+grep -ri motherduck --include="*.py" -r .
+```
+
+returns nothing; the only hits for "motherduck" in the whole tree are prose in
+`consolidation.md`. This spec does not describe a push to `md:cfb` as part of the rebuild
+because the codebase does not implement one — if a mirror is wanted, it is a separate manual
+`duckdb` CLI session against the rebuilt local file, not a step this loader performs.
+
+---
+
+A threat model was deliberately omitted from this spec: it is a documentation-only change,
+crosses no trust boundary, and installs no package.
