@@ -1,7 +1,7 @@
 """Union the Prediction Tracker season CSVs and attach a CFBD game_id to every row.
 
-Source: C:/Users/mckel/dev/cfb/prediction-tracker/ncaa*.csv  (seasons taken from the
-        files present, so a new ncaa{year}.csv is picked up without a code change)
+Source: prediction-tracker/raw/ncaa*.csv  (seasons taken from the files present, so a
+        new ncaa{year}.csv is picked up without a code change)
 CFBD:   stg.game in data/cfb.duckdb -- the GraphQL-fed table. data/raw/games_*.json holds
         regular-season rows only, which would drop every bowl (~35/season); games.csv is
         additionally 2013+ only.
@@ -25,10 +25,13 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import cfb_paths  # noqa: E402  (repo's CFB_DATA_ROOT resolver, honors the env override)
+
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT_SRC = Path("C:/Users/mckel/dev/cfb/prediction-tracker")
-DEFAULT_DB = REPO / "data" / "cfb.duckdb"
-DEFAULT_OUT = REPO / "data" / "raw" / "prediction_tracker_lines.csv"
+DEFAULT_SRC = REPO / "prediction-tracker" / "raw"
+DEFAULT_DB = cfb_paths.DB_PATH
+DEFAULT_OUT = cfb_paths.RAW / "prediction_tracker_lines.csv"
 
 # Prediction Tracker name -> extra CFBD candidates. Each name resolves against that
 # season's own CFBD team set, so era drift (Central Florida -> UCF) resolves itself.
@@ -129,9 +132,12 @@ def load_cfbd(db_path, seasons):
     import duckdb
 
     con = duckdb.connect(str(db_path), read_only=True)
+    # the GraphQL re-pull has renamed this column before (id -> gameId); tolerate either
+    cols = {c[0] for c in con.execute("describe stg.game").fetchall()}
+    id_col = "gameId" if "gameId" in cols else "id"
     rows = con.execute(
-        """
-        select season, id, homeTeam, awayTeam, week, seasonType, homePoints, awayPoints
+        f"""
+        select season, {id_col}, homeTeam, awayTeam, week, seasonType, homePoints, awayPoints
         from stg.game
         where season between ? and ?
         """,

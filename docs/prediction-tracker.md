@@ -1,11 +1,11 @@
 # Prediction Tracker lines
 
-`data/raw/prediction_tracker_lines.csv` — 17,755 rows × 179 columns, one row per
+`{CFB_DATA_ROOT}/raw/prediction_tracker_lines.csv` — 17,755 rows × 179 columns, one row per
 Prediction Tracker game 2001–2025, each carrying a CFBD `game_id`.
 
-Built by `python scripts/build_prediction_tracker.py` from
-`C:/Users/mckel/dev/cfb/prediction-tracker/ncaa*.csv` plus `stg.game` in `data/cfb.duckdb`.
-No network. The output is gitignored (`data/`) — regenerate rather than commit it.
+Built by `python scripts/build_prediction_tracker.py` from `prediction-tracker/raw/ncaa*.csv`
+plus `stg.game` in `cfb_paths.DB_PATH` (`{CFB_DATA_ROOT}/cfb.duckdb`). No network. The
+output lives under the data root, not the repo — regenerate rather than commit it.
 
 Upstream is [thepredictiontracker.com](https://www.thepredictiontracker.com), which
 publishes one CSV per season holding the market line and every computer model's predicted
