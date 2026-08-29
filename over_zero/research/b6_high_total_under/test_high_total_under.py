@@ -18,6 +18,7 @@ Run:  python research/b6_high_total_under/test_high_total_under.py
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -30,7 +31,8 @@ sys.path.insert(0, str(REPO / "v1"))
 
 from censoring_bias import censoring_bias, fit_pipeline, implied_team_points  # noqa: E402
 
-RAW_DIR = REPO / "data" / "raw"
+_HUB_DATA = Path(os.environ.get("CFB_DATA_ROOT", REPO.parent / "data"))
+RAW_DIR = _HUB_DATA / "raw"
 SEASONS = list(range(2013, 2026))
 RNG = np.random.default_rng(20260811)
 

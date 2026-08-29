@@ -3,6 +3,7 @@
 Walk-forward, paired OOS log-loss, season-block bootstrap CI. K=30 primary.
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,7 +14,8 @@ sys.path.insert(0, str(REPO / "v2"))
 from models_v2 import (_team_censor_bias, implied_team_points, pick_line,
                        probit_win_v2, tobit_left_censored_v2)
 
-RAW = REPO / "data" / "raw"
+_HUB_DATA = Path(os.environ.get("CFB_DATA_ROOT", REPO.parent / "data"))
+RAW = _HUB_DATA / "raw"
 K_PRIMARY, K_SENS = 30, (15, 60)
 
 

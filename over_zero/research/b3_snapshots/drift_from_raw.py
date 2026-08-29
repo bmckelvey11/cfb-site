@@ -16,6 +16,7 @@ present:
 drift = overUnder - overUnderOpen (positive = total rose toward close).
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -25,7 +26,8 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "v2"))
 from models_v2 import _team_censor_bias, implied_team_points, pick_line
 
-RAW = REPO / "data" / "raw"
+_HUB_DATA = Path(os.environ.get("CFB_DATA_ROOT", REPO.parent / "data"))
+RAW = _HUB_DATA / "raw"
 SEASONS = range(2013, 2026)
 SIGMA_DOG, SIGMA_FAV = 11.03, 11.78
 
