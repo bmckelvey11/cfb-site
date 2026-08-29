@@ -146,10 +146,13 @@ See `docs/duckdb-rebuild-spec.md`. Nothing below should be built on the current
 - `core.fact_team_week` — grain: team-season_type-week. Cross-check against
   `running_stats.py`'s entering-game computed features (same no-lookahead
   requirement documented in this repo's `.claude/CLAUDE.md`).
-- **Decide, explicitly, before writing SQL for the above three facts:** does this SQL
-  layer replace `normalize.py`/`enrich.py`'s JSON output, or run alongside it as a
-  second, eventually-reconciled representation? Don't let this get decided
-  implicitly by whichever gets built first.
+- **Decided (2026-08-28): run alongside, not replace.** The SQL `core` layer is a
+  second representation, not a migration — `normalize.py`/`enrich.py`'s JSON output
+  (`games.csv`/`features.json`) stays the source of truth for all three consumers.
+  `core.fact_game`/`fact_game_line`/`fact_team_week` exist for SQL-side querying
+  (MotherDuck, ad hoc analysis) and must be checked for agreement against the JSON
+  output, not treated as its replacement. Revisit this if the two ever drift or if
+  maintaining both becomes real overhead — not decided preemptively here.
 
 **Phase 2 — `mart` + `app`, only once the hosted-web-app decision is made.**
 Build `mart.model_game_team_features` (if Phase 1 didn't already fold it into
