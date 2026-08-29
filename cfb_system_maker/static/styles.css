@@ -728,7 +728,9 @@ code {
 
 /* Collapse goes inert while a search term is active, so a collapsed group still
    reveals its matching rows -- search overrides collapse. */
-.feature-filters:not(.is-searching) .feature-group.is-collapsed .filter-launch-row {
+.feature-filters:not(.is-searching)
+  .feature-group.is-collapsed
+  .filter-launch-row {
   display: none;
 }
 
@@ -1154,6 +1156,18 @@ code {
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
+}
+
+.filter-modal__table--pickable tbody tr {
+  cursor: pointer;
+}
+
+.filter-modal__table--pickable tbody tr:hover {
+  background: var(--panel-strong);
+}
+
+.filter-modal__table--pickable tbody tr.is-selected {
+  background: #e6f4f0;
 }
 
 .filter-modal__sort {
