@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -124,7 +125,7 @@ def name_clusters(profiles: pd.DataFrame) -> dict[int, str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data-dir", default="data")
+    parser.add_argument("--data-dir", default=os.environ.get("CFB_DATA_ROOT", "data"))
     args = parser.parse_args()
     raw = Path(args.data_dir) / "raw"
 

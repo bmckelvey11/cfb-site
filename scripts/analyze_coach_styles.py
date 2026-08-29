@@ -31,9 +31,10 @@ from sklearn.preprocessing import StandardScaler
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
+from cfb_paths import DATA_ROOT  # noqa: E402
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data-dir", default="data")
+parser.add_argument("--data-dir", default=str(DATA_ROOT))
 args = parser.parse_args()
 DATA = (REPO / args.data_dir) if not Path(args.data_dir).is_absolute() else Path(args.data_dir)
 RAW = DATA / "raw"

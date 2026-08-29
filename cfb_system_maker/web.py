@@ -12,6 +12,8 @@ from urllib.parse import urlencode, urlparse
 from flask import Flask, abort, g, jsonify, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
+from cfb_paths import DATA_ROOT
+
 from cfb_system_maker.backtest import (
     _side_spread,
     grade_bet,
@@ -447,7 +449,7 @@ def parse_system_strict(args: MultiDict | None = None) -> SystemFilter:
     return _system_from_form(form)
 
 
-def create_app(data_dir: str | Path = "data") -> Flask:
+def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
     app = Flask(__name__)
     app.config["DATA_DIR"] = Path(data_dir)
     app.jinja_env.globals["query_href"] = _query_href

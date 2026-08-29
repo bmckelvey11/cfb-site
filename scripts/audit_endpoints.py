@@ -25,6 +25,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # run as `python scripts/...`
+from cfb_paths import DATA_ROOT  # noqa: E402
 from cfb_system_maker.cfbd_client import find_cfbd_token  # noqa: E402
 from cfb_system_maker.scrapers import ENDPOINTS  # noqa: E402
 from cfb_system_maker.graphql_client import (  # noqa: E402
@@ -149,7 +150,7 @@ def main() -> int:
 
     gql_unaccounted: list[str] = []
     if not args.no_graphql:
-        gql_unaccounted = _audit_graphql(Path("data") / "graphql", quiet=args.quiet)
+        gql_unaccounted = _audit_graphql(DATA_ROOT / "graphql", quiet=args.quiet)
 
     total = len(registered) + len(client_only) + len(no_client)
     print(f"\n{len(registered)} registered + {len(client_only)} client-only"

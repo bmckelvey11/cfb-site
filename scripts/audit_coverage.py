@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # run as `python scripts/...`
+from cfb_paths import DATA_ROOT  # noqa: E402
 from cfb_system_maker.scrapers import (  # noqa: E402
     ENDPOINTS, ONCE, SEASON, SEASON_WEEK, GRID, PER_GAME, PER_PLAYER, ON_DEMAND,
 )
@@ -55,7 +56,7 @@ def _postseason_weeks(raw: Path | None, season: int) -> list[int]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data-dir", default="data")
+    ap.add_argument("--data-dir", default=str(DATA_ROOT))
     ap.add_argument("--seasons", default="2012-2025")
     ap.add_argument("--weeks", default="1-15")
     args = ap.parse_args()

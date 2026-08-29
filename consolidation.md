@@ -244,6 +244,21 @@ Blake approves first. Then:
 
 ## Phase 2 — Move data outside the repo
 
+**Status (2026-08-28 evening): DONE.** Executed across two sessions (Cursor did
+Step 1's path module + over_zero conversion + the physical move of `raw/`,
+`processed/`, `graphql/`, `cfb.duckdb`; Claude Code finished the tail): repo
+`data/` leftovers removed after verifying byte-identical/empty at the new root,
+`web.py`'s `create_app` default + `launch.bat` + 4 scripts
+(`analyze_coach_styles`, `audit_coverage`, `audit_endpoints`,
+`build_coach_style_clusters`, `mirror_duckdb_to_sqlite`) converted off the bare
+`"data"` default, `CFB_DATA_ROOT` set at User scope to
+`C:\Users\mckel\data\cfb`. Verified: 605 tests pass, CLI backtest + totals-model
++ over_zero `score_game` smokes green, web app serves `/` with data found.
+Remaining for Blake: add `C:\Users\mckel\data\` to the rclone backup set
+(step 4 below); restart any Flask window started before the move (it holds the
+old relative path). Terminals opened before the env var was set need a restart
+to see it.
+
 Separate session. Only after Phase 1 is merged and green.
 
 Why: one canonical data location that other projects and rclone backups point at,
