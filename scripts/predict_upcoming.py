@@ -15,10 +15,17 @@ READ THIS BEFORE USING THE OUTPUT.
 SIGN CONVENTION -- the thing most likely to silently invert every number here. Prediction
 Tracker publishes spreads as "points the home team is favoured by" (positive = home
 favoured). build_prediction_tracker.clean_cells NEGATES every line* column except linestd
-when building the archive, so the archive runs the opposite way and `y ~ -line`. The live
-snapshot is raw, so it must be flipped before it touches any analysis code. Verified
-against archive rows with known outcomes (Duke home vs Florida St. 2001, archive line
-+32.0, Duke lost by 42).
+when building the archive, so the archive runs the opposite way and `y ~ -line` (fitted
+slope -1.02). The live snapshot is raw, so it must be flipped before it touches any
+analysis code.
+
+Confirmed three independent ways rather than by reading the transform alone:
+  - raw source vs archive, 2001: Duke home vs Florida St. is -32.0 raw and +32.0 archive;
+    across 654 matched rows the correlation is -0.9999.
+  - ground truth: that same Duke side lost 13-55, i.e. by 42, so archive-positive is the
+    home underdog and archive-negative is the home favourite.
+  - round trip: _check() asserts this module reproduces a direct E4 fit on a historical
+    week through the same code path the live rows take.
 
 Serves E4, the screened equal-weighted consensus: pre-registered, never selected on, and
 73% of its effect survives decontamination. E14 (complete subset regression) has a larger
