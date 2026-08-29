@@ -32,8 +32,9 @@ general survey. Where the evidence is thin or contested, say so explicitly.
 1. **No individual model and no combination beats the closing line.** Ten combination rules —
    screened consensus, market-residual ridge, Stock–Watson shrinkage, residual principal
    components, partially-egalitarian LASSO, trimmed consensus, combination elastic net, online
-   Hedge aggregation, complete subset regression — all have Holm-adjusted p = 1.000 against the
-   closing line. Best point estimate −0.15 MSE.
+   Hedge aggregation, complete subset regression. The best Holm-adjusted p against the closing
+   line is **0.49**; every other one is 1.000. Best point estimate −0.159 MSE. One estimator
+   (ridge) is significantly **worse** than the recalibrated line, at +1.106 (p = 0.048).
 2. **The same panel decisively beats the *opening* line.** Harvey–Newbold joint encompassing:
    Wald 70.1, p = 0.0005 against the open; Wald 5.44, p = 0.56 against the close. The fitted
    weight on the model consensus is ~0.37 against the open and ~0.10 against the close.
@@ -41,9 +42,11 @@ general survey. Where the evidence is thin or contested, say so explicitly.
    seasons, for every method, on both benchmarks. Widening the grids post hoc, they keep going:
    ridge λ to 10⁷, learning rate to 10⁻⁵, mean correction shrinking to 0.019 points.
    Stock–Watson shrinkage, given a free scalar for how much of the panel correction to keep,
-   chose exactly zero. Elastic net independently zeroed every coefficient.
+   chose exactly zero against the closing line. Elastic net independently zeroed every
+   coefficient. Against the *opening* line both keep a sliver — 0.03 and 0.17 points — which is
+   the entire open/close difference expressed as a hyperparameter.
 4. **Clark-West rejects where the paired difference does not.** Against the recalibrated closing
-   line, CW gives +0.271 (one-sided p = 0.002); the plain paired ΔMSE is −0.128 [−0.312, +0.052],
+   line, CW gives +0.271 (one-sided p = 0.002); the plain paired ΔMSE is −0.128 [−0.313, +0.050],
    p = 0.15. Population signal exists; it does not survive the cost of estimating its weight.
 5. **Relative skill is highly persistent and completely stable.** Season-to-season Spearman
    rank correlation of model skill is 0.775. Offered decay factors ρ ∈ {0.80 … 1.00}, forward
@@ -57,17 +60,48 @@ general survey. Where the evidence is thin or contested, say so explicitly.
    (linear trend, since cohorts are 87/29/29/5/4) replaced the top of the screen almost entirely
    (1 of 8 in common in one season) and cost 15% of the effect. The best forecasters are recent
    entrants; the trend read their advantage as a cohort effect and adjusted it away.
+8. **Estimator families differ sharply in how much benchmark contamination they absorb.** Beyond
+   the two outright market lines, a further ~13 columns are *partially* market-anchored
+   (correlation 0.40–0.76 between their deviation from the opening number and the market's own
+   open-to-close move). Dropping the top decile by that correlation, on the opening line:
+
+   | method | all 154 | minus 15 | retained |
+   |---|---|---|---|
+   | screened consensus | −1.976 (p=0.003) | −1.446 (p=0.042) | **73%** |
+   | trimmed consensus | −1.150 (p=0.067) | −0.867 (p=0.142) | **75%** |
+   | complete subset regression | −2.615 (p<0.0001) | −1.285 (**p<0.0001**) | **49%** |
+   | **market-residual ridge** | −3.521 (p<0.0001) | **−0.966 (p=0.256)** | **27%** |
+
+   An equal-weighted consensus dilutes any one contaminated member to 1/k. A ridge with ~37
+   regressors can put weight on exactly those columns, so most of its apparent advantage is
+   market content. **This was invisible until I ran the check.**
+9. **Complete subset regression was the only method to survive multiplicity correction**, at
+   Holm p < 0.0001 against the opening line, beating the recalibrated benchmark in **all 20**
+   seasons, on full support, and retaining half its effect after decontamination. Every
+   shrinkage-type estimator on the same data collapsed toward zero correction.
+10. **A specification defect that is itself a methodological question.** My regressor-eligibility
+    filter required a model to cover 80% of *all* prior training games. Because missingness is
+    season-level, that is a test of *when a model launched*, not of how complete its record is —
+    a forecaster starting in 2015 covers well under 80% of games since 2001 however perfect its
+    record. It kept 14 of 39 active models, median entry year 2002, and excluded the two best
+    forecasters in the panel. Fixing it moved subset regression from 15 of 20 seasons to all 20,
+    and flipped the ridge's closing-line result from −0.15 to **+1.11**.
 
 ## The questions
 
 ### 1. Selection-adjusted inference with no confirmation window (highest priority)
 
 One method (complete subset regression after screening) survived Holm correction among an
-eight-member family, at adjusted p = 0.0245, ΔMSE −1.344 against the opening line. I have **no
-usable holdout**: a 2021–25 confirmation window has an MDE of 0.161 RMSE against a full-window
-0.078, so it could not confirm the effect it would exist to check. I therefore pre-registered
-the primary claim instead and reported the winner as a selection estimate with no way to shrink
-it.
+eight-member family, at adjusted p < 0.0001, ΔMSE −2.615 against the opening line, beating the
+recalibrated benchmark in all 20 seasons. I have **no usable holdout**: a 2021–25 confirmation
+window has an MDE of 0.161 RMSE against a full-window 0.078, so it could not confirm the effect
+it would exist to check. I therefore pre-registered the primary claim instead and reported the
+winner as a selection estimate with no way to shrink it.
+
+A related sub-case I am treating conservatively: on the *closing* line the same method moves
+from −0.159 (p = 0.070) to −0.193 (p = 0.013) once the market-anchored columns are removed. That
+is a post-hoc variant of the family winner, so I am calling it a candidate for pre-registration
+rather than a result. Is that the right call, or is there a defensible way to evaluate it now?
 
 Is that the best available? Specifically:
 
@@ -87,15 +121,21 @@ Is that the best available? Specifically:
 CSR (Elliott, Gargano & Timmermann 2013) after screening to 10 models at subset size k = 1–3
 was the only exploratory method to clear multiplicity correction. Ridge, LASSO, elastic net,
 Stock–Watson shrinkage and residual PCA all collapsed toward zero correction on the same data.
+CSR also proved far more robust to benchmark contamination than the ridge (finding 8): it kept
+49% of its effect where the ridge kept 27% and lost significance.
 
 - Is there theory explaining when CSR's implicit shrinkage differs *in kind* from ridge-type
   shrinkage — particularly under a **strong external benchmark** that is not one of the
   regressors?
-- Is my result plausible, or is it more likely a multiplicity artifact I should discount? It ran
-  on a reduced support (10,755 of 14,347 games) because screening to ten models is impossible in
-  early seasons, which I regard as a further reason for suspicion.
+- Is my result plausible, or is it a multiplicity artifact I should discount? The reduced-support
+  caveat I originally attached to it turned out to be my own filter bug (finding 10) and is gone;
+  it now runs on full support and wins every season. That makes me *more* suspicious, not less,
+  because it is now the single standout in a family where everything else is flat.
 - Does the literature report CSR advantages that survive honest out-of-sample evaluation, as
   opposed to in-sample or pseudo-out-of-sample comparisons?
+- Is the **averaging across subsets**, rather than the subset size, doing the work? CSR at k = 1
+  was selected in every season, which makes it close to an equal-weighted average of many
+  one-regressor corrections — is that a known special case, and does it explain the robustness?
 
 ### 3. Is the 1-SE rule the wrong selection rule for a small correction to a strong benchmark?
 
@@ -125,9 +165,27 @@ face value.
 - What **detection methods** exist beyond the two I used (exact-match rate to the benchmark; the
   correlation between a forecaster's deviation from the opening number and the benchmark's own
   subsequent move)?
-- After removal, a few columns remain intermediate — correlation ~0.4–0.75 with the market's
+- After removal, ~13 columns remain intermediate — correlation 0.40–0.76 with the market's
   open-to-close move. Is there principled guidance for **partially** market-anchored forecasters,
-  short of dropping them?
+  short of dropping them? Dropping by a decile threshold is arbitrary and I would prefer a rule.
+
+### 4b. Why does an equal-weighted consensus resist contamination that a ridge amplifies?
+
+This is the finding I least expected and can least explain (finding 8). With the same panel, the
+same benchmark and the same walk-forward protocol, removing the 15 most market-like columns costs
+a screened consensus 27% of its effect and a market-residual ridge **73%**, taking the ridge from
+p < 0.0001 to p = 0.256.
+
+- Is this a **named phenomenon**? The mechanism I assume is that equal weighting caps any one
+  contaminated member at 1/k while a penalised regression is free to load on precisely the
+  columns most correlated with the target. Is that the accepted explanation, and is it
+  quantified anywhere?
+- Does it imply a general **robustness argument for simple averaging** in panels of uncertain
+  provenance — i.e. that the forecast-combination puzzle has a data-integrity component, not
+  only a bias-variance one?
+- Is there a diagnostic that detects this **without** having a contamination measure to test
+  against? I only found it because I had a benchmark-similarity metric. In a panel where I could
+  not construct one, what would have flagged it?
 
 ### 5. When does cohort/vintage adjustment destroy signal?
 
@@ -142,6 +200,21 @@ longer-tenured models.
   genuinely better" in an unbalanced panel, *before* applying the correction?
 - Is the failure mode I hit — a cohort covariate collinear with true quality — discussed
   anywhere?
+
+### 5b. Eligibility rules in unbalanced forecaster panels
+
+My filter (finding 10) silently became a tenure test: requiring coverage of 80% of *all* prior
+observations excludes every late entrant regardless of record quality, because missingness is
+season-level rather than observation-level. It cost me the two best forecasters in the panel and
+I did not notice for two rounds of analysis.
+
+- Is this a **known trap** in unbalanced-panel forecast evaluation, and does it have a name?
+- What is the recommended way to decide **which forecasters are eligible to carry a coefficient**
+  when tenure varies from 1 to 25 periods — a minimum effective sample, a within-active-period
+  coverage rule, or something that handles both jointly with the shrinkage?
+- Is there guidance on how eligibility thresholds interact with **entry-cohort composition**?
+  Mine correlated eligibility with entry year almost perfectly, which is precisely the confound
+  the cohort correction in finding 7 was supposed to address.
 
 ### 6. Detecting slow decay in relative performance with ~20 time-series observations
 
@@ -231,7 +304,11 @@ State if any of these invalidate an answer above, but I already regard them as s
 - The benchmark is the panel publisher's own recorded line, and its capture time is undocumented
   upstream.
 - 0.8% of cells in the regression design are zero-filled for absent models; 0.1% of rows are more
-  than half filled.
+  than half filled. Zero rows in either support lack a screened model entirely.
+- Five specification defects were found and fixed during the analysis (sign error, a nesting
+  failure, a support collapse, the eligibility filter, and an uncentred stability statistic). All
+  numbers quoted above are post-fix. I mention this only so that a recommendation to "re-check
+  the implementation" is understood to have been done.
 - Survivorship: models that stopped publishing may have been dropped for being bad. The
   population is selected and this is not fixable in-sample.
 
