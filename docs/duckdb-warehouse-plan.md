@@ -5,7 +5,8 @@ saved locally, not part of this repo) into what this repo's data actually looks 
 today. The source plan is solid Kimball-style practice — raw/stg/core/mart layering,
 `dim_`/`fact_`/`bridge_` naming, atomic `CREATE OR REPLACE TABLE AS SELECT` refreshes —
 but it was written with no visibility into this project's real consumers, real table
-inventory, or the two correctness bugs already found in the existing loader. This doc
+inventory, or the correctness problems already found in the existing loader (an
+unreproducible artifact, a postseason-filename parsing bug). This doc
 is the corrected, scoped-down version: what to keep, what to cut, what the plan didn't
 know to ask about, and a phase order grounded in what's actually built.
 
@@ -21,7 +22,10 @@ The schema shape (`raw → stg → core → mart → app`) and naming convention
 keeping. The scope is not: the downloaded plan designs for a general-purpose college
 football analytics platform (players, recruiting, draft, coaching staff, plays, drives)
 when this repo has three narrower, already-defined consumers, none of which touch that
-depth. Building the full plan first is solving a problem nobody has yet.
+depth today. Coach/athlete/play-by-play work is now named near-term intent (see
+Phase 3+ below) — that moves up *when* that layer gets built, not the verdict:
+it still waits behind Phase 0/1, because every one of its use cases sits on top of a
+trustworthy `raw`/`stg` and a conformed `core` that don't exist yet.
 
 ## What the plan didn't have visibility into
 
@@ -33,11 +37,13 @@ depth. Building the full plan first is solving a problem nobody has yet.
 | `cfb_totals_model` (totals-line CLV model) | The same games/lines data, read from `cfb_system_maker`'s `data/` |
 | `over_zero` (Arscott floor-bias research) | Games/lines plus its own 1H-line and ActionNetwork snapshots not shared with the other two |
 
-(All three are being merged into this repo right now — see `consolidation.md`.) None of
-the three model athletes, coaches, recruiting, or plays. The plan's `dim_athlete`,
-`dim_coach`, `bridge_coach_team_staff_history`, `bridge_recruit_school_history`,
-`fact_draft_pick`, drive/play facts, and roster-snapshot facts have zero consumers
-right now. Building them is not wrong, it's just not Phase 1 — see `## Cut or
+(All three live in this repo as of 2026-08-28 — `consolidation.md` Phase 1 is merged;
+its Phase 2 shared-data-root move is in progress.) None of the three model athletes,
+coaches, recruiting, or plays today. The plan's `dim_athlete`, `dim_coach`,
+`bridge_coach_team_staff_history`, `bridge_recruit_school_history`,
+`fact_draft_pick`, drive/play facts, and roster-snapshot facts therefore have no
+consumers yet — though coach/athlete/play-by-play now has named near-term intent
+(Phase 3+). Building them is not wrong, it's just not Phase 1 — see `## Cut or
 deferred` below.
 
 **97 raw tables already exist, and they're messier than the plan assumes.** The plan's
@@ -113,9 +119,9 @@ sync step gets written.
 | Plan item | Status | Reason |
 |---|---|---|
 | `ref`, `model`, `qa`, `scratch` schemas | Cut for now | Nothing to put in them yet. `ref` needs a real alias-mapping problem (none identified — CFBD team/conference names are already consistent across endpoints, unlike the table-name collisions above). `model` needs a trained artifact worth querying in SQL (today's model outputs are `v1_fit.json` and a JSONL ledger — fine as files until something needs to join predictions against `core` at scale). `qa` is a handful of assertions — `tests/test_duckdb_load.py` already fills that role. `scratch` is just an ad hoc `duckdb` CLI session; it doesn't need a standing schema. Add each only when a concrete need shows up — a schema holding zero tables is a hypothesis, not infrastructure. |
-| `dim_athlete`, `dim_coach`, `bridge_athlete_team_history`, `bridge_coach_team_staff_history`, `bridge_recruit_school_history`, `bridge_game_athlete_availability`, `fact_draft_pick`, `fact_recruit`, `fact_coach_season` | Deferred | Zero of the three current consumers model players, coaches, or recruiting. The raw data is already scraped (`raw.athlete`, `raw.coach`, `raw.recruit`, `raw.draftPicks`, etc.) and isn't going anywhere — building the dimensional layer on top is cheap *later*, once something actually needs it. |
-| `fact_drive`, `fact_play`, `bridge_play_athlete_participation`, `fact_roster_snapshot`, `fact_transfer_portal_entry` | Deferred (plan's own Phase 3) | Agreed with the plan here — these are play-by-play depth nothing today consumes. |
-| `app` schema and app-facing views | Deferred | Depends on the hosted-web-app decision, which is still open (Flask currently reads `games.csv`/`features.json`, not any DuckDB table — see the hosting conversation this doc doesn't repeat). Building curated `app.*` views before there's an app pointed at them is building a contract for a client that doesn't exist yet. |
+| `dim_athlete`, `dim_coach`, `bridge_athlete_team_history`, `bridge_coach_team_staff_history`, `bridge_recruit_school_history`, `bridge_game_athlete_availability`, `fact_draft_pick`, `fact_recruit`, `fact_coach_season` | Deferred, with named intent | No current consumer models players, coaches, or recruiting — but coach/athlete work is named near-term intent with three use cases (Phase 3+). Still sequenced behind Phase 0/1: the raw data is already scraped (`raw.athlete`, `raw.coach`, `raw.recruit`, `raw.draftPicks`, etc.) and isn't going anywhere, and a `dim_coach` built before the REST/GraphQL dedup (`coaches` vs `coach`/`coachSeason`, above) would bake the mess in. |
+| `fact_drive`, `fact_play`, `bridge_play_athlete_participation`, `fact_roster_snapshot`, `fact_transfer_portal_entry` | Deferred (plan's own Phase 3), with named intent | Play-by-play is part of the same near-term intent (Phase 3+), but nothing consumes it yet and it's the largest data volume in `raw` — last in line. |
+| `app` schema and app-facing views | Deferred | The hosted-web-app direction is decided — yes, later, Flask connecting to `md:cfb` over MotherDuck was the sketched path (2026-08-28) — but Flask today reads `games.csv`/`features.json`, not any DuckDB table. Building curated `app.*` views before that work starts is building a contract for a client that doesn't exist yet. First concrete driver will be coach/athlete site pages (Phase 3+). |
 
 ## What the plan is missing that must be added
 
@@ -154,8 +160,9 @@ See `docs/duckdb-rebuild-spec.md`. Nothing below should be built on the current
   output, not treated as its replacement. Revisit this if the two ever drift or if
   maintaining both becomes real overhead — not decided preemptively here.
 
-**Phase 2 — `mart` + `app`, only once the hosted-web-app decision is made.**
-Build `mart.model_game_team_features` (if Phase 1 didn't already fold it into
+**Phase 2 — `mart` + `app`, once the hosted-web-app work actually starts.**
+Direction is decided (hosted, Flask + MotherDuck `md:cfb`); timing is not. Build
+`mart.model_game_team_features` (if Phase 1 didn't already fold it into
 `fact_team_week`) and `app.*` serving views on top of Phase 1's `core`, once
 something is actually reading from DuckDB in production instead of `games.csv`.
 
