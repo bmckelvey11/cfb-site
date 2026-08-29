@@ -393,3 +393,61 @@ Forward collection, which can start immediately since the 2026 season is under w
 3. After one season, grade the \|edge\| > 2 bets at the line prevailing at capture time.
 
 That single number decides it. Nothing in the existing archive can.
+
+---
+
+## 9. The forward collector
+
+Built 2026-08-29 and **running** — `scripts/collect_line_timing.py`. It closes the §8
+blockers for games from here on. It cannot help the 2001–2025 archive; nothing can.
+
+### What was actually wrong
+
+The Action Network history endpoint *does* serve full-game line history. The existing
+scraper never asked for it: `actionnetwork_client.DEFAULT_PERIODS` is
+`("firsthalf", "firstquarter")`, on the reasoning that "full game lives in the scoreboard's
+embedded markets" — but those embedded markets are a **snapshot, not history**. So 10,868
+history files existed and not one carried a full-game price path.
+
+The full-game period is named **`event`**. `game`, the obvious guess, returns an empty
+payload, which is also why 9,129 of those files are `[]`.
+
+### The two halves have very different urgency
+
+| | What | Urgency |
+|---|---|---|
+| `snapshot` | PT's live `ncaapredictions.csv`, written as `ncaapredictions_{UTC}.csv` with a `captured_at` sidecar | **Time-critical.** PT overwrites in place and keeps no history — a week not captured is lost forever. |
+| `history` | AN full-game history per event → `history_event_{id}.json` | Not urgent. The endpoint replays the whole path, so one call any time before the odds come down gets everything. |
+
+That asymmetry is the design: only the PT snapshot has to run on a schedule.
+
+```bash
+python scripts/collect_line_timing.py snapshot                 # weekly, mid-week
+python scripts/collect_line_timing.py history --season 2026 --weeks 1-16
+```
+
+Snapshots are content-hashed against the previous one, so running it daily is harmless —
+it writes only when PT actually changes.
+
+### First run, verified
+
+- **PT snapshot**: `ncaapredictions_20260829T134307Z.csv`, 8 games, `captured_at`
+  `2026-08-29T13:43:07+00:00`. The live file carries the same column vocabulary as the
+  archive (`lineopen`, `line`, `road`, `home`, `linesag`, `linefpi`, …) in a different
+  order, which the union-by-name combiner already handles.
+- **AN history**: 99/99 week-1 events written, **all usable** — median 7 books, median 526
+  spread ticks per game, median 95 days of price path (max 148).
+
+That density is far more than the test needs: reconstructing the line at an arbitrary
+timestamp is a lookup, not an interpolation.
+
+### What still has to happen
+
+The collector produces inputs, not an answer. Once a season of snapshots exists:
+
+1. Join each snapshot's games to `game_id` (reuse `scripts/build_prediction_tracker.py`).
+2. For each game, read the AN price at that snapshot's `captured_at`.
+3. Re-grade the §7 `|edge| > 2` bets at that price.
+
+Only then does the +6.7% become either a number or a dead end. Until a full season is
+banked, treat §7 as an unreachable upper bound, per §8.

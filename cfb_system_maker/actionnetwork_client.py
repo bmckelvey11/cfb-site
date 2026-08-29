@@ -26,7 +26,15 @@ HISTORY_URL = "https://api.actionnetwork.com/web/v2/markets/event/{event_id}/his
 
 # Action Network periods. Full game lives in the scoreboard's embedded markets, so
 # the per-event history pull only needs the period markets that aren't embedded.
+#
+# CAVEAT: the scoreboard's embedded full-game markets are a SNAPSHOT, not history, so
+# this default means no full-game line history is ever written. The history endpoint
+# does serve it -- the full-game period is named "event" (not "game", which returns an
+# empty payload). `scripts/collect_line_timing.py` pulls that separately, into
+# history_event_{id}.json so it can't collide with the firsthalf/firstquarter files
+# this module writes. See docs/prediction-tracker-model-eval.md section 8.
 DEFAULT_PERIODS: tuple[str, ...] = ("firsthalf", "firstquarter")
+FULL_GAME_PERIOD = "event"
 
 # Cloudflare 403s urllib's default User-Agent; a browser UA is required.
 _USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
