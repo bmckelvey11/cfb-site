@@ -168,14 +168,14 @@ Do **not** grow this plan with more column prose. Next work, in order:
    there if columns change).
 3. **1-map one-pager** — amend `graphql-schema-draft.md` / entity map for DuckDB
    `raw`/`graphql` schema names (REST winners only; do not rewrite the whole draft).
-4. **Phase 1a** — load `dim_week` + `fact_game` (+ Type-1 dims as needed) → agreement
-   tests 1–3, 7 green on `has_line` rows vs `games.csv`.
-5. **Phase 1b** — unnest lines → `fact_game_line` → test 4.
-6. **Phase 1c** — `fact_game_team` → tests 5–6.
+4. **Phase 1a** — done — load `dim_week` + `fact_game` (+ Type-1 dims as needed) →
+   agreement tests 1–3, 7 green on `has_line` rows vs `games.csv`.
+5. **Phase 1b** — done — unnest lines → `fact_game_line` → test 4.
+6. **Phase 1c** — done — `fact_game_team` → tests 5–6.
 7. MotherDuck promote runbook only when something will read `md:cfb` in production.
 
-Skip 1b/1c until 1a matches. Skip `app.*`, coach/athlete dims, and any week-level
-team mart until those gates pass.
+Phase 1a–1c core gates are green. Skip `app.*`, coach/athlete dims, and any week-level
+team mart until a Phase 2+ consumer needs them.
 
 ### Locked punch-list forks
 
@@ -194,8 +194,9 @@ team mart until those gates pass.
 | — | `provider_key` | Canonical **lowercase**. |
 | — | Line numeric type | `DOUBLE`. |
 
-Still open (after 1a green): Type-2 affiliations, name-alias `ref`, MotherDuck promote
-owner, orphan `venue_orientation*`, FK policy for null GQL relations.
+Still open (after Phase 1 green): Type-2 affiliations, name-alias `ref`, MotherDuck
+promote owner, orphan `venue_orientation*`, FK policy for null GQL relations,
+agreement test 8 (rebuild identity / `meta.warehouse_version`).
 
 ## Cut or deferred, and why
 
@@ -250,8 +251,10 @@ New file: `tests/test_core_agreement.py` (do not overload `test_duckdb_load.py`)
 
 Minimum suite:
 
-1. **Coverage:** `COUNT(*)` `fact_game` where `has_line` = `COUNT(*)` `games.csv`. Symmetric
-   set-diff on `game_id`. Upcoming not in this set unless explicitly included.
+1. **Coverage:** `COUNT(*)` `fact_game` where `has_line` = `COUNT(*)` `games.csv` for
+   seasons present in the CSV. Symmetric set-diff on `game_id` within that season set.
+   Forward-season open books (scraped but not yet `build`'d into `games.csv`) may appear
+   on `has_line` outside that set — not a failure. Upcoming panel stays a separate stream.
 2. **Identity columns:** `season`, `week`, `season_type`, home/away names (or resolved
    ids), points, `provider`, `spread`, `total` — exact match to `GameRecord`.
 3. **Provider clone:** multi-book fixtures — SQL close equals `_select_line` /
@@ -289,8 +292,13 @@ promote exists, local `core.*` and cloud `raw`/`stg` can diverge.
 Runbook (write before Phase 2 Flask+MotherDuck):
 
 1. Rebuild local → verify `meta` / agreement tests.
-2. Attach `md:cfb` → replace named schemas (or whole DB) → verify table counts.
-3. Record `meta.warehouse_version` on both sides.
+2. `python scripts/promote_to_motherduck.py --dry-run` — lists every table/row-count
+   that would push, pushes nothing.
+3. `python scripts/promote_to_motherduck.py --yes` — attaches `md:cfb` (requires
+   `motherduck_token` / `MOTHERDUCK_TOKEN` env var, or an interactive login on first
+   use), CTAS-replaces each table per schema (`raw`, `graphql`, `stg`, `core`, `meta`
+   by default; `--schemas` to override), verifies row counts match, and stamps
+   `meta.warehouse_version` (git sha + `promoted_at`) on **both** local and `md:cfb`.
 4. Never use loader `--only` as "refresh one table" — it is a **destructive full-file
    replace**. Never assume `--explode-only` updates `meta.load_report`.
 
@@ -309,23 +317,25 @@ Write/amend the raw → core entity map for `team`, `conference`, `venue`, `game
 **`lines`**, and calendar/week. Cite `graphql-schema-draft.md` + `SCHEMA_AUDIT.md`.
 No `core` SQL until this exists.
 
-**Phase 1a — `dim_week` + `fact_game` (+ optional Type-1 dims).**
-- `core.dim_week` — `(season, week, season_type)`.
-- `core.fact_game` — grain `game_id`; `season_type`; `has_line` / `completed`; team ids
-  (and as-of conference ids); optional degenerate selected book for CSV agreement.
-- Optional: `dim_team` / `dim_conference` / `dim_venue` if FKs are wanted in the same
-  slice; venue is not on the critical path.
-- CTAS then `ALTER` PKs / needed uniques.
-- Verify: agreement tests 1–3, 7.
+**Phase 1a — done (2026-08-28).** `dim_week` + `fact_game` (+ Type-1 dims).
+- Loader: `cfb_system_maker/duckdb_core.py` → CLI `duckdb --core-only` (or `--core` after
+  a full rebuild). Preferred book default `consensus` (`--provider`).
+- Tables: `dim_week`, `dim_team`, `dim_conference`, `dim_venue`, `dim_lines_provider`,
+  `fact_game` (all REST games + `has_line`; selected close clones `_select_line` /
+  `_select_total`).
+- Verify: `tests/test_core_agreement.py` (1–3, 7); live gate is `@pytest.mark.slow`.
 
-**Phase 1b — unnest lines → `fact_game_line`.**
-- Dedicated stg/core step to unnest REST `lines[]` (arrays stay LIST today).
-- Grain `(game_id, provider_key)`; open/close columns; home-relative spread.
-- Verify: agreement test 4.
+**Phase 1b — done (2026-08-28).** Unnest lines → `fact_game_line`.
+- Dedicated unnest of REST `stg.lines.lines` LIST (arrays stay LIST after explode).
+- Grain `(game_id, provider_key)`; open/close columns; home-relative spread; null opens
+  fail-closed; `dim_lines_provider` expanded from full tape + selected keys.
+- Verify: agreement test 4 (+ live `@pytest.mark.slow` suite).
 
-**Phase 1c — `fact_game_team` (entering-game).**
-- Grain `(game_id, team_id)`; match `running_stats.py`; no lookahead.
-- Verify: agreement tests 5–6.
+**Phase 1c — done (2026-08-28).** `fact_game_team` (entering-game).
+- Grain `(game_id, team_id)`; load clones `running_stats.compute_running_stats` over
+  all `fact_game` rows (bowls inherit regular-season history; no week-grain reset).
+- Verify: agreement tests 5–6 (bowl lookahead tripwire; live skips D3 playoff rows that
+  chronologically precede a same-season "regular" twin).
 - **Defer** any week-level team mart.
 
 **Decided (2026-08-28): run alongside, not replace.** SQL `core` is a second
@@ -369,7 +379,7 @@ reason the `app` schema (deferred above) might stop being hypothetical.
 Locked items are in `## Recommended build order` and
 [`duckdb-core-ddl.md`](duckdb-core-ddl.md). Remaining before / during Phase 1 SQL:
 
-3. **Lines unnest:** new `stg`/core step (required); do not rely on `explode_payloads`.
+3. **Lines unnest:** done in Phase 1b (`_build_fact_game_line`).
 5. **Team natural key:** CFBD `id`; name→id via `dim_team.school` index; alias map when
    renames break names (not UNIQUE on school).
 6. **`dim_team` SCD:** Type-1 now (latest season collapse — see DDL doc); Type-2 via
@@ -378,7 +388,8 @@ Locked items are in `## Recommended build order` and
 9. **FK policy** when ids disagree or GraphQL relation is null — still open.
 10. **`season_type` on raw:** Phase 0 filename/payload; degenerate on every game fact.
 12. **Nullability:** spelled in DDL doc; revisit if load hits unexpected nulls.
-13. **Agreement tests** as a CI gate (`test_core_agreement.py`).
+13. **Agreement tests** as a CI gate (`test_core_agreement.py`) — 1–7 covered (1–3,7 in
+    1a; 4–6 in 1b/1c). Rebuild identity (test 8) still open.
 14. **MotherDuck promote** steps + `meta.warehouse_version`; who may replace `md:cfb`.
 15. **Name aliases / `ref`:** warehouse is id-keyed; add alias table only when needed.
 16. **Orphan `stg.venue_orientation*`:** out of rebuild scope or register a source —
