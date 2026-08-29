@@ -290,6 +290,34 @@ frozen at 1/k, and CSR at k = 1 averages many single-regressor corrections, whic
 like equal weighting than like a joint fit. That is a hypothesis, not a result.
 `scripts/diag_weight_concentration.py`.
 
+**The betting objective, tested directly and pre-registered.** Everything above measures
+squared error; a bet is decided by sign against a threshold. Pre-registered in
+`docs/prereg-ats-tail-test.md` and committed before running: grade all 12,803 walk-forward
+predictions as ATS bets against the closing line, bucket by how far the consensus disagrees with
+the market, and ask whether any bucket clears the -110 breakeven of 52.38%.
+
+| bucket \|edge\| | n | win rate | vs breakeven | p (Holm) | ROI at -110 |
+|---|---|---|---|---|---|
+| [0,1) | 11,186 | 50.25% | -2.13% | 0.013 | -4.07% |
+| [1,2) | 1,334 | 50.60% | -1.78% | 0.175 | -3.40% |
+| [2,3) | 32 | — | — | — | too few to grade |
+| [3,5) | 8 | — | — | — | too few to grade |
+| [5,inf) | 0 | — | — | — | — |
+
+Overall **50.31% on 12,560 graded bets**, which is -2.07% against breakeven [-3.29, -0.91],
+p = 0.0020 — significantly *below* the vig, not merely short of it.
+
+**The tail the hypothesis needed does not exist.** Median disagreement with the closing line is
+0.42 points, the 99th percentile is 1.68, and 89.1% of games fall inside a single point. Only
+0.31% exceed two points. "Bet when the model disagrees strongly" fails before the statistics do,
+because a method that tracks the closing line to within a point almost never disagrees strongly.
+That is a structural fact about the panel, not a power problem.
+
+Per the pre-registration's stopping rule this was one run: no re-bucketing, no switching to
+opening lines, no post-hoc filters. The secondary E14 comparison was not run — per-game subset
+regression predictions are not persisted and it would need a sweep re-run; it was never
+decisive. `scripts/eval_ats_tail.py`.
+
 **Methodological questions the results raised**, written up as a second research prompt in
 `research-prompt-open-questions.md`: selection-adjusted inference with no confirmation window;
 why CSR survived where every shrinkage estimator collapsed; whether the 1-SE rule is
