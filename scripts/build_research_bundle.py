@@ -199,8 +199,10 @@ def main():
                    "needed to judge the analysis is in this file; no repo access required.",
             "read_this_first": [
                 "Loss is MSE in points-squared. NEGATIVE d_vs_r0 = BETTER than the benchmark.",
-                "Every number here is POST-FIX. Eight specification defects were found during "
-                "the analysis (see defects_found); all headline numbers were recomputed.",
+                "Every number here is POST-FIX. Eight defects were found during "
+                "the analysis -- SEVEN implementation bugs and ONE pre-registration violation (the "
+                "last entry in defects_found, caught by a reviewer rather than by me). All "
+                "headline numbers were recomputed.",
                 "Two benchmarks are reported separately and the answer differs completely "
                 "between them. This IS the main finding.",
                 "The bootstrap p-value floor is 1/2000 = 0.0005. A reported p of 0.000 means "

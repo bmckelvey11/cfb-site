@@ -124,6 +124,13 @@ outranked all of them.
 Every one of these was found during the analysis and is recorded rather than quietly fixed. Two
 would have invalidated headline numbers.
 
+**Seven are implementation defects; one is not.** Defects 1-7 are bugs, caught by my own tests
+and magnitude checks. Defect 8 is a *pre-registration violation* — I narrowed a selection family
+after seeing which members looked weak, against a threshold I had committed to in advance — and
+it was caught by an outside reviewer, not by me. That distinction matters more than the count,
+because §0 of the plan argues pre-registration was load-bearing, and this is precisely the class
+of error it exists to prevent. It did not prevent it; the record did.
+
 | # | Defect | Consequence had it stood |
 |---|---|---|
 | 1 | **Clark-West sign** — spreads passed to a function taking margins | An absurd +23 adjusted mean where the correct value is +0.45. Caught by magnitude alone. |
