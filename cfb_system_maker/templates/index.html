@@ -132,9 +132,9 @@
               <div class="filter-fallback" data-fallback-for="core:spread_range">
                 <label>Spread Between</label>
                 <div class="range-row">
-                  <input name="min_spread" value="{{ form.min_spread }}" type="number" step="0.5" placeholder="-60">
+                  <input name="min_spread" value="{{ form.min_spread }}" type="number" step="0.5" placeholder="-60" aria-label="Spread minimum">
                   <span>and</span>
-                  <input name="max_spread" value="{{ form.max_spread }}" type="number" step="0.5" placeholder="60">
+                  <input name="max_spread" value="{{ form.max_spread }}" type="number" step="0.5" placeholder="60" aria-label="Spread maximum">
                 </div>
               </div>
             </div>
@@ -150,9 +150,9 @@
               <div class="filter-fallback" data-fallback-for="core:total_range">
                 <label>Total Between</label>
                 <div class="range-row">
-                  <input name="min_total" value="{{ form.min_total }}" type="number" step="0.5" placeholder="20">
+                  <input name="min_total" value="{{ form.min_total }}" type="number" step="0.5" placeholder="20" aria-label="Total minimum">
                   <span>and</span>
-                  <input name="max_total" value="{{ form.max_total }}" type="number" step="0.5" placeholder="90">
+                  <input name="max_total" value="{{ form.max_total }}" type="number" step="0.5" placeholder="90" aria-label="Total maximum">
                 </div>
               </div>
             </div>
