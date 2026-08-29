@@ -426,8 +426,32 @@ python scripts/collect_line_timing.py snapshot                 # weekly, mid-wee
 python scripts/collect_line_timing.py history --season 2026 --weeks 1-16
 ```
 
-Snapshots are content-hashed against the previous one, so running it daily is harmless —
+Snapshots are content-hashed against the previous one, so running it often is harmless —
 it writes only when PT actually changes.
+
+### Scheduled, and running
+
+Registered on Windows Task Scheduler 2026-08-29 via `scripts/collect_line_timing.cmd`,
+which wraps the Python entry point and appends every run to
+`{CFB_DATA_ROOT}/logs/line_timing.log` — a silent failure in October is only discoverable
+if there is a log to read.
+
+| Task | Schedule | Why |
+|---|---|---|
+| `CFB-PT-Snapshot` | every **6 hours** | PT posts games progressively through the week and overwrites in place. Frequent capture pins `captured_at` to within six hours of publication, and the content hash means nothing is stored unless PT actually changed. |
+| `CFB-AN-History` | **Mondays 09:00** | Backfills the week just played. Not urgent — one call replays the whole price path. |
+
+Verified: snapshot task ran on demand with `Last Result: 0`.
+
+**Two limitations worth knowing.**
+
+1. **The tasks run only while the user is logged on.** Running them otherwise means storing
+   account credentials in the task definition, which was deliberately not done. On a machine
+   that is powered off for a weekend, that weekend's PT updates are lost — the one failure
+   mode that cannot be repaired later.
+2. `--season` defaults to the calendar year, which is correct from August to December and
+   **wrong in January**, when bowl games still belong to the prior season. Run the January
+   backfill by hand: `collect_line_timing.cmd history --season 2026 --weeks 1-16`.
 
 ### First run, verified
 
