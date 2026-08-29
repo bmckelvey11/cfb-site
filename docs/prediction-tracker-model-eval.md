@@ -12,9 +12,18 @@ All inference is a wild cluster bootstrap at season level (25 clusters).
 
 ## Headline
 
+> **CORRECTION, 2026-08-29.** `lineca` and `linemidweek` are **not computer models** — they
+> are market lines reprinted inside the panel. `lineca` reproduces the closing line
+> *exactly* on 65.6% of its games. Every claim below that rests on `lineca` being the best
+> model is a tautology and is retracted; see **§10**. The main conclusion — no model and no
+> combination beats the closing line — is unaffected and if anything strengthened, since the
+> one column that "tied" the market was the market. Statements about the panel as a whole
+> survive the removal of both columns (§10).
+
 **No computer model beats the closing line, and neither does any combination of all 154 of
 them.** The best single model, `lineca`, is statistically tied with the market
-(ΔMSE +0.197, BH q = 0.066). The pre-registered ensemble is also tied (ΔMSE −0.191,
+(ΔMSE +0.197, BH q = 0.066) — **but see the correction above: `lineca` is a market line, so
+this is not a statement about forecasting skill.** The pre-registered ensemble is also tied (ΔMSE −0.191,
 95% CI [−0.598, +0.230], p = 0.34; −0.248 [−0.517, +0.002], p = 0.063 once the line's own
 recalibration is netted out — see §3).
 
@@ -63,8 +72,11 @@ Worst of the well-covered models: `linesportrends` (+100.2), `linesuper` (+97.4)
 `lineloud` (+92.4), `lineclean` (+82.8) — RMSE 18.1–18.5 against a market at 15.6. These
 are not marginal; including them is what sinks naive averaging (§3).
 
-**`lineca` is the standout.** 21 seasons, 15,007 games, the only model that ties the closing
-line and the only one that clearly beats the opening line. `linemidweek` is second on both.
+**`lineca` is the standout** — and §10 explains why, which is not to its credit. 21 seasons,
+15,007 games, the only column that ties the closing line and the only one that clearly beats
+the opening line. `linemidweek` is second on both. **Both are market lines, not models.** A
+column that reproduces the closing number is trivially tied with the closing number and
+trivially beats the opening one.
 
 ### Accuracy and volatility are the same ranking
 
@@ -98,7 +110,8 @@ answer is the same model. SD of a model's own season-level skill, models with �
 | linepugh | 15 | +27.52 | 3.99 | +36.30 | +23.28 |
 
 `lineca` is five times steadier than the next model and its *worst* season is +1.04 — it has
-never been meaningfully worse than the closing line in 21 years. Full table:
+never been meaningfully worse than the closing line in 21 years. **That is what a reprinted
+closing line looks like, not what a good forecaster looks like (§10).** Full table:
 `pt_model_season_stability.csv` (69 models).
 
 ---
@@ -232,9 +245,15 @@ selected and then reported as a finding.
   (n = 14,347): opening line 15.7222 → ensemble 15.6359, against a closing line at 15.5508.
   **The ensemble recovers 50.4% of the market's own open-to-close move.** That is the
   sharpest single statement of what the 154 models collectively contain: about half of what
-  the market itself learns between opening and closing. `lineca` alone is worth 5.1 MSE.
-- **If you want one model rather than a blend,** `lineca` is the only defensible pick.
+  the market itself learns between opening and closing. The panel-level version of this
+  claim survives dropping the market-like columns (§10), at roughly 73% of the effect.
+- **~~If you want one model rather than a blend, `lineca` is the only defensible pick.~~**
+  **Retracted.** `lineca` is a reprinted market line (§10). Taking it as a forecast means
+  betting the closing line into the closing line. There is **no** single column in this
+  panel that beats the closing line on its own merits.
 - **Do not average all the models.** It is 9.3 MSE worse than doing nothing.
+- **Drop `lineca` and `linemidweek` before using this panel for anything.** They will
+  dominate any skill screen and contribute nothing a market feed does not already give you.
 
 Outputs under `{CFB_DATA_ROOT}/processed/`: `pt_leaderboard_{opening,closing}.csv`,
 `pt_ensemble_spread_{opening,closing}.csv` (per-game ensemble spread and its edge vs the
@@ -475,3 +494,71 @@ The collector produces inputs, not an answer. Once a season of snapshots exists:
 
 Only then does the +6.7% become either a number or a dead end. Until a full season is
 banked, treat §7 as an unreachable upper bound, per §8.
+
+---
+## 10. Correction: two panel columns are market lines, not models
+
+Added 2026-08-29, from `scripts/diag_market_proxy.py`, run as a robustness check on the
+combination sweep (`docs/prediction-tracker-combination-sweep.md`).
+
+The check asks a question this analysis never asked: **is every column in the panel actually
+a forecast?** Prediction Tracker's `line*` naming is just its convention, and the build
+already excludes the obvious market columns (`line`, `lineopen`, `lineavg`, `linemedian`,
+`linestd`). But it does not test the remaining 154 for market content.
+
+Two of them fail badly.
+
+| column | n | matches the close **exactly** | RMSE vs close | corr(dev from open, open→close move) |
+|---|---|---|---|---|
+| **`lineca`** | 15,003 | **65.6%** | **0.501** | **0.979** |
+| **`linemidweek`** | 9,735 | **43.3%** | 1.447 | 0.835 |
+| `linethocal` | 1,477 | 4.1% | 1.537 | 0.743 |
+| *median of 143 columns* | — | ~0% | **6.20** | 0.188 |
+
+A forecasting model does not reproduce a sportsbook number to the half-point on two thirds
+of its games. `lineca` is a market line. `linemidweek`, which says so in its name, is a
+midweek line. Neither belongs in a model leaderboard.
+
+**This is the coverage-difficulty confound's sibling, and the plan did not anticipate it.**
+Plan §8 listed four threats and handled each; "a column in the panel is the benchmark under
+another name" was not among them. The pre-registered leaderboard's winner was a market feed.
+
+### What it invalidates
+
+Everything in §1 that treats `lineca` as the best model, and §5's single-model
+recommendation. Those are retracted above. `lineca` sitting at ΔMSE +0.197 against the
+closing line and −5.089 against the opening line is arithmetic, not skill: a column that
+*is* roughly the closing line must tie the closing line and must beat the opening line by
+about the size of the open-to-close move.
+
+Its "five times steadier than the next model" stability is the same artifact.
+
+### What survives
+
+The panel-level results, attenuated but intact. Dropping the 15 most market-like columns
+(top decile by the movement correlation, which includes both offenders):
+
+| | all 154 | minus 15 | retained |
+|---|---|---|---|
+| E4 vs R0, opening | −1.976 [−3.314, −0.648] p=0.0030 | −1.446 [−2.804, −0.043] p=0.0415 | 73% |
+| E6 vs R0, opening | −2.383 [−3.834, −0.863] p=0.0020 | −1.713 [−3.254, −0.188] p=0.0355 | 72% |
+| Harvey–Newbold Wald, opening | 70.10, p<0.0001 | 29.09, p=0.0115 | still rejects |
+
+So roughly a quarter of the opening-line effect was market content leaking in, and about
+three quarters is genuine model information. The claim "the panel beats the opening line"
+holds; the claim "by 2.4 MSE" becomes "by about 1.7 MSE among actual forecasters."
+
+**The closing-line null is unaffected in direction.** Market proxying can only push a test
+*toward* rejecting, and the closing-line tests did not reject (Harvey–Newbold Wald 5.44,
+p = 0.56). Removing proxies cannot create an edge that was not there.
+
+### Two smaller checks run at the same time
+
+- **Zero-fill exposure.** The sweep's residual design zero-fills absent models before
+  projecting. If a game had *no* screened model, that would produce a spurious correction
+  proportional to the market number. Actual count: **0 of 14,347 rows (opening) and 0 of
+  14,353 (closing).** Non-issue.
+- **Harvey–Newbold without the full-sample components.** The encompassing test mixes a
+  walk-forward target with full-sample PCs. Dropping the PCs entirely: opening Wald 41.92
+  (p < 0.0001), closing 2.48 (p = 0.3475). Same verdict both benchmarks — the result is
+  consensus-driven and the PCA never mattered.
