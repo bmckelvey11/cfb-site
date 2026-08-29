@@ -261,6 +261,35 @@ bootstrap's floor, so the honest statement is *"below 1/2000 before and after wi
 correction"*, not a six-decimal number -- and AKM's real bite is on the point estimate anyway.
 Report the effect as a range of roughly **-1.88 to -2.61**.
 
+**A proposed diagnostic, tested and falsified.** A reviewer proposed the inverse Herfindahl of
+each method's fitted weights, `N_eff = 1/sum(w_i^2)`, as a *contamination-blind* fragility
+measure — the appeal being that it would have predicted the 73%-vs-27% retention split above
+without any contamination measure at all. It does not work, and the way it fails is worth more
+than the proposal was.
+
+| method | N_eff (opening) | retention | high by construction? |
+|---|---|---|---|
+| E11 trimmed consensus | 31.4 | 75% | yes |
+| E4 consensus | 20.0 | 73% | yes |
+| **E6 ridge** | **15.5** | **27%** | no |
+| **E14 subset regression** | **6.1** | **49%** | no |
+
+Ridge never concentrates — 15.5 on opening, 27.4 on closing, against a predicted 1–3. Worse,
+among the two methods whose score is *not* true by construction the ordering is **exactly
+backwards**: CSR is the most concentrated method in the panel and retains nearly twice what the
+more diffuse ridge does. The across-λ test shows why: on identical columns ridge's `N_eff` rises
+monotonically with the penalty (11.0 → 15.5), and λ = 10000 — the most conservative grid point —
+was selected in all 20 seasons on both benchmarks. The fitted ridge sits at its *least*
+concentrated setting while being the *most* contaminated.
+
+So the 73/27 split is not a concentration phenomenon. A diffuse combination of 40 partially
+anchored columns reconstructs the benchmark as well as one clone would, and no concentration
+measure can see that. The live conjecture is that what matters is whether weights are **fitted to
+the target at all** — equal weighting cannot reconstruct the benchmark because its weights are
+frozen at 1/k, and CSR at k = 1 averages many single-regressor corrections, which behaves more
+like equal weighting than like a joint fit. That is a hypothesis, not a result.
+`scripts/diag_weight_concentration.py`.
+
 **Methodological questions the results raised**, written up as a second research prompt in
 `research-prompt-open-questions.md`: selection-adjusted inference with no confirmation window;
 why CSR survived where every shrinkage estimator collapsed; whether the 1-SE rule is

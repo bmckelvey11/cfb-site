@@ -378,21 +378,66 @@ def main():
                                                       "Not yet tested which is better.",
             "script": "scripts/diag_eligibility_tenure.py",
         },
-        "untested_prediction_Neff": {
-            "claim": "A reviewer proposes the inverse Herfindahl of a method's own fitted "
+        "Neff_diagnostic_TESTED_AND_FALSIFIED": {
+            "claim": "A reviewer proposed the inverse Herfindahl of a method's own fitted "
                      "weights, N_eff = 1 / sum(w_i^2), as a CONTAMINATION-BLIND fragility "
                      "diagnostic: equal-weight top-20 has N_eff = 20 by construction, while "
                      "ridge/elastic-net should collapse toward 1-3 when one predictor's "
                      "marginal correlation dominates -- which is what a benchmark clone "
-                     "produces. It needs no contamination measure, only training-window "
-                     "weights, and flags fragility to ANY single column.",
-            "why_it_matters": "If true it would have predicted the 73%-vs-27% retention split "
-                              "in market_contamination BEFORE that split was measured.",
-            "status": "NOT TESTED. The sweep persists only the outer scalar gamma per method "
-                      "per season, not per-model ridge coefficients, so testing it needs a "
-                      "re-run with weight capture. Reported here as an open prediction, not a "
-                      "result. It is falsifiable: if ridge N_eff is NOT collapsed relative to "
-                      "the eligible-column count, the proposed mechanism is wrong.",
+                     "produces. If true it would have predicted the 73%-vs-27% retention "
+                     "split BEFORE that split was measured.",
+            "status": "TESTED. It does not work. scripts/diag_weight_concentration.py",
+            "method": "Replayed the outer fits using the hyperparameters the sweep had "
+                      "already selected and persisted. Weights normalised by absolute sum "
+                      "(ridge coefficients are signed, so raw weights are not comparable to "
+                      "1/k).",
+            "result_opening": [
+                {"method": "E11", "n_eff": 31.4, "retention": 0.75, "by_construction": True},
+                {"method": "E4", "n_eff": 20.0, "retention": 0.73, "by_construction": True},
+                {"method": "E6", "n_eff": 15.5, "retention": 0.27, "by_construction": False},
+                {"method": "E14", "n_eff": 6.1, "retention": 0.49, "by_construction": False},
+            ],
+            "why_it_fails": [
+                "PREDICTION 1 FAILS ON MAGNITUDE. Ridge N_eff is 15.5 on opening and 27.4 on "
+                "closing, not 1-3. It never concentrates.",
+                "PREDICTION 2 FAILS ON ORDER, and this is the decisive one. Among the two "
+                "methods whose N_eff is NOT true by construction, the ranking is exactly "
+                "BACKWARDS: CSR has the lowest concentration of any method (6.1) and the "
+                "BETTER retention (49%), while ridge is more diffuse (15.5) and retains "
+                "least (27%). If concentration drove contamination exposure this would be "
+                "reversed.",
+                "THE ACROSS-LAMBDA TEST EXPLAINS WHY. On identical columns, ridge N_eff rises "
+                "monotonically with the penalty (11.0 -> 15.5 opening, 20.0 -> 27.4 closing). "
+                "Heavy L2 pulls coefficients toward each other, spreading weight rather than "
+                "concentrating it. Ridge selected lambda=10000, the most conservative grid "
+                "point, in all 20 seasons on both benchmarks -- so the fitted ridge sits at "
+                "its LEAST concentrated setting while being the MOST contaminated.",
+            ],
+            "what_this_implies": "The 73/27 split is not a concentration phenomenon, so the "
+                                 "mechanism proposed for it is wrong. A diffuse combination "
+                                 "of 40 partially market-anchored columns reconstructs the "
+                                 "benchmark just as well as one clone would, and no "
+                                 "concentration measure can see that. The distinguishing "
+                                 "feature appears to be whether weights are FITTED TO THE "
+                                 "TARGET at all, not how concentrated they are: equal "
+                                 "weighting cannot reconstruct the benchmark because its "
+                                 "weights are fixed at 1/k, and CSR at k=1 averages many "
+                                 "single-regressor corrections, which behaves closer to "
+                                 "equal weighting than to a joint fit. UNTESTED conjecture, "
+                                 "offered as the next hypothesis rather than a finding.",
+            "note_on_the_tautology": "That E4/E7/E10/E11 score high is not evidence for the "
+                                     "diagnostic -- they are equal-weighting schemes, so "
+                                     "N_eff = k by definition. Only the non-construction "
+                                     "methods carry information, which is why the reversed "
+                                     "ordering between E6 and E14 is the whole result.",
+            "consistency_check": "N_eff comes back undefined for exactly E8 and E12 on the "
+                                 "closing line -- the two methods the sweep independently "
+                                 "flagged degenerate there (selected psi=0 and an "
+                                 "all-zero elastic net). Two separate code paths agreeing.",
+            "not_computed": "No correlation coefficient on 4 points, and E9 is excluded: "
+                            "mapping PCA loadings back gives a model-space vector whose "
+                            "concentration reflects the eigenstructure of the deviation "
+                            "matrix, not a weighting decision.",
         },
         "defects_found": [{"defect": a, "detail": b, "consequence": c} for a, b, c in DEFECTS],
         "preregistration_scorecard": {
