@@ -375,11 +375,11 @@
           {% endif %}
 
           <div class="form-actions">
-            <button type="submit">Run System</button>
+            <button type="submit">Run system</button>
             <label class="save-inline">Save as
               <input name="save_name" value="{{ form.save_name }}" placeholder="my-system">
             </label>
-            <button type="submit" formaction="{{ url_for('save') }}" formmethod="post">Save System</button>
+            <button type="submit" formaction="{{ url_for('save') }}" formmethod="post">Save system</button>
           </div>
         </form>
 
@@ -395,7 +395,7 @@
             {% endfor %}
           </select>
           {% else %}
-          <p class="no-saved-systems">No saved systems yet. Configure filters and click Save System.</p>
+          <p class="no-saved-systems">No saved systems yet. Configure filters and click Save system.</p>
           {% endif %}
           <p class="compare-link"><a href="{{ url_for('compare') }}">Compare saved systems &rarr;</a></p>
         </section>
@@ -421,7 +421,8 @@
           {% endif %}
 
           <section class="metrics stat-chips" aria-label="Backtest metrics">
-            <article><span>Record</span><strong>{{ result.wins }}-{{ result.losses }}-{{ result.pushes }}, {{ "%.1f"|format(result.hit_rate * 100) }}%</strong></article>
+            <article><span>Record</span><strong>{{ result.wins }}-{{ result.losses }}-{{ result.pushes }}</strong></article>
+            <article><span>Hit Rate</span><strong>{{ "%.1f%%"|format(result.hit_rate * 100) }}</strong></article>
             <article><span>Margin</span><strong class="{{ 'positive' if result.average_margin and result.average_margin > 0 else 'negative' if result.average_margin and result.average_margin < 0 else '' }}">{% if result.average_margin is not none %}{{ "%.1f"|format(result.average_margin) }}{% else %}&mdash;{% endif %}</strong></article>
             <article><span>Money Won</span><strong class="{{ 'positive' if result.profit > 0 else 'negative' if result.profit < 0 else '' }}">{{ money(result.profit) }}</strong></article>
             <article><span>ROI</span><strong class="{{ 'positive' if result.roi > 0 else 'negative' if result.roi < 0 else '' }}">{{ "%.2f%%"|format(result.roi * 100) }}</strong></article>
@@ -644,7 +645,7 @@
               <button type="button" id="filter-modal-view-chart" data-view="chart" aria-pressed="true">Chart</button>
               <button type="button" id="filter-modal-view-list" data-view="list" aria-pressed="false">List</button>
             </div>
-            <button type="button" id="filter-modal-clear" class="filter-modal__clear" hidden>Clear Filter</button>
+            <button type="button" id="filter-modal-clear" class="filter-modal__clear" hidden>Clear filter</button>
             <button type="button" id="filter-modal-max-roi" class="filter-modal__max-roi" hidden>Max ROI</button>
           </div>
           <p id="filter-modal-status" class="filter-modal__status" aria-live="polite"></p>
@@ -663,7 +664,7 @@
         </div>
         <footer class="filter-modal__footer">
           <button type="button" class="filter-modal__cancel" id="filter-modal-cancel">Cancel</button>
-          <button type="button" class="filter-modal__save" id="filter-modal-save">Save Filter</button>
+          <button type="button" class="filter-modal__save" id="filter-modal-save">Save filter</button>
         </footer>
       </form>
     </dialog>

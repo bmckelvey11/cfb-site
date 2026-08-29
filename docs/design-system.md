@@ -247,11 +247,12 @@ Behavior is entirely unchanged; the restyle adds no new interactions. For comple
 
 ## Template changes required
 
-The restyle is class-compatible, but four things in the Jinja templates need touching:
+The handoff listed four. All four are now closed — kept here with their outcomes so the
+next reader does not redo them:
 
-1. **`templates/index.html` and `dashboard.html` — split the Record chip.** The template currently renders `{{ wins }}-{{ losses }}-{{ pushes }}, {{ hit_rate }}%` into one chip. That string is too wide and wrapped to four lines. Split it into two chips: Record (`W-L-P`) and Hit Rate (`NN.N%`).
-2. **CTA casing.** Button labels are sentence case in the restyle ("Run system", "Save system", "Apply filters"), matching the design system's writing rules. The old templates use Title Case in places; normalize them.
-3. **Add `.system-cell` / `.actions-cell` classes** where they are missing on the systems table, so the `white-space: normal` override lands on the right cells.
+1. ~~Split the Record chip.~~ **Done** in `templates/index.html` — Record (`W-L-P`) and Hit Rate (`NN.N%`) are separate chips, six in the row. `dashboard.html` needed no change: its Record is a table column, not a chip, and `2155-2009-47, 51.7%` fits the column fine.
+2. ~~CTA casing.~~ **Done** — Run system, Save system, Save filter, Clear filter, New system. Screen names stay Title Case where they are the name of a screen rather than an action: My Systems, Bet Log, System Editor, Copy to My Systems.
+3. ~~Add `.system-cell` / `.actions-cell` classes.~~ **Already present** — `dashboard.html` carries both (plus `.actions-cell--copy` on the examples tab), and every cell in the row computes to `white-space: normal`. The finalist table needs no per-cell class: `.finalist-table tbody td` covers all of it.
 4. ~~Delete `static/styles.css` and replace it with `screens/cfb.css` renamed.~~ **Done** — the `url_for('static', filename='styles.css')` links are unchanged; the old stylesheet is recoverable at commit `2115c21`.
 
 ## Assets

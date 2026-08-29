@@ -216,15 +216,17 @@ def test_web_index_loads_filters_and_default_results(tmp_path):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "CFB System Maker" in html
-    assert "Run System" in html
+    assert "Run system" in html
     assert "Michigan" in html
 
     expected = run_backtest(games, SystemFilter(side="home"))
     expected_grade = compute_grade(expected, SystemFilter(side="home"))
     metrics_html = _metrics_section(html)
-    assert metrics_html.count("<article>") == 5
-    assert _chip_labels(metrics_html) == ["Record", "Margin", "Money Won", "ROI", "Grade"]
-    assert f"{expected.wins}-{expected.losses}-{expected.pushes}, {expected.hit_rate * 100:.1f}%" in metrics_html
+    # Record and Hit Rate are separate chips; the combined string overflowed one.
+    assert metrics_html.count("<article>") == 6
+    assert _chip_labels(metrics_html) == ["Record", "Hit Rate", "Margin", "Money Won", "ROI", "Grade"]
+    assert f"{expected.wins}-{expected.losses}-{expected.pushes}" in metrics_html
+    assert f"{expected.hit_rate * 100:.1f}%" in metrics_html
     assert _money_won_text(expected.profit) in metrics_html
     assert f"<span>Grade</span><strong>{expected_grade}</strong>" in metrics_html
 
@@ -245,7 +247,8 @@ def test_web_filters_apply_to_results(tmp_path):
     expected = run_backtest(games, SystemFilter(side="away", underdog=True, min_spread=3))
     assert expected.profit < 0  # sanity: this filter set is a losing sample
     metrics_html = _metrics_section(html)
-    assert f"{expected.wins}-{expected.losses}-{expected.pushes}, {expected.hit_rate * 100:.1f}%" in metrics_html
+    assert f"{expected.wins}-{expected.losses}-{expected.pushes}" in metrics_html
+    assert f"{expected.hit_rate * 100:.1f}%" in metrics_html
     assert _money_won_text(expected.profit) in metrics_html
     assert '<strong class="negative">' + _money_won_text(expected.profit) + "</strong>" in metrics_html
 
@@ -289,7 +292,8 @@ def test_web_malformed_choice_params_fall_back_to_defaults_instead_of_500(tmp_pa
     assert response.status_code == 200
     expected = run_backtest(games, SystemFilter(side="home"))
     metrics_html = _metrics_section(response.get_data(as_text=True))
-    assert f"{expected.wins}-{expected.losses}-{expected.pushes}, {expected.hit_rate * 100:.1f}%" in metrics_html
+    assert f"{expected.wins}-{expected.losses}-{expected.pushes}" in metrics_html
+    assert f"{expected.hit_rate * 100:.1f}%" in metrics_html
 
 
 def test_web_unparseable_min_spread_shows_warning_banner(tmp_path):
@@ -307,7 +311,8 @@ def test_web_unparseable_min_spread_shows_warning_banner(tmp_path):
     # visibility, it doesn't change what gets applied.
     expected = run_backtest(games, SystemFilter(side="home"))
     metrics_html = _metrics_section(html)
-    assert f"{expected.wins}-{expected.losses}-{expected.pushes}, {expected.hit_rate * 100:.1f}%" in metrics_html
+    assert f"{expected.wins}-{expected.losses}-{expected.pushes}" in metrics_html
+    assert f"{expected.hit_rate * 100:.1f}%" in metrics_html
 
 
 def test_web_valid_params_show_no_warning_banner(tmp_path):
@@ -1172,7 +1177,7 @@ def test_editor_is_served_at_system(tmp_path):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert 'id="filters-form"' in html
-    assert "Run System" in html
+    assert "Run system" in html
 
 
 def test_dashboard_loads_no_javascript(tmp_path):

@@ -177,7 +177,7 @@ def test_index_has_season_dialog_launcher_markup(tmp_path):
     html = app.test_client().get("/system").get_data(as_text=True)
     assert 'id="filter-modal"' in html
     assert 'data-candidate-id="core:season"' in html
-    assert "Save Filter" in html
+    assert "Save filter" in html
     assert "Cancel" in html
     assert "About Filter" in html
     assert 'aria-labelledby="filter-modal-title"' in html
