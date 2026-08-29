@@ -15,7 +15,8 @@ All inference is a wild cluster bootstrap at season level (25 clusters).
 **No computer model beats the closing line, and neither does any combination of all 154 of
 them.** The best single model, `lineca`, is statistically tied with the market
 (ΔMSE +0.197, BH q = 0.066). The pre-registered ensemble is also tied (ΔMSE −0.191,
-95% CI [−0.605, +0.246], p = 0.36).
+95% CI [−0.598, +0.230], p = 0.34; −0.248 [−0.517, +0.002], p = 0.063 once the line's own
+recalibration is netted out — see §3).
 
 This is a **tight null, not an underpowered one.** The CI rules out any improvement larger
 than 0.656 MSE — about **0.021 RMSE**, a 0.13% gain — against a design that could have
@@ -29,7 +30,8 @@ to close is what absorbs the models' information.
 |---|---|---|
 | Benchmark RMSE | 15.770 | 15.617 |
 | Models beating it (BH q<0.05) | **1** — `lineca` | **0** |
-| Ensemble ΔMSE | **−2.64** [−4.33, −0.83], p<0.001 | −0.19 [−0.61, +0.25], p=0.36 |
+| Ensemble ΔMSE | **−2.64** [−4.39, −0.89], p<0.001 | −0.19 [−0.60, +0.25], p=0.34 |
+| Is it the models, or a mis-scaled line? | models (recalibration alone: −0.04, p=0.83) | models (recalibration alone: +0.06, p=0.66) |
 | Weight the fit puts on the model consensus | **0.53 – 0.64** | 0.18 – 0.23 |
 
 ---
@@ -84,6 +86,21 @@ Mean Spearman correlation of model skill rank between consecutive seasons: **0.7
 season pairs (range 0.19–0.96). Last year's good models are usually this year's — which is
 what makes the walk-forward screen in §3 work at all.
 
+If "least volatile" means *consistent year to year* rather than *tight error spread*, the
+answer is the same model. SD of a model's own season-level skill, models with ≥5 seasons:
+
+| Model | Seasons | Mean skill | **SD across seasons** | Worst season | Best season |
+|---|---|---|---|---|---|
+| **lineca** | 21 | +0.17 | **0.50** | +1.04 | −0.50 |
+| lineatom | 13 | +11.43 | 2.53 | +15.41 | +5.07 |
+| linemidweek | 13 | +2.00 | 2.86 | +11.01 | −0.08 |
+| lineharville | 8 | +17.47 | 3.33 | +21.99 | +12.85 |
+| linepugh | 15 | +27.52 | 3.99 | +36.30 | +23.28 |
+
+`lineca` is five times steadier than the next model and its *worst* season is +1.04 — it has
+never been meaningfully worse than the closing line in 21 years. Full table:
+`pt_model_season_stability.csv` (69 models).
+
 ---
 
 ## 2. The market benchmark, and why the timing matters
@@ -114,11 +131,12 @@ confound from §1).
 | | Rule | RMSE | ΔMSE vs close | 95% CI | p |
 |---|---|---|---|---|---|
 | — | **closing line** | **15.5010** | — | — | — |
-| E1 | mean of all available models | 15.7990 | +9.33 | [+8.03, +10.60] | <0.001 |
-| E2 | median of available models | 15.7632 | +8.20 | [+7.04, +9.31] | <0.001 |
-| E3 | mean of top-20 by prior skill | 15.6244 | +3.84 | [+2.60, +5.03] | <0.001 |
-| **E4** | **market + 2-param consensus tilt** | **15.4948** | **−0.19** | **[−0.61, +0.25]** | **0.36** |
-| E5 | ridge on the season's active set | 15.5051 | +0.13 | [−0.49, +0.77] | 0.67 |
+| E1 | mean of all available models | 15.7990 | +9.33 | [+8.02, +10.53] | <0.001 |
+| E2 | median of available models | 15.7632 | +8.20 | [+6.96, +9.39] | <0.001 |
+| E3 | mean of top-20 by prior skill | 15.6244 | +3.84 | [+2.62, +4.98] | <0.001 |
+| R0 | **recalibration only** — `β₀ + β₁·market`, no models | 15.5028 | +0.06 | [−0.18, +0.33] | 0.66 |
+| **E4** | **market + 2-param consensus tilt** | **15.4948** | **−0.19** | **[−0.60, +0.25]** | **0.33** |
+| E5 | ridge on the season's active set | 15.5051 | +0.13 | [−0.50, +0.76] | 0.68 |
 
 The forecast-combination puzzle holds hard here. Averaging everything is **9.3 MSE worse**
 than just reading the line, because the bad tail is genuinely bad. Screening to the top 20
@@ -146,21 +164,35 @@ the market number itself.
 The screened top-20 is stable year to year, led by: `lineca`, `linemidweek`, `lineespn`,
 `lineteamrank`, `linedokter`, `linepimean`, `linepibias`, `linepiratings`.
 
-### Is the signal real, or just not usable?
+### Is it the models, or is the line just mis-scaled?
 
-E4 nests its benchmark, so the plan pre-specified **Clark-West** as the primary test. CW and
-the plain paired difference disagree, and the disagreement is the finding:
+E4 has three free parameters, so testing it against the *raw* market bundles two different
+claims: "the models add information" (β₂ ≠ 0) and "the line needs recalibrating"
+(β₁ ≠ 1, and β₁ ≈ 1.022 in every single season). To separate them, **R0** — the same fit
+with β₂ dropped — is the restricted model. E4 vs R0 differs *only* in β₂, so a rejection
+there can only be about model information.
 
-| Test | Result | What it means |
+**Recalibration is worth nothing.** R0 gains +0.06 MSE over the raw closing line
+(p = 0.66): the 2.2% under-extrapolation is real and stable but has no forecasting value.
+Every bit of the Clark-West rejection is therefore attributable to the models.
+
+| Comparison | Clark-West | Paired ΔMSE |
 |---|---|---|
-| Clark-West | +0.596, CI [+0.186, +1.033], one-sided **p = 0.004** | The consensus tilt carries **real population signal** beyond the closing line. |
-| Paired ΔMSE | −0.191, CI [−0.605, +0.246], **p = 0.36** | That signal **does not survive the cost of estimating it.** |
+| E4 vs **raw** closing line | +0.596 [+0.180, +1.036], p = 0.005 | −0.191 [−0.598, +0.230], p = 0.34 |
+| E4 vs **recalibrated** line (isolates β₂) | +0.451 [+0.184, +0.719], **p = 0.0005** | −0.248 [−0.517, **+0.002**], **p = 0.063** |
 
-Both are correct. Clark-West asks whether the extra terms have predictive content; the
-paired difference asks whether the bigger model actually forecasts better once you pay to
-estimate those terms out-of-sample. Deployment hinges on the second. The models know
-something the closing line doesn't — just not enough to overcome the noise in learning how
-much to trust them.
+Isolating β₂ makes the estimate both larger and roughly twice as precise — removing the
+recalibration noise sharpens the measurement of what the models contribute. It still does
+not reach significance, and §4 shows it is not robust to K.
+
+The two tests disagree, and that disagreement is the finding. Clark-West asks whether the
+extra term has predictive content; the paired difference asks whether the bigger model
+actually forecasts better once you pay to estimate that term out-of-sample. Deployment
+hinges on the second. **The models do know something the closing line doesn't — just not
+enough to overcome the noise in learning how much to trust them.**
+
+Against the opening line the same decomposition is emphatic: R0 is worth −0.04 (p = 0.83),
+while E4 vs R0 is −2.60 [−4.37, −0.82], p < 0.001. Models, not recalibration, both times.
 
 ### Decision value: it never pays
 
@@ -168,8 +200,8 @@ Betting E4's disagreements with the closing line at −110 (break-even 52.38%):
 
 | Filter | Bets | Hit rate | ROI |
 |---|---|---|---|
-| any edge | 14,080 | 50.40% | −3.8% |
-| \|edge\| > 1 | 1,543 | 51.20% | −2.3% |
+| any edge | 12,560 | 50.31% | −4.0% |
+| \|edge\| > 1 | 1,374 | 50.80% | −3.0% |
 
 Not close, at any threshold. A squared-error gain that never flips a profitable bet is not
 deployable, and the plan said so before the number was computed.
@@ -196,8 +228,11 @@ selected and then reported as a finding.
 - **If you have the closing line, use the closing line.** Nothing here improves on it, and
   the CI is tight enough to say that rather than merely fail to reject it.
 - **If you are forecasting before close** — grading an opener, setting a midweek number,
-  reacting to a stale book — the ensemble is worth a real 2.6 MSE
-  (RMSE 15.770 → 15.636), and `lineca` alone is worth 5.1 MSE.
+  reacting to a stale book — the ensemble is worth a real 2.6 MSE. On one consistent sample
+  (n = 14,347): opening line 15.7222 → ensemble 15.6359, against a closing line at 15.5508.
+  **The ensemble recovers 50.4% of the market's own open-to-close move.** That is the
+  sharpest single statement of what the 154 models collectively contain: about half of what
+  the market itself learns between opening and closing. `lineca` alone is worth 5.1 MSE.
 - **If you want one model rather than a blend,** `lineca` is the only defensible pick.
 - **Do not average all the models.** It is 9.3 MSE worse than doing nothing.
 

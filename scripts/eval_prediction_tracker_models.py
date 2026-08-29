@@ -243,7 +243,10 @@ def walk_forward(df, models, bench_col):
     from sklearn.linear_model import Ridge
 
     seasons = sorted(df.loc[df["season"] > BURN_IN_THROUGH, "season"].unique())
-    preds = {k: np.full(len(df), np.nan) for k in ("E1", "E2", "E3", "E4", "E5")}
+    # R0 = recalibration only (margin ~ b0 + b1*market). It is the restricted model that
+    # isolates beta2: E4 vs the RAW market would bundle "the models add information" with
+    # "the line is mildly under-extrapolated", and only the first is a claim about models.
+    preds = {k: np.full(len(df), np.nan) for k in ("E1", "E2", "E3", "E4", "E5", "R0")}
     weights_log = []
 
     for s in seasons:
@@ -271,12 +274,17 @@ def walk_forward(df, models, bench_col):
         mkt_tr = -tr[bench_col].to_numpy(float)
         ok = ~np.isnan(cons_tr) & ~np.isnan(mkt_tr)
         if ok.sum() > 500:
+            ytr = tr["y"].to_numpy()[ok]
             X = np.column_stack([np.ones(ok.sum()), mkt_tr[ok], (cons_tr - mkt_tr)[ok]])
-            beta, *_ = np.linalg.lstsq(X, tr["y"].to_numpy()[ok], rcond=None)
+            beta, *_ = np.linalg.lstsq(X, ytr, rcond=None)
             Xt = np.column_stack(
                 [np.ones(len(te_idx)), mkt_te, np.nan_to_num(cons_te - mkt_te)]
             )
             preds["E4"][te_idx] = Xt @ beta
+
+            # R0: same fit with beta2 dropped -- recalibration of the line, no models
+            b_r0, *_ = np.linalg.lstsq(X[:, :2], ytr, rcond=None)
+            preds["R0"][te_idx] = np.column_stack([np.ones(len(te_idx)), mkt_te]) @ b_r0
             weights_log.append(
                 {
                     "season": int(s),
@@ -357,7 +365,7 @@ def main():
         print(f"{'mkt':4s} {int(common.sum()):6d} {mkt_rmse:8.4f} {0.0:+9.3f} "
               f"{'(benchmark)':>20s}")
         ens_rows = []
-        for k in ("E1", "E2", "E3", "E4", "E5"):
+        for k in ("E1", "E2", "E3", "R0", "E4", "E5"):
             p = preds[k]
             mask = common
             d = sq_err(y[mask], -p[mask]) - sq_err(y[mask], -mkt[mask])
@@ -373,20 +381,28 @@ def main():
         #   CW      : do the extra terms carry population signal?
         #   plain Δ : does the bigger model actually forecast better once you pay the
         #             estimation cost? Deployment hinges on the second, not the first.
-        p4 = preds["E4"]
+        p4, r0 = preds["E4"], preds["R0"]
         mask = common
-        cw, cwci, cwp = clark_west(y[mask], mkt[mask], p4[mask], season[mask])
-        dd = sq_err(y[mask], -p4[mask]) - sq_err(y[mask], -mkt[mask])
-        pd_mean, pd_ci, pd_p = wild_cluster_boot(dd, season[mask])
         print(f"\nPRIMARY, E4 vs {label} line (n={int(mask.sum())}):")
-        print(f"  Clark-West  (is the signal real?)   adj mean {cw:+.3f} "
-              f"CI [{cwci[0]:+.3f},{cwci[1]:+.3f}] one-sided p={cwp:.4f}")
-        print(f"  paired ΔMSE (does it forecast?)     {pd_mean:+.3f} "
-              f"CI [{pd_ci[0]:+.3f},{pd_ci[1]:+.3f}] two-sided p={pd_p:.4f}")
+        for small, name in ((mkt, f"raw {label} line"), (r0, "recalibrated line (R0)")):
+            cw, cwci, cwp = clark_west(y[mask], small[mask], p4[mask], season[mask])
+            dd = sq_err(y[mask], -p4[mask]) - sq_err(y[mask], -small[mask])
+            pdm, pdci, pdp = wild_cluster_boot(dd, season[mask])
+            print(f"  vs {name}:")
+            print(f"    Clark-West  (signal?)    adj mean {cw:+.3f} "
+                  f"CI [{cwci[0]:+.3f},{cwci[1]:+.3f}] one-sided p={cwp:.4f}")
+            print(f"    paired ΔMSE (forecast?)  {pdm:+.3f} "
+                  f"CI [{pdci[0]:+.3f},{pdci[1]:+.3f}] two-sided p={pdp:.4f}")
+            if name.startswith("raw"):
+                cw_raw, pd_mean, pd_ci, pd_p = cw, pdm, pdci, pdp
+            else:
+                # this is the one that isolates beta2 -- only the models differ here
+                cw_r0, cw_r0_ci, cw_r0_p = cw, cwci, cwp
+                b2_mean, b2_ci, b2_p = pdm, pdci, pdp
 
         # decision value: ATS on E4's disagreements with the CLOSING line
         close = -df["line"].to_numpy(float)
-        dm = ev & ~np.isnan(p4) & ~np.isnan(close)
+        dm = common & ~np.isnan(close)
         edge = p4[dm] - close[dm]
         actual = y[dm] - close[dm]
         for thr in (0.0, 1.0, 2.0, 3.0):
@@ -404,8 +420,12 @@ def main():
         results[label] = {
             "benchmark_rmse": float(np.sqrt(sq_err(df["y"].to_numpy()[ok], b[ok]).mean())),
             "ensembles": ens_rows,
-            "clark_west": {"mean": cw, "ci": list(cwci), "p_one_sided": cwp},
-            "e4_paired": {"mean": pd_mean, "ci": list(pd_ci), "p_two_sided": pd_p},
+            "clark_west_vs_raw": {"mean": cw_raw, "p_one_sided": cwp},
+            "e4_paired_vs_raw": {"mean": pd_mean, "ci": list(pd_ci), "p_two_sided": pd_p},
+            "clark_west_vs_recalibrated": {"mean": cw_r0, "ci": list(cw_r0_ci),
+                                           "p_one_sided": cw_r0_p},
+            "e4_paired_vs_recalibrated": {"mean": b2_mean, "ci": list(b2_ci),
+                                          "p_two_sided": b2_p},
             "n_models_beating": int(len(beat)),
         }
         # the usable artifact: E4's spread per game, next to both benchmarks
