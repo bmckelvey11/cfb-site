@@ -321,3 +321,75 @@ seen from the betting side rather than the squared-error side.
 available at PT's publication timestamp (Action Network per-book history has intraday moves
 CFBD lacks) and re-grade the |edge| > 2 bets at that price. That single number decides whether
 any of this is real.
+
+---
+
+## 8. The timing test: cannot be run, and bounded instead
+
+Attempted 2026-08-29. **The test as specified is impossible with the data on hand**, for two
+reasons — one fixable by scraping, one not.
+
+### Blocker 1 — line history barely exists (fixable)
+
+`{CFB_DATA_ROOT}/raw/actionnetwork/history_*.json`, 10,868 files:
+
+| | Files |
+|---|---|
+| Empty `[]` | 9,129 |
+| Content, but **no timestamps** | 1,730 |
+| **Timestamped `updated_at` history** | **9** |
+
+All nine are from August 2026 — the season now in progress. The evaluation window is
+2006–2025 and 14,347 games, so the usable overlap is zero. Note the staged table
+`stg.actionnetwork_history` (146,273 rows) is *not* a substitute: flattening kept the current
+snapshot and dropped the `history` array, so it has no time column at all.
+
+The nine files do prove the endpoint returns real intraday history — `line_status: "opener"`
+followed by `"normal"` ticks with ISO `updated_at` — so this is a collection gap, not a
+capability gap.
+
+### Blocker 2 — there is no publication timestamp (not fixable retrospectively)
+
+**Prediction Tracker's archive does not record when each forecast was published.** The season
+CSVs carry no time field of any kind. Even with perfect line history for all 17,731 games,
+there would be no moment to grade *at*. No amount of odds scraping fixes this: the
+information was never recorded on the forecast side.
+
+This test can therefore never be run on the historical archive. It can only be run forward.
+
+### What can be answered now: how fast the edge decays
+
+Without a timestamp, substitute the line's own progress for elapsed time. Enter at
+`open + f·(close − open)`; `f = 0` is the opener, `f = 1` the close. Bets are the ensemble's
+disagreements at that entry price, season-clustered, break-even 0.5238.
+
+| f | Fixed bet set (\|edge vs open\| > 2) | | Re-selected at the entry price | |
+|---|---|---|---|---|
+| | **hit** (95% CI) | ROI | **hit** (95% CI) | ROI |
+| 0.00 | 0.5589 [0.530, 0.586] | **+6.7%** | 0.5589 [0.533, 0.590] | **+6.7%** |
+| 0.25 | 0.5414 [0.518, 0.566] | +3.4% | 0.5264 [0.484, 0.565] | +0.5% |
+| 0.50 | 0.5191 [0.500, 0.540] | −0.9% | 0.4928 [0.466, 0.519] | −5.9% |
+| 0.75 | 0.4944 [0.473, 0.516] | −5.6% | 0.4943 [0.472, 0.516] | −5.6% |
+| 1.00 | 0.5008 [0.479, 0.527] | −4.4% | 0.5040 [0.491, 0.517] | −3.8% |
+
+**The edge is gone once about a quarter of the line move has happened.** At `f = 0.25` the
+realistic (re-selected) interval already straddles break-even; by `f = 0.5` it is clearly
+negative. Profitability requires entering essentially *at the opener*.
+
+### What this implies
+
+Prediction Tracker publishes mid-week — by construction, after the opener. So the honest
+reading is that **the edge found in §7 is probably already gone by the time these forecasts
+are public**, and §7's +6.7% should be treated as an unreachable upper bound rather than a
+strategy. It is not disproven; it is unsupported, and the burden is on a forward test.
+
+### The only thing that would settle it
+
+Forward collection, which can start immediately since the 2026 season is under way:
+
+1. Fetch Prediction Tracker's weekly page **with a capture timestamp** — the field the
+   archive is missing.
+2. Pull Action Network `history` for those games (the endpoint demonstrably works).
+3. After one season, grade the \|edge\| > 2 bets at the line prevailing at capture time.
+
+That single number decides it. Nothing in the existing archive can.
