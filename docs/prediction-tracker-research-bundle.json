@@ -1,0 +1,2116 @@
+{
+ "_readme": {
+  "what": "Complete results from an evaluation of 154 public college-football computer models against the betting market, 2001-2025.",
+  "why": "Handed to an outside reviewer for methodological critique. Everything needed to judge the analysis is in this file; no repo access required.",
+  "read_this_first": [
+   "Loss is MSE in points-squared. NEGATIVE d_vs_r0 = BETTER than the benchmark.",
+   "Every number here is POST-FIX. Five specification defects were found during the analysis (see defects_found); all headline numbers were recomputed.",
+   "Two benchmarks are reported separately and the answer differs completely between them. This IS the main finding.",
+   "The bootstrap p-value floor is 1/2000 = 0.0005. A reported p of 0.000 means 'below the floor', not zero. Do not quote corrected p-values to six decimals.",
+   "Method codes are E4-E14; see method_catalog for what each one is."
+  ],
+  "headline": "The panel decisively beats the OPENING line and cannot beat the CLOSING line by any of ten combination rules. Best closing-line Holm-adjusted p is 0.4865."
+ },
+ "panel": {
+  "n_games": 17731,
+  "n_models": 154,
+  "seasons": "2001-2025",
+  "sweep_evaluation_support": 14347,
+  "burn_in": "seasons through 2005 train only; 20 evaluated seasons",
+  "target": "y = home margin",
+  "units": "points",
+  "unbalanced": "Models enter and exit. At 2025, 39 of 154 were active."
+ },
+ "protocol": {
+  "validation": "Nested walk-forward. Train on all prior seasons, predict the next. Hyperparameters chosen on an inner split (last 3 training seasons) by the 1-SE rule, so selection never sees the evaluated season.",
+  "anchoring": "Every method is anchored on R0 by Frisch-Waugh, so all nest the benchmark and a zero correction returns R0 exactly. Verified by test to 1e-8.",
+  "inference": "Wild cluster bootstrap-t, Rademacher weights, null imposed by centring, clustered by season. B=2000, 25 clusters.",
+  "multiplicity": "Holm within the 8-member exploratory family E7-E14, per benchmark. E4 and E6 are outside the family (E4 pre-registered, E6 a repair).",
+  "preregistration": "E6-E14 with named grids and the conservative direction of each were committed BEFORE any fitting."
+ },
+ "method_catalog": {
+  "mkt": "The raw market line (opening or closing), used as published.",
+  "R0": "Recalibrated line. OLS of margin on [1, line], refit each season on prior seasons. THE BENCHMARK: every method below is anchored on it by Frisch-Waugh, so all of them nest it and a zero correction lands on R0 exactly.",
+  "E4": "Screened equal-weighted consensus. Take the K=20 models with the best prior-season market-relative skill, average their deviations from the line, fit one scalar gamma. K was fixed at 20 BEFORE any fitting.",
+  "E6": "Market-residual ridge. Ridge of (y - mkt) on all active models' deviations.",
+  "E7": "E4 with K chosen out-of-sample by the 1-SE rule instead of fixed at 20.",
+  "E8": "Stock-Watson generalized shrinkage. Fit the unrestricted correction, shrink it toward zero by a scalar psi.",
+  "E9": "Market-residual principal components. Regress (y - mkt) on the first r scores.",
+  "E10": "Market-anchored peLASSO. LASSO-select a subset, equal-weight survivors, one gamma.",
+  "E11": "Trimmed residual consensus. Drop top and bottom tau per game, average the rest.",
+  "E12": "Combination elastic net. E6 with an l1+l2 penalty.",
+  "E13": "Online residual aggregation. Hedge-style exponential weights updated per game.",
+  "E14": "Complete subset regression after screening. Screen to the 10 best by prior-season residual skill, average all C(10,k) k-variable residual regressions. k=1 was selected in every season."
+ },
+ "hyperparameter_grids": {
+  "E6": "lambda in {0.1,1,10,100,1000,10000}; conservative = larger",
+  "E7": "K in {5,10,20,40,80,all}; conservative = larger",
+  "E8": "psi in {0,0.1,...,1.0}; conservative = smaller",
+  "E9": "r in {1,2,3}; conservative = smaller",
+  "E10": "lambda in {0.001,0.01,0.1,1.0}; conservative = larger",
+  "E11": "tau in {0,0.1,0.2,0.3,0.4}; conservative = larger",
+  "E12": "lambda in {0.1,1,10,100,1000} x l1ratio {0.1,0.5,0.9}",
+  "E13": "eta in {0.001,0.01,0.1}; conservative = smaller",
+  "E14": "k in {3,2,1}; conservative = smaller"
+ },
+ "results": {
+  "opening": {
+   "benchmark": "opening line",
+   "n_common": 14347,
+   "mkt_rmse": 15.722209182358826,
+   "r0_rmse": 15.721194315724023,
+   "table": [
+    {
+     "method": "E4",
+     "n": 14347,
+     "rmse": 15.658235776666798,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -1.9756030750652667,
+     "ci_lo": -3.314038623755285,
+     "ci_hi": -0.6475608280830283,
+     "p": 0.003,
+     "d_vs_mkt": -2.0075139361601013,
+     "frac_seasons": 0.85,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.9558533370607922,
+     "p_holm": NaN,
+     "viable": "yes"
+    },
+    {
+     "method": "E6",
+     "n": 14347,
+     "rmse": 15.608803460242624,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -3.5212052522711947,
+     "ci_lo": -5.447998517740426,
+     "ci_hi": -1.5973589271644126,
+     "p": 0.0,
+     "d_vs_mkt": -3.5531161133660287,
+     "frac_seasons": 0.9,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 1.8931435525810758,
+     "p_holm": NaN,
+     "viable": "yes"
+    },
+    {
+     "method": "E7",
+     "n": 14347,
+     "rmse": 15.690293129053059,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -0.9706522371437639,
+     "ci_lo": -2.220482759046381,
+     "ci_hi": 0.2833855599353138,
+     "p": 0.135,
+     "d_vs_mkt": -1.0025630982385982,
+     "frac_seasons": 0.7,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.7923082875318621,
+     "p_holm": 0.555,
+     "viable": "yes"
+    },
+    {
+     "method": "E8",
+     "n": 14347,
+     "rmse": 15.715934722653829,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -0.16534650603708073,
+     "ci_lo": -0.34912227223146697,
+     "ci_hi": 0.018487765652881738,
+     "p": 0.09,
+     "d_vs_mkt": -0.19725736713191488,
+     "frac_seasons": 0.15,
+     "sign_stab": 0.85,
+     "mean_abs_corr": 0.029976252259786222,
+     "p_holm": 0.54,
+     "viable": "NO"
+    },
+    {
+     "method": "E9",
+     "n": 14347,
+     "rmse": 15.703758551127756,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -0.5479180806351978,
+     "ci_lo": -1.8244492241930779,
+     "ci_hi": 0.7430213420298997,
+     "p": 0.398,
+     "d_vs_mkt": -0.5798289417300322,
+     "frac_seasons": 0.55,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.8579100250317534,
+     "p_holm": 1.0,
+     "viable": "NO"
+    },
+    {
+     "method": "E10",
+     "n": 14347,
+     "rmse": 15.68401292091904,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -1.167689409198012,
+     "ci_lo": -2.522747721166281,
+     "ci_hi": 0.24228724228176213,
+     "p": 0.111,
+     "d_vs_mkt": -1.199600270292846,
+     "frac_seasons": 0.7,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.8863793217969832,
+     "p_holm": 0.555,
+     "viable": "yes"
+    },
+    {
+     "method": "E11",
+     "n": 14347,
+     "rmse": 15.684572805357625,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -1.1501266261894014,
+     "ci_lo": -2.35266425277884,
+     "ci_hi": 0.06626854452582065,
+     "p": 0.061,
+     "d_vs_mkt": -1.1820374872842354,
+     "frac_seasons": 0.7,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.7564654341942605,
+     "p_holm": 0.427,
+     "viable": "yes"
+    },
+    {
+     "method": "E12",
+     "n": 14347,
+     "rmse": 15.712817525222357,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -0.2633161318185253,
+     "ci_lo": -0.6486494095043192,
+     "ci_hi": 0.136472104166518,
+     "p": 0.512,
+     "d_vs_mkt": -0.2952269929133595,
+     "frac_seasons": 0.15,
+     "sign_stab": 0.85,
+     "mean_abs_corr": 0.17432644835373548,
+     "p_holm": 1.0,
+     "viable": "NO"
+    },
+    {
+     "method": "E13",
+     "n": 14347,
+     "rmse": 15.715296093085612,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -0.18541941940143136,
+     "ci_lo": -0.5470024488772625,
+     "ci_hi": 0.1611637595393029,
+     "p": 0.348,
+     "d_vs_mkt": -0.2173302804962655,
+     "frac_seasons": 0.55,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.2756306489722419,
+     "p_holm": 1.0,
+     "viable": "NO"
+    },
+    {
+     "method": "E14",
+     "n": 14347,
+     "rmse": 15.637820492677053,
+     "rmse_mkt_same_games": 15.722209182358826,
+     "d_vs_r0": -2.6145209515630103,
+     "ci_lo": -3.595841312107301,
+     "ci_hi": -1.5833808419538453,
+     "p": 0.0,
+     "d_vs_mkt": -2.646431812657844,
+     "frac_seasons": 1.0,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.6065407780216164,
+     "p_holm": 0.0,
+     "viable": "yes"
+    }
+   ],
+   "harvey_newbold_encompassing": {
+    "wald": 70.09993103392988,
+    "p": 0.0,
+    "n": 14347,
+    "slopes": [
+     0.34921109176097764,
+     0.46410238474577803,
+     -0.0664720456111833,
+     -0.02072966431991774,
+     0.06474043132047569
+    ],
+    "_what": "Joint encompassing: does the line encompass the panel as a SET? Five PRE-SPECIFIED directions, not a 154-dim Wald that would have no power. Null imposed by centring, season-clustered wild bootstrap calibrates it. IN-SAMPLE by construction (the PCA and the screen both use the whole panel) -- that is the standard framing for an encompassing test, which asks about the population, not about out-of-sample deployability.",
+    "_slope_order": [
+     "top20 consensus",
+     "top5 consensus",
+     "PC1",
+     "PC2",
+     "PC3"
+    ],
+    "_reading": "line does NOT encompass the panel"
+   },
+   "e6_vs_e5_repair": {
+    "mean": -1.431294772793659,
+    "ci": [
+     -3.0206492285409046,
+     0.09963411502958652
+    ],
+    "p": 0.073,
+    "n": 12798,
+    "_what": "E6 (ridge) vs E5 (the parent unrestricted combination) on their own paired support. E6 was pre-registered as a REPAIR of E5, not an exploratory method, so it carries no Holm correction."
+   },
+   "parent_run": {
+    "benchmark_rmse": 15.769875766942686,
+    "ensembles": [
+     {
+      "ens": "E1",
+      "n": 12798,
+      "rmse": 15.797517337599587,
+      "delta_mse": 3.931611853294168,
+      "ci_lo": 1.6700866193386243,
+      "ci_hi": 6.175949326854209,
+      "p": 0.0
+     },
+     {
+      "ens": "E2",
+      "n": 12798,
+      "rmse": 15.7616361150462,
+      "delta_mse": 2.7992308446632284,
+      "ci_lo": 0.6560539491290238,
+      "ci_hi": 5.060324709764142,
+      "p": 0.0085
+     },
+     {
+      "ens": "E3",
+      "n": 12798,
+      "rmse": 15.626692172558595,
+      "delta_mse": -1.4364339225613187,
+      "ci_lo": -3.924045348356354,
+      "ci_hi": 0.9873927640427345,
+      "p": 0.2835
+     },
+     {
+      "ens": "R0",
+      "n": 12798,
+      "rmse": 15.671403974617252,
+      "delta_mse": -0.03703964281598505,
+      "ci_lo": -0.35698116863985163,
+      "ci_hi": 0.2952736806755543,
+      "p": 0.8275
+     },
+     {
+      "ens": "E4",
+      "n": 12798,
+      "rmse": 15.588299027871212,
+      "delta_mse": -2.6348755961347776,
+      "ci_lo": -4.3548061351954095,
+      "ci_hi": -0.9646577356258437,
+      "p": 0.0005
+     },
+     {
+      "ens": "E5",
+      "n": 12798,
+      "rmse": 15.603251560300462,
+      "delta_mse": -2.1684829244465607,
+      "ci_lo": -3.669579672461503,
+      "ci_hi": -0.6817431565059575,
+      "p": 0.003
+     }
+    ],
+    "clark_west_vs_raw": {
+     "mean": 4.957003624951523,
+     "p_one_sided": 0.0
+    },
+    "e4_paired_vs_raw": {
+     "mean": -2.6348755961347776,
+     "ci": [
+      -4.384969708344558,
+      -0.8903047375094217
+     ],
+     "p_two_sided": 0.0005
+    },
+    "clark_west_vs_recalibrated": {
+     "mean": 4.658283066119765,
+     "ci": [
+      2.375948715464163,
+      6.957330548208207
+     ],
+     "p_one_sided": 0.0
+    },
+    "e4_paired_vs_recalibrated": {
+     "mean": -2.5978359533187922,
+     "ci": [
+      -4.371978416529513,
+      -0.8205723753863481
+     ],
+     "p_two_sided": 0.0
+    },
+    "n_models_beating": 1
+   },
+   "leaderboard_top25": [
+    {
+     "model": "lineca",
+     "n": 15003,
+     "seasons": 21,
+     "rmse": 15.5451,
+     "delta_mse": -5.0893,
+     "p": 0.0,
+     "q_bh": 0.0,
+     "NOT_A_MODEL": "This column is a market line, not a forecasting model. Its skill is not model skill. Do not cite it."
+    },
+    {
+     "model": "linemidweek",
+     "n": 9735,
+     "seasons": 13,
+     "rmse": 15.7025,
+     "delta_mse": -2.6395,
+     "p": 0.105,
+     "q_bh": 0.1135,
+     "NOT_A_MODEL": "This column is a market line, not a forecasting model. Its skill is not model skill. Do not cite it."
+    },
+    {
+     "model": "lineespn",
+     "n": 6699,
+     "seasons": 9,
+     "rmse": 15.9254,
+     "delta_mse": 4.8774,
+     "p": 0.0625,
+     "q_bh": 0.0704
+    },
+    {
+     "model": "linedokter",
+     "n": 14341,
+     "seasons": 20,
+     "rmse": 15.9184,
+     "delta_mse": 6.1848,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "lineteamrank",
+     "n": 7551,
+     "seasons": 10,
+     "rmse": 16.0032,
+     "delta_mse": 6.2738,
+     "p": 0.0075,
+     "q_bh": 0.0086
+    },
+    {
+     "model": "lineatom",
+     "n": 9589,
+     "seasons": 13,
+     "rmse": 15.9978,
+     "delta_mse": 6.275,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linepimean",
+     "n": 9761,
+     "seasons": 13,
+     "rmse": 16.0695,
+     "delta_mse": 8.7882,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "lineash",
+     "n": 11175,
+     "seasons": 16,
+     "rmse": 16.0576,
+     "delta_mse": 9.0752,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linepig",
+     "n": 15617,
+     "seasons": 22,
+     "rmse": 16.0705,
+     "delta_mse": 9.7194,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesprs",
+     "n": 3113,
+     "seasons": 5,
+     "rmse": 15.9312,
+     "delta_mse": 11.117,
+     "p": 0.2125,
+     "q_bh": 0.2179
+    },
+    {
+     "model": "linepibias",
+     "n": 9761,
+     "seasons": 13,
+     "rmse": 16.1468,
+     "delta_mse": 11.2781,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linepiratings",
+     "n": 11204,
+     "seasons": 15,
+     "rmse": 16.1258,
+     "delta_mse": 11.9955,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "lineharville",
+     "n": 6020,
+     "seasons": 8,
+     "rmse": 16.0613,
+     "delta_mse": 12.0228,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesagpred",
+     "n": 14347,
+     "seasons": 20,
+     "rmse": 16.1475,
+     "delta_mse": 13.5533,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesaggm",
+     "n": 9030,
+     "seasons": 12,
+     "rmse": 16.2943,
+     "delta_mse": 15.3379,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesag",
+     "n": 16999,
+     "seasons": 24,
+     "rmse": 16.2638,
+     "delta_mse": 15.8219,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linedonchess",
+     "n": 9731,
+     "seasons": 13,
+     "rmse": 16.308,
+     "delta_mse": 16.6433,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linefox",
+     "n": 15381,
+     "seasons": 22,
+     "rmse": 16.3899,
+     "delta_mse": 18.5378,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linemass",
+     "n": 8783,
+     "seasons": 12,
+     "rmse": 16.406,
+     "delta_mse": 19.0591,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linekam",
+     "n": 15588,
+     "seasons": 22,
+     "rmse": 16.3399,
+     "delta_mse": 20.0121,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesagr",
+     "n": 7552,
+     "seasons": 10,
+     "rmse": 16.4598,
+     "delta_mse": 21.1143,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linelaz",
+     "n": 15000,
+     "seasons": 21,
+     "rmse": 16.3914,
+     "delta_mse": 21.8981,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linemore",
+     "n": 7963,
+     "seasons": 12,
+     "rmse": 16.4174,
+     "delta_mse": 22.5766,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linefeng",
+     "n": 5755,
+     "seasons": 8,
+     "rmse": 16.708,
+     "delta_mse": 22.8401,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linepugh",
+     "n": 11126,
+     "seasons": 15,
+     "rmse": 16.4634,
+     "delta_mse": 22.8849,
+     "p": 0.0,
+     "q_bh": 0.0
+    }
+   ],
+   "_leaderboard_caveat": "Single-model skill, NOT the combination results. Ranked by delta_mse vs the raw line (negative = better). Rows flagged NOT_A_MODEL are market lines and must not be read as forecasting skill. NOTE: once those two are removed, EVERY remaining model is worse than the raw line -- the best (lineespn) by +4.88 MSE. 'The two best forecasters' elsewhere in this file means best AMONG MODELS, not better than the market. The panel only beats the line in combination, never individually."
+  },
+  "closing": {
+   "benchmark": "closing line",
+   "n_common": 14353,
+   "mkt_rmse": 15.551601625082677,
+   "r0_rmse": 15.552735750913321,
+   "table": [
+    {
+     "method": "E4",
+     "n": 14353,
+     "rmse": 15.54862016819128,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": -0.12800020305271262,
+     "ci_lo": -0.3131920370568163,
+     "ci_hi": 0.049736320763121566,
+     "p": 0.153,
+     "d_vs_mkt": -0.09272397058955109,
+     "frac_seasons": 0.65,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.28697619794445195,
+     "p_holm": NaN,
+     "viable": "yes"
+    },
+    {
+     "method": "E6",
+     "n": 14353,
+     "rmse": 15.588238632490775,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": 1.1055943257405503,
+     "ci_lo": 0.03317531375739158,
+     "ci_hi": 2.23240232807069,
+     "p": 0.048,
+     "d_vs_mkt": 1.140870558203712,
+     "frac_seasons": 0.45,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 1.3105472318310785,
+     "p_holm": NaN,
+     "viable": "NO"
+    },
+    {
+     "method": "E7",
+     "n": 14353,
+     "rmse": 15.552850683453906,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": 0.0035750440752871353,
+     "ci_lo": -0.13551762315823704,
+     "ci_hi": 0.13731002739935308,
+     "p": 0.9515,
+     "d_vs_mkt": 0.03885127653844867,
+     "frac_seasons": 0.55,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.1790274767063427,
+     "p_holm": 1.0,
+     "viable": "NO"
+    },
+    {
+     "method": "E8",
+     "n": 14353,
+     "rmse": 15.552735750913321,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": 0.0,
+     "ci_lo": 0.0,
+     "ci_hi": 0.0,
+     "p": NaN,
+     "d_vs_mkt": 0.03527623246316159,
+     "frac_seasons": 0.0,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.0,
+     "p_holm": NaN,
+     "viable": "none"
+    },
+    {
+     "method": "E9",
+     "n": 14353,
+     "rmse": 15.554043755150285,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": 0.04068779939226776,
+     "ci_lo": -0.057704175384667655,
+     "ci_hi": 0.1352990636257706,
+     "p": 0.3715,
+     "d_vs_mkt": 0.0759640318554293,
+     "frac_seasons": 0.45,
+     "sign_stab": 0.9,
+     "mean_abs_corr": 0.11830399795228913,
+     "p_holm": 1.0,
+     "viable": "NO"
+    },
+    {
+     "method": "E10",
+     "n": 14353,
+     "rmse": 15.55467186323495,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": 0.06022743517564793,
+     "ci_lo": -0.149050797937522,
+     "ci_hi": 0.2619040808904697,
+     "p": 0.55,
+     "d_vs_mkt": 0.09550366763880945,
+     "frac_seasons": 0.45,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.223044390913747,
+     "p_holm": 1.0,
+     "viable": "NO"
+    },
+    {
+     "method": "E11",
+     "n": 14353,
+     "rmse": 15.552153873398845,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": -0.01809923586261283,
+     "ci_lo": -0.1437650335685396,
+     "ci_hi": 0.10866211376133642,
+     "p": 0.7685,
+     "d_vs_mkt": 0.017176996600548763,
+     "frac_seasons": 0.55,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 0.16257836343477167,
+     "p_holm": 1.0,
+     "viable": "NO"
+    },
+    {
+     "method": "E12",
+     "n": 14353,
+     "rmse": 15.552735750913321,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": 3.4161653892556267e-16,
+     "ci_lo": -1.0317471743170444e-15,
+     "ci_hi": 1.7589483444819322e-15,
+     "p": 0.63,
+     "d_vs_mkt": 0.03527623246316188,
+     "frac_seasons": 0.2,
+     "sign_stab": 1.0,
+     "mean_abs_corr": 1.4000518919648231e-15,
+     "p_holm": 1.0,
+     "viable": "none"
+    },
+    {
+     "method": "E13",
+     "n": 14353,
+     "rmse": 15.553691331713727,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": 0.02972470448941288,
+     "ci_lo": -0.011883887855960281,
+     "ci_hi": 0.072945911571685,
+     "p": 0.189,
+     "d_vs_mkt": 0.06500093695257445,
+     "frac_seasons": 0.35,
+     "sign_stab": 0.95,
+     "mean_abs_corr": 0.03929318677846635,
+     "p_holm": 1.0,
+     "viable": "NO"
+    },
+    {
+     "method": "E14",
+     "n": 14353,
+     "rmse": 15.547613702366203,
+     "rmse_mkt_same_games": 15.551601625082677,
+     "d_vs_r0": -0.1592974997319694,
+     "ci_lo": -0.32694206741275145,
+     "ci_hi": 0.014299662702234234,
+     "p": 0.0695,
+     "d_vs_mkt": -0.12402126726880784,
+     "frac_seasons": 0.65,
+     "sign_stab": 0.95,
+     "mean_abs_corr": 0.2132875427658593,
+     "p_holm": 0.48650000000000004,
+     "viable": "yes"
+    }
+   ],
+   "harvey_newbold_encompassing": {
+    "wald": 5.437858756610921,
+    "p": 0.571,
+    "n": 14353,
+    "slopes": [
+     0.09278993199350077,
+     -0.029953078823288043,
+     -0.004977071217204511,
+     -0.01293186236562558,
+     -0.017368855638521533
+    ],
+    "_what": "Joint encompassing: does the line encompass the panel as a SET? Five PRE-SPECIFIED directions, not a 154-dim Wald that would have no power. Null imposed by centring, season-clustered wild bootstrap calibrates it. IN-SAMPLE by construction (the PCA and the screen both use the whole panel) -- that is the standard framing for an encompassing test, which asks about the population, not about out-of-sample deployability.",
+    "_slope_order": [
+     "top20 consensus",
+     "top5 consensus",
+     "PC1",
+     "PC2",
+     "PC3"
+    ],
+    "_reading": "line encompasses the panel"
+   },
+   "e6_vs_e5_repair": {
+    "mean": 0.9926562465994277,
+    "ci": [
+     0.10235654123585947,
+     1.9656135801413765
+    ],
+    "p": 0.0385,
+    "n": 12803,
+    "_what": "E6 (ridge) vs E5 (the parent unrestricted combination) on their own paired support. E6 was pre-registered as a REPAIR of E5, not an exploratory method, so it carries no Holm correction."
+   },
+   "parent_run": {
+    "benchmark_rmse": 15.616797581648889,
+    "ensembles": [
+     {
+      "ens": "E1",
+      "n": 12803,
+      "rmse": 15.799018831676852,
+      "delta_mse": 9.328905439915063,
+      "ci_lo": 8.022600754036505,
+      "ci_hi": 10.532674296976593,
+      "p": 0.0
+     },
+     {
+      "ens": "E2",
+      "n": 12803,
+      "rmse": 15.76316745044487,
+      "delta_mse": 8.197357466999922,
+      "ci_lo": 6.9578753859505795,
+      "ci_hi": 9.392229766554054,
+      "p": 0.0
+     },
+     {
+      "ens": "E3",
+      "n": 12803,
+      "rmse": 15.624431670428619,
+      "delta_mse": 3.8427744201281064,
+      "ci_lo": 2.6176542579259103,
+      "ci_hi": 4.981199713331806,
+      "p": 0.0
+     },
+     {
+      "ens": "R0",
+      "n": 12803,
+      "rmse": 15.502784994104701,
+      "delta_mse": 0.05625196967317475,
+      "ci_lo": -0.1813080674495136,
+      "ci_hi": 0.3338694921082896,
+      "p": 0.656
+     },
+     {
+      "ens": "E4",
+      "n": 12803,
+      "rmse": 15.494795672675611,
+      "delta_mse": -0.19139766579788656,
+      "ci_lo": -0.5954946575125049,
+      "ci_hi": 0.25362250422458155,
+      "p": 0.3315
+     },
+     {
+      "ens": "E5",
+      "n": 12803,
+      "rmse": 15.505081976093539,
+      "delta_mse": 0.12747648161598726,
+      "ci_lo": -0.49750902831158184,
+      "ci_hi": 0.7572196894161821,
+      "p": 0.6755
+     }
+    ],
+    "clark_west_vs_raw": {
+     "mean": 0.5958784119112934,
+     "p_one_sided": 0.0005
+    },
+    "e4_paired_vs_raw": {
+     "mean": -0.19139766579788656,
+     "ci": [
+      -0.5980930781592915,
+      0.2303347044181571
+     ],
+     "p_two_sided": 0.338
+    },
+    "clark_west_vs_recalibrated": {
+     "mean": 0.45114403759751553,
+     "ci": [
+      0.18407814268035994,
+      0.7191940710165511
+     ],
+     "p_one_sided": 0.0005
+    },
+    "e4_paired_vs_recalibrated": {
+     "mean": -0.24764963547106134,
+     "ci": [
+      -0.5165358008218832,
+      0.0023363316790225575
+     ],
+     "p_two_sided": 0.063
+    },
+    "n_models_beating": 0
+   },
+   "leaderboard_top25": [
+    {
+     "model": "lineca",
+     "n": 15007,
+     "seasons": 21,
+     "rmse": 15.5448,
+     "delta_mse": 0.1972,
+     "p": 0.06,
+     "q_bh": 0.0632,
+     "NOT_A_MODEL": "This column is a market line, not a forecasting model. Its skill is not model skill. Do not cite it."
+    },
+    {
+     "model": "linemidweek",
+     "n": 9736,
+     "seasons": 13,
+     "rmse": 15.7039,
+     "delta_mse": 2.0481,
+     "p": 0.0,
+     "q_bh": 0.0,
+     "NOT_A_MODEL": "This column is a market line, not a forecasting model. Its skill is not model skill. Do not cite it."
+    },
+    {
+     "model": "lineespn",
+     "n": 6699,
+     "seasons": 9,
+     "rmse": 15.9254,
+     "delta_mse": 10.0558,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "lineteamrank",
+     "n": 7551,
+     "seasons": 10,
+     "rmse": 16.0032,
+     "delta_mse": 11.2726,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "lineatom",
+     "n": 9595,
+     "seasons": 13,
+     "rmse": 15.9991,
+     "delta_mse": 11.4036,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linedokter",
+     "n": 14347,
+     "seasons": 20,
+     "rmse": 15.9196,
+     "delta_mse": 11.5519,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linepimean",
+     "n": 9763,
+     "seasons": 13,
+     "rmse": 16.0703,
+     "delta_mse": 13.44,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "lineash",
+     "n": 11182,
+     "seasons": 16,
+     "rmse": 16.0592,
+     "delta_mse": 14.0938,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linepig",
+     "n": 15671,
+     "seasons": 22,
+     "rmse": 16.0752,
+     "delta_mse": 14.2446,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linepibias",
+     "n": 9763,
+     "seasons": 13,
+     "rmse": 16.1475,
+     "delta_mse": 15.9261,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesprs",
+     "n": 3114,
+     "seasons": 5,
+     "rmse": 15.9335,
+     "delta_mse": 16.8047,
+     "p": 0.1075,
+     "q_bh": 0.1117
+    },
+    {
+     "model": "linepiratings",
+     "n": 11206,
+     "seasons": 15,
+     "rmse": 16.1265,
+     "delta_mse": 16.8312,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "lineharville",
+     "n": 6020,
+     "seasons": 8,
+     "rmse": 16.0613,
+     "delta_mse": 17.3359,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesagpred",
+     "n": 14353,
+     "seasons": 20,
+     "rmse": 16.1482,
+     "delta_mse": 18.9123,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesaggm",
+     "n": 9032,
+     "seasons": 12,
+     "rmse": 16.2952,
+     "delta_mse": 20.038,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linedonchess",
+     "n": 9733,
+     "seasons": 13,
+     "rmse": 16.3091,
+     "delta_mse": 21.3032,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesag",
+     "n": 17709,
+     "seasons": 25,
+     "rmse": 16.2954,
+     "delta_mse": 21.656,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linemass",
+     "n": 9486,
+     "seasons": 13,
+     "rmse": 16.389,
+     "delta_mse": 22.7626,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linefox",
+     "n": 15442,
+     "seasons": 22,
+     "rmse": 16.3887,
+     "delta_mse": 23.7376,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linekam",
+     "n": 15594,
+     "seasons": 22,
+     "rmse": 16.3418,
+     "delta_mse": 25.0062,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesagr",
+     "n": 7552,
+     "seasons": 10,
+     "rmse": 16.4598,
+     "delta_mse": 26.1152,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linesagp",
+     "n": 2707,
+     "seasons": 4,
+     "rmse": 16.7376,
+     "delta_mse": 26.6778,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linemore",
+     "n": 8667,
+     "seasons": 13,
+     "rmse": 16.3967,
+     "delta_mse": 26.9336,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linelaz",
+     "n": 15007,
+     "seasons": 21,
+     "rmse": 16.3921,
+     "delta_mse": 27.183,
+     "p": 0.0,
+     "q_bh": 0.0
+    },
+    {
+     "model": "linepugh",
+     "n": 11128,
+     "seasons": 15,
+     "rmse": 16.4645,
+     "delta_mse": 27.6068,
+     "p": 0.0,
+     "q_bh": 0.0
+    }
+   ],
+   "_leaderboard_caveat": "Single-model skill, NOT the combination results. Ranked by delta_mse vs the raw line (negative = better). Rows flagged NOT_A_MODEL are market lines and must not be read as forecasting skill. NOTE: once those two are removed, EVERY remaining model is worse than the raw line -- the best (lineespn) by +4.88 MSE. 'The two best forecasters' elsewhere in this file means best AMONG MODELS, not better than the market. The panel only beats the line in combination, never individually."
+  }
+ },
+ "column_glossary": {
+  "d_vs_r0": "mean paired MSE difference vs the recalibrated benchmark; NEGATIVE is better",
+  "p": "wild cluster bootstrap-t two-sided p, unadjusted",
+  "p_holm": "Holm-adjusted within the 8-member exploratory family; null = outside it",
+  "frac_seasons": "fraction of the 20 evaluated seasons the method beat R0",
+  "mean_abs_corr": "mean |prediction - R0|; how far the method actually moves off its own reference. Near zero = the selected hyperparameter switched the correction OFF, so the method IS R0.",
+  "sign_stab": "KNOWN INERT, see defect 7. Bounded below at 0.50.",
+  "rmse_mkt_same_games": "the market RMSE on THIS method games, so a reduced-support method is not compared against a different game set",
+  "viable": "yes / NO / none, from the stability gate; 'none' = degenerate"
+ },
+ "recency_and_cohort": {
+  "question": "Does exponentially discounting old market-relative losses, or adjusting for entry cohort, improve the screen? Validation was to determine the decay rate rather than declaring a structural break.",
+  "answer": "No. rho=1.00 (no decay) won 20/20 seasons on both benchmarks. Giacomini-Rossi finds no instability. The cohort correction DESTROYS signal because the best forecasters are recent entrants.",
+  "opening": {
+   "rho_grid": [
+    {
+     "k": 5,
+     "rho": 0.8,
+     "d_vs_r0": -1.8706324429829853,
+     "ci_lo": -2.97898073559371,
+     "ci_hi": -0.6792960038083158,
+     "p": 0.0005,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 0.85,
+     "d_vs_r0": -1.817999808100826,
+     "ci_lo": -3.0171167273865973,
+     "ci_hi": -0.677632879041761,
+     "p": 0.0,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 0.9,
+     "d_vs_r0": -1.742426137199981,
+     "ci_lo": -2.855773038672872,
+     "ci_hi": -0.6393985757833129,
+     "p": 0.001,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 0.95,
+     "d_vs_r0": -1.7259857856842775,
+     "ci_lo": -2.9132227600000764,
+     "ci_hi": -0.5761164107783383,
+     "p": 0.0005,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 0.975,
+     "d_vs_r0": -1.8866005571548021,
+     "ci_lo": -3.0738150587749344,
+     "ci_hi": -0.6716242289822827,
+     "p": 0.0015,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 1.0,
+     "d_vs_r0": -1.9495025137012778,
+     "ci_lo": -3.0490388067680074,
+     "ci_hi": -0.78213889722703,
+     "p": 0.0005,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.8,
+     "d_vs_r0": -2.1004328520982147,
+     "ci_lo": -3.3450993302951284,
+     "ci_hi": -0.8539266865070239,
+     "p": 0.0,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.85,
+     "d_vs_r0": -2.0760487347859886,
+     "ci_lo": -3.3139904796137616,
+     "ci_hi": -0.8364405243265589,
+     "p": 0.0,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.9,
+     "d_vs_r0": -2.0037051670686608,
+     "ci_lo": -3.30008834803862,
+     "ci_hi": -0.6977666511374139,
+     "p": 0.002,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.95,
+     "d_vs_r0": -1.8898538926549469,
+     "ci_lo": -3.0764799280561563,
+     "ci_hi": -0.6742660565731768,
+     "p": 0.001,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.975,
+     "d_vs_r0": -1.8921091636798981,
+     "ci_lo": -3.1391636874594977,
+     "ci_hi": -0.6419584387286006,
+     "p": 0.003,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 1.0,
+     "d_vs_r0": -1.856756905486309,
+     "ci_lo": -3.019564801199434,
+     "ci_hi": -0.6718553739485831,
+     "p": 0.001,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.8,
+     "d_vs_r0": -1.7245480712438122,
+     "ci_lo": -2.852393430441273,
+     "ci_hi": -0.6426604444356054,
+     "p": 0.0015,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.85,
+     "d_vs_r0": -1.7349855129927616,
+     "ci_lo": -2.884801006685589,
+     "ci_hi": -0.6129567562715632,
+     "p": 0.002,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.9,
+     "d_vs_r0": -1.8376772461423279,
+     "ci_lo": -3.003440333427469,
+     "ci_hi": -0.6147444912353137,
+     "p": 0.001,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.95,
+     "d_vs_r0": -1.7756605879452727,
+     "ci_lo": -2.9803437931022696,
+     "ci_hi": -0.5564867962587419,
+     "p": 0.003,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.975,
+     "d_vs_r0": -1.739806788586379,
+     "ci_lo": -2.976653957381297,
+     "ci_hi": -0.5008283448755619,
+     "p": 0.005,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 1.0,
+     "d_vs_r0": -1.7519918860364048,
+     "ci_lo": -2.9698247073992503,
+     "ci_hi": -0.5387424513738002,
+     "p": 0.004,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.8,
+     "d_vs_r0": -1.6777802777728708,
+     "ci_lo": -2.9348309035806244,
+     "ci_hi": -0.453191627506244,
+     "p": 0.009,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.85,
+     "d_vs_r0": -1.6801117285409624,
+     "ci_lo": -2.956655848964338,
+     "ci_hi": -0.43639782012854256,
+     "p": 0.0075,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.9,
+     "d_vs_r0": -1.6551437582653126,
+     "ci_lo": -2.9221880244783494,
+     "ci_hi": -0.390113727542712,
+     "p": 0.0085,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.95,
+     "d_vs_r0": -1.6428044395112869,
+     "ci_lo": -2.8862588539762015,
+     "ci_hi": -0.43397851583746627,
+     "p": 0.011,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.975,
+     "d_vs_r0": -1.6099634498065658,
+     "ci_lo": -2.9075413950493774,
+     "ci_hi": -0.3068074541852317,
+     "p": 0.0145,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 1.0,
+     "d_vs_r0": -1.6114582196124618,
+     "ci_lo": -2.8793598103119935,
+     "ci_hi": -0.3885281899733959,
+     "p": 0.009,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.8,
+     "d_vs_r0": -1.5265299490090756,
+     "ci_lo": -2.875010081189421,
+     "ci_hi": -0.15794124873369064,
+     "p": 0.0245,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.85,
+     "d_vs_r0": -1.5719186322108025,
+     "ci_lo": -2.915305221065699,
+     "ci_hi": -0.1772187610624818,
+     "p": 0.0215,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.9,
+     "d_vs_r0": -1.5854283331710215,
+     "ci_lo": -2.931106957465071,
+     "ci_hi": -0.24228554234780364,
+     "p": 0.0195,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.95,
+     "d_vs_r0": -1.5544589293636308,
+     "ci_lo": -2.88206114056815,
+     "ci_hi": -0.19690756766468942,
+     "p": 0.021,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.975,
+     "d_vs_r0": -1.5574077582816064,
+     "ci_lo": -2.9524537396018182,
+     "ci_hi": -0.21571170429853348,
+     "p": 0.0265,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 1.0,
+     "d_vs_r0": -1.523699026503445,
+     "ci_lo": -2.9788937379552554,
+     "ci_hi": -0.04859540270804463,
+     "p": 0.038,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.8,
+     "d_vs_r0": -1.3016352731742624,
+     "ci_lo": -2.6479656784784558,
+     "ci_hi": 0.0034783094947461457,
+     "p": 0.054,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.85,
+     "d_vs_r0": -1.3021178316259325,
+     "ci_lo": -2.748571172297164,
+     "ci_hi": 0.05612505135656631,
+     "p": 0.0615,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.9,
+     "d_vs_r0": -1.2993246599704162,
+     "ci_lo": -2.662089097094686,
+     "ci_hi": 0.09502816258576141,
+     "p": 0.063,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.95,
+     "d_vs_r0": -1.2838471728974676,
+     "ci_lo": -2.669052287651441,
+     "ci_hi": 0.10037866080909419,
+     "p": 0.0715,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.975,
+     "d_vs_r0": -1.2895785449431785,
+     "ci_lo": -2.6810459694935926,
+     "ci_hi": 0.06723780840631766,
+     "p": 0.0615,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 1.0,
+     "d_vs_r0": -1.3086758772324703,
+     "ci_lo": -2.6977877808287447,
+     "ci_hi": 0.09907552373585049,
+     "p": 0.0665,
+     "n": 14361
+    }
+   ],
+   "robust": [
+    {
+     "spec": "primary (\u03c1=1, \u03ba=1000)",
+     "n": 14361,
+     "d_vs_r0": -1.523699026503445,
+     "ci_lo": -2.921294403897837,
+     "ci_hi": -0.13572141359855783,
+     "p": 0.028
+    },
+    {
+     "spec": "\u03c1=0.90",
+     "n": 14361,
+     "d_vs_r0": -1.5854283331710215,
+     "ci_lo": -2.9112535064678196,
+     "ci_hi": -0.2508771192131303,
+     "p": 0.019
+    },
+    {
+     "spec": "blend \u03b7=0.5",
+     "n": 14361,
+     "d_vs_r0": -1.4903026157594286,
+     "ci_lo": -2.812910152871747,
+     "ci_hi": -0.108181090948821,
+     "p": 0.027
+    },
+    {
+     "spec": "5-season rolling",
+     "n": 14361,
+     "d_vs_r0": -1.532341945654818,
+     "ci_lo": -2.8551767694245287,
+     "ci_hi": -0.1721410960507459,
+     "p": 0.024
+    },
+    {
+     "spec": "10-season rolling",
+     "n": 14361,
+     "d_vs_r0": -1.5796939772014387,
+     "ci_lo": -2.8922644644098137,
+     "ci_hi": -0.22170198632397242,
+     "p": 0.02
+    },
+    {
+     "spec": "cohort-adjusted",
+     "n": 14361,
+     "d_vs_r0": -1.2947985614544235,
+     "ci_lo": -2.670872184844813,
+     "ci_hi": 0.05105507948603294,
+     "p": 0.07
+    },
+    {
+     "spec": "\u03bb=0 (no gap penalty)",
+     "n": 14361,
+     "d_vs_r0": -1.518286560784298,
+     "ci_lo": -2.9578368659067937,
+     "ci_hi": -0.20008982496381766,
+     "p": 0.0305
+    },
+    {
+     "spec": "\u03bb=0.5",
+     "n": 14361,
+     "d_vs_r0": -1.5397515526622305,
+     "ci_lo": -2.974756049924359,
+     "ci_hi": -0.15247426275975395,
+     "p": 0.0315
+    }
+   ],
+   "gr_fluctuation": {
+    "stat": 1.2810513484821435,
+    "p": 0.7145,
+    "seasons": 20
+   },
+   "rho_selected_share_1": 1.0
+  },
+  "closing": {
+   "rho_grid": [
+    {
+     "k": 5,
+     "rho": 0.8,
+     "d_vs_r0": -0.2267941207360706,
+     "ci_lo": -0.45309659661168367,
+     "ci_hi": -0.001146735501571211,
+     "p": 0.0495,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 0.85,
+     "d_vs_r0": -0.2763398375141853,
+     "ci_lo": -0.4958812576905695,
+     "ci_hi": -0.03573219934805216,
+     "p": 0.022,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 0.9,
+     "d_vs_r0": -0.25996795031893605,
+     "ci_lo": -0.4973722376689206,
+     "ci_hi": -0.009470233589970123,
+     "p": 0.0355,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 0.95,
+     "d_vs_r0": -0.26205617923714875,
+     "ci_lo": -0.4919799676117703,
+     "ci_hi": -0.03245708883698284,
+     "p": 0.0285,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 0.975,
+     "d_vs_r0": -0.3012041247680915,
+     "ci_lo": -0.576693432479197,
+     "ci_hi": 0.0013724617084366897,
+     "p": 0.0445,
+     "n": 14361
+    },
+    {
+     "k": 5,
+     "rho": 1.0,
+     "d_vs_r0": -0.29387382932732015,
+     "ci_lo": -0.5949914078413643,
+     "ci_hi": -0.0003363318646690816,
+     "p": 0.0525,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.8,
+     "d_vs_r0": -0.28686191821001983,
+     "ci_lo": -0.5203996096324586,
+     "ci_hi": -0.048378909321486196,
+     "p": 0.017,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.85,
+     "d_vs_r0": -0.290794840440415,
+     "ci_lo": -0.5247406975544737,
+     "ci_hi": -0.07410866985821912,
+     "p": 0.0105,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.9,
+     "d_vs_r0": -0.2730994083607035,
+     "ci_lo": -0.49943876001839904,
+     "ci_hi": -0.040807596152423825,
+     "p": 0.0265,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.95,
+     "d_vs_r0": -0.27613637739781843,
+     "ci_lo": -0.5121360414808123,
+     "ci_hi": -0.040144326045713996,
+     "p": 0.0225,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 0.975,
+     "d_vs_r0": -0.2761363773978185,
+     "ci_lo": -0.5135836500024116,
+     "ci_hi": -0.034592158938247075,
+     "p": 0.02,
+     "n": 14361
+    },
+    {
+     "k": 8,
+     "rho": 1.0,
+     "d_vs_r0": -0.2677240033711333,
+     "ci_lo": -0.4984847503669575,
+     "ci_hi": -0.05935184826416548,
+     "p": 0.018,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.8,
+     "d_vs_r0": -0.15386346928664607,
+     "ci_lo": -0.34388023455774275,
+     "ci_hi": 0.03016841355932423,
+     "p": 0.1015,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.85,
+     "d_vs_r0": -0.1358278940117172,
+     "ci_lo": -0.3248302536764458,
+     "ci_hi": 0.07100430292773269,
+     "p": 0.1505,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.9,
+     "d_vs_r0": -0.15604398751223117,
+     "ci_lo": -0.353878207246234,
+     "ci_hi": 0.040782778031393685,
+     "p": 0.1175,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.95,
+     "d_vs_r0": -0.16641699877207067,
+     "ci_lo": -0.3668613409311817,
+     "ci_hi": 0.04802916619912778,
+     "p": 0.1175,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 0.975,
+     "d_vs_r0": -0.15969396758187368,
+     "ci_lo": -0.3699897431992526,
+     "ci_hi": 0.0530117448389468,
+     "p": 0.136,
+     "n": 14361
+    },
+    {
+     "k": 12,
+     "rho": 1.0,
+     "d_vs_r0": -0.17914503417464753,
+     "ci_lo": -0.39651898944516273,
+     "ci_hi": 0.051708564992509726,
+     "p": 0.119,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.8,
+     "d_vs_r0": -0.16288156514299304,
+     "ci_lo": -0.3602198980682062,
+     "ci_hi": 0.03482819272296592,
+     "p": 0.1115,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.85,
+     "d_vs_r0": -0.14369044214535068,
+     "ci_lo": -0.3530782378453319,
+     "ci_hi": 0.062186850963284135,
+     "p": 0.1605,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.9,
+     "d_vs_r0": -0.12441759452897001,
+     "ci_lo": -0.3260622240300283,
+     "ci_hi": 0.08492843303963184,
+     "p": 0.1995,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.95,
+     "d_vs_r0": -0.1113301971054612,
+     "ci_lo": -0.31606606400010206,
+     "ci_hi": 0.09666204997843271,
+     "p": 0.285,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 0.975,
+     "d_vs_r0": -0.11092518841779629,
+     "ci_lo": -0.31369210390583024,
+     "ci_hi": 0.09523618860866061,
+     "p": 0.274,
+     "n": 14361
+    },
+    {
+     "k": 16,
+     "rho": 1.0,
+     "d_vs_r0": -0.13034575835905152,
+     "ci_lo": -0.3601779552418342,
+     "ci_hi": 0.09314414331719492,
+     "p": 0.2495,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.8,
+     "d_vs_r0": -0.11700562769878864,
+     "ci_lo": -0.30433873592064964,
+     "ci_hi": 0.07217610435834532,
+     "p": 0.213,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.85,
+     "d_vs_r0": -0.1056329392852567,
+     "ci_lo": -0.30745436881877286,
+     "ci_hi": 0.11631240775697098,
+     "p": 0.2865,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.9,
+     "d_vs_r0": -0.09642162017256702,
+     "ci_lo": -0.28903204791430137,
+     "ci_hi": 0.09758835977595588,
+     "p": 0.341,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.95,
+     "d_vs_r0": -0.10386718523788183,
+     "ci_lo": -0.32506539928719586,
+     "ci_hi": 0.11062939437821112,
+     "p": 0.3495,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 0.975,
+     "d_vs_r0": -0.10176053828734645,
+     "ci_lo": -0.3233720360546644,
+     "ci_hi": 0.12217236887870926,
+     "p": 0.359,
+     "n": 14361
+    },
+    {
+     "k": 20,
+     "rho": 1.0,
+     "d_vs_r0": -0.10218338803394836,
+     "ci_lo": -0.3122685413817661,
+     "ci_hi": 0.10111507868856426,
+     "p": 0.304,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.8,
+     "d_vs_r0": -0.07161282568311848,
+     "ci_lo": -0.2705159146367635,
+     "ci_hi": 0.12264834580795085,
+     "p": 0.4835,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.85,
+     "d_vs_r0": -0.06036842740196149,
+     "ci_lo": -0.2546925094457706,
+     "ci_hi": 0.14718507748029977,
+     "p": 0.535,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.9,
+     "d_vs_r0": -0.06085393999529458,
+     "ci_lo": -0.28531798489759824,
+     "ci_hi": 0.14604981711226034,
+     "p": 0.5535,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.95,
+     "d_vs_r0": -0.05772238019770819,
+     "ci_lo": -0.26865660577649075,
+     "ci_hi": 0.1554554655863854,
+     "p": 0.597,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 0.975,
+     "d_vs_r0": -0.05420181596607525,
+     "ci_lo": -0.26361045828268936,
+     "ci_hi": 0.15879412615963784,
+     "p": 0.624,
+     "n": 14361
+    },
+    {
+     "k": 30,
+     "rho": 1.0,
+     "d_vs_r0": -0.052485303437543755,
+     "ci_lo": -0.2750282295686157,
+     "ci_hi": 0.1610136792475363,
+     "p": 0.6315,
+     "n": 14361
+    }
+   ],
+   "robust": [
+    {
+     "spec": "primary (\u03c1=1, \u03ba=1000)",
+     "n": 14361,
+     "d_vs_r0": -0.10218338803394836,
+     "ci_lo": -0.3033736834852958,
+     "ci_hi": 0.10941030890766579,
+     "p": 0.3135
+    },
+    {
+     "spec": "\u03c1=0.90",
+     "n": 14361,
+     "d_vs_r0": -0.09642162017256702,
+     "ci_lo": -0.3103286647620923,
+     "ci_hi": 0.11890538976887476,
+     "p": 0.346
+    },
+    {
+     "spec": "blend \u03b7=0.5",
+     "n": 14361,
+     "d_vs_r0": -0.07853053536050546,
+     "ci_lo": -0.2796474618744623,
+     "ci_hi": 0.11691644945764747,
+     "p": 0.415
+    },
+    {
+     "spec": "5-season rolling",
+     "n": 14361,
+     "d_vs_r0": -0.10154205952744397,
+     "ci_lo": -0.29549769096741935,
+     "ci_hi": 0.08285881042465726,
+     "p": 0.2755
+    },
+    {
+     "spec": "10-season rolling",
+     "n": 14361,
+     "d_vs_r0": -0.11057574068551591,
+     "ci_lo": -0.32586545677530226,
+     "ci_hi": 0.090408635566898,
+     "p": 0.286
+    },
+    {
+     "spec": "cohort-adjusted",
+     "n": 14361,
+     "d_vs_r0": -0.0373420540060146,
+     "ci_lo": -0.22078048669254083,
+     "ci_hi": 0.14369940778975582,
+     "p": 0.669
+    },
+    {
+     "spec": "\u03bb=0 (no gap penalty)",
+     "n": 14361,
+     "d_vs_r0": -0.11237286664326246,
+     "ci_lo": -0.314302813987143,
+     "ci_hi": 0.1041459016269122,
+     "p": 0.279
+    },
+    {
+     "spec": "\u03bb=0.5",
+     "n": 14361,
+     "d_vs_r0": -0.10991965322601861,
+     "ci_lo": -0.3135712819857216,
+     "ci_hi": 0.09728844586315895,
+     "p": 0.2705
+    }
+   ],
+   "gr_fluctuation": {
+    "stat": 0.9657115913018567,
+    "p": 0.917,
+    "seasons": 20
+   },
+   "rho_selected_share_1": 1.0
+  }
+ },
+ "market_contamination": {
+  "what": "Two panel columns (lineca, linemidweek) proved to BE market lines, not models. This check drops the 15 most market-like columns and refits.",
+  "note": "Retention is the fraction of the original effect that survives.",
+  "rows": [
+   {
+    "method": "E4",
+    "family": "consensus",
+    "all_154": -1.976,
+    "p_all": 0.003,
+    "decontaminated": -1.446,
+    "p_dec": 0.0415,
+    "retained": 0.73
+   },
+   {
+    "method": "E11",
+    "family": "consensus",
+    "all_154": -1.15,
+    "p_all": 0.0665,
+    "decontaminated": -0.867,
+    "p_dec": 0.142,
+    "retained": 0.75
+   },
+   {
+    "method": "E14",
+    "family": "subset regression",
+    "all_154": -2.615,
+    "p_all": 0.0001,
+    "decontaminated": -1.285,
+    "p_dec": 0.0001,
+    "retained": 0.49
+   },
+   {
+    "method": "E6",
+    "family": "shrinkage",
+    "all_154": -3.521,
+    "p_all": 0.0001,
+    "decontaminated": -0.966,
+    "p_dec": 0.256,
+    "retained": 0.27
+   }
+  ],
+  "closing_line_lead": "On the CLOSING line E14 strengthens under decontamination: -0.159 (p=0.0695) becomes -0.193 [-0.344,-0.045] p=0.0125. This is a post-hoc variant of the winner of an eight-member family with no confirmation window. Holm across that family puts it near 0.10. A candidate for pre-registration, NOT a closing-line edge."
+ },
+ "akm_bound": {
+  "problem": "E14 was the SELECTED method among 8, so its effect is conditional on having won a noisy tournament.",
+  "approach": "Andrews-Kitagawa-McCloskey is the right framework, but implementing it literally needs an 8x8 cluster-robust covariance not persisted by the sweep. Bounded instead: the correction is E[max_m Z] * se * sqrt(1-rho), and BOTH unknowns (rho, effective m) only ever shrink it. The rho=0 corner is a valid worst case.",
+  "inputs": {
+   "d_vs_r0": -2.614521,
+   "ci": [
+    -3.595841,
+    -1.583381
+   ],
+   "se_conservative": 0.5134,
+   "naive_z": 5.093,
+   "m": 8,
+   "E_max_m_Z": 1.4225,
+   "se_note": "half-width / 1.96. Real bootstrap-t quantiles at 20 clusters are fatter, implying a SMALLER se and LARGER z, so this is the reading least favourable to the finding."
+  },
+  "bound": [
+   {
+    "rho": 0.0,
+    "z_corr": 3.67016,
+    "p_corr": 0.000242,
+    "bias_bound": 0.73029
+   },
+   {
+    "rho": 0.3,
+    "z_corr": 3.902508,
+    "p_corr": 9.5e-05,
+    "bias_bound": 0.611004
+   },
+   {
+    "rho": 0.7,
+    "z_corr": 4.313516,
+    "p_corr": 1.6e-05,
+    "bias_bound": 0.399996
+   },
+   {
+    "rho": 0.9,
+    "z_corr": 4.642812,
+    "p_corr": 3e-06,
+    "bias_bound": 0.230938
+   },
+   {
+    "rho": 0.99,
+    "z_corr": 4.950392,
+    "p_corr": 1e-06,
+    "bias_bound": 0.073029
+   }
+  ],
+  "conclusion": "Worst case over the entire rho range leaves p = 2.4e-4, still under the bootstrap 1/2000 floor, and the effect no weaker than -1.88. Two of the eight candidates were degenerate on opening (E8 |corr|=0.03, E12=0.17) and could not have won, so effective m is 6 and the bound tightens to 1.3e-4.",
+  "cautions": [
+   "The correction REPLACES Holm rather than stacking with it.",
+   "Both raw and corrected p sit below the bootstrap floor, so the honest statement is 'below 1/2000 before and after winner correction'.",
+   "AKM real bite is on the POINT ESTIMATE, not the p-value."
+  ]
+ },
+ "defects_found": [
+  {
+   "defect": "Clark-West sign",
+   "detail": "spreads passed to a function taking margins",
+   "consequence": "An absurd +23 adjusted mean where the correct value is +0.45."
+  },
+  {
+   "defect": "Methods did not nest the benchmark",
+   "detail": "fitting y-mkt ~ deviations pins the market coefficient at 1",
+   "consequence": "Every comparison against R0, Clark-West included, formally invalid. Rebuilt on Frisch-Waugh anchoring with a test asserting 1e-8 equivalence."
+  },
+  {
+   "defect": "Support collapse",
+   "detail": "one method that cannot fit before ~2011 silently deleted those seasons for every other method",
+   "consequence": "n fell 14347 -> 9234 with no indication why."
+  },
+  {
+   "defect": "Coverage filter was a tenure test",
+   "detail": "coverage measured over the whole training history, so a model launched in 2015 could never qualify however complete its record",
+   "consequence": "Regression methods fit on ~14 old models rather than the season's ~39 active ones, EXCLUDING THE TWO BEST FORECASTERS. Changed every headline in the regression family."
+  },
+  {
+   "defect": "Giacomini-Rossi statistic uncentred",
+   "detail": "while its bootstrap imposed the null by centring",
+   "consequence": "Tested 'is the difference nonzero', not 'does it change over time'."
+  },
+  {
+   "defect": "Misleading RMSE column",
+   "detail": "a reduced-support method printed beside the shared market RMSE",
+   "consequence": "Reproduced the coverage-difficulty confound inside a doc explaining that confound."
+  },
+  {
+   "defect": "Stability gate half-inert",
+   "detail": "sign_stability is bounded below at 0.50 and returns 1.00 for a consistently tiny coefficient",
+   "consequence": "The gate was one criterion, not two. Recorded, not retrofitted."
+  }
+ ],
+ "preregistration_scorecard": {
+  "summary": "Eight expectations were committed before fitting. FOUR WERE WRONG.",
+  "rows": [
+   {
+    "round": "sweep",
+    "expectation": "K-by-rule will score worse than K=20, exposing the latter as selection-inflated",
+    "outcome": "CORRECT, WRONG REASON",
+    "detail": "the rule chose 'all' in 20/20 seasons -- K is not identifiable out-of-sample at all"
+   },
+   {
+    "round": "sweep",
+    "expectation": "Market-residual ridge beats E5, still not R0",
+    "outcome": "WRONG ON BOTH",
+    "detail": "it beats R0 on opening, and is significantly WORSE than both on closing"
+   },
+   {
+    "round": "sweep",
+    "expectation": "Online aggregation and CSR will not help",
+    "outcome": "HALF WRONG",
+    "detail": "CSR was the only exploratory method to survive Holm, on full support, p<0.0001, beating the reference in all 20 seasons"
+   },
+   {
+    "round": "sweep",
+    "expectation": "No method passes the stability gate",
+    "outcome": "WRONG",
+    "detail": "seven did, and the gate was weaker than designed (defect 7)"
+   },
+   {
+    "round": "recency",
+    "expectation": "rho=1.00 selected in a majority of seasons",
+    "outcome": "CONFIRMED",
+    "detail": "unanimously, 20/20"
+   },
+   {
+    "round": "recency",
+    "expectation": "No recency scheme changes the closing-line null",
+    "outcome": "CONFIRMED",
+    "detail": ""
+   },
+   {
+    "round": "recency",
+    "expectation": "Giacomini-Rossi rejects on opening, not closing",
+    "outcome": "WRONG",
+    "detail": "rejects on neither; the open/close gap is a difference in level, not drift over time"
+   },
+   {
+    "round": "recency",
+    "expectation": "Cohort trend small, will not reorder the screen",
+    "outcome": "WRONG ON BOTH CLAUSES",
+    "detail": "the correction destroys signal because the best forecasters are recent entrants"
+   }
+  ]
+ },
+ "known_limitations": [
+  "No confirmation window exists. The 2021-25 minimum detectable effect is 0.161 RMSE against a full-window 0.078, so a holdout cannot confirm an effect this size.",
+  "Prediction Tracker publishes mid-week with no publication timestamp, so it is unknown what price was available when a forecast appeared. The opening-line edge is an UNREACHABLE UPPER BOUND, not a strategy.",
+  "25 season clusters is below the ~40 where analytic cluster SEs can be trusted; wild cluster bootstrap-t with Rademacher weights and the null imposed by centring is the primary inference. B=2000, so the p-value floor is 1/2000 = 0.0005.",
+  "Missingness is almost certainly not at random: models enter and exit, and coverage correlates with game difficulty.",
+  "sign_stability is inert (defect 7), so the viability gate is one criterion, not two.",
+  "The pairwise correlation structure across the 8 candidate methods was never measured; the AKM bound below is constructed so that it does not need to be."
+ ],
+ "open_questions": [
+  "Selection-adjusted inference with no confirmation window (see akm_bound -- believed closed by bound, would like this confirmed or refuted).",
+  "Why did complete subset regression survive when every shrinkage estimator did not? Is CSR at k=1 effectively an equal-weighted average of many one-regressor corrections?",
+  "Is the 1-SE rule the wrong selection rule for a SMALL correction to a STRONG benchmark? It always picks the more conservative end, which here means 'do nothing'.",
+  "Benchmark contamination inside forecast panels -- is there a named detection method?",
+  "4b. Why does an equal-weighted consensus resist contamination that a ridge amplifies (73% vs 27% retention)? Is there a diagnostic that finds this WITHOUT already having a contamination measure?",
+  "When does cohort/vintage adjustment destroy signal rather than confounding?",
+  "5b. Eligibility rules in unbalanced forecaster panels -- my filter silently became a tenure test, and eligibility correlated with entry year almost perfectly, which is the same confound the cohort correction was meant to address.",
+  "Detecting slow decay in relative performance with ~20 time-series observations.",
+  "Is squared error the right loss for a betting decision (which is a sign/threshold call)?",
+  "Which market number is the right benchmark?",
+  "Does closing line value actually predict realised profitability?",
+  "Persistent skill without exploitable edge -- the mutual-fund analogy.",
+  "Inference at 20-25 clusters."
+ ]
+}
