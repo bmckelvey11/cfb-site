@@ -1,6 +1,6 @@
 # CFBD endpoint field reference
 
-Auto-generated from the vendored `cfbd-python` client (spec version pinned in `cfbd-python/README.md`). Every field description below is authored by us — CFBD's OpenAPI spec ships descriptions for request *parameters* only (see `cfbd/api/*.py`), never for response fields, so nothing here is copied from upstream docs. Regenerate by rerunning the generator script if the vendored client is bumped; verify names against the model source under `cfbd-python/cfbd/models/` if in doubt.
+Auto-generated from the vendored `cfbd-python` client (spec version pinned in `cfbd-python/README.md`) by [`scripts/gen_endpoint_field_reference.py`](../scripts/gen_endpoint_field_reference.py). Every field description below is authored by us — CFBD's OpenAPI spec ships descriptions for request *parameters* only (see `cfbd/api/*.py`), never for response fields, so nothing here is copied from upstream docs. Regenerate after bumping the vendored client; verify names against the model source under `cfbd-python/cfbd/models/` if in doubt.
 
 Endpoint list mirrors the `ENDPOINTS` registry in [`cfb_system_maker/scrapers.py`](../cfb_system_maker/scrapers.py) — see [`docs/data-coverage.md`](data-coverage.md) for which endpoints are actually scraped, on what cadence, and known data floors/gaps.
 
@@ -1151,7 +1151,7 @@ _SRS including FCS opponents, with additional sub-components._
 | `year` | int | Season year. |
 | `ranking` | int | Rank (1 = best) within the given scope. |
 | `name` | str | Name. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 | `committedTo` | str | School the recruit committed to. |
 | `position` | str | Position abbreviation. |
 | `height` | float | Height in inches. |
@@ -1341,7 +1341,7 @@ Same schema as its base endpoint above. `excludeGarbageTime=true` — drops garb
 | Field | Type | Description |
 |---|---|---|
 | `id` | int | Unique identifier for the record. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 | `mascot` | str | Team mascot name. |
 | `abbreviation` | str | Short abbreviation. |
 | `alternateNames` | List[str] | Alternate names. |
@@ -1413,7 +1413,7 @@ Same schema as its base endpoint above. `excludeGarbageTime=true` — drops garb
 | Field | Type | Description |
 |---|---|---|
 | `id` | int | Unique identifier for the record. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 | `mascot` | str | Team mascot name. |
 | `abbreviation` | str | Short abbreviation. |
 | `alternateNames` | List[str] | Alternate names. |
@@ -1807,7 +1807,7 @@ Enum values: `active`, `eliminated`, `champion`
 | Field | Type | Description |
 |---|---|---|
 | `id` | int | Unique identifier for the record. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 
 ### CoachCareer
 
@@ -1932,7 +1932,7 @@ Enum values: `active`, `eliminated`, `champion`
 | Field | Type | Description |
 |---|---|---|
 | `id` | int | Unique identifier for the record. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 | `conference` | str | Conference name. |
 
 ### CoachTeamReference
@@ -1940,7 +1940,7 @@ Enum values: `active`, `eliminated`, `champion`
 | Field | Type | Description |
 |---|---|---|
 | `id` | int | Unique identifier for the record. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 
 ### CoachTenure
 
@@ -2714,7 +2714,7 @@ Enum values: `scheduled`, `selected`, `in_progress`, `completed`
 | Field | Type | Description |
 |---|---|---|
 | `id` | int | Unique identifier for the record. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 | `conference` | str | Conference name. |
 
 ### PollWeek
@@ -2756,7 +2756,7 @@ Enum values: `scheduled`, `selected`, `in_progress`, `completed`
 | `year` | int | Season year. |
 | `ranking` | int | Rank (1 = best) within the given scope. |
 | `name` | str | Name. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 | `committedTo` | str | School the recruit committed to. |
 | `position` | str | Position abbreviation. |
 | `height` | float | Height in inches. |
@@ -2894,7 +2894,7 @@ Enum values: `allstar`, `postseason`, `preseason`, `regular`, `spring_postseason
 | Field | Type | Description |
 |---|---|---|
 | `id` | int | Unique identifier for the record. |
-| `school` | str | School coached. |
+| `school` | str | School/team name. |
 | `mascot` | str | Team mascot name. |
 | `abbreviation` | str | Short abbreviation. |
 | `alternateNames` | List[str] | Alternate names. |
