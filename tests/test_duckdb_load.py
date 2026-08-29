@@ -5,15 +5,31 @@ from cfb_system_maker.duckdb_load import build_duckdb, explode_payloads, flatten
 
 
 def test_parse_dump_stem_splits_season_and_week():
-    assert parse_dump_stem("games_2023") == ("games", 2023, None)
-    assert parse_dump_stem("plays_2023_wk1") == ("plays", 2023, 1)
-    assert parse_dump_stem("conferences") == ("conferences", None, None)
-    assert parse_dump_stem("gamePlayerStat_2012") == ("gamePlayerStat", 2012, None)
+    assert parse_dump_stem("games_2023") == ("games", 2023, None, None)
+    assert parse_dump_stem("plays_2023_wk1") == ("plays", 2023, 1, "regular")
+    assert parse_dump_stem("conferences") == ("conferences", None, None, None)
+    assert parse_dump_stem("gamePlayerStat_2012") == ("gamePlayerStat", 2012, None, None)
+
+
+def test_parse_dump_stem_postseason_week():
+    assert parse_dump_stem("game_team_stats_2024_post_wk1") == (
+        "game_team_stats",
+        2024,
+        1,
+        "postseason",
+    )
+    assert parse_dump_stem("ppa_players_games_ngt_2024_post_wk3") == (
+        "ppa_players_games_ngt",
+        2024,
+        3,
+        "postseason",
+    )
 
 
 def test_parse_dump_stem_keeps_non_year_numeric_suffix():
     assert parse_dump_stem("pff_facet_offense_summary_21580") == (
         "pff_facet_offense_summary_21580",
+        None,
         None,
         None,
     )
@@ -62,8 +78,42 @@ def test_build_duckdb_loads_raw_and_graphql_payloads(tmp_path):
     assert home == [("A",), ("B",)]
     week = con.execute("SELECT week FROM raw.plays").fetchone()[0]
     assert week == 1
+    assert con.execute("SELECT season_type FROM raw.plays").fetchone()[0] == "regular"
     assert con.execute("SELECT season FROM graphql.\"gamePlayerStat\"").fetchone()[0] == 2012
     assert con.execute("SELECT COUNT(*) FROM meta.load_report").fetchone()[0] == 6
+
+
+def test_build_duckdb_groups_postseason_week_into_same_table(tmp_path):
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    (raw / "game_team_stats_2024_wk1.json").write_text(
+        json.dumps([{"id": 1, "team": "A"}]),
+        encoding="utf-8",
+    )
+    (raw / "game_team_stats_2024_post_wk1.json").write_text(
+        json.dumps([{"id": 2, "team": "B"}]),
+        encoding="utf-8",
+    )
+
+    db_path, reports = build_duckdb(tmp_path, include_actionnetwork=False)
+    by_name = {(r.schema, r.name): r for r in reports}
+    assert ("raw", "game_team_stats") in by_name
+    assert by_name[("raw", "game_team_stats")].rows == 2
+    assert not any(r.name.startswith("game_team_stats_2024") for r in reports)
+
+    import duckdb
+
+    con = duckdb.connect(str(db_path), read_only=True)
+    rows = con.execute(
+        "SELECT season, week, season_type, json_extract_string(payload, '$.team') "
+        "FROM raw.game_team_stats ORDER BY season_type, json_extract(payload, '$.id')"
+    ).fetchall()
+    assert rows == [
+        (2024, 1, "postseason", "B"),
+        (2024, 1, "regular", "A"),
+    ]
+    # No season filter silent-drop of bowls:
+    assert con.execute("SELECT COUNT(*) FROM raw.game_team_stats WHERE season = 2024").fetchone()[0] == 2
 
 
 def test_explode_payloads_writes_stg_columns(tmp_path):

@@ -229,10 +229,8 @@ print(parse_dump_stem('game_team_stats_2024_post_wk1'))
 "
 ```
 
-`parse_dump_stem('game_team_stats_2024_post_wk1') -> ('game_team_stats_2024_post_wk1', None,
-None)` — `_SEASON_WEEK_RE` requires `_{season}_wk{n}` with nothing between `{season}` and
-`wk`, and `_post_wk1` does not match it (nor does the plain `_SEASON_RE`), so the whole stem
-survives as the table name instead of being grouped with its regular-season siblings.
+`parse_dump_stem('game_team_stats_2024_post_wk1')` previously returned
+`('game_team_stats_2024_post_wk1', None, None)` — whole stem as table name, no season.
 
 The in-SQL filename regex used to populate the `season`/`week` columns (`_insert_json_file`)
 disagrees with the stem parser on the same file — it extracts `season=None` (its year regex
@@ -268,15 +266,18 @@ print(parse_dump_stem('ppa_players_games_ngt_2024_post_wk3'))
 
 `('ppa_players_games_ngt_2024_post_wk3', None, None)` — same failure mode, same fix needed.
 
-**Proposed fix — a decision for review, not an implementation.** Add an optional `_post`
-segment to `_SEASON_WEEK_RE` (and the matching in-SQL filename regex), and add a
-`season_type` column so a rebuilt `raw.game_team_stats` can distinguish a regular-week-1 row
-from a postseason-week-1 row instead of merging their week numbers. This is flagged as a
-rebuild-time decision rather than an auto-fix because **it changes table identity**: today
-`game_team_stats_2024_wk1.json` and `game_team_stats_2024_post_wk1.json` produce different
-table names (one grouped, one standalone); after the fix they would both load into
-`raw.game_team_stats` with `week=1` and different `season_type` values, which is a schema
-change for every consumer of that table, not just a bugfix.
+**Fix (implemented 2026-08-28).** `_SEASON_WEEK_RE` accepts an optional `_post_` segment;
+`parse_dump_stem` returns `(name, season, week, season_type)` with `season_type`
+`regular` | `postseason` for week-scoped files (`NULL` for season-only / once dumps).
+Raw/graphql JSON tables gain a `season_type` column populated from that parser (no second
+in-SQL filename regex). Regular and postseason week files group into the same table —
+a schema change for consumers that previously saw orphan `*_post_wk*` table names.
+
+**Rebuild note (2026-08-28):** clean rebuild to `$CFB_DATA_ROOT/cfb.duckdb` with `--explode`
+landed `raw` 77 + `graphql` 36 (separate schemas; zero `*_post_wk*` table names;
+`raw.game_team_stats` postseason rows all have non-null `season`). Two `stg` explode
+passes OOM on this machine (`plays`, `gamePlayerStat`) — raw payloads remain; defer those
+`stg` tables or explode on a higher-RAM host. Rebuild used `--skip-actionnetwork`.
 
 ### `--only` is destructive, and `meta.load_report` omits the `stg` pass
 

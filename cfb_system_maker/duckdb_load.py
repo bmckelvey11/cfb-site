@@ -22,7 +22,8 @@ _SKIP_STEMS = frozenset({"user_info"})
 _YEAR_MIN = 1990
 _YEAR_MAX = 2035
 
-_SEASON_WEEK_RE = re.compile(r"^(.+)_(\d{4})_wk(\d+)$")
+# Optional ``_post`` before ``_wk`` — postseason scrapes write ``{name}_{year}_post_wk{n}``.
+_SEASON_WEEK_RE = re.compile(r"^(.+)_(\d{4})_(post_)?wk(\d+)$")
 _SEASON_RE = re.compile(r"^(.+)_(\d{4})$")
 
 # DuckDB allocates a buffer of maximum_object_size per JSON read. Size it to the
@@ -35,7 +36,8 @@ CREATE TABLE {table} (
   payload JSON,
   source_file VARCHAR,
   season INTEGER,
-  week INTEGER
+  week INTEGER,
+  season_type VARCHAR
 )
 """
 
@@ -49,19 +51,26 @@ class TableLoad:
     error: str | None = None
 
 
-def parse_dump_stem(stem: str) -> tuple[str, int | None, int | None]:
-    """Split ``games_2023_wk1`` → ``('games', 2023, 1)``; unknown stems stay whole."""
+def parse_dump_stem(stem: str) -> tuple[str, int | None, int | None, str | None]:
+    """Split dump stems into ``(table, season, week, season_type)``.
+
+    ``plays_2023_wk1`` → ``('plays', 2023, 1, 'regular')``;
+    ``plays_2023_post_wk1`` → ``('plays', 2023, 1, 'postseason')``;
+    ``games_2023`` → ``('games', 2023, None, None)`` (season-level; type is in payload);
+    unknown stems stay whole with null season/week/type.
+    """
     match = _SEASON_WEEK_RE.fullmatch(stem)
     if match:
         year = int(match.group(2))
         if _YEAR_MIN <= year <= _YEAR_MAX:
-            return match.group(1), year, int(match.group(3))
+            season_type = "postseason" if match.group(3) else "regular"
+            return match.group(1), year, int(match.group(4)), season_type
     match = _SEASON_RE.fullmatch(stem)
     if match:
         year = int(match.group(2))
         if _YEAR_MIN <= year <= _YEAR_MAX:
-            return match.group(1), year, None
-    return stem, None, None
+            return match.group(1), year, None, None
+    return stem, None, None, None
 
 
 def build_duckdb(
@@ -329,7 +338,7 @@ def _plan_loads(
         for path in sorted(raw_dir.glob("*.json")):
             if path.stem in _SKIP_STEMS or path.stem.startswith("_"):
                 continue
-            name, _, _ = parse_dump_stem(path.stem)
+            name, _, _, _ = parse_dump_stem(path.stem)
             raw_groups.setdefault(name, []).append(path)
         for name, paths in sorted(raw_groups.items()):
             if only is not None and name not in only:
@@ -344,7 +353,7 @@ def _plan_loads(
     if gql_dir.is_dir():
         gql_groups: dict[str, list[Path]] = {}
         for path in sorted(gql_dir.glob("*.json")):
-            name, _, _ = parse_dump_stem(path.stem)
+            name, _, _, _ = parse_dump_stem(path.stem)
             gql_groups.setdefault(name, []).append(path)
         for name, paths in sorted(gql_groups.items()):
             if only is not None and name not in only:
@@ -407,23 +416,26 @@ def _load_job(con: duckdb.DuckDBPyConnection, job: dict[str, Any]) -> TableLoad:
 def _insert_json_file(con: duckdb.DuckDBPyConnection, table: str, path: Path) -> None:
     json_format = _json_root_format(path)
     object_size = max(_DEFAULT_OBJECT_SIZE, path.stat().st_size + _OBJECT_SIZE_SLACK)
+    _, season, week, season_type = parse_dump_stem(path.stem)
+    # Bind season/week/type from the stem parser (one source of truth) — do not
+    # re-parse filenames with a second in-SQL regex that can drift from grouping.
     con.execute(
         f"""
         INSERT INTO {table}
         SELECT
           json AS payload,
           filename AS source_file,
-          TRY_CAST(nullif(regexp_extract(filename, '_(\\d{{4}})(?:_wk\\d+)?\\.json$', 1), '') AS INTEGER)
-            AS season,
-          TRY_CAST(nullif(regexp_extract(filename, '_wk(\\d+)\\.json$', 1), '') AS INTEGER)
-            AS week
+          ?::INTEGER AS season,
+          ?::INTEGER AS week,
+          ?::VARCHAR AS season_type
         FROM read_json_objects(
           {_sql_path_list([path])},
           format='{json_format}',
           filename=true,
           maximum_object_size={object_size}
         )
-        """
+        """,
+        [season, week, season_type],
     )
 
 
