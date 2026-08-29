@@ -255,3 +255,69 @@ market), `pt_e4_weights_{opening,closing}.csv`, `pt_model_eval.json`.
   are noise, and are reported with blank CIs rather than a rank.
 - **The market benchmark is Prediction Tracker's own recorded line,** not an independently
   sourced closing price, and its exact capture time is undocumented upstream.
+
+---
+
+## 7. Follow-up: other model sources, and where the edge actually is
+
+Added 2026-08-29, after the main analysis. **Everything in this section is exploratory** —
+none of it was pre-registered, and the thresholds below were chosen after seeing results.
+
+### Other prediction sources in the warehouse — mostly dead ends
+
+| Source | Grain | Usable? |
+|---|---|---|
+| `stg.sp`, `stg.fpi`, `stg.srs`, `stg.talent`, `stg.ratings` | season × team, **season-final** | Only lagged a full season. Using them in-season is lookahead. `features.py` already lags them. |
+| `stg.core_ratings` | has `throughWeek`, but every row is `postseason` week 1 | Season-final in practice. Same limit. |
+| `stg.pregame_win_prob` | per game, 2013–2026 | Its `spread` column **is the market line echoed back** (−31.5, −35.0, −14.0 …), not an independent forecast. |
+| `stg.game.homeStartElo` / `awayStartElo` | **per game, as-of** | The one genuine per-game pre-game rating in the warehouse, ~700 games/season back to 2001. |
+
+The bigger problem is redundancy, not availability. Prediction Tracker already carries
+`lineelo` (99.6% coverage), `linefpi`, `lineespn` (FPI-derived) and `linesag`. Elo-, FPI- and
+Sagarin-flavoured signals have already been tested here **and already lost to the closing
+line.** Adding SP+ or a fresh Elo is adding more of what did not work.
+
+Nor is the ceiling a modelling-method problem: a ridge over 60+ active models did no better
+than a two-parameter fit. When extra flexibility buys nothing, the constraint is signal, not
+specification — gradient boosting or stacking would not change that.
+
+### Where the edge actually is: the open-to-close window
+
+§5 found the ensemble recovers 50.4% of the market's open-to-close move. Pushing on that:
+
+| Quantity | Value |
+|---|---|
+| corr(ensemble's disagreement with the opener, actual line move) | **0.546** |
+| Market's move direction called correctly | **65.7%** of 12,301 games |
+
+The models predict **where the line is going**, not where the game lands. Betting the opener
+on the ensemble's side, season-clustered CIs, break-even 52.38%:
+
+| Filter | Bets | Hit rate | 95% CI | ROI |
+|---|---|---|---|---|
+| any edge | 14,069 | 52.11% | [50.76, 53.21] | −0.5% |
+| \|edge\| > 1 | 6,154 | 53.01% | [50.87, 54.93] | +1.2% |
+| **\|edge\| > 2** | **1,936** | **55.89%** | **[53.05, 58.65]** | **+6.7%** |
+| \|edge\| > 3 | 512 | 61.33% | [55.55, 67.92] | +17.1% |
+
+The same bets graded at the **closing** number: 50.1%, ROI −4.3%. The entire edge lives in
+the gap between the two prices and is fully gone by close — which is the same finding as §3
+seen from the betting side rather than the squared-error side.
+
+### Why this is not yet a strategy
+
+- **The opener may not be a price you can hit.** Prediction Tracker records an opening number;
+  whether it was executable, and at what limit, is undocumented. Openers carry low limits.
+- **Worse, the timing may not exist at all.** PT publishes model forecasts *mid-week* — by then
+  the opener is gone. The real entry price is whatever the line is at publication time, which
+  is somewhere between open and close and which this dataset does not contain. The true
+  capture is bounded above by the table and below by roughly zero.
+- **Post-hoc thresholds.** |edge| > 2 was picked after looking; five thresholds were examined.
+- A CLV proxy of 65.7% alongside a −4.3% ROI at closing prices is a standing warning that
+  **beating the close is not the same as winning**, and should not be used as the success
+  metric here.
+
+**The next test worth running is a timing test, not another model:** reconstruct the line
+available at PT's publication timestamp (Action Network per-book history has intraday moves
+CFBD lacks) and re-grade the |edge| > 2 bets at that price. That single number decides whether
+any of this is real.
