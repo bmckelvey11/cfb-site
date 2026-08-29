@@ -491,6 +491,12 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
         response.headers.setdefault("X-Frame-Options", "DENY")
         return response
 
+    @app.get("/favicon.ico")
+    def favicon():
+        # Browsers ask for /favicon.ico whatever the <link rel="icon"> says, so
+        # every page load was logging a 404. Point it at the SVG we do have.
+        return redirect(url_for("static", filename="favicon.svg"))
+
     @app.get("/")
     def dashboard():
         if _wants_editor(request.args):

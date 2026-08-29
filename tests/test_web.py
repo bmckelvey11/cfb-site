@@ -2206,6 +2206,16 @@ def test_pages_link_svg_favicon(tmp_path):
         assert b'rel="icon"' in client.get(path).data
 
 
+def test_favicon_ico_redirects_to_the_svg(tmp_path):
+    """Browsers request /favicon.ico regardless of the <link rel="icon">."""
+    app = create_app(data_dir=tmp_path)
+    client = app.test_client()
+    resp = client.get("/favicon.ico")
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/static/favicon.svg")
+    assert client.get("/static/favicon.svg").status_code == 200
+
+
 def test_disclaimer_footer_on_main_pages(tmp_path):
     app = create_app(data_dir=tmp_path)
     client = app.test_client()
