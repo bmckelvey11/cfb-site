@@ -3,7 +3,7 @@
 Written to be handed to an outside reviewer with no access to this repo. That constraint
 drives two choices: every method code carries a plain-English label (an earlier reviewer
 answered about "CSR" without knowing it was E14), and every headline number is the
-post-fix value, since five specification defects were found mid-analysis.
+post-fix value, since eight specification defects were found mid-analysis.
 """
 
 from __future__ import annotations
@@ -75,6 +75,12 @@ DEFECTS = [
     ["Stability gate half-inert", "sign_stability is bounded below at 0.50 and returns 1.00 "
      "for a consistently tiny coefficient", "The gate was one criterion, not two. Recorded, "
      "not retrofitted."],
+    ["Post-hoc narrowing of the selection family",
+     "shrank the AKM candidate count from 8 to 6 by calling two methods degenerate on the "
+     "OPENING line using the CLOSING line flags",
+     "Would have tightened a bound that needed no tightening, by violating the "
+     "pre-specified DEGENERATE_CORR = 0.01. Caught by an outside reviewer asking whether the "
+     "threshold was chosen after seeing the results. See akm_bound.retracted_tightening."],
 ]
 
 SCORECARD = [
@@ -193,7 +199,7 @@ def main():
                    "needed to judge the analysis is in this file; no repo access required.",
             "read_this_first": [
                 "Loss is MSE in points-squared. NEGATIVE d_vs_r0 = BETTER than the benchmark.",
-                "Every number here is POST-FIX. Five specification defects were found during "
+                "Every number here is POST-FIX. Eight specification defects were found during "
                 "the analysis (see defects_found); all headline numbers were recomputed.",
                 "Two benchmarks are reported separately and the answer differs completely "
                 "between them. This IS the main finding.",
@@ -311,15 +317,80 @@ def main():
             "bound": [{k: round(v, 6) for k, v in r.items()} for r in akm],
             "conclusion": "Worst case over the entire rho range leaves p = 2.4e-4, still "
                           "under the bootstrap 1/2000 floor, and the effect no weaker than "
-                          "-1.88. Two of the eight candidates were degenerate on opening "
-                          "(E8 |corr|=0.03, E12=0.17) and could not have won, so effective m "
-                          "is 6 and the bound tightens to 1.3e-4.",
+                          "-1.88. m stays at 8; see retracted_tightening.",
+            "retracted_tightening": "An earlier version of this bundle shrank the effective "
+                                    "candidate count to 6, calling E8 and E12 degenerate on "
+                                    "opening. WRONG, and worth stating plainly: the "
+                                    "pre-specified degeneracy threshold is "
+                                    "DEGENERATE_CORR = 0.01, and their opening mean_abs_corr "
+                                    "is 0.030 and 0.174 -- both clear it. They are degenerate "
+                                    "on CLOSING (0.0, 1.4e-15). Shrinking m applied the wrong "
+                                    "benchmark's flags, i.e. exactly the post-hoc narrowing a "
+                                    "reviewer should object to. The m=8 bound needs no help.",
+            "two_corrections_two_targets": {
+                "note": "These answer different questions and should be reported separately "
+                        "rather than one 'replacing' the other. What must NOT happen is "
+                        "applying both to the same p-value.",
+                "holm_multiplicity": "TESTING. Controls family-wise error across the 8 null "
+                                     "hypotheses: is ANY of these methods distinguishable "
+                                     "from R0? Remains the right tool for that question.",
+                "akm_winner": "ESTIMATION. Addresses bias in the point estimate for the "
+                              "method that was SELECTED: how much should -2.615 be trusted "
+                              "given that it won a noisy tournament?",
+            },
+            "reviewer_ready_statement": "The opening-line CSR finding survives worst-case "
+                                        "winner's-curse correction on significance, but the "
+                                        "point estimate should be reported as a range of "
+                                        "roughly -1.88 to -2.61 rather than a single number.",
             "cautions": [
-                "The correction REPLACES Holm rather than stacking with it.",
+                "Do not apply Holm and AKM to the same p-value; see "
+                "two_corrections_two_targets.",
                 "Both raw and corrected p sit below the bootstrap floor, so the honest "
                 "statement is 'below 1/2000 before and after winner correction'.",
                 "AKM real bite is on the POINT ESTIMATE, not the p-value.",
             ],
+        },
+        "eligibility_tenure_diagnostic": {
+            "what": "Defect 4 cost two rounds of analysis. This is the check that would have "
+                    "caught it from PANEL METADATA ALONE -- no fitting, no skill estimate, no "
+                    "knowledge of which models are good. Per season, compare the entry-year "
+                    "distribution of the ELIGIBLE set against that of the ACTIVE set. If "
+                    "eligibility skews older, the filter is truncating on age whatever its "
+                    "stated purpose.",
+            "measure": "age_skew = median(entry year | active) - median(entry year | eligible)."
+                       " Positive means the filter keeps older models than the panel holds.",
+            "legacy_filter": {"mean_age_skew_seasons": 6.2, "mean_kept": 0.27,
+                              "at_2025": "kept 14/39, median entry 2002 vs active 2011"},
+            "fixed_filter": {"mean_age_skew_seasons": 0.3, "mean_kept": 0.87,
+                             "at_2025": "kept 37/39, median entry 2011 vs active 2011"},
+            "rule_now_used": "Coverage is measured over the seasons a model actually "
+                             "PUBLISHED IN, not over the whole training window.",
+            "known_difference_from_the_textbook_fix": "A reviewer proposed coverage = "
+                                                      "observed / min(seasons since entry, "
+                                                      "window). That is stricter than what is "
+                                                      "implemented: mine drops gap seasons "
+                                                      "from the denominator entirely, so a "
+                                                      "model that stopped publishing for two "
+                                                      "seasons and resumed is not penalised. "
+                                                      "Only 25 of 154 models have gap seasons. "
+                                                      "Not yet tested which is better.",
+            "script": "scripts/diag_eligibility_tenure.py",
+        },
+        "untested_prediction_Neff": {
+            "claim": "A reviewer proposes the inverse Herfindahl of a method's own fitted "
+                     "weights, N_eff = 1 / sum(w_i^2), as a CONTAMINATION-BLIND fragility "
+                     "diagnostic: equal-weight top-20 has N_eff = 20 by construction, while "
+                     "ridge/elastic-net should collapse toward 1-3 when one predictor's "
+                     "marginal correlation dominates -- which is what a benchmark clone "
+                     "produces. It needs no contamination measure, only training-window "
+                     "weights, and flags fragility to ANY single column.",
+            "why_it_matters": "If true it would have predicted the 73%-vs-27% retention split "
+                              "in market_contamination BEFORE that split was measured.",
+            "status": "NOT TESTED. The sweep persists only the outer scalar gamma per method "
+                      "per season, not per-model ridge coefficients, so testing it needs a "
+                      "re-run with weight capture. Reported here as an open prediction, not a "
+                      "result. It is falsifiable: if ridge N_eff is NOT collapsed relative to "
+                      "the eligible-column count, the proposed mechanism is wrong.",
         },
         "defects_found": [{"defect": a, "detail": b, "consequence": c} for a, b, c in DEFECTS],
         "preregistration_scorecard": {

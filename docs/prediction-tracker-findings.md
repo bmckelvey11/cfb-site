@@ -133,6 +133,7 @@ would have invalidated headline numbers.
 | 5 | **Giacomini–Rossi statistic uncentred** while its bootstrap imposed the null by centring | Tested "is the difference nonzero", not "does it change over time" — a uniformly-better method would have tripped it. Found by writing its test. |
 | 6 | **Misleading RMSE column** — a method on reduced support printed beside the shared market RMSE | Reproduced the coverage-difficulty confound the plan names as threat #1, inside a document whose §1 explains that confound. Every row now carries the market's RMSE on its own games. |
 | 7 | **Stability gate half-inert** — `sign_stability` is bounded below at 0.50 and returns 1.00 for a consistently tiny coefficient as readily as a large one | The gate was effectively one criterion, not two. Recorded, not retrofitted. |
+| 8 | **Post-hoc narrowing of the selection family** — shrank the AKM candidate count from 8 to 6 by calling two methods degenerate on the *opening* line using the *closing* line's flags | Would have tightened a bound that needed no tightening, by violating my own pre-specified `DEGENERATE_CORR = 0.01`. Caught by an outside reviewer asking whether the threshold was chosen after seeing the results. |
 
 ### Pre-registration scorecard
 
@@ -235,15 +236,23 @@ sweep does not persist. It does not need to: the correction is bounded by
 `E[max_m Z] * se * sqrt(1 - rho)`, and both unknown inputs move it only one way. At the rho = 0
 corner -- candidates *independent*, the largest correction available -- the adjusted p is
 2.4e-4, still under the bootstrap's 1/2000 resolution floor, and the effect is no weaker than
--1.88. Two of the eight candidates were degenerate on opening (E8 |corr| = 0.03, E12 = 0.17):
-they had collapsed onto R0 and could not have won, so effective *m* is smaller and the bound
-tightens further (rho = 0, m = 6 gives 1.3e-4). `scripts/akm_winner_bound.py`.
+-1.88. `scripts/akm_winner_bound.py`.
 
-Three cautions on how to quote this. The correction **replaces** Holm rather than stacking with
-it -- conditioning on selection and adjusting for multiplicity are the same job done twice. Both
-the raw and corrected p sit below the bootstrap's floor, so the honest statement is *"below
-1/2000 before and after winner correction"*, not a six-decimal number. And AKM's real bite is on
-the **point estimate**, not the p-value: report -2.615 with the selection-bias bound attached.
+**A tightening I claimed and have retracted.** I first shrank the effective candidate count to
+6, calling E8 and E12 degenerate on opening. Wrong, and worth recording as defect 8: the
+pre-specified threshold is `DEGENERATE_CORR = 0.01`, and their opening `mean_abs_corr` is 0.030
+and 0.174 -- both clear it. They are degenerate on *closing* (0.0 and 1.4e-15). I had applied
+the wrong benchmark's flags, which is precisely the post-hoc narrowing of a selection family
+that a reviewer should object to. The m = 8 bound needs no help.
+
+Two cautions on how to quote this. Holm and AKM answer **different questions and should be
+reported separately**: Holm controls family-wise error across the eight nulls (*is any method
+distinguishable from R0?*), AKM corrects bias in the point estimate of the method that was
+selected (*how much should -2.615 be trusted, given that it won?*). What must not happen is
+applying both to the same p-value. Second, both the raw and corrected p sit below the
+bootstrap's floor, so the honest statement is *"below 1/2000 before and after winner
+correction"*, not a six-decimal number -- and AKM's real bite is on the point estimate anyway.
+Report the effect as a range of roughly **-1.88 to -2.61**.
 
 **Methodological questions the results raised**, written up as a second research prompt in
 `research-prompt-open-questions.md`: selection-adjusted inference with no confirmation window;

@@ -11,6 +11,7 @@ Usage:
 Requires `motherduck_token` (or `MOTHERDUCK_TOKEN`) env var, or a prior
 `duckdb -c "ATTACH 'md:'"` interactive login on this machine.
 """
+
 import argparse
 import os
 import subprocess
@@ -20,7 +21,7 @@ from datetime import datetime, timezone
 
 import duckdb
 
-DEFAULT_SCHEMAS = ["raw", "graphql", "stg", "core", "meta"]
+DEFAULT_SCHEMAS = ["raw", "stg", "core", "meta"]
 
 
 def git_sha() -> str | None:
@@ -37,7 +38,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", default=os.environ.get("CFB_DATA_ROOT", "data"))
     parser.add_argument("--schemas", nargs="+", default=DEFAULT_SCHEMAS)
-    parser.add_argument("--dry-run", action="store_true", help="list tables, push nothing")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="list tables, push nothing"
+    )
     parser.add_argument("--yes", action="store_true", help="required to actually push")
     args = parser.parse_args()
 
@@ -47,12 +50,17 @@ def main() -> int:
         return 1
 
     if not args.dry_run and not args.yes:
-        print("Refusing to push without --yes (md:cfb is shared, not scratch).", file=sys.stderr)
+        print(
+            "Refusing to push without --yes (md:cfb is shared, not scratch).",
+            file=sys.stderr,
+        )
         print("Run with --dry-run first to see what would be pushed.", file=sys.stderr)
         return 1
 
     if not (os.environ.get("motherduck_token") or os.environ.get("MOTHERDUCK_TOKEN")):
-        print("No motherduck_token/MOTHERDUCK_TOKEN set — ATTACH 'md:' will prompt to login.")
+        print(
+            "No motherduck_token/MOTHERDUCK_TOKEN set — ATTACH 'md:' will prompt to login."
+        )
 
     con = duckdb.connect()
     # Not READ_ONLY: the warehouse_version stamp below writes back to src too.
@@ -72,7 +80,9 @@ def main() -> int:
     ).fetchall()
 
     if not tables:
-        print(f"No tables found in schemas {args.schemas} on {src_path}.", file=sys.stderr)
+        print(
+            f"No tables found in schemas {args.schemas} on {src_path}.", file=sys.stderr
+        )
         return 1
 
     for schema, table in tables:
@@ -87,9 +97,14 @@ def main() -> int:
             f'CREATE OR REPLACE TABLE md."{schema}"."{table}" AS '
             f'SELECT * FROM src."{schema}"."{table}"'
         )
-        dst_n = con.execute(f'SELECT COUNT(*) FROM md."{schema}"."{table}"').fetchone()[0]
+        dst_n = con.execute(f'SELECT COUNT(*) FROM md."{schema}"."{table}"').fetchone()[
+            0
+        ]
         status = "OK" if dst_n == n else f"MISMATCH (src={n} dst={dst_n})"
-        print(f"{schema}.{table}: {dst_n} rows ({time.time()-t0:.1f}s) {status}", file=sys.stderr)
+        print(
+            f"{schema}.{table}: {dst_n} rows ({time.time()-t0:.1f}s) {status}",
+            file=sys.stderr,
+        )
 
     if args.dry_run:
         return 0

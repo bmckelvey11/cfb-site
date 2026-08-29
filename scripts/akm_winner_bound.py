@@ -60,11 +60,12 @@ def main():
     worst = rows[0]
     print(f"\nworst case (rho=0): p={worst['p_corr']:.2e}, "
           f"effect no weaker than {d + worst['bias_bound']:+.3f}")
-    # Two of the eight candidates are degenerate on opening (E8 |corr|=0.03, E12=0.17):
-    # they collapsed onto R0 and could not have won, so effective m is smaller.
-    _, _, e6, r6 = bound(d, lo, hi, 6)
-    print(f"effective m=6 (drop degenerate E8/E12): E[max]={e6:.4f}, "
-          f"rho=0 p={r6[0]['p_corr']:.2e}")
+    print("\nm stays at 8. An earlier version of this script shrank it to 6 by calling E8 and"
+          "\nE12 degenerate on opening -- but the PRE-SPECIFIED degeneracy threshold is"
+          "\nDEGENERATE_CORR=0.01, and their mean_abs_corr there is 0.030 and 0.174. Both clear"
+          "\nit. They are degenerate on CLOSING (0.0 and 1.4e-15), not on opening, so shrinking"
+          "\nm was reading the wrong benchmark's flags -- exactly the post-hoc narrowing a"
+          "\nreviewer should object to. The m=8 bound above needs no such help.")
 
 
 def _check():
