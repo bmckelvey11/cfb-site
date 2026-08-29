@@ -228,6 +228,23 @@ equally consistent with noise — those windows carry intervals of ±2.5 and ±2
 which uses the full span and is built for the question, finds nothing. The honest statement is
 that the recent era cannot resolve an effect of this size.
 
+**The winner's curse is bounded, and it does not bite.** CSR was the *selected* method among
+eight, so its effect is conditional on having won a noisy tournament. Andrews-Kitagawa-McCloskey
+is the right framework, but implementing it literally needs an 8x8 cluster-robust covariance the
+sweep does not persist. It does not need to: the correction is bounded by
+`E[max_m Z] * se * sqrt(1 - rho)`, and both unknown inputs move it only one way. At the rho = 0
+corner -- candidates *independent*, the largest correction available -- the adjusted p is
+2.4e-4, still under the bootstrap's 1/2000 resolution floor, and the effect is no weaker than
+-1.88. Two of the eight candidates were degenerate on opening (E8 |corr| = 0.03, E12 = 0.17):
+they had collapsed onto R0 and could not have won, so effective *m* is smaller and the bound
+tightens further (rho = 0, m = 6 gives 1.3e-4). `scripts/akm_winner_bound.py`.
+
+Three cautions on how to quote this. The correction **replaces** Holm rather than stacking with
+it -- conditioning on selection and adjusting for multiplicity are the same job done twice. Both
+the raw and corrected p sit below the bootstrap's floor, so the honest statement is *"below
+1/2000 before and after winner correction"*, not a six-decimal number. And AKM's real bite is on
+the **point estimate**, not the p-value: report -2.615 with the selection-bias bound attached.
+
 **Methodological questions the results raised**, written up as a second research prompt in
 `research-prompt-open-questions.md`: selection-adjusted inference with no confirmation window;
 why CSR survived where every shrinkage estimator collapsed; whether the 1-SE rule is
@@ -235,7 +252,12 @@ systematically wrong for a small correction to a strong benchmark; benchmark con
 named problem in forecast panels; when cohort adjustment destroys signal; the power of stability
 tests at 20 observations; whether squared error is the right loss for a betting decision; which
 market number is the right benchmark; and whether closing line value actually predicts realised
-profit.
+profit. Two of those came back with no settled answer in the literature, which is itself the
+finding: **benchmark cloning inside a forecast panel has no named detection method**, and
+**cohort adjustment has no standard pretest** -- the recommended substitutes are a continuous
+anchoring model (`f_it = a_i + b_i*m_t + (1-b_i)*u_it`, classifying forecasters by anchoring
+intensity instead of dropping them on a threshold) and overlap-based identification checks
+before any cohort control. Both are open work, not applied here.
 
 ---
 
