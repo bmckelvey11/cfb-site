@@ -159,10 +159,16 @@ Build `mart.model_game_team_features` (if Phase 1 didn't already fold it into
 `fact_team_week`) and `app.*` serving views on top of Phase 1's `core`, once
 something is actually reading from DuckDB in production instead of `games.csv`.
 
-**Phase 3+ — not committed, revisit on demand.**
-Athlete/coach/recruiting/draft dimensional layer, play/drive facts, `ref`/`model`/`qa`
-schemas — build the specific piece a real task needs, when it needs it, using the raw
-data that's already sitting in `raw.athlete`/`raw.coach`/`raw.recruit`/etc. today.
+**Phase 3+ — not committed, but coaches/athletes/play-by-play flagged as near-term
+intent (2026-08-28).** No build yet — still waiting on Phase 0/1 and a concrete use
+case, per `## What the plan is missing` above. When this starts, note one thing
+already true: coach-level work has a Python precedent, not a SQL one —
+`coach_style.py`'s `coach_style_cluster` registry feature (a generated k-means label
+from `raw.coach`/advanced stats, `docs/coach-playstyle-analysis.md` is its validity
+study) already ships as a `result_lookahead`-quarantined feature, not a `core.dim_coach`.
+Athlete- and play-level work has no precedent either way — first real decision when
+that starts is the same one Phase 1 already made for games: registry feature in
+Python, or `core`/`mart` table in SQL, and why.
 
 ---
 
