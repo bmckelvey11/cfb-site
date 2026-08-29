@@ -148,7 +148,9 @@ Applied sizes:
 
 Deliberately tight — the previous app used 6px everywhere.
 
-`--radius-xs` 1px · `--radius-sm` **2px** (buttons, inputs, controls, pills, active-filter rows) · `--radius-md` **4px** (range-filter card, brand mark) · `--radius-lg` **8px** (metric chips, panels, table wrappers) · `--radius-full` 9999px (timeframe pills).
+`--radius-xs` 1px · `--radius-sm` **2px** (buttons, inputs, controls, pills, active-filter rows) · `--radius-md` **4px** (range-filter card, brand mark) · `--radius-lg` **8px** (metric chips, panels, table wrappers, filter-modal shell) · `--radius-full` 9999px (timeframe pills, range track and thumbs).
+
+`spacing.css` also defines `--radius-xl` 12px and calls it the modal radius. That is the generic design-system default; this product tops out at `lg`, and 12px reads bubbly against 2px controls, so the filter modal uses `--radius-lg` like every other panel.
 
 ### Shadows & transitions
 
@@ -265,12 +267,13 @@ next reader does not redo them:
 
 ## Known issues to be aware of
 
-These are real defects in the source design system, not things to reproduce faithfully:
+These were real defects in the source design system, not things to reproduce faithfully.
+Numbers 1-3 still stand; 4 is closed:
 
 1. **`--signal-50` and `--ink-50` are the same value** (`#EEF2F8`). Anything tinted with the accent-light token is invisible against the page background, which is why selected controls in `cfb.css` use `--signal-100` instead. If you fix the token, `--signal-100` usages can move back down a step.
 2. **The shadow stack is still warm-tinted** — `--shadow-xs` through `--shadow-2xl` use `rgba(28, 21, 16, …)`, a brown left over from an earlier palette. They are barely used in these screens, but they are wrong against slate. `rgba(17, 19, 24, …)` is the correct tint.
 3. **The design system's `Button` component force-uppercases every label**, which contradicts the sentence-case CTA rule in its own writing guidelines. `cfb.css` follows the guidelines, not the component. If you adopt the shared component library, expect this conflict.
-4. **The filter modal is unstyled by this pass.** `filter_modal.js` builds its controls dynamically and the `.filter-modal__*` classes are only partially covered. Budget a follow-up for it.
+4. ~~The filter modal is unstyled by this pass.~~ **Done** — the modal is on the tokens now: chips inherit the `.metrics` treatment (18px mono over a 9px uppercase label) instead of overriding it, the value table takes the app's `--ink-800` sticky header, the seven secondary buttons collapse into one rule whose pressed state is the `--signal-100` fill used by `.segmented` / `.check`, and the shell is `--radius-lg`. The block carries no raw hex. `filter_modal.js` still builds the controls, so its hooks — inline `left`/`width` on the dual-range fill, inline opacity on the chips, and the `.is-active` / `.is-selected` / `.positive` / `.negative` classes — are preserved deliberately.
 
 ## Files
 
