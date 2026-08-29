@@ -2183,7 +2183,14 @@ def test_security_headers_present_on_all_pages(tmp_path):
         resp = client.get(path)
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
         assert resp.headers["Referrer-Policy"] == "same-origin"
-        assert resp.headers["Content-Security-Policy"] == "default-src 'self'"
+        csp = resp.headers["Content-Security-Policy"]
+        assert "default-src 'self'" in csp
+        # Google Fonts is the only allowed off-origin source (design system faces).
+        assert csp == (
+            "default-src 'self'; "
+            "style-src 'self' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com"
+        )
         assert resp.headers["X-Frame-Options"] == "DENY"
 
 

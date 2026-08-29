@@ -1,0 +1,89 @@
+/* Saturday Signal — Typography Tokens
+ *
+ * Instrument Sans (UI, body, headings) + Instrument Serif (display, 48px and up)
+ * + JetBrains Mono (stat values, table numerals, code).
+ * Loaded from Google Fonts CDN.
+ *
+ * ⚠️  SUBSTITUTION NOTE: if you have Saturday Signal's licensed typefaces,
+ * replace the @import below with local @font-face declarations and copy the
+ * font files into assets/fonts/.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ── Font Families ── */
+  /* --font-display is reserved for 48px and above (hero, marketing, covers).
+     Below that it reads mannered — use --font-body at 600 instead. */
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-body:    'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* ── Type Scale (rem, base 16px) ── */
+  --text-xs:   0.75rem;    /*  12px */
+  --text-sm:   0.875rem;   /*  14px */
+  --text-base: 1rem;       /*  16px */
+  --text-lg:   1.125rem;   /*  18px */
+  --text-xl:   1.25rem;    /*  20px */
+  --text-2xl:  1.5rem;     /*  24px */
+  --text-3xl:  1.875rem;   /*  30px */
+  --text-4xl:  2.25rem;    /*  36px */
+  --text-5xl:  3rem;       /*  48px ← display serif starts here */
+  --text-6xl:  3.75rem;    /*  60px */
+  --text-7xl:  4.5rem;     /*  72px */
+
+  /* ── Line Height ── */
+  --leading-none:    1;
+  --leading-tight:   1.1;
+  --leading-snug:    1.25;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.65;
+  --leading-loose:   1.8;
+
+  /* ── Letter Spacing ── */
+  --tracking-tightest: -0.04em;
+  --tracking-tight:    -0.02em;
+  --tracking-normal:    0;
+  --tracking-wide:      0.04em;
+  --tracking-wider:     0.08em;
+  --tracking-widest:    0.14em;
+
+  /* ── Font Weight ── */
+  --weight-light:    300;
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ── Semantic Type Styles ── */
+  /* Display — serif, 48px and up ONLY */
+  --type-display-xl:  var(--weight-regular) var(--text-7xl)/var(--leading-tight) var(--font-display);
+  --type-display-lg:  var(--weight-regular) var(--text-6xl)/var(--leading-tight) var(--font-display);
+  --type-display-md:  var(--weight-regular) var(--text-5xl)/var(--leading-tight) var(--font-display);
+
+  /* Headings — sans below 48px */
+  --type-heading-2xl: var(--weight-semibold) var(--text-4xl)/var(--leading-snug) var(--font-body);
+  --type-heading-xl:  var(--weight-semibold) var(--text-3xl)/var(--leading-snug) var(--font-body);
+  --type-heading-lg:  var(--weight-semibold) var(--text-2xl)/var(--leading-snug) var(--font-body);
+  --type-heading-md:  var(--weight-semibold) var(--text-xl)/var(--leading-normal) var(--font-body);
+  --type-heading-sm:  var(--weight-semibold) var(--text-base)/var(--leading-normal) var(--font-body);
+
+  /* Body */
+  --type-body-lg:     var(--weight-regular) var(--text-lg)/var(--leading-relaxed) var(--font-body);
+  --type-body-md:     var(--weight-regular) var(--text-base)/var(--leading-relaxed) var(--font-body);
+  --type-body-sm:     var(--weight-regular) var(--text-sm)/var(--leading-normal) var(--font-body);
+
+  /* UI / Labels */
+  --type-label-lg:    var(--weight-medium) var(--text-sm)/1.4 var(--font-body);
+  --type-label-md:    var(--weight-medium) var(--text-xs)/1.4 var(--font-body);
+  --type-caption:     var(--weight-regular) var(--text-xs)/var(--leading-normal) var(--font-body);
+  --type-overline:    var(--weight-semibold) 0.6875rem/1.4 var(--font-body);  /* 11px, pair with --tracking-widest */
+
+  /* Numeric — stat values and table numerals. Body copy stays sans. */
+  --type-stat-lg:     var(--weight-medium) var(--text-2xl)/1.15 var(--font-mono);
+  --type-stat-md:     var(--weight-medium) var(--text-lg)/1.15 var(--font-mono);
+  --type-numeric-sm:  var(--weight-regular) var(--text-xs)/var(--leading-normal) var(--font-mono);
+
+  /* Code */
+  --type-code:        var(--weight-regular) var(--text-sm)/var(--leading-relaxed) var(--font-mono);
+}

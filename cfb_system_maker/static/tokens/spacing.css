@@ -1,0 +1,69 @@
+/* Saturday Signal — Spacing, Radius, Shadow & Layout Tokens */
+
+:root {
+  /* ── Space Scale (base unit: 4px) ── */
+  --space-0:  0;
+  --space-1:  0.25rem;   /*  4px */
+  --space-2:  0.5rem;    /*  8px */
+  --space-3:  0.75rem;   /* 12px */
+  --space-4:  1rem;      /* 16px */
+  --space-5:  1.25rem;   /* 20px */
+  --space-6:  1.5rem;    /* 24px */
+  --space-8:  2rem;      /* 32px */
+  --space-10: 2.5rem;    /* 40px */
+  --space-12: 3rem;      /* 48px */
+  --space-16: 4rem;      /* 64px */
+  --space-20: 5rem;      /* 80px */
+  --space-24: 6rem;      /* 96px */
+  --space-32: 8rem;      /* 128px */
+
+  /* ── Border Radius ── */
+  /* Editorial aesthetic: minimal, near-square. Nothing bubbly. */
+  --radius-none: 0;
+  --radius-xs:   1px;
+  --radius-sm:   2px;    /* buttons, inputs */
+  --radius-md:   4px;    /* small cards, dropdowns */
+  --radius-lg:   8px;    /* cards, panels */
+  --radius-xl:   12px;   /* modals, large containers */
+  --radius-2xl:  16px;   /* sheets */
+  --radius-full: 9999px; /* pills, avatars, chips */
+
+  /* ── Box Shadows (warm-tinted) ── */
+  --shadow-xs:  0 1px 2px rgba(28, 21, 16, 0.06);
+  --shadow-sm:  0 1px 3px rgba(28, 21, 16, 0.08), 0 1px 2px rgba(28, 21, 16, 0.05);
+  --shadow-md:  0 4px 12px rgba(28, 21, 16, 0.09), 0 2px 4px rgba(28, 21, 16, 0.05);
+  --shadow-lg:  0 8px 24px rgba(28, 21, 16, 0.11), 0 4px 8px rgba(28, 21, 16, 0.06);
+  --shadow-xl:  0 16px 40px rgba(28, 21, 16, 0.13), 0 8px 16px rgba(28, 21, 16, 0.07);
+  --shadow-2xl: 0 32px 64px rgba(28, 21, 16, 0.16), 0 16px 24px rgba(28, 21, 16, 0.08);
+
+  /* Focus ring — used on interactive elements */
+  --shadow-focus: 0 0 0 3px var(--color-focus-ring, rgba(201, 75, 46, 0.30));
+
+  /* ── Z-Index Scale ── */
+  --z-base:     0;     /* @kind other */
+  --z-raised:   10;    /* @kind other */
+  --z-dropdown: 100;   /* @kind other */
+  --z-sticky:   200;   /* @kind other */
+  --z-overlay:  300;   /* @kind other */
+  --z-modal:    400;   /* @kind other */
+  --z-toast:    500;   /* @kind other */
+
+  /* ── Layout / Container Widths ── */
+  --container-xs:  480px;
+  --container-sm:  640px;
+  --container-md:  768px;
+  --container-lg:  1024px;
+  --container-xl:  1280px;
+  --container-2xl: 1440px;
+
+  /* Reading / content widths */
+  --content-narrow: 640px;   /* editorial body text, optimal reading */
+  --content-normal: 860px;   /* standard content column */
+  --content-wide:   1120px;  /* wide layouts */
+
+  /* ── Transition Presets ── */
+  --transition-fast:   150ms ease-out;   /* @kind other */
+  --transition-normal: 200ms ease-out;   /* @kind other */
+  --transition-slow:   300ms ease-out;   /* @kind other */
+  --transition-modal:  300ms ease-in-out; /* @kind other */
+}

@@ -62,7 +62,7 @@ Canonical data dir is `cfb_paths.DATA_ROOT` (`CFB_DATA_ROOT`, default `<repo>/da
 
 `actionnetwork` is a fourth acquire path (no CFBD token): per-book odds including 1H/1Q markets CFBD lacks → `data/raw/actionnetwork/`. Browser-ish UA required.
 
-`duckdb` loads `data/raw/` + `data/graphql/` into `data/cfb.duckdb` (one file; `raw` JSON payloads, optional `stg` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`.
+`duckdb` loads `data/raw/` + `data/graphql/` into `data/cfb.duckdb` (one file; both land in `raw` as JSON payloads — GraphQL `calendar` becomes `raw.calendar_gql` on name clash — optional `stg` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`.
 
 **MotherDuck (`md:cfb`) is a manual mirror, local file is source of truth.** Never write to `md:cfb` directly — rebuild and verify local first (`python -m pytest -m slow tests/test_core_agreement.py`), then promote with `python scripts/promote_to_motherduck.py --dry-run` (lists tables/rows, pushes nothing) followed by `--yes` (CTAS-replaces each table, stamps `meta.warehouse_version` on both sides). See `docs/duckdb-warehouse-plan.md` (`## MotherDuck promote`) for the full runbook.
 
@@ -91,6 +91,7 @@ Canonical data dir is `cfb_paths.DATA_ROOT` (`CFB_DATA_ROOT`, default `<repo>/da
 - **Running season-to-date stats** (`running_stats.py`, source kind `computed_running`): values are entering-game — computed from that team's strictly-prior games in the same season, ordered by raw `startDate` (fallback: week). First game of a season → `games_played=0`, percentages/averages `None` (which fail closed as filters).
 - **Coach playstyle labels** (`coach_style.py`, feature `coach_style_cluster`): a GENERATED 189-coach dict mapping head-coach name → one of five k-means style groups; regenerate with `python scripts/build_coach_style_clusters.py`, never hand-edit. Grouped `result_lookahead` because the label is career-level (2016–2024) and residualized on SP+, so an early-season game reads a label informed by later results. `docs/coach-playstyle-analysis.md` is the validity study — read it before trusting a label: seasons match their coach's career cluster only 45.6% of the time, `balanced_spread` is a residual bucket rather than a style, and a walk-forward market test found no edge.
 - **Sidecar `_meta`**: `features.json` is `{"_meta": {registry_version, game_count, generated_at}, "games": {...}}`. `features.registry_version()` hashes sorted registry keys; the web UI warns when the sidecar was built by an older registry. Legacy flat sidecars still load.
+- **Design system (`docs/design-system.md`)**: the UI runs on Saturday Signal tokens. `static/styles.css` consumes them via `var(--*)` only — put color/type/space values in `static/tokens/{colors,typography,spacing}.css`, never inline hex in `styles.css`. Three rules that bite: Instrument Serif is for 48px+ and appears nowhere in this app; JetBrains Mono is stat values and chart axes only, never tables; tables use Instrument Sans with `font-variant-numeric: tabular-nums`. CTA labels are sentence case. Radii are tight (2px controls, 8px panels).
 
 ## Tests
 

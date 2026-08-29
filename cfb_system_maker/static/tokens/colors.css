@@ -1,0 +1,101 @@
+/* Saturday Signal — Color Tokens
+ * Two palettes: Signal (brand accent) and Ink (cool slate neutrals),
+ * plus semantic colors and functional aliases.
+ */
+
+:root {
+  /* ── Signal Palette (brand accent — steel slate blue) ── */
+  --signal-50:  #EEF2F8;
+  --signal-100: #DDE5F1;
+  --signal-200: #BAC9E3;
+  --signal-300: #8AAACE;
+  --signal-400: #567298;
+  --signal-500: #2E4A6B; /* ← Brand primary */
+  --signal-600: #233856;
+  --signal-700: #192840;
+  --signal-800: #0F1C2E;
+  --signal-900: #070D18;
+
+  /* ── Ink Palette (cool slate neutrals — text, surfaces, borders) ── */
+  --ink-0:   #FFFFFF;
+  --ink-50:  #EEF2F8;
+  --ink-100: #E2E6EE;
+  --ink-200: #CDD2DC;
+  --ink-300: #A8ADB9;
+  --ink-400: #7E8494;
+  --ink-500: #5C6272;
+  --ink-600: #424854;
+  --ink-700: #2C3038;
+  --ink-800: #1B1E24;
+  --ink-900: #111318;
+
+  /* ── Semantic Palette ── */
+  --success-50:  #F0FAF5;
+  --success-100: #DCF4E9;
+  --success-500: #2A7A4E;
+  --success-700: #1A5234;
+  --success-900: #0F3020;
+
+  --warning-50:  #FDFBF0;
+  --warning-100: #FDF3E0;
+  --warning-500: #B87314;
+  --warning-700: #7A4D0D;
+  --warning-900: #452A06;
+
+  --error-50:    #FEF3F1;
+  --error-100:   #FBEBE8;
+  --error-500:   #C23030;
+  --error-700:   #8A1F1F;
+  --error-900:   #520F0F;
+
+  --info-50:     #EEF3FC;
+  --info-100:    #DDE7F9;
+  --info-500:    #1E50A0;
+  --info-700:    #133470;
+  --info-900:    #0A1C40;
+
+  /* ── Semantic Aliases (use these in component code) ── */
+
+  /* Backgrounds */
+  --color-bg:              var(--ink-50);     /* default page background */
+  --color-bg-alt:          var(--ink-100);    /* alternate/section background */
+  --color-bg-invert:       var(--ink-900);    /* dark sections */
+
+  /* Surfaces */
+  --color-surface:         var(--ink-0);      /* card, panel, dialog */
+  --color-surface-raised:  var(--ink-50);     /* subtly elevated surface */
+  --color-surface-overlay: rgba(17, 19, 24, 0.55); /* modal backdrop */
+
+  /* Borders */
+  --color-border:          var(--ink-200);    /* default border */
+  --color-border-subtle:   var(--ink-100);    /* hairline/separator */
+  --color-border-strong:   var(--ink-300);    /* emphasized border */
+
+  /* Text */
+  --color-text-primary:    var(--ink-900);    /* main content */
+  --color-text-secondary:  var(--ink-500);    /* supporting copy */
+  --color-text-tertiary:   var(--ink-400);    /* placeholder, de-emphasized */
+  --color-text-disabled:   var(--ink-300);
+  --color-text-inverted:   var(--ink-0);      /* on dark backgrounds  */
+
+  /* Brand / Accent */
+  --color-accent:          var(--signal-500);
+  --color-accent-hover:    var(--signal-600);
+  --color-accent-active:   var(--signal-700);
+  --color-accent-light:    var(--signal-50);
+  --color-accent-subtle:   var(--signal-100);
+  --color-accent-on:       var(--ink-0);      /* text on accent */
+
+  /* Status */
+  --color-success:         var(--success-500);
+  --color-success-surface: var(--success-100);
+  --color-warning:         var(--warning-500);
+  --color-warning-surface: var(--warning-100);
+  --color-error:           var(--error-500);
+  --color-error-surface:   var(--error-100);
+  --color-info:            var(--info-500);
+  --color-info-surface:    var(--info-100);
+
+  /* Focus ring */
+  --color-focus-ring:      rgba(46, 74, 107, 0.25);
+}

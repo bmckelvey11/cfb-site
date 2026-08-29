@@ -35,6 +35,7 @@ from cfb_system_maker.features import (
     FEATURE_REGISTRY,
     FeatureDef,
     effective_perspective,
+    format_kickoff_hour,
     registry_version,
     resolve_feature_value,
 )
@@ -309,7 +310,9 @@ def aggregate_filter_value_rows(
         profit = round(sum(bet.profit for bet in details), 4)
         risked = bets * stake
         roi = round(profit / risked, 4) if risked else 0.0
-        description = _value_description(value, control)
+        description = _value_description(
+            value, control, feature_key=str(descriptor.get("key", ""))
+        )
         rows.append(
             {
                 "value": value,
@@ -340,9 +343,11 @@ def _categorical_sort_key(value: object) -> tuple:
         return (1, str(value))
 
 
-def _value_description(value: object, control: str) -> str:
+def _value_description(value: object, control: str, *, feature_key: str = "") -> str:
     if control == "bool":
         return "Yes" if value is True else "No"
+    if feature_key == "kickoff_hour":
+        return format_kickoff_hour(value)
     return str(value)
 
 
@@ -476,7 +481,13 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
         logger.info("%s %s %s %.0fms", request.method, request.full_path.rstrip("?"), response.status_code, elapsed_ms)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "same-origin")
-        response.headers.setdefault("Content-Security-Policy", "default-src 'self'")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            # Google Fonts serves the design system's three faces; everything else is local.
+            "default-src 'self'; "
+            "style-src 'self' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com",
+        )
         response.headers.setdefault("X-Frame-Options", "DENY")
         return response
 
