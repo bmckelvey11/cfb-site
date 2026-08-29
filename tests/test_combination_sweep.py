@@ -155,3 +155,31 @@ def test_ewa_weights_use_only_prior_weeks():
     first = df.index[df["wk"] == df["wk"].min()].to_numpy()
     assert np.isnan(ewa[0.01][first]).all()
     assert np.isfinite(ewa[0.01][df.index[df["wk"] == df["wk"].max()].to_numpy()]).any()
+
+
+def test_coverage_filter_is_not_a_tenure_test():
+    """A complete record must qualify regardless of when the model launched.
+
+    Measuring coverage over the whole training history silently excludes every model that
+    did not exist in season one -- including, in the real panel, the two best forecasters.
+    """
+    rng = np.random.default_rng(11)
+    rows = []
+    for s in range(2000, 2010):
+        for i in range(200):
+            line = rng.normal(0, 10)
+            rows.append({
+                "season": s, "pt_week": i % 15, "y": -line + rng.normal(0, 14),
+                "line": line, "lineopen": line,
+                "veteran": line + rng.normal(0, 5),          # present every season
+                "newcomer": line + rng.normal(0, 5) if s >= 2008 else np.nan,
+            })
+    df = pd.DataFrame(rows)
+    tr, te = df[df.season < 2009], df[df.season == 2009]
+
+    cols, active = sweep_mod.regressor_cols(tr, te, ["veteran", "newcomer"])
+    assert set(active) == {"veteran", "newcomer"}
+    assert set(cols) == {"veteran", "newcomer"}, "a complete recent record must qualify"
+
+    legacy, _ = sweep_mod.regressor_cols(tr, te, ["veteran", "newcomer"], legacy=True)
+    assert set(legacy) == {"veteran"}, "the old filter should drop the newcomer"

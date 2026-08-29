@@ -101,10 +101,31 @@ def deviations(frame, cols, bench_col):
     return fcast - mkt[:, None], mkt
 
 
-def regressor_cols(tr, te, models):
-    """Models active this season with enough training coverage to carry a coefficient."""
+def regressor_cols(tr, te, models, legacy=False):
+    """Models active this season with enough training coverage to carry a coefficient.
+
+    Coverage is measured over the seasons the model actually PUBLISHED IN, not over the whole
+    training history. Measuring it over the whole history silently demands that a model have
+    existed since 2001: a strong forecaster that launched in 2015 covers well under 80% of
+    all prior games no matter how complete its record is, so it never becomes a regressor.
+    That is not a coverage test, it is a tenure test, and the parent plan specifies "the
+    model set active in that season".
+
+    `legacy=True` reproduces the original whole-history filter for the correction check in
+    `scripts/diag_regressor_filter.py`.
+    """
     active = [m for m in models if te[m].notna().mean() >= 0.5]
-    return [m for m in active if tr[m].notna().mean() > COL_COVERAGE], active
+    if legacy:
+        return [m for m in active if tr[m].notna().mean() > COL_COVERAGE], active
+    cols = []
+    for m in active:
+        seasons = tr.loc[tr[m].notna(), "season"].unique()
+        if len(seasons) == 0:
+            continue
+        sub = tr.loc[tr["season"].isin(seasons), m]
+        if len(sub) and sub.notna().mean() > COL_COVERAGE:
+            cols.append(m)
+    return cols, active
 
 
 def screened(skill, active, k):
@@ -727,7 +748,13 @@ def main():
 
 
 def rebuild_e5(df, models, bench_col):
-    """E5 exactly as the parent script fits it -- raw forecasts, market penalised too."""
+    """E5 exactly as the parent script fits it -- raw forecasts, market penalised too.
+
+    `legacy=True` deliberately: the parent script used the whole-history coverage filter, and
+    the point of this comparison is E6's CENTRING against E5's, not E6's larger regressor set.
+    Handing E5 the corrected filter would make it worse -- more columns under a complete-row
+    requirement means fewer usable rows -- and the repair would be measured against a strawman.
+    """
     from sklearn.linear_model import Ridge
 
     out = np.full(len(df), np.nan)
@@ -735,7 +762,7 @@ def rebuild_e5(df, models, bench_col):
         tr = df[df["season"] < s]
         te_idx = df.index[df["season"] == s].to_numpy()
         te = df.loc[te_idx]
-        cols, _ = regressor_cols(tr, te, models)
+        cols, _ = regressor_cols(tr, te, models, legacy=True)
         if not cols:
             continue
         sub = tr[cols + [bench_col, "y"]].dropna()

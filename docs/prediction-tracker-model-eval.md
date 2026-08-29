@@ -540,13 +540,19 @@ The panel-level results, attenuated but intact. Dropping the 15 most market-like
 
 | | all 154 | minus 15 | retained |
 |---|---|---|---|
-| E4 vs R0, opening | −1.976 [−3.314, −0.648] p=0.0030 | −1.446 [−2.804, −0.043] p=0.0415 | 73% |
-| E6 vs R0, opening | −2.383 [−3.834, −0.863] p=0.0020 | −1.713 [−3.254, −0.188] p=0.0355 | 72% |
+| E4 vs R0, opening (consensus) | −1.976 [−3.314, −0.648] p=0.0030 | −1.446 [−2.804, −0.043] p=0.0415 | **73%** |
+| E14 vs R0, opening (subset reg.) | −2.615 p<0.0001 | −1.285 [−1.948, −0.641] p<0.0001 | **49%** |
+| E6 vs R0, opening (ridge) | −3.521 p<0.0001 | −0.966 [−2.561, +0.640] **p=0.2560** | **27%** |
 | Harvey–Newbold Wald, opening | 70.10, p<0.0001 | 29.09, p=0.0115 | still rejects |
 
-So roughly a quarter of the opening-line effect was market content leaking in, and about
-three quarters is genuine model information. The claim "the panel beats the opening line"
-holds; the claim "by 2.4 MSE" becomes "by about 1.7 MSE among actual forecasters."
+So roughly a quarter of the *consensus* family's opening-line effect was market content
+leaking in, and about three quarters is genuine model information. The claim "the panel beats
+the opening line" holds; the claim "by 2.0 MSE" becomes "by about 1.4 MSE among actual
+forecasters."
+
+**The ridge is the exception and must not be quoted as model skill.** With a large regressor
+set it loads on the partially market-anchored columns the consensus dilutes away, and 73% of
+its effect goes with them. See `prediction-tracker-combination-sweep.md` §9 and §10.
 
 **The closing-line null is unaffected in direction.** Market proxying can only push a test
 *toward* rejecting, and the closing-line tests did not reject (Harvey–Newbold Wald 5.44,

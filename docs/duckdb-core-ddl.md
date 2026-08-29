@@ -5,9 +5,12 @@ Physical contract for the Phase 1 warehouse tables described in
 dual-SoT policy live in that plan. **This file is columns, keys, CHECKs, and
 indexes only.**
 
-Do not implement until Phase 0 (`duckdb-rebuild-spec.md`) is done. Load pattern:
-full rebuild → CTAS or `CREATE TABLE` + `INSERT` → `ALTER TABLE … ADD PRIMARY KEY`
-(and uniques) if CTAS was used. DuckDB FKs are soft; agreement tests are the gate.
+**Status (2026-08-28):** Phase 1a–1c implemented in `cfb_system_maker/duckdb_core.py`
+(`build_core` / CLI `--core-only`). Agreement gates in `tests/test_core_agreement.py`.
+
+Load pattern: full rebuild → CTAS or `CREATE TABLE` + `INSERT` →
+`ALTER TABLE … ADD PRIMARY KEY` (and uniques) if CTAS was used. DuckDB FKs are soft;
+agreement tests are the gate.
 
 ## Locked defaults (2026-08-28)
 
@@ -20,6 +23,7 @@ full rebuild → CTAS or `CREATE TABLE` + `INSERT` → `ALTER TABLE … ADD PRIM
 | `dim_week` vs fact | Week attrs **degenerate on the fact** always; `dim_week` is a filter spine. **No hard FK** from `fact_game` → `dim_week` (calendar gaps must not block load). |
 | Types for lines | `DOUBLE` (match Python `float` / `GameRecord`). |
 | Spread sign | Home-relative (same as `GameRecord.spread`). |
+| `season_type` CHECK | Include CFBD spring slate: `regular`, `postseason`, `spring_regular`, `spring_postseason`. |
 
 ## Provider canonicalization
 
@@ -43,7 +47,7 @@ CREATE TABLE core.dim_week (
     start_date   TIMESTAMPTZ,
     end_date     TIMESTAMPTZ,
     PRIMARY KEY (season, week, season_type),
-    CHECK (season_type IN ('regular', 'postseason'))
+    CHECK (season_type IN ('regular', 'postseason', 'spring_regular', 'spring_postseason'))
 );
 
 CREATE TABLE core.dim_conference (
@@ -104,7 +108,7 @@ CREATE TABLE core.fact_game (
     selected_total_provider_key     VARCHAR,
     selected_spread                 DOUBLE,   -- home-relative close
     selected_total                  DOUBLE,
-    CHECK (season_type IN ('regular', 'postseason')),
+    CHECK (season_type IN ('regular', 'postseason', 'spring_regular', 'spring_postseason')),
     CHECK (home_team_id <> away_team_id),
     CHECK (
         NOT has_line

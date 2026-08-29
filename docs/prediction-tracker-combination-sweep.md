@@ -50,25 +50,30 @@ reproduce exactly the coverage-difficulty confound the parent plan names as thre
 |---|---|---|---|---|---|---|---|---|---|---|
 | market | 14347 | 15.7222 | 15.7222 | | | | | | | |
 | R0 | 14347 | 15.7212 | 15.7222 | — | reference | | | | | |
-| **E4** (parent primary) | 14347 | 15.6582 | 15.7222 | **−1.976** | [−3.314, −0.648] | 0.0030 | — | 0.96 | 0.85 | pass |
-| **E6** market-residual ridge | 14347 | 15.6452 | 15.7222 | **−2.383** | [−3.834, −0.863] | 0.0020 | — | 1.33 | 0.85 | pass |
-| E7 K by rule | 14347 | 15.6903 | 15.7222 | −0.971 | [−2.220, +0.283] | 0.1350 | 0.675 | 0.79 | 0.70 | pass |
-| E8 SW shrinkage | 14347 | 15.7212 | 15.7222 | +0.000 | — | — | — | 0.00 | 0.00 | none |
-| E9 residual PCs | 14347 | 15.7032 | 15.7222 | −0.566 | [−1.630, +0.499] | 0.2800 | 0.840 | 0.70 | 0.65 | pass |
-| E10 peLASSO | 14347 | 15.6944 | 15.7222 | −0.842 | [−2.017, +0.381] | 0.1735 | 0.694 | 0.82 | 0.70 | pass |
-| E11 trimmed consensus | 14347 | 15.6846 | 15.7222 | −1.150 | [−2.353, +0.066] | 0.0610 | 0.366 | 0.76 | 0.70 | pass |
-| E12 elastic net | 14347 | 15.7212 | 15.7222 | −0.000 | — | 0.4550 | 0.840 | 0.00 | 0.05 | none |
-| E13 online (Hedge) | 14347 | 15.7153 | 15.7222 | −0.185 | [−0.547, +0.161] | 0.3480 | 0.840 | 0.28 | 0.55 | fail |
-| **E14** screened CSR | 10755 | 15.6754 | **15.7187** | **−1.344** | [−2.320, −0.384] | 0.0035 | **0.0245** | 0.66 | 0.87 | pass |
+| **E4** (parent primary) | 14347 | 15.6582 | 15.7222 | −1.976 | [−3.314, −0.648] | 0.0030 | — | 0.96 | 0.85 | pass |
+| **E6** market-residual ridge | 14347 | 15.6088 | 15.7222 | **−3.521** | [−5.448, −1.597] | **<0.0001** | — | 1.89 | 0.90 | pass |
+| E7 K by rule | 14347 | 15.6903 | 15.7222 | −0.971 | [−2.220, +0.283] | 0.1350 | 0.555 | 0.79 | 0.70 | pass |
+| E8 SW shrinkage | 14347 | 15.7159 | 15.7222 | −0.165 | [−0.349, +0.018] | 0.0900 | 0.540 | 0.03 | 0.15 | fail |
+| E9 residual PCs | 14347 | 15.7038 | 15.7222 | −0.548 | [−1.824, +0.743] | 0.3980 | 1.000 | 0.86 | 0.55 | fail |
+| E10 peLASSO | 14347 | 15.6840 | 15.7222 | −1.168 | [−2.523, +0.242] | 0.1110 | 0.555 | 0.89 | 0.70 | pass |
+| E11 trimmed consensus | 14347 | 15.6846 | 15.7222 | −1.150 | [−2.353, +0.066] | 0.0610 | 0.427 | 0.76 | 0.70 | pass |
+| E12 elastic net | 14347 | 15.7128 | 15.7222 | −0.263 | [−0.649, +0.136] | 0.5120 | 1.000 | 0.17 | 0.15 | fail |
+| E13 online (Hedge) | 14347 | 15.7153 | 15.7222 | −0.185 | [−0.547, +0.161] | 0.3480 | 1.000 | 0.28 | 0.55 | fail |
+| **E14** screened CSR | 14347 | 15.6378 | 15.7222 | **−2.615** | [−3.596, −1.583] | **<0.0001** | **<0.0001** | 0.61 | **1.00** | pass |
 
 Clark-West against R0 rejects for every single-direction corrector: E4 +3.721 (p<0.0001),
-E11 +2.250 (p<0.0001), E7 +2.132 (p=0.0003), E10 +2.040 (p=0.0020), E13 +0.362 (p=0.0208).
+E11 +2.250 (p<0.0001), E10 +2.646 (p=0.0008), E7 +2.132 (p=0.0003), E13 +0.362 (p=0.0203).
 
-**E14 is the only exploratory method to survive Holm** (adjusted p=0.0245). Caveats attach
-and none of them are optional: it runs on its own reduced support (10,755 games, 15 of 20
-seasons — screening to ten models is impossible in the early years), it is the winner of an
-eight-member family, and §0 of the addendum ruled out any confirmation window. Its −1.344
-is a **selection estimate** with no second look available to shrink it.
+**E14 is the only exploratory method to survive Holm** (adjusted p < 0.0001), and it beats R0
+in **every one of the 20 seasons**. Two caveats that stood in the first run are now gone: it
+covers the full common support (§10 fixed the filter that starved it of models before 2011),
+and §9 shows its effect is not market proxying — dropping the 15 most market-like columns
+retains 49% and it stays at p < 0.0001.
+
+The caveats that remain are not optional. It is the winner of an eight-member family, and §0
+of the addendum ruled out any confirmation window. **−2.615 is a selection estimate with no
+second look available to shrink it**, and the honest reading is that CSR is a candidate for
+pre-registration, not a result.
 
 ---
 
@@ -78,16 +83,16 @@ is a **selection estimate** with no second look available to shrink it.
 |---|---|---|---|---|---|---|---|---|---|---|
 | market | 14353 | 15.5516 | 15.5516 | | | | | | | |
 | R0 | 14353 | 15.5527 | 15.5516 | — | reference | | | | | |
-| E4 | 14353 | 15.5486 | 15.5516 | −0.128 | [−0.312, +0.052] | 0.1495 | — | 0.29 | 0.65 | pass |
-| E6 | 14353 | 15.5478 | 15.5516 | −0.152 | [−0.638, +0.304] | 0.5115 | — | 0.68 | 0.60 | pass |
-| E7 | 14353 | 15.5529 | 15.5516 | +0.004 | [−0.139, +0.138] | 0.9605 | 1.000 | 0.18 | 0.55 | fail |
+| E4 | 14353 | 15.5486 | 15.5516 | −0.128 | [−0.313, +0.050] | 0.1530 | — | 0.29 | 0.65 | pass |
+| **E6** | 14353 | 15.5882 | 15.5516 | **+1.106** | [+0.033, +2.232] | **0.0480** | — | 1.31 | 0.45 | fail |
+| E7 | 14353 | 15.5529 | 15.5516 | +0.004 | [−0.136, +0.137] | 0.9515 | 1.000 | 0.18 | 0.55 | fail |
 | E8 | 14353 | 15.5527 | 15.5516 | +0.000 | — | — | — | 0.00 | 0.00 | none |
-| E9 | 14353 | 15.5536 | 15.5516 | +0.027 | [−0.041, +0.090] | 0.3980 | 1.000 | 0.08 | 0.50 | fail |
-| E10 | 14353 | 15.5533 | 15.5516 | +0.019 | [−0.164, +0.189] | 0.8245 | 1.000 | 0.18 | 0.50 | fail |
-| E11 | 14353 | 15.5522 | 15.5516 | −0.018 | [−0.144, +0.113] | 0.7635 | 1.000 | 0.16 | 0.55 | fail |
-| E12 | 14353 | 15.5527 | 15.5516 | +0.000 | — | 0.6350 | 1.000 | 0.00 | 0.20 | none |
-| E13 | 14353 | 15.5537 | 15.5516 | +0.030 | [−0.012, +0.072] | 0.1875 | 1.000 | 0.04 | 0.35 | fail |
-| E14 | 9234 | 15.4181 | **15.4187** | −0.023 | [−0.120, +0.074] | 0.6225 | 1.000 | 0.21 | 0.62 | pass |
+| E9 | 14353 | 15.5540 | 15.5516 | +0.041 | [−0.058, +0.135] | 0.3715 | 1.000 | 0.12 | 0.45 | fail |
+| E10 | 14353 | 15.5547 | 15.5516 | +0.060 | [−0.149, +0.262] | 0.5500 | 1.000 | 0.22 | 0.45 | fail |
+| E11 | 14353 | 15.5522 | 15.5516 | −0.018 | [−0.144, +0.109] | 0.7685 | 1.000 | 0.16 | 0.55 | fail |
+| E12 | 14353 | 15.5527 | 15.5516 | +0.000 | — | 0.6300 | 1.000 | 0.00 | 0.20 | none |
+| E13 | 14353 | 15.5537 | 15.5516 | +0.030 | [−0.012, +0.073] | 0.1890 | 1.000 | 0.04 | 0.35 | fail |
+| E14 | 14353 | 15.5476 | 15.5516 | −0.159 | [−0.327, +0.014] | 0.0695 | **0.4865** | 0.21 | 0.65 | pass |
 
 E14's row is the clearest illustration of why the paired column exists. Its raw RMSE of
 15.4181 looks a full 0.13 better than the market's 15.5516 -- but on **E14's own games**
@@ -120,10 +125,15 @@ method, on both benchmarks.**
 
 The addendum's §3 committed in advance to reporting endpoint clipping rather than widening
 the grid, so the registered run stops here. But the distinction matters: four of these are
-the edge of the parameter space itself, not of a grid I chose. **E8 chose ψ=0 — Stock–Watson
+the edge of the parameter space itself, not of a grid I chose. **E8 chose ψ = 0 — Stock–Watson
 shrinkage, handed a free scalar and asked how much of the panel correction to keep, kept
-none of it.** E12's elastic net independently zeroed every coefficient. Both collapse onto
-R0 exactly (|corr| = 0.000), which is why they are marked `none` rather than given a verdict.
+none of it in 85% of seasons.** E12's elastic net independently zeroed every coefficient just
+as often.
+
+Against the **closing** line both collapse onto R0 exactly (|corr| = 0.000), which is why they
+are marked `none` there rather than given a verdict. Against the **opening** line, where signal
+exists, they occasionally keep a sliver — E8's mean correction is 0.03 points, E12's 0.17 —
+which is the entire difference between the two benchmarks expressed as a hyperparameter.
 
 ### The widened-grid appendix — exploratory, outside every gate
 
@@ -152,13 +162,18 @@ E5's own complete-row support:
 
 | benchmark | n | E5 RMSE | E6 RMSE | ΔMSE(E6−E5) | p |
 |---|---|---|---|---|---|
-| opening | 12798 | 15.6033 | 15.5979 | −0.168 [−0.425, +0.107] | 0.2185 |
-| closing | 12803 | 15.5051 | 15.4978 | −0.225 [−0.545, +0.102] | 0.1450 |
+| opening | 12798 | 15.6033 | 15.5573 | **−1.431** [−3.021, +0.100] | 0.0730 |
+| closing | 12803 | 15.5051 | 15.5371 | **+0.993** [+0.102, +1.966] | 0.0385 |
 
-The repair helps in the predicted direction on both benchmarks and is significant on
-neither. Expectation 2 was that correct centring would recover most of what ridge lost
-without manufacturing signal — that is what happened, and the recovery is not large enough
-to claim.
+E5 is held on the *legacy* coverage filter here deliberately (§10): the comparison is about
+E6's centring, not about its larger regressor set, and handing E5 the corrected filter would
+give it 37 columns under a complete-row requirement and measure the repair against a strawman.
+
+**The repair helps against the opening line and significantly hurts against the closing one.**
+That is not a contradiction — it is the sweep's central finding in one row. Where signal
+exists, correct centring plus more regressors extracts it; where it does not, the same extra
+regressors are pure estimation variance and cost about 1.0 MSE. Expectation 2 said E6 would
+beat E5 on both benchmarks; that is **wrong on the closing line**.
 
 ---
 
@@ -265,17 +280,34 @@ analysis's single-model claims.
 
 Dropping the top decile by `corr(f_i − open, close − open)` — 15 columns, including both:
 
+Opening line, ΔMSE vs R0:
+
 | | all 154 | minus 15 | retained |
 |---|---|---|---|
-| E4 vs R0 | −1.976 [−3.314, −0.648] p=0.0030 | −1.446 [−2.804, −0.043] p=0.0415 | 73% |
-| E6 vs R0 | −2.383 [−3.834, −0.863] p=0.0020 | −1.713 [−3.254, −0.188] p=0.0355 | 72% |
-| E11 vs R0 | −1.150 [−2.358, +0.077] p=0.0665 | −0.867 [−1.974, +0.253] p=0.1420 | 75% |
+| E4 vs R0 (consensus) | −1.976 [−3.314, −0.648] p=0.0030 | −1.446 [−2.804, −0.043] p=0.0415 | **73%** |
+| E11 vs R0 (consensus) | −1.150 [−2.358, +0.077] p=0.0665 | −0.867 [−1.974, +0.253] p=0.1420 | **75%** |
+| **E14 vs R0** (subset regression) | −2.615 [−3.666, −1.558] p<0.0001 | −1.285 [−1.948, −0.641] **p<0.0001** | **49%** |
+| **E6 vs R0** (ridge) | −3.521 [−5.448, −1.597] p<0.0001 | **−0.966** [−2.561, +0.640] **p=0.2560** | **27%** |
 | Harvey–Newbold Wald | 70.10, p<0.0001 | 29.09, p=0.0115 | still rejects |
 
-**§1 survives at about three quarters of its size.** Roughly a quarter of the opening-line
-effect was market content leaking in; the rest is genuine model information. §3's closing-line
-null needs no adjustment at all — proxying can only push a test *toward* rejecting, and that
-test did not reject.
+**The families separate sharply, and this is the most important row in the document.**
+
+- The **consensus family** (E4, E11) retains ~three quarters and E4 stays significant. Its
+  opening-line effect is genuine model information.
+- **E14** retains half and stays at p < 0.0001. Also genuine.
+- **E6 retains 27% and stops being significant.** Its headline −3.521 is substantially market
+  proxying. A ridge with 37 regressors can load on the partially market-anchored columns
+  (movement correlations 0.49–0.76) that the consensus family dilutes to a twentieth each.
+  **E6's opening-line figure should not be quoted as model skill.**
+
+§3's closing-line null needs no adjustment in direction — proxying can only push a test
+*toward* rejecting, and that test did not reject.
+
+**One lead, and it is only a lead.** On the closing line E14 *strengthens* under
+decontamination: −0.159 (p=0.0695) becomes **−0.193 [−0.344, −0.045], p=0.0125**. That is a
+post-hoc variant of the winner of an eight-member family, with no confirmation window; Holm
+across that family would put it near 0.10. Per addendum §0 it is a candidate for future
+pre-registration, **not** a closing-line edge.
 
 Two further checks, both clean:
 
@@ -286,3 +318,50 @@ Two further checks, both clean:
   with full-sample PCs. Dropping the PCs: opening Wald 41.92 (p<0.0001), closing 2.48
   (p=0.3475). Same verdict on both benchmarks — the result is consensus-driven and the PCA
   never mattered.
+
+---
+## 10. Correction: the coverage filter was a tenure test
+
+Found 2026-08-29 while writing the consolidated findings, and fixed. Every number in §2, §3,
+§5 and §9 above is post-fix; the first published version of this document was not.
+
+`regressor_cols` required a model to cover **80% of all prior training games**. Because
+missingness in this panel is season-level, that is not a completeness test — it is a test of
+*when a model launched*. A forecaster that began in 2015 covers well under 80% of games since
+2001 no matter how perfect its record, so it could never become a regressor.
+
+At the 2025 season the filter kept **14 of 39** active models, median entry year 2002, and
+excluded `lineespn` and `lineteamrank` — the two best forecasters in the panel (§6 of
+`prediction-tracker-recency-screen.md`). Measuring coverage over the seasons a model actually
+published in keeps **37 of 39**.
+
+Fixing it is a bug repair, not a re-specification: the parent plan specifies "the model set
+**active in that season**", and the code did not implement that.
+
+### What it affected
+
+The **regression family only** — E6, E9, E10, E12, E14. The consensus family (E4, E7, E11,
+E13) reads the active set directly and never touched the filter, so **every consensus result,
+the entire recency analysis, and the §11.1 decontamination figure are unchanged.**
+
+| | before fix | after fix |
+|---|---|---|
+| E6, opening | −2.383 | −3.521 |
+| E6, closing | −0.152 | **+1.106** (significantly *worse* than R0) |
+| E14, opening | −1.344, Holm 0.0245, **15 of 20 seasons** | −2.615, Holm <0.0001, **20 of 20** |
+| E14, closing | −0.023 | −0.159 |
+| E8 / E12, opening | 0.000 (degenerate) | −0.165 / −0.263 |
+
+Two consequences worth stating plainly:
+
+1. **E14's largest caveat is gone.** The filter was what starved complete subset regression of
+   models before 2011; it now runs on the full common support. §9 then shows its effect is not
+   market proxying. It is a much stronger result than first published.
+2. **E6 inverts on the closing line.** Given 37 regressors instead of 14 it goes from −0.152 to
+   +1.106 (p = 0.048) — significantly *worse* than the recalibrated line. That is the sweep's
+   thesis stated as a sign flip rather than an argument: the same estimator on the same
+   regressors gains 3.5 MSE where signal exists and loses 1.1 where it does not. §9 then shows
+   most of the opening-line gain was market content anyway.
+
+`rebuild_e5` is deliberately pinned to the **legacy** filter, because the E6-vs-E5 repair
+comparison in §5 is about centring, not regressor count.
