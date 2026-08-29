@@ -372,9 +372,10 @@ def pick_1se(cands):
     return scored[max(ok)][0]  # last qualifying = most conservative, per the grid order
 
 
-def sweep(df, models, bench_col, verbose=True, grids=None):
+def sweep(df, models, bench_col, verbose=True, grids=None, only=None):
     """Every method's out-of-sample prediction, hyperparameters chosen inside the loop."""
     grids = grids or GRIDS
+    wanted = METHODS if only is None else [m for m in METHODS if m in only]
     seasons = sorted(df.loc[df["season"] > base.BURN_IN_THROUGH, "season"].unique())
     keys = METHODS + ["R0", "E4"]
     preds = {k: np.full(len(df), np.nan) for k in keys}
@@ -416,7 +417,7 @@ def sweep(df, models, bench_col, verbose=True, grids=None):
         if not ia.usable:
             continue
 
-        for m in METHODS:
+        for m in wanted:
             fitter = FITTERS[m]
             cands = []
             for p in grids[m]:
@@ -489,7 +490,7 @@ def sign_stability(coefs, method):
     return max(pos, len(c) - pos) / len(c)
 
 
-def harvey_newbold(df, preds, models, bench_col, y, r0, season, mask, n_boot):
+def harvey_newbold(df, preds, models, bench_col, y, r0, season, mask, n_boot, n_pcs=3):
     """Joint encompassing: does the line encompass the panel as a SET?
 
     IN-SAMPLE by construction (the PCA and the screen both use the whole panel).
@@ -503,8 +504,6 @@ def harvey_newbold(df, preds, models, bench_col, y, r0, season, mask, n_boot):
 
     cols = [m for m in models if df[m].notna().mean() > 0.5]
     d_all, mkt = deviations(df, cols, bench_col)
-    dz = np.nan_to_num(d_all)
-    pcs = PCA(n_components=3).fit_transform(dz - dz.mean(axis=0))
 
     skill = base.prior_skill(df, models, bench_col, base.BURN_IN_THROUGH)
     top20 = [m for m in screened(skill, cols, 20)]
@@ -512,8 +511,11 @@ def harvey_newbold(df, preds, models, bench_col, y, r0, season, mask, n_boot):
     d20, _ = deviations(df, top20, bench_col)
     d5, _ = deviations(df, top5, bench_col)
 
-    X = np.column_stack([np.nan_to_num(np.nanmean(d20, axis=1)),
-                         np.nan_to_num(np.nanmean(d5, axis=1)), pcs])
+    parts = [np.nan_to_num(np.nanmean(d20, axis=1)), np.nan_to_num(np.nanmean(d5, axis=1))]
+    if n_pcs:  # n_pcs=0 drops the components -- the only full-sample piece of this test
+        dz = np.nan_to_num(d_all)
+        parts.append(PCA(n_components=n_pcs).fit_transform(dz - dz.mean(axis=0)))
+    X = np.column_stack(parts)
     resid = y - r0
     sel = mask & np.isfinite(resid) & np.isfinite(X).all(axis=1)
     Xs, rs, cl = X[sel], resid[sel], season[sel]
@@ -618,6 +620,11 @@ def main():
                 "method": k,
                 "n": int(sup.sum()),
                 "rmse": float(np.sqrt(base.sq_err(y[sup], -p[sup]).mean())),
+                # The market's RMSE on THIS method's games. A method scored on a reduced
+                # support has a reduced-support RMSE, and putting it next to the shared
+                # market RMSE reproduces the coverage-difficulty confound the parent plan
+                # names as threat #1 -- easier games, better raw RMSE, no more skill.
+                "rmse_mkt_same_games": float(np.sqrt(base.sq_err(y[sup], -mkt[sup]).mean())),
                 "d_vs_r0": dm, "ci_lo": ci[0], "ci_hi": ci[1], "p": pv,
                 "d_vs_mkt": float(np.nanmean(d_mkt)),
                 "frac_seasons": season_win_rate(y, p, r0, season, sup),
@@ -639,17 +646,19 @@ def main():
 
         mkt_rmse = float(np.sqrt(base.sq_err(y[common], -mkt[common]).mean()))
         r0_rmse = float(np.sqrt(base.sq_err(y[common], -r0[common]).mean()))
-        print(f"\n{'':5s} {'n':>6s} {'RMSE':>8s} {'ΔvsR0':>8s} {'95% CI':>19s} {'p':>7s} "
-              f"{'pHolm':>7s} {'Δvsmkt':>8s} {'|corr|':>7s} {'seas':>5s} {'sign':>5s} "
+        print(f"\n{'':5s} {'n':>6s} {'RMSE':>8s} {'mktRMSE':>8s} {'ΔvsR0':>8s} "
+              f"{'95% CI':>19s} {'p':>7s} {'pHolm':>7s} {'|corr|':>7s} {'seas':>5s} "
               f"{'ok':>5s}")
-        print(f"{'mkt':5s} {n:6d} {mkt_rmse:8.4f}")
-        print(f"{'R0':5s} {n:6d} {r0_rmse:8.4f} {0.0:+8.3f} {'(reference)':>19s}")
+        print(f"{'mkt':5s} {n:6d} {mkt_rmse:8.4f} {mkt_rmse:8.4f}")
+        print(f"{'R0':5s} {n:6d} {r0_rmse:8.4f} {mkt_rmse:8.4f} {0.0:+8.3f} "
+              f"{'(reference)':>19s}")
         for _, r in tab.iterrows():
             ph = f"{r.p_holm:7.4f}" if np.isfinite(r.p_holm) else f"{'-':>7s}"
-            print(f"{r.method:5s} {int(r.n):6d} {r.rmse:8.4f} {r.d_vs_r0:+8.3f} "
+            flag = "" if int(r.n) == n else "  <- own support, RMSE not comparable to the rest"
+            print(f"{r.method:5s} {int(r.n):6d} {r.rmse:8.4f} "
+                  f"{r.rmse_mkt_same_games:8.4f} {r.d_vs_r0:+8.3f} "
                   f"[{r.ci_lo:+8.3f},{r.ci_hi:+7.3f}] {r.p:7.4f} {ph} "
-                  f"{r.d_vs_mkt:+8.3f} {r.mean_abs_corr:7.3f} {r.frac_seasons:5.2f} "
-                  f"{r.sign_stab:5.2f} {r.viable:>5s}")
+                  f"{r.mean_abs_corr:7.3f} {r.frac_seasons:5.2f} {r.viable:>5s}{flag}")
         tab.to_csv(OUT_DIR / f"pt_sweep_{label}{suffix}.csv", index=False)
 
         # --- Clark-West for the two nested single-direction correctors

@@ -39,23 +39,27 @@ the models know, the market learns it between open and close.
 ## 2. Against the opening line — several methods work
 
 ΔMSE vs R0 (the recalibrated line), negative = better. `seas` = fraction of the 20 seasons
-beating R0; `sign` = sign stability of the correction coefficient; `|corr|` = mean distance
-from R0.
+beating R0; `|corr|` = mean distance from R0.
 
-| | n | RMSE | ΔvsR0 | 95% CI | p | Holm | \|corr\| | seas | sign | gate |
+**Read `RMSE` only against `mkt RMSE` on the same row.** E14 runs on its own reduced support,
+so its raw RMSE is a different games' RMSE — setting it beside the shared market figure would
+reproduce exactly the coverage-difficulty confound the parent plan names as threat #1.
+(`sign_stability` is omitted: it is inert as specified — see §6.)
+
+| | n | RMSE | mkt RMSE, same games | ΔvsR0 | 95% CI | p | Holm | \|corr\| | seas | gate |
 |---|---|---|---|---|---|---|---|---|---|---|
-| market | 14347 | 15.7222 | | | | | | | | |
-| R0 | 14347 | 15.7212 | — | reference | | | | | | |
-| **E4** (parent primary) | 14347 | 15.6582 | **−1.976** | [−3.314, −0.648] | 0.0030 | — | 0.96 | 0.85 | 1.00 | pass |
-| **E6** market-residual ridge | 14347 | 15.6452 | **−2.383** | [−3.834, −0.863] | 0.0020 | — | 1.33 | 0.85 | 1.00 | pass |
-| E7 K by rule | 14347 | 15.6903 | −0.971 | [−2.220, +0.283] | 0.1350 | 0.675 | 0.79 | 0.70 | 1.00 | pass |
-| E8 SW shrinkage | 14347 | 15.7212 | +0.000 | — | — | — | 0.00 | 0.00 | — | none |
-| E9 residual PCs | 14347 | 15.7032 | −0.566 | [−1.630, +0.499] | 0.2800 | 0.840 | 0.70 | 0.65 | 1.00 | pass |
-| E10 peLASSO | 14347 | 15.6944 | −0.842 | [−2.017, +0.381] | 0.1735 | 0.694 | 0.82 | 0.70 | 1.00 | pass |
-| E11 trimmed consensus | 14347 | 15.6846 | −1.150 | [−2.353, +0.066] | 0.0610 | 0.366 | 0.76 | 0.70 | 1.00 | pass |
-| E12 elastic net | 14347 | 15.7212 | −0.000 | — | 0.4550 | 0.840 | 0.00 | 0.05 | — | none |
-| E13 online (Hedge) | 14347 | 15.7153 | −0.185 | [−0.547, +0.161] | 0.3480 | 0.840 | 0.28 | 0.55 | 1.00 | fail |
-| **E14** screened CSR | 10755 | 15.6754 | **−1.344** | [−2.320, −0.384] | 0.0035 | **0.0245** | 0.66 | 0.87 | 1.00 | pass |
+| market | 14347 | 15.7222 | 15.7222 | | | | | | | |
+| R0 | 14347 | 15.7212 | 15.7222 | — | reference | | | | | |
+| **E4** (parent primary) | 14347 | 15.6582 | 15.7222 | **−1.976** | [−3.314, −0.648] | 0.0030 | — | 0.96 | 0.85 | pass |
+| **E6** market-residual ridge | 14347 | 15.6452 | 15.7222 | **−2.383** | [−3.834, −0.863] | 0.0020 | — | 1.33 | 0.85 | pass |
+| E7 K by rule | 14347 | 15.6903 | 15.7222 | −0.971 | [−2.220, +0.283] | 0.1350 | 0.675 | 0.79 | 0.70 | pass |
+| E8 SW shrinkage | 14347 | 15.7212 | 15.7222 | +0.000 | — | — | — | 0.00 | 0.00 | none |
+| E9 residual PCs | 14347 | 15.7032 | 15.7222 | −0.566 | [−1.630, +0.499] | 0.2800 | 0.840 | 0.70 | 0.65 | pass |
+| E10 peLASSO | 14347 | 15.6944 | 15.7222 | −0.842 | [−2.017, +0.381] | 0.1735 | 0.694 | 0.82 | 0.70 | pass |
+| E11 trimmed consensus | 14347 | 15.6846 | 15.7222 | −1.150 | [−2.353, +0.066] | 0.0610 | 0.366 | 0.76 | 0.70 | pass |
+| E12 elastic net | 14347 | 15.7212 | 15.7222 | −0.000 | — | 0.4550 | 0.840 | 0.00 | 0.05 | none |
+| E13 online (Hedge) | 14347 | 15.7153 | 15.7222 | −0.185 | [−0.547, +0.161] | 0.3480 | 0.840 | 0.28 | 0.55 | fail |
+| **E14** screened CSR | 10755 | 15.6754 | **15.7187** | **−1.344** | [−2.320, −0.384] | 0.0035 | **0.0245** | 0.66 | 0.87 | pass |
 
 Clark-West against R0 rejects for every single-direction corrector: E4 +3.721 (p<0.0001),
 E11 +2.250 (p<0.0001), E7 +2.132 (p=0.0003), E10 +2.040 (p=0.0020), E13 +0.362 (p=0.0208).
@@ -70,20 +74,24 @@ is a **selection estimate** with no second look available to shrink it.
 
 ## 3. Against the closing line — nothing works
 
-| | n | RMSE | ΔvsR0 | 95% CI | p | Holm | \|corr\| | seas | gate |
-|---|---|---|---|---|---|---|---|---|---|
-| market | 14353 | 15.5516 | | | | | | | |
-| R0 | 14353 | 15.5527 | — | reference | | | | | |
-| E4 | 14353 | 15.5486 | −0.128 | [−0.312, +0.052] | 0.1495 | — | 0.29 | 0.65 | pass |
-| E6 | 14353 | 15.5478 | −0.152 | [−0.638, +0.304] | 0.5115 | — | 0.68 | 0.60 | pass |
-| E7 | 14353 | 15.5529 | +0.004 | [−0.139, +0.138] | 0.9605 | 1.000 | 0.18 | 0.55 | fail |
-| E8 | 14353 | 15.5527 | +0.000 | — | — | — | 0.00 | 0.00 | none |
-| E9 | 14353 | 15.5536 | +0.027 | [−0.041, +0.090] | 0.3980 | 1.000 | 0.08 | 0.50 | fail |
-| E10 | 14353 | 15.5533 | +0.019 | [−0.164, +0.189] | 0.8245 | 1.000 | 0.18 | 0.50 | fail |
-| E11 | 14353 | 15.5522 | −0.018 | [−0.144, +0.113] | 0.7635 | 1.000 | 0.16 | 0.55 | fail |
-| E12 | 14353 | 15.5527 | +0.000 | — | 0.6350 | 1.000 | 0.00 | 0.20 | none |
-| E13 | 14353 | 15.5537 | +0.030 | [−0.012, +0.072] | 0.1875 | 1.000 | 0.04 | 0.35 | fail |
-| E14 | 9234 | 15.4181 | −0.023 | [−0.120, +0.074] | 0.6225 | 1.000 | 0.21 | 0.62 | pass |
+| | n | RMSE | mkt RMSE, same games | ΔvsR0 | 95% CI | p | Holm | \|corr\| | seas | gate |
+|---|---|---|---|---|---|---|---|---|---|---|
+| market | 14353 | 15.5516 | 15.5516 | | | | | | | |
+| R0 | 14353 | 15.5527 | 15.5516 | — | reference | | | | | |
+| E4 | 14353 | 15.5486 | 15.5516 | −0.128 | [−0.312, +0.052] | 0.1495 | — | 0.29 | 0.65 | pass |
+| E6 | 14353 | 15.5478 | 15.5516 | −0.152 | [−0.638, +0.304] | 0.5115 | — | 0.68 | 0.60 | pass |
+| E7 | 14353 | 15.5529 | 15.5516 | +0.004 | [−0.139, +0.138] | 0.9605 | 1.000 | 0.18 | 0.55 | fail |
+| E8 | 14353 | 15.5527 | 15.5516 | +0.000 | — | — | — | 0.00 | 0.00 | none |
+| E9 | 14353 | 15.5536 | 15.5516 | +0.027 | [−0.041, +0.090] | 0.3980 | 1.000 | 0.08 | 0.50 | fail |
+| E10 | 14353 | 15.5533 | 15.5516 | +0.019 | [−0.164, +0.189] | 0.8245 | 1.000 | 0.18 | 0.50 | fail |
+| E11 | 14353 | 15.5522 | 15.5516 | −0.018 | [−0.144, +0.113] | 0.7635 | 1.000 | 0.16 | 0.55 | fail |
+| E12 | 14353 | 15.5527 | 15.5516 | +0.000 | — | 0.6350 | 1.000 | 0.00 | 0.20 | none |
+| E13 | 14353 | 15.5537 | 15.5516 | +0.030 | [−0.012, +0.072] | 0.1875 | 1.000 | 0.04 | 0.35 | fail |
+| E14 | 9234 | 15.4181 | **15.4187** | −0.023 | [−0.120, +0.074] | 0.6225 | 1.000 | 0.21 | 0.62 | pass |
+
+E14's row is the clearest illustration of why the paired column exists. Its raw RMSE of
+15.4181 looks a full 0.13 better than the market's 15.5516 -- but on **E14's own games**
+the market is 15.4187. It drew easier games. The honest gap is -0.023, which is nothing.
 
 Every Holm-adjusted p is 1.000. Clark-West still rejects for E4 (+0.271, p=0.0020) — the
 signal is there in population — and for nobody else. Nine additional estimators, several of
@@ -181,10 +189,21 @@ implied. **E14 (screened CSR) was the only exploratory method to survive Holm on
 benchmark.** I expected complete subset regression to be a waste and it was the strongest
 exploratory result on the opening line. The caveats in §2 stand and are load-bearing.
 
-**4. "No method will pass the stability gate" — wrong.** Six methods clear both stability
-floors on the opening line (E4, E6, E7, E9, E10, E11, E14). The gate turned out to
-discriminate weakly when a real effect is present, which is the correct behaviour and not
-what I predicted.
+**4. "No method will pass the stability gate" — wrong, and the gate is weaker than
+designed.** Seven methods clear it on the opening line (E4, E6, E7, E9, E10, E11, E14).
+
+But the gate is not doing what the addendum's §5 said it would. It has two components and
+**one of them is inert.** `sign_stability` is computed as `max(pos, n−pos) / n`, which is
+bounded below at 0.50 and returns 1.00 for a coefficient that is consistently +0.001 just
+as readily as for one that is consistently +0.8. It measures whether a sign flips, not
+whether a correction is meaningfully sized, so with a coefficient that never changes sign
+it is constant at 1.00 across every method in both tables — which is exactly what the
+`sign` column shows. The gate is therefore effectively `frac_seasons ≥ 0.60` plus the
+degeneracy check, and the degeneracy check is what actually caught E8 and E12.
+
+This is a flaw in the metric as I specified it, not a property of the data. A useful
+version would compare the coefficient's mean to its across-window standard deviation.
+Recorded rather than retrofitted.
 
 ---
 
@@ -231,3 +250,39 @@ opening-line result is a candidate for future pre-registration and not a finding
 And none of it touches the open question — whether the parent analysis's opening-line edge
 survives at a price you could actually take. That still waits on
 `docs/line-timing-collector.md`.
+
+---
+## 9. Robustness: is the opening-line result skill, or proxying?
+
+`scripts/diag_market_proxy.py`. §1's claim is that the panel carries information the opening
+line has not priced. The alternative is a tautology: a column that is really "the line plus my
+adjustment," published mid-week, beats the opening number mechanically.
+
+**It found something worse than proxying — two columns that are not forecasts at all.**
+`lineca` reproduces the closing line *exactly* on 65.6% of its games; `linemidweek` on 43.3%.
+Full write-up in `docs/prediction-tracker-model-eval.md` §10, which retracts the parent
+analysis's single-model claims.
+
+Dropping the top decile by `corr(f_i − open, close − open)` — 15 columns, including both:
+
+| | all 154 | minus 15 | retained |
+|---|---|---|---|
+| E4 vs R0 | −1.976 [−3.314, −0.648] p=0.0030 | −1.446 [−2.804, −0.043] p=0.0415 | 73% |
+| E6 vs R0 | −2.383 [−3.834, −0.863] p=0.0020 | −1.713 [−3.254, −0.188] p=0.0355 | 72% |
+| E11 vs R0 | −1.150 [−2.358, +0.077] p=0.0665 | −0.867 [−1.974, +0.253] p=0.1420 | 75% |
+| Harvey–Newbold Wald | 70.10, p<0.0001 | 29.09, p=0.0115 | still rejects |
+
+**§1 survives at about three quarters of its size.** Roughly a quarter of the opening-line
+effect was market content leaking in; the rest is genuine model information. §3's closing-line
+null needs no adjustment at all — proxying can only push a test *toward* rejecting, and that
+test did not reject.
+
+Two further checks, both clean:
+
+- **Zero-fill exposure.** The residual design zero-fills absent models before projecting, so a
+  game with *no* screened model would get a spurious correction proportional to the market
+  number. Count: **0 of 14,347 rows (opening), 0 of 14,353 (closing).**
+- **Harvey–Newbold without the full-sample components.** The test mixes a walk-forward target
+  with full-sample PCs. Dropping the PCs: opening Wald 41.92 (p<0.0001), closing 2.48
+  (p=0.3475). Same verdict on both benchmarks — the result is consensus-driven and the PCA
+  never mattered.
