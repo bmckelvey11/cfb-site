@@ -287,16 +287,11 @@ tbody tr:hover{background:var(--ink-50)}
 }
 
 /* Filter modal — progressive enhancement + dialog shell */
+/* Only the no-JS default survives from the old rule — the restyle owns every
+   other property of the launcher, and the old fill/radius/weight would shadow it
+   from down here. */
 .filter-launcher {
   display: none;
-  width: 100%;
-  text-align: left;
-  background: var(--panel-strong);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 10px 12px;
-  font-weight: 700;
 }
 
 .filter-modal {
@@ -839,3 +834,138 @@ tbody tr:hover{background:var(--ink-50)}
     padding: 16px;
   }
 }
+
+.load-system-select {
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.js .filter-fallback {
+  display: none;
+}
+
+/* Same progressive-enhancement pair as .filter-launcher above, but keyed off
+   feature_sidebar.js's own flag: with no JS the search box would do nothing. */
+.filter-search {
+  display: none;
+}
+
+.feature-sidebar-js .filter-search {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.cm-fallback {
+  margin-top: 16px;
+}
+
+.cm-fallback strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.cm-fallback p {
+  margin: 0;
+}
+
+.cm-kickoff {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.cm-type {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.error-page {
+  max-width: 480px;
+  margin: 15vh auto 0;
+  padding: 32px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.error-page p {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.systems-table .trend-cell {
+  width: 104px;
+}
+
+.row-menu__pop {
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  min-width: 216px;
+  margin-top: 6px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  text-align: left;
+  white-space: normal;
+}
+
+.row-menu__form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.row-menu__form input {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 13px;
+}
+
+.row-menu__delete {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--loss);
+  color: var(--loss);
+  font-weight: 700;
+}
+
+.row-menu__delete:hover {
+  background: var(--loss);
+  color: #fff;
+}
+
+/* The restyle keeps the 46ch cap but drops the old two-line clamp, which turned
+   the Example Systems rows into 14-line paragraphs. The design's own reference
+   renders this as a short supporting line, so the clamp comes back. */
+.system-theory,
+.example-theory {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Launchers stay hidden until feature_sidebar.js sets .js on <html>; without
+   scripting the fallback selects are the working control. Revealed as
+   inline-flex, not the old block, so the restyle's centering survives. */
+.js .filter-launcher {
+  display: inline-flex;
+}
+
+.js .stat-row__side:hover {
+  background: var(--panel);
+  border-color: var(--accent);
+  color: var(--text);
+}
+

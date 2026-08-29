@@ -15,13 +15,36 @@ The existing app is a Flask + Jinja2 application (`cfb_system_maker/`) with serv
 
 ## About the Design Files
 
-The files in `screens/` are **design references created in HTML** — prototypes showing intended look and behavior, not production code to copy directly.
+The handoff shipped one stylesheet plus six HTML prototypes. The stylesheet is now
+`cfb_system_maker/static/styles.css`; the prototypes are references only and are not
+checked in.
 
-There is one important exception, called out because it changes the work substantially:
+The handoff claimed the stylesheet "deliberately preserves every class name from the
+original," so the Jinja templates would need no markup changes. **That claim is not
+quite true.** Diffing the old stylesheet's selectors against the new one, filtered to
+classes the templates and JS actually emit, turned up rules the restyle dropped:
 
-> **`screens/cfb.css` is intended to ship.** It is a drop-in replacement for the app's existing `cfb_system_maker/static/styles.css`. It deliberately preserves every class name from the original stylesheet, so the Jinja templates need **no markup changes** for the restyle to take effect. The six HTML files in `screens/` exist to show that stylesheet rendering against realistic content; they are not templates and should not be checked in.
+- the whole filter modal (`.filter-modal__*`) and the feature-group collapse/search
+  states — the handoff admits this one under Known issues #4;
+- the progressive-enhancement toggles `.js .filter-fallback` and `.filter-search`,
+  without which every filter renders its no-JS fallback select *and* its launcher
+  button side by side;
+- the row rename/delete popover (`.row-menu__pop`), `.error-page`, `.cm-*` current-match
+  lines, `.load-system-select`, `.trend-cell`.
 
-So the task is: replace the stylesheet, then reconcile the handful of places where the templates need a small structural change (listed under **Template changes required** below). If you are instead porting this UI into a different environment (React, Vue, etc.), treat the HTML files as pixel references and the token files as the source of truth for values.
+All of those are carried forward verbatim at the end of `styles.css` under a marked
+block. They pick up the new palette through the `--accent` / `--border` / `--panel`
+aliases at the top of the file, but keep the old 6px radii — restyling them onto the
+tokens is the outstanding follow-up.
+
+Rules that *were* legitimately retired: the per-chart blocks (`.cumulative-chart`,
+`.range-chart`, `.betlog-chart`), superseded by `.chart-card`, which the templates
+already carry alongside them; and `.compare-page.app-shell`, since compare moved to
+`.dash-shell`.
+
+If you re-run this exercise after another design pass, the check is: every class in
+(old selectors − new selectors) that still appears in `templates/*.html` or
+`static/*.js` is markup with no rule behind it.
 
 ## Fidelity
 
@@ -34,7 +57,7 @@ Two caveats on the content, not the styling:
 
 ## Design tokens
 
-All tokens live in `styles.css`, which imports the three files in `tokens/`. Ship these as-is or port the values into the codebase's existing token layer. `cfb.css` consumes them exclusively through `var(--*)` — it defines no raw hex values of its own except `#fff`.
+Tokens live in `static/tokens/{colors,typography,spacing}.css`; `static/styles.css` imports all three at the top and is the only file the templates link. The restyled rules consume tokens exclusively through `var(--*)` and define no raw hex of their own except `#fff` — the carried-forward block at the end of the file is the exception and still has literals in it.
 
 ### Color
 
@@ -135,7 +158,8 @@ Only one shadow is used in these screens: `--shadow-focus` (`0 0 0 3px var(--col
 
 ## Screens
 
-All six live in `screens/` and share `cfb.css`. Two shell types:
+The six prototypes all share the stylesheet that is now `static/styles.css`. Each
+section below names the Jinja template the screen maps to. Two shell types:
 
 - **`.app-shell`** — `display: grid; grid-template-columns: 320px minmax(0, 1fr)`. Used by System Editor and Past Matches. Left column is a sticky, independently-scrolling filter panel (`position: sticky; top: 0; max-height: 100dvh; overflow-y: auto; overflow-x: hidden`).
 - **`.dash-shell`** — centered column, `max-width: var(--container-2xl)` (1440px), `padding: 24px 32px`, `gap: 20px`. Used by My Systems, Compare, Bet Log, Search Run.
