@@ -166,9 +166,22 @@ already true: coach-level work has a Python precedent, not a SQL one —
 `coach_style.py`'s `coach_style_cluster` registry feature (a generated k-means label
 from `raw.coach`/advanced stats, `docs/coach-playstyle-analysis.md` is its validity
 study) already ships as a `result_lookahead`-quarantined feature, not a `core.dim_coach`.
-Athlete- and play-level work has no precedent either way — first real decision when
-that starts is the same one Phase 1 already made for games: registry feature in
-Python, or `core`/`mart` table in SQL, and why.
+Athlete- and play-level work has no precedent either way.
+
+**Named use cases (2026-08-28), not yet scoped into tasks:** backtest filters,
+web-app content (coach/athlete/game pages), and modeling. That's not the single-fork
+choice Phase 1 faced for games — it's three consumers with different shapes:
+
+| Use case | Likely shape | Precedent |
+|---|---|---|
+| Backtest filters | Python registry feature (`enrich.py`, quarantined into `result_lookahead` if it's a career-level/post-hoc label) | `coach_style_cluster` |
+| Web-app content | `core.dim_coach`/`dim_athlete` + `app.*` serving views | None yet — this is the first real driver for the `app` schema this doc deferred above |
+| Modeling | Feature table joinable at scale — could be either, depends on the model | `v1_fit.json` (Python-only, today) |
+
+Same open question as the games decision: do these get built once in SQL and read by
+both the web app and the Python backtest/model code, or does each consumer keep its
+own shape? Not deciding here — flagging that "web-app content" is the first concrete
+reason the `app` schema (deferred above) might stop being hypothetical.
 
 ---
 
