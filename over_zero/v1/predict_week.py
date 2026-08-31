@@ -135,8 +135,9 @@ def main():
     ap.add_argument("--fetch", action="store_true",
                      help="pull current lines from the CFBD API first "
                           "(token from env.env), write them to --raw "
-                          "(default data/raw/lines_{season}_week{week}.json), "
-                          "then score")
+                          "(default data/raw/lines_{season}_week{week}_"
+                          "{YYYYMMDD}.json, date-stamped so a fetch never "
+                          "overwrites an earlier day's snapshot), then score")
     ap.add_argument("--season", type=int, default=2026,
                      help="season for --fetch")
     ap.add_argument("--week", type=int, default=1, help="week for --fetch")
@@ -155,8 +156,13 @@ def main():
     args = ap.parse_args()
 
     if args.fetch:
-        raw = args.raw or str(REPO / "data" / "raw" /
-                              f"lines_{args.season}_week{args.week}.json")
+        # Date-stamped so a fetch never clobbers an earlier day's snapshot.
+        # Same-day reruns do refresh their own file; per-run spread/total are
+        # preserved in the --snapshot-dir CSVs regardless.
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+        raw = args.raw or str(
+            REPO / "data" / "raw" /
+            f"lines_{args.season}_week{args.week}_{stamp}.json")
         args.raw = str(fetch_lines(args.season, args.week, raw))
     elif not args.raw:
         ap.error("--raw is required unless --fetch is given")
