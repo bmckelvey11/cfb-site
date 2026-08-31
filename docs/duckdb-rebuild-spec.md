@@ -309,6 +309,11 @@ of `_SEASON_WEEK_RE`/`_SEASON_RE` update before a rebuild groups it correctly.
 
 ## MotherDuck mirror
 
+**Superseded (2026-08-31):** `scripts/promote_to_motherduck.py` now exists — see
+`duckdb-warehouse-plan.md` (`## MotherDuck promote`) and `cfb_system_maker/CLAUDE.md` for
+the current `--dry-run`/`--yes` runbook. The "no code for it anywhere" claim below was true
+when written but no longer holds; kept for history, not as current guidance.
+
 `md:cfb` — referenced in `consolidation.md` as "a MotherDuck mirror (same pattern as
 Greenview), not a local folder" if cross-machine sharing is ever needed — is a **manual,
 out-of-band step**. There is no code for it anywhere in this repo:

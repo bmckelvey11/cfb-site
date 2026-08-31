@@ -286,8 +286,10 @@ Do not emit nineteen single-column indexes for one composite predicate.
 
 ## MotherDuck promote
 
-Local rebuild is file-atomic. `md:cfb` is manual and has **no code path**. Until a
-promote exists, local `core.*` and cloud `raw`/`stg` can diverge.
+**Done (2026-08-31):** `scripts/promote_to_motherduck.py` implements the runbook below —
+see `cfb_system_maker/CLAUDE.md` for the day-to-day usage note. Local rebuild is still
+file-atomic and the promote is still a manual step (not run automatically after a
+rebuild), so local `core.*` and cloud `raw`/`stg` can still diverge between promotes.
 
 Runbook (write before Phase 2 Flask+MotherDuck):
 
