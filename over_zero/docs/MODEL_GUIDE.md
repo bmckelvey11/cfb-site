@@ -559,9 +559,9 @@ python v3/run_v3.py                          # "is it really the floor effect?"
 python saturation_bias/run_saturation.py     # the under-side negative result
 ```
 
-Data comes from this repo's local `data/` folder
-(`data/raw/lines_{season}.json`, `data/processed/games.csv`) — see the
-[root README](../README.md) for how to refresh it from `cfb-site`.
+Data comes from required `CFB_DATA_ROOT`
+(`raw/lines_{season}.json`, `processed/games.csv`) — see the
+[root README](../README.md) for refresh instructions.
 
 ## 7. Model summary card
 

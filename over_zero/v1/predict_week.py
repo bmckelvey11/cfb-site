@@ -8,6 +8,7 @@ Run:  python v1/predict_week.py --fit-seasons 2015 2016 ... 2025 \
 import argparse
 import csv
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,8 +19,9 @@ from censoring_bias import censoring_bias, fit_pipeline, implied_team_points
 from run_on_project_data import DEFAULT_CSV, load
 
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT_OUT_CSV = REPO / "data" / "processed" / "predictions.csv"
-DEFAULT_SNAPSHOT_DIR = REPO / "data" / "predictions"
+DATA_ROOT = Path(os.environ["CFB_DATA_ROOT"])
+DEFAULT_OUT_CSV = DATA_ROOT / "processed" / "over_zero" / "predictions.csv"
+DEFAULT_SNAPSHOT_DIR = DATA_ROOT / "processed" / "over_zero" / "predictions"
 CFBD_LINES_URL = "https://api.collegefootballdata.com/lines"
 CSV_COLUMNS = [
     "run_at", "source", "book", "game_id", "game_date", "week",
@@ -59,12 +61,13 @@ def _cfbd_token():
 
     The hub root is the only env.env -- per README, do not add a second one
     under over_zero/."""
-    import os
     for key in ("CFBD_API_KEY", "CFBD-API", "BEARER_TOKEN"):
         if os.environ.get(key):
             return os.environ[key]
-    env = REPO.parent / "env.env"
-    if env.exists():
+    for parent in Path(__file__).resolve().parents:
+        env = parent / "env.env"
+        if not env.exists():
+            continue
         for line in env.read_text(encoding="utf-8").splitlines():
             if "=" in line:
                 k, v = line.split("=", 1)
@@ -161,7 +164,7 @@ def main():
         # preserved in the --snapshot-dir CSVs regardless.
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
         raw = args.raw or str(
-            REPO / "data" / "raw" /
+            DATA_ROOT / "raw" /
             f"lines_{args.season}_week{args.week}_{stamp}.json")
         args.raw = str(fetch_lines(args.season, args.week, raw))
     elif not args.raw:

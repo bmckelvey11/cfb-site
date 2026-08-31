@@ -17,7 +17,7 @@ sys.path.insert(0, str(REPO / "v2"))
 from models_v2 import (censoring_bias, implied_team_points, pick_line,
                        tobit_left_censored_v2)
 
-_HUB_DATA = Path(os.environ.get("CFB_DATA_ROOT", REPO.parent / "data"))
+_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
 RAW = _HUB_DATA / "raw"
 FEATURES = ["week", "neutralSite", "conferenceGame", "home_dog"]  # fcs_dog → home_dog per BLOCKERS.md 11b2500
 BONFERRONI_P = 0.05 / 4

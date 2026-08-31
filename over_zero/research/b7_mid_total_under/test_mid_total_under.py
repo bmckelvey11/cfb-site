@@ -52,7 +52,7 @@ from test_high_total_under import (  # noqa: E402
     wilson_ci,
 )
 
-_HUB_DATA = Path(os.environ.get("CFB_DATA_ROOT", REPO.parent / "data"))
+_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
 RAW_DIR = _HUB_DATA / "raw"
 SEASONS = list(range(2013, 2026))
 RNG = np.random.default_rng(20260811)

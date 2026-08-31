@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +45,7 @@ from models_v2 import (  # noqa: E402
     tobit_left_censored_v2,
 )
 
-RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw"
+RAW_DIR = Path(os.environ["CFB_DATA_ROOT"]) / "raw"
 
 
 # ---------------------------------------------------------------------------

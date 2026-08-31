@@ -54,7 +54,8 @@ Data flows acquire → build → enrich → consume. Each CLI command persists t
 
 `web.py` (`create_app`) skips fetch/build — it loads already-built `games.csv` (+ `features.json` if present). Missing data → `error="missing_data"`. Routes: `/` dashboard, `/system` editor, `/compare`, `/betlog`, `/filter-detail`, `/api/backtest`. Vanilla JS/CSS, no frontend framework. Waitress unless `--debug`.
 
-Canonical data dir is `cfb_paths.DATA_ROOT` (`CFB_DATA_ROOT`, default `<repo>/data`). Explicit `--data-dir` still wins.
+Canonical data dir is required `CFB_DATA_ROOT`, resolved by root `cfb_paths.py`. Explicit
+`--data-dir` still wins where a command supports it; no repository-relative fallback exists.
 
 `scrapers.py` is a parallel REST sweep: registry `ENDPOINTS` (82 entries = unique vendored-client methods plus 9 `*_ngt` garbage-time variants). Unique live spec paths: 74; 73 methods registered, `/info/usage` is account metering (deliberately unregistered). `*_ngt` is a **second source** — `excludeGarbageTime` changes aggregates and cannot be derived from the unfiltered dump. (Vendored client bumped `034cd17` → `52f2bbf` on 2026-08-28 for CFP, core ratings, expanded SRS, coach profile/seasons/tenures, conference affiliations/changes.) Re-check with `python scripts/audit_coverage.py` (registry vs disk) and `python scripts/audit_endpoints.py` (live spec vs registry); `docs/data-coverage.md` records why absent endpoints are absent and why empty `[]` files are data floors, not failures. Writes `data/raw/` only — does not feed `build`/`backtest`.
 

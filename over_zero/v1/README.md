@@ -80,14 +80,14 @@ that clears 52.38% is `(Φ⁻¹(0.5238) − const)/slope`.
 python v1/run_on_project_data.py --raw --season 2013 2014 2015 2016 \
     2017 2018 2019 2020 2021 2022 2023 2024 2025
 
-# Or from the processed build (../cfb-site/data/processed/games.csv):
+# Or from the processed build ($CFB_DATA_ROOT/processed/games.csv):
 python v1/run_on_project_data.py [--season 2024 2025]
 
 # Synthetic self-test: Tobit recovers planted sigmas to 2 decimals.
 python v1/demo_reproduce.py
 ```
 
-Two data paths: `--raw` reads `data/raw/lines_{season}.json` (has scores +
+Two data paths: `--raw` reads `$CFB_DATA_ROOT/raw/lines_{season}.json` (has scores +
 every book's lines); default reads the consensus `games.csv`, which omits
 seasons whose first usable book was spread-only (2013/2015/2016).
 

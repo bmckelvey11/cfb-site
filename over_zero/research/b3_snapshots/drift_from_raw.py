@@ -26,7 +26,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "v2"))
 from models_v2 import _team_censor_bias, implied_team_points, pick_line
 
-_HUB_DATA = Path(os.environ.get("CFB_DATA_ROOT", REPO.parent / "data"))
+_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
 RAW = _HUB_DATA / "raw"
 SEASONS = range(2013, 2026)
 SIGMA_DOG, SIGMA_FAV = 11.03, 11.78

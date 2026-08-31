@@ -41,9 +41,7 @@ NORM = stats.norm
 # Shared CFBD raw-lines loader (v2/v3/saturation/monitor drivers; v1 keeps
 # its own frozen copy)
 # ===========================================================================
-_HUB_DATA = Path(os.environ.get(
-    "CFB_DATA_ROOT", Path(__file__).resolve().parents[2] / "data"
-))
+_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
 RAW_DIR = _HUB_DATA / "raw"
 
 

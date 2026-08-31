@@ -1,4 +1,7 @@
-/data/
+# Working datasets never belong in a git tree, at any depth.
+data/
+!tests/fixtures/
+!cfb_system_maker/examples/
 out/
 env.env
 .venv/

@@ -1,8 +1,8 @@
 import sys, numpy as np
 from pathlib import Path
-REPO = Path("C:/Users/mckel/dev/over-zero")
-sys.path.insert(0, str(REPO/"v1"))
-sys.path.insert(0, str(REPO/"research/b6_high_total_under"))
+UNIT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(UNIT_ROOT / "v1"))
+sys.path.insert(0, str(UNIT_ROOT / "research" / "b6_high_total_under"))
 from censoring_bias import fit_pipeline, implied_team_points, _team_censor_bias, censoring_bias
 from test_high_total_under import load_with_season
 

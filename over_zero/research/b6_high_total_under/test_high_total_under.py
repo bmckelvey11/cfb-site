@@ -31,7 +31,7 @@ sys.path.insert(0, str(REPO / "v1"))
 
 from censoring_bias import censoring_bias, fit_pipeline, implied_team_points  # noqa: E402
 
-_HUB_DATA = Path(os.environ.get("CFB_DATA_ROOT", REPO.parent / "data"))
+_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
 RAW_DIR = _HUB_DATA / "raw"
 SEASONS = list(range(2013, 2026))
 RNG = np.random.default_rng(20260811)
