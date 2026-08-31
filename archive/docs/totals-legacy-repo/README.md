@@ -1,3 +1,8 @@
+**Archived 2026-08-31.** Docs from the standalone `cfb-totals-model` repo, from before
+it was merged into this repo as `models/totals` (see `archive/consolidation.md`).
+Superseded by `docs/totals-model.md` and `docs/totals-early-weeks.md`; the TODO items
+were folded into root `TODO.md` under "## Totals model" (all done).
+
 # cfb-totals-model
 
 A walk-forward backtest harness for a college-football totals model. Predicts
