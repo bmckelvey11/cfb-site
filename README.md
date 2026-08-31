@@ -13,7 +13,7 @@ No CFBD token needed for this part — `sample` uses bundled sample data.
 
 ```powershell
 git clone <this-repo-url>
-cd cfb-site
+cd cfb
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.lock

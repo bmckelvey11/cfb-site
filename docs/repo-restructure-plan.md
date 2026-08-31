@@ -1,6 +1,6 @@
 # Repo restructure plan
 
-**Status:** approved 2026-08-31, not yet executed.
+**Status:** executed 2026-08-31. Final verification passed before checkout rename.
 **Goal:** scope each unit so its context stops bleeding into the others, and get data out of git.
 The finished local checkout is `C:\Users\mckel\dev\cfb` (renamed from `cfb-site`).
 

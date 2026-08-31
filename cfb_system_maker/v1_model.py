@@ -2,7 +2,7 @@
 efficiency and censoring bias in college football gambling" (SSRN 4197428).
 
 Ported from over-zero/v1/censoring_bias.py (fit_pipeline path only -- no
-betting-strategy/Kelly code, since cfb-site only needs P(over) per game).
+betting-strategy/Kelly code, since CFB System Maker only needs P(over) per game).
 Fits once on historical games.csv (see cli.py's ``refit-v1`` command), caches
 the fitted params to data/processed/v1_fit.json, then scores any game
 (played or upcoming) from spread/total alone -- no scores needed to score.

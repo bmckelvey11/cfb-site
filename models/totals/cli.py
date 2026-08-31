@@ -17,7 +17,7 @@ from .model import (
 
 def _add_common(p):
     p.add_argument("--data-root", default=None,
-                   help=f"cfb-site data directory (default: {DEFAULT_DATA_ROOT})")
+                   help=f"CFB data directory (default: {DEFAULT_DATA_ROOT})")
     p.add_argument("--line", default="ou_open", choices=["ou_open", "total"],
                    help="ou_open = opening total (bettable); total = closing total")
     p.add_argument("--min-prior-games", type=int, default=3)

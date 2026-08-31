@@ -310,7 +310,7 @@ No change to default behavior.
 
 ## How to reproduce
 
-From repo root with `../cfb-site/data` present:
+From repo root with `CFB_DATA_ROOT` set:
 
 ```bash
 # Production baseline
@@ -320,7 +320,7 @@ python -m models.totals backtest --line ou_open --permute
 python -m models.totals backtest --line ou_open --min-prior-games 0 --permute
 
 # Open vs close comparison
-python compare_lines.py
+python research/spread/scripts/compare_lines.py
 ```
 
 Test-filtered early/late slices require a one-off script that calls `walk_forward` with filtered test frames (as run in the August 2026 session). A future CLI flag would replace that script.

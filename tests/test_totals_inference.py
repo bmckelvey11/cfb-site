@@ -1,4 +1,4 @@
-"""Paired scores and cluster-robust means on toy numbers — no cfb-site data."""
+"""Paired scores and cluster-robust means on toy numbers — no project data."""
 
 import numpy as np
 import pandas as pd

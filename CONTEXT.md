@@ -1,6 +1,6 @@
 # CONTEXT
 
-Glossary of canonical terms for cfb-site. Add terms as they are resolved; keep implementation details out.
+Glossary of canonical terms for CFB System Maker. Add terms as they are resolved; keep implementation details out.
 
 ## Football identity
 
