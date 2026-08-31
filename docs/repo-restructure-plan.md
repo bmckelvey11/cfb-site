@@ -213,6 +213,34 @@ Also note `1H-raw/scoreboard/` holds 15 byte-identical duplicates of files one l
 and `lines_2026_week1.json` / `lines_2026_week1_20260826.json` is the same
 duplicate-with-date-suffix pattern. Both die with the move.
 
+### B2a. Rescue the builders before deleting `1H-raw/`
+
+**B is not a pure move.** Two builders live *inside* the directory the delete row removes:
+
+- `over_zero/data/raw/1H-raw/combine_to_csv.py` → writes `1h_lines.csv`
+- `over_zero/data/raw/1H-raw/build_1h_games_csv.py` → writes `1h_games.csv`
+
+Neither imports `cfb_paths`. Both compute paths as `__file__`-relative arithmetic
+(`RAW_DIR.parent.parent / "processed" / ...`), so after the data move those paths point at
+a directory that no longer exists — and would silently recreate in-repo `over_zero/data/`,
+the exact failure mode B removes. `build_1h_games_csv.py` also reads `1H-raw/scoreboard/`,
+the duplicate subdir that dies with the move.
+
+Before deleting anything:
+
+1. Move both builders to `models/over_zero/scripts/`.
+2. Repoint them at `cfb_paths` (`RAW`, `PROCESSED`) instead of `__file__` arithmetic.
+3. Point `build_1h_games_csv.py` at the warehouse (`raw.actionnetwork_scoreboard`) or at
+   `CFB_DATA_ROOT/raw/`, not the dupe subdir.
+4. Run both, confirm outputs match the current `processed/` CSVs byte-for-byte.
+
+Only then run the `git rm --cached` + delete. These are content edits, so B is a small
+series of commits, not one rename commit.
+
+Corollary for C1: "`over_zero` → 0 import lines" is true of *imports*. The `__file__`-relative
+path arithmetic is a second kind of coupling and it does not survive the data move — which
+is why it is handled here in B rather than in C.
+
 ## B3. No history rewrite
 
 `.git` is 28 MB — the blobs compressed well and have not bloated history. `git rm --cached`
@@ -245,7 +273,26 @@ Pure-rename commits, zero content edits, `python -m pytest` as the gate.
 
 Also update: `pytest.ini` if testpaths change, `python -m` strings in `CLAUDE.md`,
 `launch.bat`, and roughly 15 live docs that cite paths. Do not sed `.planning/` (113 files,
-historical) or `graphify-out/` (regenerable).
+historical), `graphify-out/` (regenerable), or `.claude/` + `.solopreneur/` + `.remember/`
+(agent state, not docs — leave alone).
+
+### C1a. Splitting `scripts/`
+
+`scripts/` is shared tooling *and* spread-research scripts in one directory. Nine files
+import `cfb_paths` as a top-level module, which resolves only because repo root is on
+`sys.path` — true when run from repo root, false once they sit two levels deep and get run
+from their own directory.
+
+| Stays in `scripts/` | Moves to `research/spread/scripts/` |
+|---|---|
+| `audit_coverage.py`, `audit_endpoints.py`, `promote_to_motherduck.py`, `analyze_coach_styles.py`, `build_coach_style_clusters.py` | `eval_combination_sweep.py`, `eval_prediction_tracker_models.py`, `eval_recency_screen.py`, `build_prediction_tracker.py`, `collect_line_timing.py`, `predict_upcoming.py`, `build_research_bundle.py`, `akm_winner_bound.py` |
+
+Decide one rule and state it in root `CLAUDE.md`: **all scripts run from repo root**
+(cheapest — the `cfb_paths` import keeps working unchanged), or each script bootstraps
+`sys.path` itself. Do not leave it implicit.
+
+`compare_lines.py` is the sharp case — the only file importing `cfb_totals_model`, and it
+also exists in the fork being archived in D. Reconcile the two versions before moving it.
 
 **Verify C1:** `python -m pytest` green; `python -m models.totals backtest --line ou_open`
 runs; one `over_zero` script runs.
