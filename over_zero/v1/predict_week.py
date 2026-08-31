@@ -55,12 +55,15 @@ def load_future_lines(path, book):
 
 
 def _cfbd_token():
-    """CFBD API token from env vars or the repo's env.env (gitignored)."""
+    """CFBD API token from env vars or the hub repo's env.env (gitignored).
+
+    The hub root is the only env.env -- per README, do not add a second one
+    under over_zero/."""
     import os
     for key in ("CFBD_API_KEY", "CFBD-API", "BEARER_TOKEN"):
         if os.environ.get(key):
             return os.environ[key]
-    env = REPO / "env.env"
+    env = REPO.parent / "env.env"
     if env.exists():
         for line in env.read_text(encoding="utf-8").splitlines():
             if "=" in line:
