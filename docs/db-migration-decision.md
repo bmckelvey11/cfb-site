@@ -48,7 +48,7 @@ Problem A. The rest of this doc is about Problem B.
   makes a full scan actually slow — it doesn't yet.
 - **The join work is already done, once, upstream.** `enrich.py` is exactly the ETL step a
   database would otherwise do at query time (joining raw REST/GraphQL sources by
-  `game_id`/`(team, season)` — see `SCHEMA_AUDIT.md`'s verified join keys). The output,
+  `game_id`/`(team, season)` — see `schema-audit.md`'s verified join keys). The output,
   `features.json`, is a single denormalized table. A DB's main strength — efficient
   multi-table joins at query time — isn't being exploited, because there's deliberately only
   one table to query.
@@ -69,7 +69,7 @@ The scraper layer was designed with this migration in mind from day one —
 `scrapers.py`: *"Raw JSON is the load format for Postgres later (a JSONB staging column)."*
 Two documents already exist and stay valid regardless of when the migration happens:
 
-- **`SCHEMA_AUDIT.md`** — verified REST↔GraphQL join keys against real 2023 data (not assumed),
+- **`schema-audit.md`** — verified REST↔GraphQL join keys against real 2023 data (not assumed),
   plus a suggested `dim_team`/`dim_athlete`/`dim_game`/`fact_*` Postgres model.
 - **`docs/graphql-schema-draft.md`** — full draft DDL for all 61 REST endpoints + 24 GraphQL
   tables, endpoint coverage table, and the REST/GraphQL shape-divergence gotchas (name-keyed

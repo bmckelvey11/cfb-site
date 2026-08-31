@@ -98,7 +98,7 @@ new work, and it's the actual hard part of building `core` — harder than the p
 **A prior entity map already exists — cite it, don't restart from a blank table.**
 [`docs/graphql-schema-draft.md`](graphql-schema-draft.md) already declares REST
 canonical for shape, documents REST↔GQL coverage, and sets `game_lines` PK to
-`(game_id, lines_provider_id)`. [`SCHEMA_AUDIT.md`](../SCHEMA_AUDIT.md) verified
+`(game_id, lines_provider_id)`. [`schema-audit.md`](schema-audit.md) verified
 `game_id` / `team_id` join spaces against real 2023 data. Phase 1's map amends those
 docs for DuckDB `raw`/`graphql` schema names; it does not invent a third parallel map.
 Replacing the schema-draft line PK with "game-book-timestamp" was a **regression** —
@@ -314,7 +314,7 @@ rebuild skipped ActionNetwork (`--skip-actionnetwork`). See
 
 **Phase 1-map — entity winners + keys + SCD (document gate).**
 Write/amend the raw → core entity map for `team`, `conference`, `venue`, `game`,
-**`lines`**, and calendar/week. Cite `graphql-schema-draft.md` + `SCHEMA_AUDIT.md`.
+**`lines`**, and calendar/week. Cite `graphql-schema-draft.md` + `schema-audit.md`.
 No `core` SQL until this exists.
 
 **Phase 1a — done (2026-08-28).** `dim_week` + `fact_game` (+ Type-1 dims).
