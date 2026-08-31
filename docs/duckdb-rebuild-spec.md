@@ -1,5 +1,10 @@
 # DuckDB rebuild — design spec
 
+**Status (2026-08-31): rebuild executed 2026-08-28** (`_post_wk` fix landed, clean rebuild
+run — see the `Rebuild note` below). Kept as a live reference, not just history: the
+"Adding a new endpoint" and "MotherDuck mirror" sections still describe current loader
+behavior.
+
 This is a spec to review before touching anything, not a runbook. It describes the loader
 that already exists (`cfb_system_maker/duckdb_load.py`, driven by the `duckdb` CLI
 subcommand) and the state of the artifact it produces, `data/cfb.duckdb`. It proposes no new

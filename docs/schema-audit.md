@@ -28,6 +28,11 @@ where they join. Id-space alignment **verified against real data** (2023), not a
 
 ## Suggested Postgres model
 
+**Superseded (2026-08-31):** the actual build target became DuckDB, not Postgres — see
+`duckdb-warehouse-plan.md` / `duckdb-core-ddl.md` for the implemented `core` schema. The
+verified join keys above are still current and cited from those docs; only the Postgres
+DDL sketch below is stale.
+
 ```
 dim_team    (team_id PK, school, conference, conference_id)   -- from teams + currentTeams
 dim_athlete (athlete_id PK int, name, position)               -- from athlete (+ roster names)

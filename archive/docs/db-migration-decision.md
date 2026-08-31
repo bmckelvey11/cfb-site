@@ -1,5 +1,10 @@
 # Flat-file vs. Postgres — decision framework
 
+**Archived 2026-08-31 — superseded.** The migration happened, to DuckDB (not Postgres):
+`cfb.duckdb` is now the source of truth (see root `CLAUDE.md`), with a `core` star schema
+(`duckdb-core-ddl.md`) implemented and mirrored to MotherDuck `md:cfb`. Kept for the
+decision-framework reasoning and trigger table, not as current guidance.
+
 **Verdict as of 2026-07-20: stay flat-file.** Nothing in the current data volume, access
 pattern, or user count crosses a threshold that a database would fix. There's a real
 performance bug in the web app today, but it's a missing-cache bug, not a storage-format
