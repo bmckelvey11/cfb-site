@@ -28,11 +28,11 @@
   // Exclusions post to a parallel hidden input rather than an operator on the
   // include select, matching the server's separate exclude_* fields.
   const CORE_EXCLUDE_PARAM = {
-    "filter_seasons": "filter_exclude_seasons",
-    "filter_weeks": "filter_exclude_weeks",
-    "filter_teams": "filter_exclude_teams",
-    "filter_conferences": "filter_exclude_conferences",
-    "filter_providers": "filter_exclude_providers",
+    filter_seasons: "filter_exclude_seasons",
+    filter_weeks: "filter_exclude_weeks",
+    filter_teams: "filter_exclude_teams",
+    filter_conferences: "filter_exclude_conferences",
+    filter_providers: "filter_exclude_providers",
   };
 
   const CORE_PARAM = {
@@ -78,7 +78,7 @@
     // Grey out via a class, NOT the disabled attribute: disabled controls are
     // omitted from FormData, so the server would fall back to its "home"/"over"
     // default and silently overwrite the side the user actually picked -- which
-    // then gets persisted by Save System.
+    // then gets persisted by Save system.
     spreadFieldset.classList.toggle("fieldset-inactive", isTotal);
     totalFieldset.classList.toggle("fieldset-inactive", !isTotal);
     // Favorite/underdog are spread-only concepts; same class-not-disabled rule.
@@ -102,7 +102,11 @@
     if (fromEdit) {
       return fromEdit;
     }
-    if (committed && committed.perspective && committed.perspective !== "single") {
+    if (
+      committed &&
+      committed.perspective &&
+      committed.perspective !== "single"
+    ) {
       return committed.perspective;
     }
     return defaultPerspective();
@@ -168,7 +172,8 @@
   }
 
   function renderChips(summary) {
-    recordEl.textContent = summary.wins + "-" + summary.losses + "-" + summary.pushes;
+    recordEl.textContent =
+      summary.wins + "-" + summary.losses + "-" + summary.pushes;
     moneyEl.textContent = formatMoney(summary.money_won);
     roiEl.textContent = formatRoiFixed(summary.roi);
     applyChipTone(moneyEl, summary.money_won);
@@ -226,7 +231,10 @@
     if (!value) {
       return [];
     }
-    return value.split(",").map((part) => part.trim()).filter(Boolean);
+    return value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
   }
 
   // A committed exclusion lives in the hidden filter_exclude_* input, so
@@ -241,11 +249,16 @@
     if (!value) {
       return [];
     }
-    return value.split(",").map((part) => part.trim()).filter(Boolean);
+    return value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
   }
 
   function committedFeature(key) {
-    const fallback = document.querySelector('[data-fallback-for="feature:' + key + '"]');
+    const fallback = document.querySelector(
+      '[data-fallback-for="feature:' + key + '"]',
+    );
     if (!fallback) {
       return null;
     }
@@ -259,7 +272,10 @@
     const raw = valueEl ? String(valueEl.value || "") : "";
     let values;
     if (opEl && opEl.value === "in") {
-      values = raw.split(",").map((part) => part.trim()).filter(Boolean);
+      values = raw
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
     } else if (raw === "true" || raw === "false") {
       values = [raw === "true"];
     } else {
@@ -291,7 +307,9 @@
     if (candidateId.indexOf("feature:") !== 0) {
       return null;
     }
-    const fallback = document.querySelector('[data-fallback-for="' + candidateId + '"]');
+    const fallback = document.querySelector(
+      '[data-fallback-for="' + candidateId + '"]',
+    );
     if (!fallback) {
       return null;
     }
@@ -325,9 +343,10 @@
       }
       // Each launcher chip owns ONE perspective; restore that chip's own bounds
       // rather than whichever perspective happened to be written first.
-      const pick = (wantPerspective && byPerspective[wantPerspective])
-        ? wantPerspective
-        : Object.keys(byPerspective)[0];
+      const pick =
+        wantPerspective && byPerspective[wantPerspective]
+          ? wantPerspective
+          : Object.keys(byPerspective)[0];
       return {
         min: byPerspective[pick].min,
         max: byPerspective[pick].max,
@@ -376,7 +395,10 @@
         params.delete(excludeName.replace("filter_", ""));
       }
       if (state.selected.length) {
-        params.set(state.exclude && excludeName ? excludeName : state.param, state.selected.join(","));
+        params.set(
+          state.exclude && excludeName ? excludeName : state.param,
+          state.selected.join(","),
+        );
       }
     } else if (state.kind === "feature") {
       const key = state.featureKey;
@@ -404,7 +426,12 @@
         params.append("ff_enable", key);
         params.append("ff_key", key);
         params.append("ff_op", "eq");
-        params.append("ff_value", state.selected[0] === true || state.selected[0] === "true" ? "true" : "false");
+        params.append(
+          "ff_value",
+          state.selected[0] === true || state.selected[0] === "true"
+            ? "true"
+            : "false",
+        );
         params.append("ff_perspective", state.perspective || "single");
       } else if (state.control === "categorical" && state.selected.length) {
         params.append("ff_enable", key);
@@ -416,20 +443,26 @@
     } else if (state.kind === "numeric" && boundsAreValid()) {
       // Domain-edge bounds are cleared on Save (see writeNumericToForm), so the
       // live preview must drop them too or its chips diverge from the commit.
-      // Exception: a Max ROI single-value pick (state.singleValuePick) is an
-      // explicit selection, not "user dragged to the edge" -- write both
+      // Exception: a Max ROI or list-row single-value pick (state.singleValuePick)
+      // is an explicit selection, not "user dragged to the edge" -- write both
       // bounds unconditionally so the preview matches what Save commits.
-      const atDomainMin = !state.singleValuePick
-        && state.domainMin != null && Number(state.min) <= Number(state.domainMin);
-      const atDomainMax = !state.singleValuePick
-        && state.domainMax != null && Number(state.max) >= Number(state.domainMax);
+      const atDomainMin =
+        !state.singleValuePick &&
+        state.domainMin != null &&
+        Number(state.min) <= Number(state.domainMin);
+      const atDomainMax =
+        !state.singleValuePick &&
+        state.domainMax != null &&
+        Number(state.max) >= Number(state.domainMax);
       const fields = CORE_RANGE_FIELDS[state.candidateId];
       if (fields) {
         params.set(fields.min, atDomainMin ? "" : String(state.min));
         params.set(fields.max, atDomainMax ? "" : String(state.max));
       } else if (state.featureKey) {
         const key = state.featureKey;
-        const enables = params.getAll("ff_enable").filter((item) => item !== key);
+        const enables = params
+          .getAll("ff_enable")
+          .filter((item) => item !== key);
         const keys = params.getAll("ff_key");
         const ops = params.getAll("ff_op");
         const values = params.getAll("ff_value");
@@ -474,7 +507,11 @@
     if (!state) {
       return;
     }
-    if (state.kind === "feature" && state.control === "bool" && state.selected.length !== 1) {
+    if (
+      state.kind === "feature" &&
+      state.control === "bool" &&
+      state.selected.length !== 1
+    ) {
       abortLiveFetch();
       saveBtn.disabled = true;
       liveOk = false;
@@ -506,7 +543,10 @@
       liveAbort = new AbortController();
       setUpdating(true);
       const url = "/api/backtest?" + draftQuery().toString();
-      fetch(url, { headers: { Accept: "application/json" }, signal: liveAbort.signal })
+      fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: liveAbort.signal,
+      })
         .then((response) => {
           if (!response.ok) {
             throw new Error("live_failed");
@@ -635,15 +675,20 @@
     if (!rows || !rows.length) {
       return { min: null, max: null };
     }
-    const sorted = rows.slice().sort((a, b) => Number(a.value) - Number(b.value));
+    const sorted = rows
+      .slice()
+      .sort((a, b) => Number(a.value) - Number(b.value));
     const totalDecisions = sorted.reduce(
       (sum, row) => sum + Number(row.wins) + Number(row.losses),
-      0
+      0,
     );
     // On a filter too small to ever clear the floor, fall back to the whole
     // range rather than silently returning an unqualified single bucket.
     if (totalDecisions < MAX_ROI_MIN_DECISIONS) {
-      return { min: Number(sorted[0].value), max: Number(sorted[sorted.length - 1].value) };
+      return {
+        min: Number(sorted[0].value),
+        max: Number(sorted[sorted.length - 1].value),
+      };
     }
     let bestStart = 0;
     let bestEnd = sorted.length - 1;
@@ -665,7 +710,10 @@
         }
       }
     }
-    return { min: Number(sorted[bestStart].value), max: Number(sorted[bestEnd].value) };
+    return {
+      min: Number(sorted[bestStart].value),
+      max: Number(sorted[bestEnd].value),
+    };
   }
 
   // A window SUM across numeric buckets assumes each game contributes to at
@@ -675,7 +723,7 @@
   // is the exact fallback when the server flags overlapping_rows.
   function bestSingleNumericBucket(rows) {
     const eligible = rows.filter(
-      (row) => Number(row.wins) + Number(row.losses) >= MAX_ROI_MIN_DECISIONS
+      (row) => Number(row.wins) + Number(row.losses) >= MAX_ROI_MIN_DECISIONS,
     );
     const pool = eligible.length ? eligible : rows;
     let best = pool[0];
@@ -685,6 +733,31 @@
       }
     });
     return { min: Number(best.value), max: Number(best.value) };
+  }
+
+  function pickNumericListRow(row) {
+    if (!state || state.kind !== "numeric") {
+      return;
+    }
+    // Bound from the stored numeric value — never parse row.description
+    // (kickoff list labels are clock times like "7:00 PM").
+    const value = Number(row.value);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+    const already = Number(state.min) === value && Number(state.max) === value;
+    if (already) {
+      state.min = state.domainMin;
+      state.max = state.domainMax;
+      state.singleValuePick = false;
+    } else {
+      state.min = value;
+      state.max = value;
+      state.singleValuePick = true;
+    }
+    syncBoundInputs();
+    renderNumericList();
+    refreshLive();
   }
 
   function applyMaxRoi() {
@@ -708,7 +781,9 @@
       const decided = (row) => Number(row.wins) + Number(row.losses);
       // Same sample floor as bestRoiWindow -- a lone winning bet otherwise
       // outranks every real edge in the table.
-      const eligible = state.rows.filter((row) => decided(row) >= MAX_ROI_MIN_DECISIONS);
+      const eligible = state.rows.filter(
+        (row) => decided(row) >= MAX_ROI_MIN_DECISIONS,
+      );
       const pool = eligible.length ? eligible : state.rows;
       let best = pool[0];
       pool.forEach((row) => {
@@ -729,7 +804,9 @@
     const query = (state.search || "").trim().toLowerCase();
     let rows = state.rows.slice();
     if (query) {
-      rows = rows.filter((row) => String(row.description).toLowerCase().includes(query));
+      rows = rows.filter((row) =>
+        String(row.description).toLowerCase().includes(query),
+      );
     }
     const key = state.sortKey || "description";
     const dir = state.sortDir === "desc" ? -1 : 1;
@@ -781,11 +858,14 @@
         state.selected.push(value);
       }
     } else {
-      state.selected = state.selected.filter((item) => String(item) !== asString);
+      state.selected = state.selected.filter(
+        (item) => String(item) !== asString,
+      );
     }
   }
 
-  const OVERLAP_NOTE = "Either-perspective values can overlap per game, so Max ROI picks the single best value here instead of a range.";
+  const OVERLAP_NOTE =
+    "Either-perspective values can overlap per game, so Max ROI picks the single best value here instead of a range.";
 
   // Rebuilds aboutEl from a base description/lookahead text plus the overlap
   // disclosure, keyed off state.overlappingRows. Rebuilding (not appending)
@@ -797,14 +877,19 @@
   // The categorical/value-table path has its own separate
   // row-sum reconciliation caption, rendered directly in renderValueTable().
   function applyOverlapNote(baseText) {
-    aboutEl.textContent = baseText
-      + (state && state.kind === "numeric" && state.overlappingRows
+    aboutEl.textContent =
+      baseText +
+      (state && state.kind === "numeric" && state.overlappingRows
         ? (baseText ? "\n\n" : "") + OVERLAP_NOTE
         : "");
   }
 
   function reloadFeatureDetail() {
-    if (!state || (state.kind !== "feature" && !(state.kind === "numeric" && state.featureKey))) {
+    if (
+      !state ||
+      (state.kind !== "feature" &&
+        !(state.kind === "numeric" && state.featureKey))
+    ) {
       return;
     }
     statusEl.textContent = "Loading values…";
@@ -816,7 +901,9 @@
       detailParams.set("perspective", state.perspective);
     }
     const generation = ++detailGeneration;
-    fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
+    fetch("/filter-detail?" + detailParams.toString(), {
+      headers: { Accept: "application/json" },
+    })
       .then((response) => {
         if (!response.ok) {
           throw new Error("detail_failed");
@@ -830,9 +917,10 @@
         if (payload.description) {
           let baseText = payload.description;
           if (payload.lookahead_warning) {
-            const warning = typeof payload.lookahead_warning === "string"
-              ? payload.lookahead_warning
-              : "lookahead — analysis only";
+            const warning =
+              typeof payload.lookahead_warning === "string"
+                ? payload.lookahead_warning
+                : "lookahead — analysis only";
             baseText = payload.description + "\n\n" + warning;
           }
           state.overlappingRows = Boolean(payload.overlapping_rows);
@@ -847,8 +935,14 @@
         // New rows/domain invalidate any prior Max ROI single-value pick.
         state.singleValuePick = false;
         if (payload.domain) {
-          state.domainMin = payload.domain.min != null ? Number(payload.domain.min) : state.domainMin;
-          state.domainMax = payload.domain.max != null ? Number(payload.domain.max) : state.domainMax;
+          state.domainMin =
+            payload.domain.min != null
+              ? Number(payload.domain.min)
+              : state.domainMin;
+          state.domainMax =
+            payload.domain.max != null
+              ? Number(payload.domain.max)
+              : state.domainMax;
         }
         if (payload.perspective) {
           state.perspective = payload.perspective;
@@ -892,7 +986,8 @@
       controlsEl.appendChild(empty);
       const body = document.createElement("p");
       body.className = "filter-modal__hint";
-      body.textContent = "No observed values remain after the rest of this system. Adjust other filters, or cancel.";
+      body.textContent =
+        "No observed values remain after the rest of this system. Adjust other filters, or cancel.";
       controlsEl.appendChild(body);
       return;
     }
@@ -902,8 +997,13 @@
     if (state.overlappingRows) {
       const caption = document.createElement("p");
       caption.className = "filter-modal__hint";
-      caption.textContent = "These rows cover " + state.matchedGames + " games — each game "
-        + "counts once per matching value, so rows can sum to more than " + state.matchedGames + ".";
+      caption.textContent =
+        "These rows cover " +
+        state.matchedGames +
+        " games — each game " +
+        "counts once per matching value, so rows can sum to more than " +
+        state.matchedGames +
+        ".";
       controlsEl.appendChild(caption);
     }
 
@@ -946,13 +1046,21 @@
       const th = document.createElement("th");
       th.scope = "col";
       const sortKey = col.key === "record" ? "wins" : col.key;
-      if (col.key === "description" || col.key === "roi" || col.key === "money" || col.key === "record") {
+      if (
+        col.key === "description" ||
+        col.key === "roi" ||
+        col.key === "money" ||
+        col.key === "record"
+      ) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "filter-modal__sort";
         btn.textContent = col.label;
         if ((state.sortKey || "description") === sortKey) {
-          th.setAttribute("aria-sort", state.sortDir === "desc" ? "descending" : "ascending");
+          th.setAttribute(
+            "aria-sort",
+            state.sortDir === "desc" ? "descending" : "ascending",
+          );
         } else {
           th.removeAttribute("aria-sort");
         }
@@ -1034,8 +1142,8 @@
       return;
     }
     if (source) {
-      // A manual drag/type overrides any prior Max ROI single-value pick,
-      // restoring normal domain-edge-clearing semantics.
+      // A manual drag/type overrides any prior Max ROI / list-row single-value
+      // pick, restoring normal domain-edge-clearing semantics.
       state.singleValuePick = false;
     }
     let min = Number(state.min);
@@ -1068,6 +1176,12 @@
     if (maxNumber && source !== "maxNumber") {
       maxNumber.value = String(state.max);
     }
+    if (minRange) {
+      minRange.setAttribute("aria-valuetext", formatAxisValue(state.min));
+    }
+    if (maxRange) {
+      maxRange.setAttribute("aria-valuetext", formatAxisValue(state.max));
+    }
     const valid = boundsAreValid();
     if (hint) {
       hint.hidden = valid;
@@ -1099,7 +1213,21 @@
     return el;
   }
 
+  function formatKickoffHour(value) {
+    const hour = Number(value);
+    if (!Number.isFinite(hour)) {
+      return "";
+    }
+    const wrapped = ((Math.round(hour) % 24) + 24) % 24;
+    const meridiem = wrapped < 12 ? "AM" : "PM";
+    const display = wrapped % 12 || 12;
+    return display + ":00 " + meridiem;
+  }
+
   function formatAxisValue(value) {
+    if (state && state.featureKey === "kickoff_hour") {
+      return formatKickoffHour(value);
+    }
     const num = Number(value);
     if (!Number.isFinite(num)) {
       return "";
@@ -1134,7 +1262,10 @@
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 " + width + " " + height);
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", (titleEl.textContent || "Value") + " vs ROI scatter plot");
+    svg.setAttribute(
+      "aria-label",
+      (titleEl.textContent || "Value") + " vs ROI scatter plot",
+    );
     svg.classList.add("filter-modal__chart");
 
     const values = points.map((point) => Number(point.value));
@@ -1147,28 +1278,57 @@
     const zeroY = plotH - 18 - ((0 - minRoi) / roiSpan) * (plotH - 36);
 
     // Axis lines
-    svg.appendChild(svgText(10, marginTop + plotH / 2, "ROI", "filter-modal__axis-title filter-modal__axis-title--y"));
-    const xTitle = svgText(marginLeft + plotW / 2, height - 4, titleEl.textContent || "Value", "filter-modal__axis-title");
+    svg.appendChild(
+      svgText(
+        10,
+        marginTop + plotH / 2,
+        "ROI",
+        "filter-modal__axis-title filter-modal__axis-title--y",
+      ),
+    );
+    const xTitle = svgText(
+      marginLeft + plotW / 2,
+      height - 4,
+      titleEl.textContent || "Value",
+      "filter-modal__axis-title",
+    );
     xTitle.setAttribute("text-anchor", "middle");
     svg.appendChild(xTitle);
 
     [minRoi, (minRoi + maxRoi) / 2, maxRoi].forEach((roiValue) => {
-      const y = marginTop + plotH - 18 - ((roiValue - minRoi) / roiSpan) * (plotH - 36);
-      const tick = svgText(marginLeft - 6, y + 3, formatRowRoi(roiValue), "filter-modal__axis-tick");
+      const y =
+        marginTop + plotH - 18 - ((roiValue - minRoi) / roiSpan) * (plotH - 36);
+      const tick = svgText(
+        marginLeft - 6,
+        y + 3,
+        formatRowRoi(roiValue),
+        "filter-modal__axis-tick",
+      );
       tick.setAttribute("text-anchor", "end");
       svg.appendChild(tick);
     });
 
     [minValue, (minValue + maxValue) / 2, maxValue].forEach((tickValue) => {
       const valueSpan = maxValue - minValue || 1;
-      const x = marginLeft + 28 + (plotW - 28 * 2) * (tickValue - minValue) / valueSpan;
-      const tick = svgText(x, marginTop + plotH + 14, formatAxisValue(tickValue), "filter-modal__axis-tick");
+      const x =
+        marginLeft +
+        28 +
+        ((plotW - 28 * 2) * (tickValue - minValue)) / valueSpan;
+      const tick = svgText(
+        x,
+        marginTop + plotH + 14,
+        formatAxisValue(tickValue),
+        "filter-modal__axis-tick",
+      );
       tick.setAttribute("text-anchor", "middle");
       svg.appendChild(tick);
     });
 
     const plot = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    plot.setAttribute("transform", "translate(" + marginLeft + "," + marginTop + ")");
+    plot.setAttribute(
+      "transform",
+      "translate(" + marginLeft + "," + marginTop + ")",
+    );
 
     const zero = document.createElementNS("http://www.w3.org/2000/svg", "line");
     zero.setAttribute("x1", "28");
@@ -1179,15 +1339,30 @@
     plot.appendChild(zero);
 
     points.forEach((point) => {
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      const circle = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "circle",
+      );
       const x = point.x != null ? point.x : 28;
       const y = point.y != null ? point.y : zeroY;
       circle.setAttribute("cx", String(x));
       circle.setAttribute("cy", String(y));
       circle.setAttribute("r", "3.5");
-      circle.setAttribute("class", Number(point.roi) >= 0 ? "positive" : "negative");
-      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-      title.textContent = String(point.value) + ": " + formatRowRoi(point.roi) + " ROI (" + formatRowMoney(point.money) + ")";
+      circle.setAttribute(
+        "class",
+        Number(point.roi) >= 0 ? "positive" : "negative",
+      );
+      const title = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "title",
+      );
+      title.textContent =
+        formatAxisValue(point.value) +
+        ": " +
+        formatRowRoi(point.roi) +
+        " ROI (" +
+        formatRowMoney(point.money) +
+        ")";
       circle.appendChild(title);
       plot.appendChild(circle);
     });
@@ -1210,10 +1385,10 @@
     const wrap = document.createElement("div");
     wrap.className = "filter-modal__table-wrap";
     const table = document.createElement("table");
-    table.className = "filter-modal__table";
+    table.className = "filter-modal__table filter-modal__table--pickable";
     const thead = document.createElement("thead");
     const headRow = document.createElement("tr");
-    ["Description", "Record", "ROI", "Money"].forEach((label) => {
+    ["Select", "Description", "Record", "ROI", "Money"].forEach((label) => {
       const th = document.createElement("th");
       th.scope = "col";
       th.textContent = label;
@@ -1223,7 +1398,38 @@
     table.appendChild(thead);
     const tbody = document.createElement("tbody");
     state.rows.forEach((row) => {
+      const value = Number(row.value);
+      const selected =
+        Number.isFinite(value) &&
+        Number(state.min) === value &&
+        Number(state.max) === value;
       const tr = document.createElement("tr");
+      tr.tabIndex = 0;
+      tr.setAttribute("role", "button");
+      tr.setAttribute("aria-pressed", String(selected));
+      if (selected) {
+        tr.classList.add("is-selected");
+      }
+      tr.addEventListener("click", () => {
+        pickNumericListRow(row);
+      });
+      tr.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          pickNumericListRow(row);
+        }
+      });
+
+      const pickTd = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = selected;
+      input.tabIndex = -1;
+      input.setAttribute("aria-hidden", "true");
+      input.style.pointerEvents = "none";
+      pickTd.appendChild(input);
+      tr.appendChild(pickTd);
+
       const cells = [
         String(row.description),
         String(row.record),
@@ -1276,14 +1482,19 @@
       return;
     }
 
-    if (state.domainMin == null || state.domainMax == null || !state.rows.length) {
+    if (
+      state.domainMin == null ||
+      state.domainMax == null ||
+      !state.rows.length
+    ) {
       const empty = document.createElement("p");
       empty.className = "filter-modal__hint";
       empty.textContent = "No values in range";
       controlsEl.appendChild(empty);
       const body = document.createElement("p");
       body.className = "filter-modal__hint";
-      body.textContent = "No observed values remain after the rest of this system. Adjust other filters, or cancel.";
+      body.textContent =
+        "No observed values remain after the rest of this system. Adjust other filters, or cancel.";
       controlsEl.appendChild(body);
       if (exploreEl) {
         exploreEl.innerHTML = "";
@@ -1314,6 +1525,7 @@
     minRange.step = rangeStep;
     minRange.value = String(state.min);
     minRange.setAttribute("aria-label", "Minimum");
+    minRange.setAttribute("aria-valuetext", formatAxisValue(state.min));
 
     const maxRange = document.createElement("input");
     maxRange.type = "range";
@@ -1324,6 +1536,7 @@
     maxRange.step = rangeStep;
     maxRange.value = String(state.max);
     maxRange.setAttribute("aria-label", "Maximum");
+    maxRange.setAttribute("aria-valuetext", formatAxisValue(state.max));
 
     minRange.addEventListener("input", () => {
       state.min = Number(minRange.value);
@@ -1360,13 +1573,15 @@
     maxNumber.value = String(state.max);
     maxNumber.setAttribute("aria-label", "Maximum");
     minNumber.addEventListener("input", () => {
-      const parsed = minNumber.value.trim() === "" ? NaN : Number(minNumber.value);
+      const parsed =
+        minNumber.value.trim() === "" ? NaN : Number(minNumber.value);
       state.min = parsed;
       syncBoundInputs("minNumber");
       refreshLive();
     });
     maxNumber.addEventListener("input", () => {
-      const parsed = maxNumber.value.trim() === "" ? NaN : Number(maxNumber.value);
+      const parsed =
+        maxNumber.value.trim() === "" ? NaN : Number(maxNumber.value);
       state.max = parsed;
       syncBoundInputs("maxNumber");
       refreshLive();
@@ -1391,7 +1606,11 @@
   // Include/exclude toggle for core list filters. Feature filters carry their
   // own op, so this only applies to the core-list kind.
   function renderExcludeControl() {
-    if (!state || state.kind !== "core-list" || !CORE_EXCLUDE_PARAM[state.param]) {
+    if (
+      !state ||
+      state.kind !== "core-list" ||
+      !CORE_EXCLUDE_PARAM[state.param]
+    ) {
       return;
     }
     const wrap = document.createElement("div");
@@ -1407,7 +1626,10 @@
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = option.label;
-      button.setAttribute("aria-pressed", String(Boolean(state.exclude) === option.mode));
+      button.setAttribute(
+        "aria-pressed",
+        String(Boolean(state.exclude) === option.mode),
+      );
       button.addEventListener("click", () => {
         if (Boolean(state.exclude) === option.mode) {
           return;
@@ -1448,7 +1670,10 @@
       excludeEl.value = "";
     }
     let draftOpt = select.querySelector("option[data-modal-draft='1']");
-    if (joined && !Array.from(select.options).some((opt) => opt.value === joined)) {
+    if (
+      joined &&
+      !Array.from(select.options).some((opt) => opt.value === joined)
+    ) {
       if (!draftOpt) {
         draftOpt = document.createElement("option");
         draftOpt.dataset.modalDraft = "1";
@@ -1464,7 +1689,9 @@
     if (!state || state.kind !== "feature") {
       return;
     }
-    const fallback = document.querySelector('[data-fallback-for="feature:' + state.featureKey + '"]');
+    const fallback = document.querySelector(
+      '[data-fallback-for="feature:' + state.featureKey + '"]',
+    );
     if (!fallback) {
       return;
     }
@@ -1483,7 +1710,10 @@
         opEl.value = "eq";
       }
       if (valueEl) {
-        valueEl.value = state.selected[0] === true || state.selected[0] === "true" ? "true" : "false";
+        valueEl.value =
+          state.selected[0] === true || state.selected[0] === "true"
+            ? "true"
+            : "false";
       }
     } else if (state.control === "categorical") {
       if (!state.selected.length) {
@@ -1523,14 +1753,26 @@
       const minEl = filtersForm.querySelector('[name="' + fields.min + '"]');
       const maxEl = filtersForm.querySelector('[name="' + fields.max + '"]');
       if (minEl) {
-        minEl.value = (!singleValuePick && state.domainMin != null && Number(state.min) <= Number(state.domainMin)) ? "" : String(state.min);
+        minEl.value =
+          !singleValuePick &&
+          state.domainMin != null &&
+          Number(state.min) <= Number(state.domainMin)
+            ? ""
+            : String(state.min);
       }
       if (maxEl) {
-        maxEl.value = (!singleValuePick && state.domainMax != null && Number(state.max) >= Number(state.domainMax)) ? "" : String(state.max);
+        maxEl.value =
+          !singleValuePick &&
+          state.domainMax != null &&
+          Number(state.max) >= Number(state.domainMax)
+            ? ""
+            : String(state.max);
       }
       return;
     }
-    const fallback = document.querySelector('[data-fallback-for="' + state.candidateId + '"]');
+    const fallback = document.querySelector(
+      '[data-fallback-for="' + state.candidateId + '"]',
+    );
     if (!fallback) {
       return;
     }
@@ -1538,10 +1780,14 @@
     // domain edge is cleared instead of committed. Feature values fail closed
     // on null, so a full-domain gte/lte pair is NOT "no filter" -- it silently
     // drops every game missing the feature.
-    const atDomainMin = !singleValuePick
-      && state.domainMin != null && Number(state.min) <= Number(state.domainMin);
-    const atDomainMax = !singleValuePick
-      && state.domainMax != null && Number(state.max) >= Number(state.domainMax);
+    const atDomainMin =
+      !singleValuePick &&
+      state.domainMin != null &&
+      Number(state.min) <= Number(state.domainMin);
+    const atDomainMax =
+      !singleValuePick &&
+      state.domainMax != null &&
+      Number(state.max) >= Number(state.domainMax);
     const enable = fallback.querySelector('input[name="ff_enable"]');
     const perRows = fallback.querySelectorAll("[data-bound-perspective]");
     if (perRows.length) {
@@ -1627,7 +1873,11 @@
     if (!liveOk || !state) {
       return;
     }
-    if (state.kind === "feature" && state.control === "bool" && state.selected.length !== 1) {
+    if (
+      state.kind === "feature" &&
+      state.control === "bool" &&
+      state.selected.length !== 1
+    ) {
       return;
     }
     if (state.kind === "numeric" && !boundsAreValid()) {
@@ -1654,16 +1904,21 @@
       candidateId,
       button ? button.getAttribute("data-perspective") : null,
     );
-    const teamScoped = button ? button.getAttribute("data-team-scoped") === "1" : false;
+    const teamScoped = button
+      ? button.getAttribute("data-team-scoped") === "1"
+      : false;
     const perspective = button
       ? resolveInitialPerspective(button, committed)
-      : (committed && committed.perspective && committed.perspective !== "single"
+      : committed && committed.perspective && committed.perspective !== "single"
         ? committed.perspective
-        : "single");
+        : "single";
     state = {
       kind: "numeric",
       candidateId: candidateId,
-      featureKey: candidateId.indexOf("feature:") === 0 ? candidateId.split(":").slice(1).join(":") : null,
+      featureKey:
+        candidateId.indexOf("feature:") === 0
+          ? candidateId.split(":").slice(1).join(":")
+          : null,
       control: "numeric",
       teamScoped: teamScoped,
       perspective: perspective,
@@ -1685,7 +1940,9 @@
       detailParams.set("perspective", state.perspective);
     }
     const generation = ++detailGeneration;
-    fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
+    fetch("/filter-detail?" + detailParams.toString(), {
+      headers: { Accept: "application/json" },
+    })
       .then((response) => {
         if (!response.ok) {
           throw new Error("detail_failed");
@@ -1702,9 +1959,10 @@
         // matching pre-fix behavior.
         let baseText = aboutEl.textContent;
         if (payload.lookahead_warning) {
-          const warning = typeof payload.lookahead_warning === "string"
-            ? payload.lookahead_warning
-            : "lookahead — analysis only";
+          const warning =
+            typeof payload.lookahead_warning === "string"
+              ? payload.lookahead_warning
+              : "lookahead — analysis only";
           baseText = (payload.description || description) + "\n\n" + warning;
         } else if (payload.description) {
           baseText = payload.description;
@@ -1713,8 +1971,14 @@
         }
         state.rows = payload.rows || [];
         state.chartPoints = payload.chart_points || [];
-        state.domainMin = payload.domain && payload.domain.min != null ? Number(payload.domain.min) : null;
-        state.domainMax = payload.domain && payload.domain.max != null ? Number(payload.domain.max) : null;
+        state.domainMin =
+          payload.domain && payload.domain.min != null
+            ? Number(payload.domain.min)
+            : null;
+        state.domainMax =
+          payload.domain && payload.domain.max != null
+            ? Number(payload.domain.max)
+            : null;
         if (payload.perspective) {
           state.perspective = payload.perspective;
         }
@@ -1723,9 +1987,16 @@
         }
         state.overlappingRows = Boolean(payload.overlapping_rows);
         applyOverlapNote(baseText);
-        if (committed && (Number.isFinite(committed.min) || Number.isFinite(committed.max))) {
-          state.min = Number.isFinite(committed.min) ? committed.min : state.domainMin;
-          state.max = Number.isFinite(committed.max) ? committed.max : state.domainMax;
+        if (
+          committed &&
+          (Number.isFinite(committed.min) || Number.isFinite(committed.max))
+        ) {
+          state.min = Number.isFinite(committed.min)
+            ? committed.min
+            : state.domainMin;
+          state.max = Number.isFinite(committed.max)
+            ? committed.max
+            : state.domainMax;
         } else if (state.domainMin != null && state.domainMax != null) {
           state.min = state.domainMin;
           state.max = state.domainMax;
@@ -1756,11 +2027,15 @@
     const control = button.getAttribute("data-control") || "categorical";
     const description = button.getAttribute("data-description") || "";
     const lookahead = button.getAttribute("data-lookahead-warning") || "";
-    const label = button.getAttribute("data-label") || button.textContent.trim() || "Filter";
+    const label =
+      button.getAttribute("data-label") ||
+      button.textContent.trim() ||
+      "Filter";
     titleEl.textContent = label;
     aboutEl.textContent = description;
     if (lookahead) {
-      aboutEl.textContent = description + (description ? "\n\n" : "") + lookahead;
+      aboutEl.textContent =
+        description + (description ? "\n\n" : "") + lookahead;
     }
     abortLiveFetch();
     lastSummary = null;
@@ -1786,7 +2061,8 @@
     setViewToggleVisible(false);
     setMaxRoiVisible(false);
     setClearVisible(false);
-    const param = CORE_PARAM[candidateId] || button.getAttribute("data-param") || "";
+    const param =
+      CORE_PARAM[candidateId] || button.getAttribute("data-param") || "";
     if (candidateId.indexOf("core:") === 0) {
       const committedExcluded = committedCoreExclusion(param);
       state = {
@@ -1796,7 +2072,9 @@
         teamScoped: false,
         param: param,
         exclude: committedExcluded.length > 0,
-        selected: committedExcluded.length ? committedExcluded : committedCoreList(param),
+        selected: committedExcluded.length
+          ? committedExcluded
+          : committedCoreList(param),
         rows: [],
         search: "",
         sortKey: "description",
@@ -1808,7 +2086,9 @@
       let selected = [];
       if (control === "bool") {
         if (committed && committed.values.length === 1) {
-          selected = [committed.values[0] === true || committed.values[0] === "true"];
+          selected = [
+            committed.values[0] === true || committed.values[0] === "true",
+          ];
         }
       } else if (committed) {
         selected = committed.values.slice();
@@ -1832,11 +2112,17 @@
     statusEl.textContent = "Loading values…";
     const detailParams = new URLSearchParams(new FormData(filtersForm));
     detailParams.set("candidate_id", candidateId);
-    if (state.kind === "feature" && state.perspective && state.perspective !== "single") {
+    if (
+      state.kind === "feature" &&
+      state.perspective &&
+      state.perspective !== "single"
+    ) {
       detailParams.set("perspective", state.perspective);
     }
     const generation = ++detailGeneration;
-    fetch("/filter-detail?" + detailParams.toString(), { headers: { Accept: "application/json" } })
+    fetch("/filter-detail?" + detailParams.toString(), {
+      headers: { Accept: "application/json" },
+    })
       .then((response) => {
         if (!response.ok) {
           throw new Error("detail_failed");
@@ -1848,10 +2134,12 @@
           return;
         }
         if (payload.lookahead_warning) {
-          const warning = typeof payload.lookahead_warning === "string"
-            ? payload.lookahead_warning
-            : "lookahead — analysis only";
-          aboutEl.textContent = (payload.description || description) + "\n\n" + warning;
+          const warning =
+            typeof payload.lookahead_warning === "string"
+              ? payload.lookahead_warning
+              : "lookahead — analysis only";
+          aboutEl.textContent =
+            (payload.description || description) + "\n\n" + warning;
         } else if (payload.description) {
           aboutEl.textContent = payload.description;
         }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from cfb_system_maker.features import FEATURE_BY_KEY
+from cfb_system_maker.features import FEATURE_BY_KEY, format_kickoff_hour
 from cfb_system_maker.models import FeatureFilter, SystemFilter
 
 _PERSPECTIVE_PREFIX: dict[str, str] = {
@@ -41,17 +41,18 @@ def _labeled_range_sentence(
     *,
     label: str,
     key: str,
+    fmt=_fmt_num,
 ) -> dict[str, object] | None:
     if minimum is None and maximum is None:
         return None
     if minimum is not None and maximum is not None and minimum == maximum:
-        text = f"{label} is exactly {_fmt_num(minimum)}"
+        text = f"{label} is exactly {fmt(minimum)}"
     elif minimum is not None and maximum is not None:
-        text = f"{label} is between {_fmt_num(minimum)} and {_fmt_num(maximum)}"
+        text = f"{label} is between {fmt(minimum)} and {fmt(maximum)}"
     elif minimum is not None:
-        text = f"{label} is at least {_fmt_num(minimum)}"
+        text = f"{label} is at least {fmt(minimum)}"
     else:
-        text = f"{label} is at most {_fmt_num(maximum)}"
+        text = f"{label} is at most {fmt(maximum)}"
     return {"text": text, "key": key}
 
 
@@ -97,7 +98,8 @@ def _feature_group_sentence(filts: list[FeatureFilter]) -> dict[str, object] | N
         if feature.control == "numeric":
             gte = next((float(filt.value) for filt in filts if filt.op == "gte"), None)
             lte = next((float(filt.value) for filt in filts if filt.op == "lte"), None)
-            return _labeled_range_sentence(gte, lte, label=label, key=sentence_key)
+            fmt = format_kickoff_hour if feature.key == "kickoff_hour" else _fmt_num
+            return _labeled_range_sentence(gte, lte, label=label, key=sentence_key, fmt=fmt)
         filt = filts[0]
         if filt.op == "eq" and feature.control == "bool":
             text = f"{label} is {'Yes' if filt.value else 'No'}"

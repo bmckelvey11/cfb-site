@@ -7,6 +7,7 @@ not break the load. Filename suffixes supply season/week columns.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -49,6 +50,342 @@ class TableLoad:
     files: int
     rows: int
     error: str | None = None
+
+
+# Browse order for stg.* (JSON explode dumps keys in API order, so id/season
+# sit at the end of games). Arrays stay with their group, after scalars.
+_JOIN_ID_RANK = {
+    "playId": 0,
+    "play_id": 0,
+    "event_id": 1,
+    "gameId": 1,
+    "game_id": 1,
+    "driveId": 2,
+    "drive_id": 2,
+    "teamId": 3,
+    "team_id": 3,
+    "athleteId": 4,
+    "athlete_id": 4,
+    "conferenceId": 5,
+    "conference_id": 5,
+    "matchupId": 6,
+}
+_TIME_RANK = {
+    "season": 0,
+    "year": 1,
+    "week": 2,
+    "seasonType": 3,
+    "season_type": 3,
+    "startDate": 4,
+    "start_date": 4,
+    "startTime": 5,
+    "start_time": 5,
+    "startTimeTBD": 6,
+    "date": 7,
+    "wallclock": 8,
+}
+_ENTITY_RANK = {
+    "team": 0,
+    "school": 1,
+    "name": 2,
+    "opponent": 3,
+    "mascot": 4,
+    "abbreviation": 5,
+    "classification": 6,
+    "conference": 7,
+    "division": 8,
+    "playType": 9,
+    "playText": 10,
+    "driveResult": 11,
+    "homeAway": 12,
+    "book_id": 13,
+    "period": 14,
+    "market_type": 15,
+    "side": 16,
+}
+_PREFIX_GROUPS = (
+    "home",
+    "away",
+    "offense",
+    "defense",
+    "start",
+    "end",
+    "clock",
+    "elapsed",
+    "location",
+    "venue",
+)
+
+
+# Bare ``id`` is the CFBD row's own key, but the value is a game/play/team/… id.
+# Names match the FKs already on sibling tables (play_stats.playId, game.homeTeamId).
+_BARE_ID_RENAME = {
+    "athlete": "athleteId",
+    "cfp_games": "matchupId",
+    "coach": "coachId",
+    "conference": "conferenceId",
+    "conferences": "conferenceId",
+    "draftPosition": "draftPositionId",
+    "draftTeam": "draftTeamId",
+    "drives": "driveId",
+    "fbs_teams": "teamId",
+    "game": "gameId",
+    "game_player_stats": "gameId",
+    "game_team_stats": "gameId",
+    "games": "gameId",
+    "historicalTeam": "teamId",
+    "lines": "gameId",
+    "linesProvider": "linesProviderId",
+    "media": "gameId",
+    "play_stat_types": "playStatTypeId",
+    "play_types": "playTypeId",
+    "player_success_game": "athleteId",
+    "player_success_season": "athleteId",
+    "player_usage": "athleteId",
+    "plays": "playId",
+    "pollType": "pollTypeId",
+    "position": "positionId",
+    "ppa_players_games": "athleteId",
+    "ppa_players_season": "athleteId",
+    "recruit": "recruitId",
+    "recruitPosition": "recruitPositionId",
+    "recruitSchool": "recruitSchoolId",
+    "recruitingTeam": "recruitingTeamId",
+    "recruits": "recruitId",
+    "roster": "athleteId",
+    "teams": "teamId",
+    "venues": "venueId",
+    "weather": "gameId",
+    "weatherCondition": "weatherConditionId",
+}
+_EXTRA_ID_RENAMES = {
+    "games": {"homeId": "homeTeamId", "awayId": "awayTeamId"},
+    "win_probability": {"homeId": "homeTeamId", "awayId": "awayTeamId"},
+}
+
+
+def stg_id_renames(table: str) -> dict[str, str]:
+    """Map current column names → names that match what the id actually is."""
+    base = table[:-4] if table.endswith("_ngt") else table
+    out: dict[str, str] = {}
+    dest = _BARE_ID_RENAME.get(base)
+    if dest:
+        out["id"] = dest
+    out.update(_EXTRA_ID_RENAMES.get(base, {}))
+    return out
+
+
+def stg_column_order(
+    columns: list[tuple[str, str]],
+    table: str | None = None,
+) -> list[str]:
+    """Return column names in browse order. ``columns`` is ``(name, type)``."""
+    pk = stg_id_renames(table).get("id") if table else None
+    ranked: list[tuple[tuple[int, int, int, int], str]] = []
+    for orig, (name, dtype) in enumerate(columns):
+        ranked.append((_stg_nav_key(name, dtype, orig, pk), name))
+    ranked.sort()
+    return [name for _, name in ranked]
+
+
+def _stg_nav_key(
+    name: str, dtype: str, orig: int, pk: str | None = None
+) -> tuple[int, int, int, int]:
+    # (bucket, subrank, id/scalar/list, original index)
+    if name in {"_source_file", "source_file"}:
+        return (90, 0, 0, orig)
+    inner = _within_group_flag(name, dtype)
+    if name == "id" or (pk is not None and name == pk):
+        return (0, 0, inner, orig)
+    if name in _TIME_RANK:
+        return (2, _TIME_RANK[name], inner, orig)
+    if name in _ENTITY_RANK:
+        return (3, _ENTITY_RANK[name], inner, orig)
+    prefix = _prefix_group(name)
+    if prefix is not None:
+        return (4, _PREFIX_GROUPS.index(prefix), inner, orig)
+    if name in _JOIN_ID_RANK or _is_id_column(name):
+        return (1, _JOIN_ID_RANK.get(name, 50), inner, orig)
+    return (5, 0, inner, orig)
+
+
+def _within_group_flag(name: str, dtype: str) -> int:
+    if name == "id" or _is_id_column(name):
+        return 0
+    if _is_list_type(dtype):
+        return 2
+    return 1
+
+
+def _prefix_group(name: str) -> str | None:
+    for prefix in _PREFIX_GROUPS:
+        if _has_camel_prefix(name, prefix):
+            return prefix
+    return None
+
+
+def _has_camel_prefix(name: str, prefix: str) -> bool:
+    if name == prefix:
+        return True
+    if not name.startswith(prefix) or len(name) <= len(prefix):
+        return False
+    nxt = name[len(prefix)]
+    return nxt == "_" or nxt.isupper()
+
+
+def _is_id_column(name: str) -> bool:
+    return name.endswith("Id") or name.endswith("_id") or name.endswith("ID")
+
+
+def _is_list_type(dtype: object) -> bool:
+    text = str(dtype).strip().upper()
+    return text.endswith("[]") or text.startswith("LIST") or "[]" in text
+
+
+def reorder_stg_columns(
+    db: str | Path | duckdb.DuckDBPyConnection,
+    *,
+    progress: Callable[[TableLoad], None] | None = None,
+) -> list[TableLoad]:
+    """Rewrite ``stg.*`` tables so identity/time/sides come before leftover JSON keys."""
+    owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
+    con = duckdb.connect(str(db)) if owns_connection else db
+    reports: list[TableLoad] = []
+    try:
+        views = con.execute(
+            """
+            SELECT view_name, sql
+            FROM duckdb_views()
+            WHERE schema_name = 'stg'
+            ORDER BY view_name
+            """
+        ).fetchall()
+        for view_name, _sql in views:
+            con.execute(f"DROP VIEW IF EXISTS {_qualify('stg', view_name)}")
+        tables = [
+            row[0]
+            for row in con.execute(
+                """
+                SELECT table_name
+                FROM duckdb_tables()
+                WHERE schema_name = 'stg'
+                ORDER BY table_name
+                """
+            ).fetchall()
+        ]
+        for name in tables:
+            report = _reorder_stg_table(con, name)
+            reports.append(report)
+            if progress is not None:
+                progress(report)
+            con.execute("CHECKPOINT")
+        for view_name, sql in views:
+            con.execute(sql)
+    finally:
+        if owns_connection:
+            con.close()
+    return reports
+
+
+def _reorder_stg_table(con: duckdb.DuckDBPyConnection, name: str) -> TableLoad:
+    table = _qualify("stg", name)
+    described = [
+        (row[0], str(row[1])) for row in con.execute(f"DESCRIBE {table}").fetchall()
+    ]
+    ordered = stg_column_order(described, table=name)
+    current = [col for col, _dtype in described]
+    if ordered == current:
+        rows = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        return TableLoad("stg", name, 0, int(rows))
+    tmp_name = name + "__reordering"
+    tmp = _qualify("stg", tmp_name)
+    select_list = ", ".join(_ident(col) for col in ordered)
+    try:
+        con.execute(f"DROP TABLE IF EXISTS {tmp}")
+        con.execute(f"CREATE TABLE {tmp} AS SELECT {select_list} FROM {table}")
+        con.execute(f"DROP TABLE {table}")
+        con.execute(f"ALTER TABLE {tmp} RENAME TO {_ident(name)}")
+        rows = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        return TableLoad("stg", name, 1, int(rows))
+    except Exception as exc:
+        try:
+            con.execute(f"DROP TABLE IF EXISTS {tmp}")
+        except Exception:
+            pass
+        detail = str(exc).split("\n", 1)[0]
+        return TableLoad("stg", name, 0, 0, error=f"{type(exc).__name__}: {detail}")
+
+
+def rename_stg_id_columns(
+    db: str | Path | duckdb.DuckDBPyConnection,
+    *,
+    progress: Callable[[TableLoad], None] | None = None,
+) -> list[TableLoad]:
+    """Rename bare ``id`` (and ``homeId``/``awayId``) to names that match the value."""
+    owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
+    con = duckdb.connect(str(db)) if owns_connection else db
+    reports: list[TableLoad] = []
+    try:
+        views = con.execute(
+            """
+            SELECT view_name, sql
+            FROM duckdb_views()
+            WHERE schema_name = 'stg'
+            ORDER BY view_name
+            """
+        ).fetchall()
+        for view_name, _sql in views:
+            con.execute(f"DROP VIEW IF EXISTS {_qualify('stg', view_name)}")
+        tables = [
+            row[0]
+            for row in con.execute(
+                """
+                SELECT table_name
+                FROM duckdb_tables()
+                WHERE schema_name = 'stg'
+                ORDER BY table_name
+                """
+            ).fetchall()
+        ]
+        for name in tables:
+            renamed = _rename_stg_table_ids(con, name)
+            if renamed:
+                ordered = _reorder_stg_table(con, name)
+                if ordered.error:
+                    reports.append(ordered)
+                else:
+                    reports.append(TableLoad("stg", name, renamed, ordered.rows))
+            else:
+                rows = con.execute(
+                    f"SELECT COUNT(*) FROM {_qualify('stg', name)}"
+                ).fetchone()[0]
+                reports.append(TableLoad("stg", name, 0, int(rows)))
+            if progress is not None:
+                progress(reports[-1])
+            con.execute("CHECKPOINT")
+        for view_name, sql in views:
+            try:
+                con.execute(sql)
+            except Exception:
+                pass
+    finally:
+        if owns_connection:
+            con.close()
+    return reports
+
+
+def _rename_stg_table_ids(con: duckdb.DuckDBPyConnection, name: str) -> int:
+    table = _qualify("stg", name)
+    present = {row[0] for row in con.execute(f"DESCRIBE {table}").fetchall()}
+    changed = 0
+    for old, new in stg_id_renames(name).items():
+        if old not in present or new in present:
+            continue
+        con.execute(f"ALTER TABLE {table} RENAME COLUMN {_ident(old)} TO {_ident(new)}")
+        present.discard(old)
+        present.add(new)
+        changed += 1
+    return changed
 
 
 def parse_dump_stem(stem: str) -> tuple[str, int | None, int | None, str | None]:
@@ -97,7 +434,6 @@ def build_duckdb(
         con.execute("SET preserve_insertion_order = false")
         con.execute("SET threads = 1")
         con.execute("CREATE SCHEMA IF NOT EXISTS raw")
-        con.execute("CREATE SCHEMA IF NOT EXISTS graphql")
         con.execute("CREATE SCHEMA IF NOT EXISTS meta")
         for job in jobs:
             report = _load_job(con, job)
@@ -121,15 +457,20 @@ def build_duckdb(
     return db_path, reports
 
 
+_STRUCTURE_SAMPLE_ROWS = 5000
+_RAW_SPINE = ("season", "week", "season_type")
+
+
 def explode_payloads(
     db: str | Path | duckdb.DuckDBPyConnection,
     *,
+    only: set[str] | None = None,
     progress: Callable[[TableLoad], None] | None = None,
 ) -> list[TableLoad]:
     """Create ``stg.*`` tables with JSON payload keys exploded into columns.
 
     Nested objects become prefixed columns (``offense.overall`` → ``offense_overall``).
-    Arrays stay lists (row grain unchanged). ``raw`` / ``graphql`` stay as JSON.
+    Arrays stay lists (row grain unchanged). ``raw`` stays as JSON.
     Load filename is kept as ``_source_file``.
     """
     owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
@@ -150,9 +491,11 @@ def explode_payloads(
             """
         ).fetchall()
         taken: set[str] = set()
-        # REST first so graphql.calendar loses the name clash, not raw.calendar.
+        # REST first so a leftover graphql.calendar loses the clash, not raw.calendar.
         sources.sort(key=lambda row: (0 if row[0] == "raw" else 1, row[1]))
         for schema, name in sources:
+            if only is not None and name not in only:
+                continue
             dest = _stg_dest_name(name, taken)
             report = _explode_table(con, schema, name, dest)
             reports.append(report)
@@ -161,10 +504,235 @@ def explode_payloads(
             if progress is not None:
                 progress(report)
             con.execute("CHECKPOINT")
+        extra = backfill_gamelines_from_actionnetwork(con)
+        if extra is not None:
+            reports.append(extra)
+            if progress is not None:
+                progress(extra)
+            con.execute("CHECKPOINT")
     finally:
         if owns_connection:
             con.close()
     return reports
+
+
+# Action Network book_id → CFBD linesProvider.id when the book already exists.
+_AN_BOOK_PROVIDER = {15: 888888, 71: 38}  # DraftKings, Caesars
+_AN_PROVIDER_NAMES = {
+    30: "Circa",
+    49: "Pinnacle",
+    68: "FanDuel",
+    69: "BetMGM",
+    75: "Bet365",
+}
+_AN_SCHOOL_ALIAS = {
+    "Miami (FL)": "Miami",
+    "San Jose State": "San José State",
+    "Appalachian State": "App State",
+    "Louisiana-Monroe": "UL Monroe",
+    "UMass": "Massachusetts",
+    "University at Albany": "UAlbany",
+}
+
+
+def backfill_gamelines_from_actionnetwork(
+    db: str | Path | duckdb.DuckDBPyConnection,
+) -> TableLoad | None:
+    """Merge Action Network period + extra-book lines into ``stg.gameLines``.
+
+    CFBD ``gameLines`` is full-game only. AN history is 1H/1Q; scoreboard
+    ``markets`` is full-game per book. Existing CFBD numbers win; AN fills
+    nulls and inserts missing ``(gameId, linesProviderId, period)`` rows.
+    """
+    owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
+    con = duckdb.connect(str(db)) if owns_connection else db
+    try:
+        tables = {
+            row[0]
+            for row in con.execute(
+                "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
+            ).fetchall()
+        }
+        needed = {"gameLines", "games", "actionnetwork_scoreboard"}
+        if not needed.issubset(tables):
+            return None
+        return _backfill_gamelines(con, tables)
+    except Exception as exc:
+        detail = str(exc).split("\n", 1)[0]
+        return TableLoad(
+            "stg", "gameLines", 0, 0, error=f"{type(exc).__name__}: {detail}"
+        )
+    finally:
+        if owns_connection:
+            con.close()
+
+
+def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> TableLoad:
+    game_cols = {row[0] for row in con.execute("DESCRIBE stg.games").fetchall()}
+    game_id = "gameId" if "gameId" in game_cols else "id"
+    gl_types = {
+        row[0]: row[1] for row in con.execute("DESCRIBE stg.gameLines").fetchall()
+    }
+    gid_type = gl_types.get("gameId", "BIGINT")
+    prov_type = gl_types.get("linesProviderId", "BIGINT")
+    has_history = "actionnetwork_history" in tables
+    has_provider = "linesProvider" in tables
+    alias_sql = " ".join(
+        f"WHEN '{src.replace(chr(39), chr(39) + chr(39))}' THEN '{dst.replace(chr(39), chr(39) + chr(39))}'"
+        for src, dst in _AN_SCHOOL_ALIAS.items()
+    )
+    book_sql = " ".join(
+        f"WHEN {an_id} THEN {cfbd_id}" for an_id, cfbd_id in _AN_BOOK_PROVIDER.items()
+    )
+    loc = """list_first(list_transform(list_filter(
+              TRY_CAST(teams AS JSON[]),
+              t -> TRY_CAST(json_extract(t, '$.id') AS BIGINT) = {tid}
+            ), t -> json_extract_string(t, '$.location')))"""
+    home_loc = loc.format(tid="home_team_id")
+    away_loc = loc.format(tid="away_team_id")
+
+    history_sql = (
+        """
+        SELECT event_id, book_id, period, market_type, side, line, odds, _source_file
+        FROM stg.actionnetwork_history
+        WHERE market_type IN ('spread', 'total', 'moneyline')
+        """
+        if has_history
+        else """
+        SELECT NULL::BIGINT AS event_id, NULL::INTEGER AS book_id,
+               NULL::VARCHAR AS period, NULL::VARCHAR AS market_type,
+               NULL::VARCHAR AS side, NULL::DOUBLE AS line, NULL::BIGINT AS odds,
+               NULL::VARCHAR AS _source_file
+        WHERE FALSE
+        """
+    )
+
+    con.execute("DROP TABLE IF EXISTS stg.gameLines__backfill")
+    con.execute(
+        f"""
+        CREATE TABLE stg.gameLines__backfill AS
+        WITH map AS (
+          SELECT
+            sb.event_id,
+            g.{_ident(game_id)} AS game_id,
+            sb._source_file
+          FROM stg.actionnetwork_scoreboard sb
+          JOIN stg.games g
+            ON g.season = sb.season
+           AND g.week = sb.week
+           AND g.homeTeam = CASE {home_loc} {alias_sql} ELSE {home_loc} END
+           AND g.awayTeam = CASE {away_loc} {alias_sql} ELSE {away_loc} END
+        ),
+        sb_long AS (
+          SELECT
+            t.event_id,
+            TRY_CAST(b.key AS INTEGER) AS book_id,
+            COALESCE(json_extract_string(offering.value, '$.period'), 'event') AS period,
+            COALESCE(
+              json_extract_string(offering.value, '$.type'),
+              mkt.key
+            ) AS market_type,
+            json_extract_string(offering.value, '$.side') AS side,
+            TRY_CAST(json_extract(offering.value, '$.value') AS DOUBLE) AS line,
+            TRY_CAST(json_extract(offering.value, '$.odds') AS BIGINT) AS odds,
+            t._source_file
+          FROM stg.actionnetwork_scoreboard t,
+            json_each(t.markets) AS b,
+            json_each(b.value) AS slot,
+            json_each(slot.value) AS mkt,
+            json_each(mkt.value) AS offering
+          WHERE t.markets IS NOT NULL
+            AND json_type(t.markets) = 'OBJECT'
+            AND json_array_length(json_keys(t.markets)) > 0
+        ),
+        an_long AS (
+          SELECT * FROM sb_long
+          WHERE market_type IN ('spread', 'total', 'moneyline')
+          UNION ALL
+          {history_sql}
+        ),
+        an_wide AS (
+          SELECT
+            CAST(m.game_id AS {gid_type}) AS gameId,
+            CAST(
+              (CASE book_id {book_sql} ELSE book_id END) AS {prov_type}
+            ) AS linesProviderId,
+            CASE
+              WHEN period IN ('event', 'game') THEN 'game'
+              ELSE period
+            END AS period,
+            MAX(CASE WHEN market_type = 'spread' AND side = 'home'
+                     THEN line END) AS spread,
+            MAX(CASE WHEN market_type = 'total' AND side IN ('over', 'under')
+                     THEN line END) AS overUnder,
+            MAX(CASE WHEN market_type = 'moneyline' AND side = 'home'
+                     THEN odds END) AS moneylineHome,
+            MAX(CASE WHEN market_type = 'moneyline' AND side = 'away'
+                     THEN odds END) AS moneylineAway,
+            ANY_VALUE(an_long._source_file) AS _source_file
+          FROM an_long
+          JOIN map m USING (event_id)
+          GROUP BY 1, 2, 3
+        ),
+        cfbd AS (
+          SELECT
+            gameId,
+            linesProviderId,
+            'game' AS period,
+            TRY_CAST(spread AS DOUBLE) AS spread,
+            spreadOpen,
+            TRY_CAST(overUnder AS DOUBLE) AS overUnder,
+            overUnderOpen,
+            moneylineHome,
+            moneylineAway,
+            _source_file
+          FROM stg.gameLines
+        )
+        SELECT
+          COALESCE(c.gameId, a.gameId) AS gameId,
+          COALESCE(c.linesProviderId, a.linesProviderId) AS linesProviderId,
+          COALESCE(c.period, a.period) AS period,
+          COALESCE(c.spread, a.spread) AS spread,
+          c.spreadOpen,
+          COALESCE(c.overUnder, a.overUnder) AS overUnder,
+          c.overUnderOpen,
+          COALESCE(c.moneylineHome, a.moneylineHome) AS moneylineHome,
+          COALESCE(c.moneylineAway, a.moneylineAway) AS moneylineAway,
+          CASE
+            WHEN c.gameId IS NOT NULL AND a.gameId IS NOT NULL THEN 'cfbd+an'
+            WHEN c.gameId IS NOT NULL THEN 'cfbd'
+            ELSE 'actionnetwork'
+          END AS line_source,
+          COALESCE(c._source_file, a._source_file) AS _source_file
+        FROM cfbd c
+        FULL OUTER JOIN an_wide a
+          ON c.gameId = a.gameId
+         AND c.linesProviderId = a.linesProviderId
+         AND c.period = a.period
+        """
+    )
+    con.execute("DROP TABLE stg.gameLines")
+    con.execute("ALTER TABLE stg.gameLines__backfill RENAME TO gameLines")
+
+    if has_provider:
+        prov_cols = {
+            row[0] for row in con.execute("DESCRIBE stg.linesProvider").fetchall()
+        }
+        pid_col = "linesProviderId" if "linesProviderId" in prov_cols else "id"
+        name_rows = ", ".join(
+            f"({pid}, '{name.replace(chr(39), chr(39) + chr(39))}', 'actionnetwork')"
+            for pid, name in _AN_PROVIDER_NAMES.items()
+        )
+        con.execute(
+            f"""
+            INSERT INTO stg.linesProvider ({_ident(pid_col)}, name, _source_file)
+            SELECT v.id, v.name, v.src
+            FROM (VALUES {name_rows}) v(id, name, src)
+            WHERE v.id NOT IN (SELECT {_ident(pid_col)} FROM stg.linesProvider)
+            """
+        )
+
+    return _finish_stg_table(con, "gameLines", _qualify("stg", "gameLines"))
 
 
 def flatten_stg_nested(
@@ -214,19 +782,257 @@ def _stg_dest_name(name: str, taken: set[str]) -> str:
     return "gql_" + name
 
 
-def _explode_table(con: duckdb.DuckDBPyConnection, schema: str, name: str, dest: str) -> TableLoad:
-    source = _qualify(schema, name)
-    target = _qualify("stg", dest)
+def _payload_structure(con: duckdb.DuckDBPyConnection, source: str) -> str | None:
+    # LIMIT must wrap the scan. json_group_structure is an aggregate, so a top-level
+    # LIMIT still unions every row and OOMs on plays / gamePlayerStat.
+    row = con.execute(
+        f"""
+        SELECT json_group_structure(payload)
+        FROM (
+          SELECT payload FROM {source}
+          WHERE payload IS NOT NULL
+          LIMIT {_STRUCTURE_SAMPLE_ROWS}
+        )
+        """
+    ).fetchone()
+    return None if row is None else row[0]
+
+
+def _structure_top_keys(structure: str) -> set[str]:
     try:
-        structure = con.execute(f"SELECT json_group_structure(payload) FROM {source}").fetchone()[0]
-        if structure is None:
-            return TableLoad("stg", dest, 0, 0, error="empty payload")
+        parsed = json.loads(structure)
+    except json.JSONDecodeError:
+        return set()
+    return set(parsed) if isinstance(parsed, dict) else set()
+
+
+def _spine_select(con: duckdb.DuckDBPyConnection, source: str, structure: str) -> str:
+    raw_cols = {row[0] for row in con.execute(f"DESCRIBE {source}").fetchall()}
+    payload_keys = _structure_top_keys(structure)
+    pieces = []
+    for col in _RAW_SPINE:
+        if col in raw_cols and col not in payload_keys:
+            pieces.append(_ident(col))
+    pieces.append("source_file AS _source_file")
+    return ",\n              ".join(pieces)
+
+
+def _explode_actionnetwork_history(
+    con: duckdb.DuckDBPyConnection, source: str, target: str, dest: str
+) -> TableLoad:
+    """Unpivot book→period→market maps into one row per offering.
+
+    Generic explode turns dynamic book ids into sparse LIST columns
+    (``15_firsthalf_spread``). History files are one event each; empty ``{}``
+    payloads produce no rows.
+    """
+    try:
         con.execute(f"DROP TABLE IF EXISTS {target}")
         con.execute(
             f"""
             CREATE TABLE {target} AS
             SELECT
-              source_file AS _source_file,
+              COALESCE(
+                TRY_CAST(json_extract(offering.value, '$.event_id') AS BIGINT),
+                TRY_CAST(regexp_extract(t.source_file, 'history_(\\d+)', 1) AS BIGINT)
+              ) AS event_id,
+              TRY_CAST(b.key AS INTEGER) AS book_id,
+              p.key AS period,
+              COALESCE(
+                json_extract_string(offering.value, '$.type'),
+                m.key
+              ) AS market_type,
+              json_extract_string(offering.value, '$.side') AS side,
+              TRY_CAST(json_extract(offering.value, '$.team_id') AS BIGINT) AS team_id,
+              TRY_CAST(json_extract(offering.value, '$.value') AS DOUBLE) AS line,
+              TRY_CAST(json_extract(offering.value, '$.odds') AS BIGINT) AS odds,
+              json_extract_string(offering.value, '$.market_id') AS market_id,
+              json_extract_string(offering.value, '$.outcome_id') AS outcome_id,
+              TRY_CAST(json_extract(offering.value, '$.is_live') AS BOOLEAN) AS is_live,
+              json_extract_string(offering.value, '$.line_status') AS line_status,
+              TRY_CAST(
+                json_extract(offering.value, '$.odds_coefficient_score') AS DOUBLE
+              ) AS odds_coefficient_score,
+              TRY_CAST(
+                json_extract(offering.value, '$.option_type_id') AS INTEGER
+              ) AS option_type_id,
+              TRY_CAST(
+                json_extract(offering.value, '$.bet_info.money.percent') AS INTEGER
+              ) AS money_pct,
+              TRY_CAST(
+                json_extract(offering.value, '$.bet_info.money.value') AS BIGINT
+              ) AS money,
+              TRY_CAST(
+                json_extract(offering.value, '$.bet_info.tickets.percent') AS INTEGER
+              ) AS tickets_pct,
+              TRY_CAST(
+                json_extract(offering.value, '$.bet_info.tickets.value') AS BIGINT
+              ) AS tickets,
+              t.source_file AS _source_file
+            FROM {source} AS t,
+              json_each(t.payload) AS b,
+              json_each(b.value) AS p,
+              json_each(p.value) AS m,
+              json_each(m.value) AS offering
+            WHERE json_type(t.payload) = 'OBJECT'
+              AND json_array_length(json_keys(t.payload)) > 0
+            """
+        )
+        return _finish_stg_table(con, dest, target)
+    except Exception as exc:
+        return _explode_failed(con, target, dest, exc)
+
+
+def _explode_actionnetwork_scoreboard(
+    con: duckdb.DuckDBPyConnection, source: str, target: str, dest: str
+) -> TableLoad:
+    """Unnest ``games[]`` to one row per event; drop league-calendar noise.
+
+    Generic explode keeps one row per weekly file with a STRUCT[] of every
+    game plus 20 ``league_*`` columns. Nested book maps stay JSON.
+    """
+    try:
+        cols = {row[0] for row in con.execute(f"DESCRIBE {source}").fetchall()}
+        season_type = (
+            "t.season_type" if "season_type" in cols else "NULL::VARCHAR AS season_type"
+        )
+        con.execute(f"DROP TABLE IF EXISTS {target}")
+        con.execute(
+            f"""
+            CREATE TABLE {target} AS
+            SELECT
+              COALESCE(
+                TRY_CAST(json_extract(g, '$.id') AS BIGINT),
+                TRY_CAST(json_extract(g, '$.core_id') AS BIGINT)
+              ) AS event_id,
+              TRY_CAST(json_extract(g, '$.core_id') AS BIGINT) AS core_id,
+              COALESCE(
+                TRY_CAST(json_extract(g, '$.season') AS INTEGER),
+                t.season
+              ) AS season,
+              COALESCE(
+                TRY_CAST(json_extract(g, '$.week') AS INTEGER),
+                t.week
+              ) AS week,
+              {season_type},
+              json_extract_string(g, '$.start_time') AS start_time,
+              json_extract_string(g, '$.status') AS status,
+              json_extract_string(g, '$.status_display') AS status_display,
+              json_extract_string(g, '$.real_status') AS real_status,
+              TRY_CAST(json_extract(g, '$.home_team_id') AS BIGINT) AS home_team_id,
+              TRY_CAST(json_extract(g, '$.away_team_id') AS BIGINT) AS away_team_id,
+              TRY_CAST(
+                json_extract(g, '$.home_rotation_number') AS INTEGER
+              ) AS home_rotation_number,
+              TRY_CAST(
+                json_extract(g, '$.away_rotation_number') AS INTEGER
+              ) AS away_rotation_number,
+              TRY_CAST(
+                json_extract(g, '$.winning_team_id') AS BIGINT
+              ) AS winning_team_id,
+              TRY_CAST(json_extract(g, '$.attendance') AS INTEGER) AS attendance,
+              TRY_CAST(json_extract(g, '$.num_bets') AS INTEGER) AS num_bets,
+              json_extract_string(g, '$.coverage') AS coverage,
+              TRY_CAST(json_extract(g, '$.league_id') AS INTEGER) AS league_id,
+              json_extract_string(g, '$.league_name') AS league_name,
+              json_extract_string(g, '$.broadcast.network') AS broadcast_network,
+              json_extract_string(
+                g, '$.broadcast.network_short'
+              ) AS broadcast_network_short,
+              json_extract_string(g, '$.boxscore.clock') AS clock,
+              TRY_CAST(json_extract(g, '$.boxscore.period') AS INTEGER) AS period,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.total_home_points') AS INTEGER
+              ) AS home_points,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.total_away_points') AS INTEGER
+              ) AS away_points,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.total_home_firsthalf_points') AS INTEGER
+              ) AS home_firsthalf_points,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.total_away_firsthalf_points') AS INTEGER
+              ) AS away_firsthalf_points,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.total_home_secondhalf_points') AS INTEGER
+              ) AS home_secondhalf_points,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.total_away_secondhalf_points') AS INTEGER
+              ) AS away_secondhalf_points,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.home_timeouts') AS INTEGER
+              ) AS home_timeouts,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.away_timeouts') AS INTEGER
+              ) AS away_timeouts,
+              json_extract_string(g, '$.boxscore.situation.display') AS situation,
+              TRY_CAST(
+                json_extract(g, '$.boxscore.situation.down') AS INTEGER
+              ) AS "down",
+              TRY_CAST(
+                json_extract(g, '$.boxscore.situation.distance') AS INTEGER
+              ) AS distance,
+              json_extract(g, '$.boxscore.latest_odds') AS latest_odds,
+              json_extract(g, '$.teams') AS teams,
+              json_extract(g, '$.markets') AS markets,
+              json_extract(g, '$.ranks') AS ranks,
+              json_extract(g, '$.last_play') AS last_play,
+              json_extract(g, '$.boxscore.linescore') AS linescore,
+              t.source_file AS _source_file
+            FROM {source} AS t,
+              UNNEST(
+                json_transform(json_extract(t.payload, '$.games'), '["JSON"]')
+              ) AS u(g)
+            WHERE json_extract(t.payload, '$.games') IS NOT NULL
+            """
+        )
+        return _finish_stg_table(con, dest, target)
+    except Exception as exc:
+        return _explode_failed(con, target, dest, exc)
+
+
+def _finish_stg_table(
+    con: duckdb.DuckDBPyConnection, dest: str, target: str
+) -> TableLoad:
+    _rename_stg_table_ids(con, dest)
+    ordered = _reorder_stg_table(con, dest)
+    if ordered.error:
+        return ordered
+    rows = con.execute(f"SELECT COUNT(*) FROM {target}").fetchone()[0]
+    return TableLoad("stg", dest, 1, int(rows))
+
+
+def _explode_failed(
+    con: duckdb.DuckDBPyConnection, target: str, dest: str, exc: Exception
+) -> TableLoad:
+    try:
+        con.execute(f"DROP TABLE IF EXISTS {target}")
+    except Exception:
+        pass
+    detail = str(exc).split("\n", 1)[0]
+    return TableLoad("stg", dest, 0, 0, error=f"{type(exc).__name__}: {detail}")
+
+
+def _explode_table(
+    con: duckdb.DuckDBPyConnection, schema: str, name: str, dest: str
+) -> TableLoad:
+    source = _qualify(schema, name)
+    target = _qualify("stg", dest)
+    if name == "actionnetwork_history":
+        return _explode_actionnetwork_history(con, source, target, dest)
+    if name == "actionnetwork_scoreboard":
+        return _explode_actionnetwork_scoreboard(con, source, target, dest)
+    try:
+        structure = _payload_structure(con, source)
+        if structure is None:
+            return TableLoad("stg", dest, 0, 0, error="empty payload")
+        spine = _spine_select(con, source, structure)
+        con.execute(f"DROP TABLE IF EXISTS {target}")
+        con.execute(
+            f"""
+            CREATE TABLE {target} AS
+            SELECT
+              {spine},
               unnest(
                 json_transform(payload, ?),
                 recursive := true,
@@ -240,6 +1046,10 @@ def _explode_table(con: duckdb.DuckDBPyConnection, schema: str, name: str, dest:
         leftover = _flatten_struct_columns(con, "stg", dest)
         if leftover is not None and leftover.error:
             return leftover
+        _rename_stg_table_ids(con, dest)
+        ordered = _reorder_stg_table(con, dest)
+        if ordered.error:
+            return ordered
         rows = con.execute(f"SELECT COUNT(*) FROM {target}").fetchone()[0]
         return TableLoad("stg", dest, 1, int(rows))
     except Exception as exc:
@@ -291,6 +1101,10 @@ def _flatten_struct_columns(
             rewrote = True
         if not rewrote:
             return None
+        _rename_stg_table_ids(con, name)
+        ordered = _reorder_stg_table(con, name)
+        if ordered.error:
+            return ordered
         rows = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
         return TableLoad(schema, name, 1, int(rows))
     except Exception as exc:
@@ -314,7 +1128,9 @@ def _rename_dotted_columns(con: duckdb.DuckDBPyConnection, table: str) -> None:
         while dest.lower() in taken:
             dest = f"{base}_{suffix}"
             suffix += 1
-        con.execute(f"ALTER TABLE {table} RENAME COLUMN {_ident(col)} TO {_ident(dest)}")
+        con.execute(
+            f"ALTER TABLE {table} RENAME COLUMN {_ident(col)} TO {_ident(dest)}"
+        )
         taken.discard(col.lower())
         taken.add(dest.lower())
 
@@ -343,12 +1159,22 @@ def _plan_loads(
         for name, paths in sorted(raw_groups.items()):
             if only is not None and name not in only:
                 continue
-            jobs.append({"schema": "raw", "name": name, "paths": paths, "format": "array"})
+            jobs.append(
+                {"schema": "raw", "name": name, "paths": paths, "format": "array"}
+            )
 
         csv_path = raw_dir / "actionnetwork_odds.csv"
         if csv_path.exists() and (only is None or "actionnetwork_odds" in only):
-            jobs.append({"schema": "raw", "name": "actionnetwork_odds", "paths": [csv_path], "format": "csv"})
+            jobs.append(
+                {
+                    "schema": "raw",
+                    "name": "actionnetwork_odds",
+                    "paths": [csv_path],
+                    "format": "csv",
+                }
+            )
 
+    taken = {job["name"].lower() for job in jobs}
     gql_dir = data_dir / "graphql"
     if gql_dir.is_dir():
         gql_groups: dict[str, list[Path]] = {}
@@ -356,9 +1182,13 @@ def _plan_loads(
             name, _, _, _ = parse_dump_stem(path.stem)
             gql_groups.setdefault(name, []).append(path)
         for name, paths in sorted(gql_groups.items()):
-            if only is not None and name not in only:
+            dest = _stg_dest_name(name, taken)
+            if only is not None and name not in only and dest not in only:
                 continue
-            jobs.append({"schema": "graphql", "name": name, "paths": paths, "format": "array"})
+            jobs.append(
+                {"schema": "raw", "name": dest, "paths": paths, "format": "array"}
+            )
+            taken.add(dest.lower())
 
     if include_actionnetwork:
         an_dir = data_dir / "raw" / "actionnetwork"
@@ -410,7 +1240,13 @@ def _load_job(con: duckdb.DuckDBPyConnection, job: dict[str, Any]) -> TableLoad:
         except Exception:
             pass
         detail = str(exc).split("\n", 1)[0]
-        return TableLoad(job["schema"], job["name"], len(paths), 0, error=f"{type(exc).__name__}: {detail}")
+        return TableLoad(
+            job["schema"],
+            job["name"],
+            len(paths),
+            0,
+            error=f"{type(exc).__name__}: {detail}",
+        )
 
 
 def _insert_json_file(con: duckdb.DuckDBPyConnection, table: str, path: Path) -> None:
@@ -466,7 +1302,14 @@ def _write_meta(con: duckdb.DuckDBPyConnection, reports: Iterable[TableLoad]) ->
     for report in reports:
         con.execute(
             "INSERT INTO meta.load_report VALUES (?, ?, ?, ?, ?, ?)",
-            [report.schema, report.name, report.files, report.rows, report.error, loaded_at],
+            [
+                report.schema,
+                report.name,
+                report.files,
+                report.rows,
+                report.error,
+                loaded_at,
+            ],
         )
 
 

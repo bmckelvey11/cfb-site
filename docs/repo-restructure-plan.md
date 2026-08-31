@@ -2,9 +2,30 @@
 
 **Status:** approved 2026-08-31, not yet executed.
 **Goal:** scope each unit so its context stops bleeding into the others, and get data out of git.
+The finished local checkout is `C:\Users\mckel\dev\cfb` (renamed from `cfb-site`).
 
 Two problems, one cause: every unit's instructions and docs load on every turn, and
 `over_zero/data/` was committed because `.gitignore` only ignores root-anchored `/data/`.
+
+## Execution recommendation
+
+**Use Codex as the primary executor.** This job is mostly guarded filesystem work, git
+renames, path rewrites, and repeated test runs against a dirty Windows checkout. Codex
+should execute one step at a time, stop on any failed gate, and preserve unrelated local
+changes.
+
+Use Claude for one focused review after Step A. The context-scoping result depends on
+Claude's own root and nested `CLAUDE.md` loading behavior, so Claude should confirm that a
+fresh session sees the small root file and loads only the relevant unit instructions.
+Claude should review that result, not independently rerun the data moves or code-tree
+renames.
+
+Recommended handoff:
+
+1. Codex executes Step 0 and Step A, then records file sizes and changed instruction paths.
+2. Claude opens a fresh session and verifies root versus nested `CLAUDE.md` scope.
+3. Codex addresses any Step A finding, then executes B through E with each verification
+   gate and commit boundary intact.
 
 Success is measurable:
 
@@ -12,6 +33,7 @@ Success is measurable:
 - `git ls-files | grep -E '\.(csv|json|jsonl)$'` drops from 990 files / 178 MB to fixtures only.
 - `python -m pytest` green after every step.
 - One data root (`CFB_DATA_ROOT`), one home per unit, one archive nobody cites.
+- Local checkout opens and passes tests from `C:\Users\mckel\dev\cfb`.
 
 ## Units
 
@@ -26,7 +48,7 @@ Success is measurable:
 ## Target layout
 
 ```
-cfb-site/
+cfb/
 ├── CLAUDE.md                  ≤3K: shared plumbing + precedence + unit index
 ├── README.md                  human entry point
 ├── cfb_paths.py               shared, stays at root (all trees import it top-level)
@@ -317,23 +339,59 @@ Outside the repo, where nested `CLAUDE.md` scoping cannot reach.
 | Path | Finding | Action |
 |---|---|---|
 | `C:\Users\mckel\dev\cfb-totals-model` | separate git repo, 3 commits, clean tree, last commit 2026-08-27. Its `cfb_totals_model/` package is superseded — **every file differs** from the in-repo copy, which is newer (2026-08-28) | **salvage its `README.md`, `TODO.md`, `docs/` first** (the in-repo package has none), then move the repo to `C:\Users\mckel\dev\_archive\` |
-| `C:\Users\mckel\dev\cfb` | empty | delete |
+| `C:\Users\mckel\dev\cfb` | empty; this is the requested final checkout path | delete the empty directory so Step E can rename into it |
 | `C:\Users\mckel\OneDrive\cfb_data`, `OneDrive - 150 Out\CFB` | API-key text files, not data | leave |
 
 **Verify D:** no `cfb_totals_model` package outside `models/totals/`.
 
 ---
 
+# Step E — rename the local checkout
+
+Run last, after the nested worktree is resolved and every earlier step is green. This is a
+filesystem rename, not a git content rename. The GitHub repository name remains `cfb-site`
+unless that separate rename is requested later.
+
+Before renaming:
+
+1. Confirm `git status --short` is clean and `git worktree list` contains only the main
+   checkout.
+2. Confirm `C:\Users\mckel\dev\cfb` is absent after Step D.
+3. Update live instructions and launch examples that depend on the checkout name, including
+   root `README.md` (`cd cfb`) and any active absolute `C:\Users\mckel\dev\cfb-site`
+   references. Do not rewrite historical `.planning/` records or archived documents merely
+   to modernize their old paths.
+4. Close terminals, editors, servers, and agents whose working directory is inside
+   `cfb-site`.
+
+From `C:\Users\mckel\dev`:
+
+```powershell
+Rename-Item -LiteralPath 'C:\Users\mckel\dev\cfb-site' -NewName 'cfb'
+Set-Location -LiteralPath 'C:\Users\mckel\dev\cfb'
+```
+
+Reopen the project from its new path. Update local editor/workspace shortcuts if they still
+point at `cfb-site`; those machine-local files do not belong in git.
+
+**Verify E:** `git status --short` is clean; `git worktree list` reports
+`C:\Users\mckel\dev\cfb`; `python -m pytest` is green; `CFB_DATA_ROOT` still resolves to
+`C:\Users\mckel\data\cfb`; no live code or current instructions contain the old absolute
+checkout path.
+
+---
+
 # Order and rollback
 
 ```
-0 pre-work  →  A docs  →  B data  →  C1 code  →  [C2 optional]  →  D external
+0 pre-work  →  A docs  →  B data  →  C1 code  →  [C2 optional]  →  D external  →  E checkout rename
 ```
 
 Each step is its own commit (or small series) and independently verifiable. A is reversible
 by `git revert`. B is reversible only for tracked files — the deleted 165 MB is recoverable
 from git history until the commit is old, and from the warehouse permanently. C is pure
-renames, revert-safe.
+renames, revert-safe. E is reversed by closing tools and renaming the directory back from
+`cfb` to `cfb-site`; it does not alter git history.
 
 Out of scope: `pyproject.toml` / packaging (the repo has never needed an install step;
 adding one is a new failure mode, not a saving), `cfbd-python/`, and any change to the

@@ -21,21 +21,21 @@
 
 ## Technology Stack
 
-Technology stack not yet documented. Will populate after codebase mapping or first phase.
+Python 3 + Flask + vanilla JS/CSS (no frontend framework). Vendored `cfbd-python` (pydantic v1, path-injected). Optional DuckDB warehouse. Waitress for `web` unless `--debug`. Full commands and architecture: repo-root `CLAUDE.md`.
 <!-- GSD:stack-end -->
 
 <!-- GSD:conventions-start source:CONVENTIONS.md -->
 
 ## Conventions
 
-Conventions not yet established. Will populate as patterns emerge during development.
+No lookahead unless tagged `result_lookahead` and UI-quarantined. `GameRecord` CSV field order is frozen — new game-level data goes in `features.json`. `SavedSystem` missing keys must default. Do not edit `cfbd-python/`. Details in root `CLAUDE.md`.
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
 
 ## Architecture
 
-Architecture not yet mapped. Follow existing patterns found in the codebase.
+CLI package `cfb_system_maker/` + Flask `web.py`. Acquire (`fetch` / `scrape` / `graphql` / `actionnetwork`) → build `games.csv` → enrich `features.json` → backtest/web/search. Live week is `upcoming` (separate CSV). Optional `duckdb` warehouse; serving still csv+features. Sibling trees: `over_zero/`, `cfb_totals_model/`. Root `CLAUDE.md` is the agent source of truth.
 <!-- GSD:architecture-end -->
 
 <!-- GSD:skills-start source:skills/ -->
@@ -49,15 +49,13 @@ No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skill
 
 ## GSD Workflow Enforcement
 
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
+Prefer GSD so planning artifacts stay in sync:
 
 - `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
 - `/gsd-debug` for investigation and bug fixing
 - `/gsd-execute-phase` for planned phase work
 
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+Small fixes and doc edits may go straight to the files. Root `CLAUDE.md` is the agent source of truth; this file is the GSD overlay (`claude_md_path`).
 <!-- GSD:workflow-end -->
 
 <!-- GSD:profile-start -->

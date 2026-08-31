@@ -2,9 +2,27 @@
 
 Glossary of canonical terms for cfb-site. Add terms as they are resolved; keep implementation details out.
 
+## Football identity
+
+- **Team** — a school/program that persists across seasons (Ohio State). Identity only; record, ratings, and play shape do not live here.
+- **FBS Team** — a Team whose classification is FBS. The Team-season profile picker is FBS Teams only.
+- **Team-season** — that school in one season, built from regular and postseason games only (2020 spring types are out). Record, conference, ratings, and play shape attach here, not to the Team forever.
+- **Completed Team-season** — a Team-season with at least one completed game. Distinct from a scheduled-only Team-season (slate exists, no result yet). The profile lands on the newest Completed Team-season; the picker may still open a scheduled-only year.
+- **Team-season profile** — a one-subject view of a Team-season (identity, SU record, ATS record, ratings strip, play shape, coach cluster, game log). Complementary to league-wide comparison. Not a betting book.
+  _Avoid_: Team summary, Team P&L, Team involvement
+- **Ratings strip** — SP+, FPI, and Elo as equal-rank quality numbers for a Team-season. There is no single canonical rating.
+  _Avoid_: “the” rating, SP+ as the headline
+- **Play shape** — how this Team-season plays: pace, run rate, success. Not the coach’s career label.
+- **Coach cluster** — the career playstyle label for a head coach on that Team-season, shown with identity (not with play shape) and always qualified as career, not this year. If two HCs served, both appear, each with a cluster.
+  _Avoid_: style (that word meant both)
+- **Head coaches** — every HC who served that Team-season, labeled. Not file-order last-write-wins.
+- **SU record** — wins and losses on the scoreboard for Team-season games. Ties count for neither side.
+- **ATS record** — covers and non-covers against the selected close, equal rank to the SU record on the profile. Pushes and unlined games count for neither side. The selected book is named on each game, not as a season-level house book. Not Team P&L: no units, no “taken” side.
+- **Game log** — every Team-season game in date order. SU, ATS, and the selected book sit on the row. Unplayed slate rows appear only on a scheduled-only Team-season; they do not enter SU or ATS.
+
 ## Bet-history analysis
 
-- **Team P&L** — net units from bets where that team was *taken* (spread or moneyline sides only). Totals bets never contribute to Team P&L, because a totals bet backs no team.
+- **Team P&L** — net units from bets where that team was _taken_ (spread or moneyline sides only). Totals bets never contribute to Team P&L, because a totals bet backs no team.
 - **Team involvement** — any core bet placed on a game that team played in, including totals. Measures where betting attention goes, not who was backed.
 - **Core bet** — NCAAF full-game straight bet (spread, total, or moneyline). Excludes first-half/second-half/live/team-total bets, parlays, and teasers.
 - **Break-even rate** — 52.38%, the win rate needed to profit at −110 juice.

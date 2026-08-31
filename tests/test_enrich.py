@@ -592,3 +592,125 @@ def test_enrich_conference_change_none_when_season_file_absent(tmp_path):
     row = enrich_games(tmp_path, games)["1"]
 
     assert row["home_conference_change"] is None
+
+
+def test_enrich_kickoff_hour_is_eastern(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"games_{season}.json").write_text(
+        json.dumps(
+            [
+                {"id": 1, "season": season, "startDate": "2023-09-02T16:00:00+00:00"},
+                {"id": 2, "season": season, "startDate": "2023-11-25T00:30:00Z"},
+                {"id": 3, "season": season, "startDate": "2023-09-02T16:00:00+00:00", "startTimeTBD": True},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [
+        GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None),
+        GameRecord(2, season, 13, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None),
+        GameRecord(3, season, 1, "Gamma", "Delta", None, None, 10, 7, "consensus", -3.5, None),
+    ]
+    features = enrich_games(tmp_path, games)
+
+    assert features["1"]["kickoff_hour"] == 12  # 16:00 UTC in September = noon EDT
+    assert features["2"]["kickoff_hour"] == 19  # 00:30 UTC in November = 7:30 PM EST
+    assert features["3"]["kickoff_hour"] is None
+
+
+def test_enrich_preseason_rank_from_coach_seasons(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"coach_seasons_{season}.json").write_text(
+        json.dumps(
+            [
+                {"year": season, "team": {"id": 1, "school": "Alpha"}, "preseasonRank": 8},
+                {"year": season, "team": {"id": 2, "school": "Beta"}, "preseasonRank": None},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    row = enrich_games(tmp_path, games)["1"]
+
+    assert row["home_preseasonRank"] == 8
+    assert row["away_preseasonRank"] is None
+
+
+def test_enrich_core_overall_reads_this_season_as_lookahead(tmp_path):
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / "core_ratings_2022.json").write_text(
+        json.dumps([{"team": "Alpha", "year": 2022, "overall": 12.5}]),
+        encoding="utf-8",
+    )
+    (raw_dir / "core_ratings_2023.json").write_text(
+        json.dumps([{"team": "Alpha", "year": 2023, "overall": 99.0}]),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, 2023, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    row = enrich_games(tmp_path, games)["1"]
+
+    assert row["home_core_overall"] == 99.0
+    assert row["home_prior_core_overall"] == 12.5
+    assert row["away_core_overall"] is None
+
+
+def test_enrich_ngt_defense_stats_this_game(tmp_path):
+    season = 2023
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"advanced_game_stats_ngt_{season}.json").write_text(
+        json.dumps(
+            [
+                {
+                    "gameId": 1,
+                    "team": "Alpha",
+                    "defense": {
+                        "explosiveness": 1.2,
+                        "ppa": 0.15,
+                        "successRate": 0.42,
+                        "passingDowns": {"ppa": 0.22},
+                        "rushingPlays": {"ppa": 0.08},
+                    },
+                },
+                {
+                    "gameId": 1,
+                    "team": "Beta",
+                    "defense": {
+                        "explosiveness": 0.9,
+                        "ppa": -0.05,
+                        "successRate": 0.31,
+                        "passingDowns": {"ppa": 0.11},
+                        "rushingPlays": {"ppa": -0.02},
+                    },
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    row = enrich_games(tmp_path, games)["1"]
+
+    assert row["home_defense_explosiveness"] == 1.2
+    assert row["home_defense_ppa"] == 0.15
+    assert row["home_defense_successRate"] == 0.42
+    assert row["home_defense_passingDowns_ppa"] == 0.22
+    assert row["home_defense_rushingPlays_ppa"] == 0.08
+    assert row["away_defense_explosiveness"] == 0.9
+    assert row["away_defense_ppa"] == -0.05
+
+
+def test_enrich_ngt_defense_stats_none_when_file_absent(tmp_path):
+    (tmp_path / "raw").mkdir(parents=True)
+    games = [GameRecord(1, 2023, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
+    row = enrich_games(tmp_path, games)["1"]
+    assert row["home_defense_ppa"] is None
+    assert row["away_defense_successRate"] is None

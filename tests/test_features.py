@@ -2,6 +2,7 @@ from cfb_system_maker.features import (
     FEATURE_BY_KEY,
     FEATURE_REGISTRY,
     feature_ok,
+    format_kickoff_hour,
     registry_keys_unique,
     registry_version,
 )
@@ -76,6 +77,47 @@ def test_prior_off_wepa_is_team_preseason_player_agg():
     assert feature.group == "team_preseason"
     assert feature.source_kind == "raw_player_agg"
     assert feature.team_scoped is True
+
+
+def test_format_kickoff_hour_is_12_hour_clock():
+    assert format_kickoff_hour(0) == "12:00 AM"
+    assert format_kickoff_hour(12) == "12:00 PM"
+    assert format_kickoff_hour(19) == "7:00 PM"
+    assert format_kickoff_hour(19.0) == "7:00 PM"
+
+
+def test_new_web_features_are_registered():
+    kickoff = FEATURE_BY_KEY["kickoff_hour"]
+    assert kickoff.group == "matchup"
+    assert kickoff.source_kind == "raw_game"
+    assert kickoff.control == "numeric"
+    assert kickoff.team_scoped is False
+    assert kickoff.label == "Kickoff Time (ET)"
+
+    rank = FEATURE_BY_KEY["preseasonRank"]
+    assert rank.group == "team_preseason"
+    assert rank.source_kind == "raw_team_season"
+    assert rank.source_file == "coach_seasons"
+    assert rank.team_scoped is True
+
+    overall = FEATURE_BY_KEY["core_overall"]
+    assert overall.group == "result_lookahead"
+    assert overall.source_file == "core_ratings"
+    assert overall.field == "overall"
+
+    ngt_keys = (
+        "defense_explosiveness",
+        "defense_passingDowns_ppa",
+        "defense_ppa",
+        "defense_rushingPlays_ppa",
+        "defense_successRate",
+    )
+    for key in ngt_keys:
+        feature = FEATURE_BY_KEY[key]
+        assert feature.group == "result_lookahead"
+        assert feature.source_kind == "raw_adv_ngt"
+        assert feature.source_file == "advanced_game_stats_ngt"
+        assert feature.team_scoped is True
 
 
 def test_registry_version_changed_from_phase3_baseline():

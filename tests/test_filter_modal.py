@@ -145,21 +145,24 @@ def test_form_parse_normalizes_bet_side_to_either_on_totals():
 
     from cfb_system_maker.web import _form_values_from_args, _system_from_form
 
-    args = MultiDict([
-        ("bet_type", "total"),
-        ("total_side", "over"),
-        ("ff_enable", "running_win_pct"),
-        ("ff_key", "running_win_pct"),
-        ("ff_op", "gte"),
-        ("ff_value", "0.8"),
-        ("ff_perspective", "bet_side"),
-    ])
+    args = MultiDict(
+        [
+            ("bet_type", "total"),
+            ("total_side", "over"),
+            ("ff_enable", "running_win_pct"),
+            ("ff_key", "running_win_pct"),
+            ("ff_op", "gte"),
+            ("ff_value", "0.8"),
+            ("ff_perspective", "bet_side"),
+        ]
+    )
     system = _system_from_form(_form_values_from_args(args))
     assert system.feature_filters[0].perspective == "either"
 
-    args_spread = MultiDict([("bet_type", "spread"), ("side", "home")] + [
-        item for item in args.items(multi=True) if item[0].startswith("ff_")
-    ])
+    args_spread = MultiDict(
+        [("bet_type", "spread"), ("side", "home")]
+        + [item for item in args.items(multi=True) if item[0].startswith("ff_")]
+    )
     system_spread = _system_from_form(_form_values_from_args(args_spread))
     assert system_spread.feature_filters[0].perspective == "bet_side"
 
@@ -349,7 +352,11 @@ def test_aggregate_filter_value_rows_team_on_total_buckets_both_sides():
 
     # Spread systems keep bet-side-only buckets.
     spread_rows = aggregate_filter_value_rows(
-        games, SystemFilter(side="home"), descriptor, feature_map={}, perspective="single"
+        games,
+        SystemFilter(side="home"),
+        descriptor,
+        feature_map={},
+        perspective="single",
     )
     assert {row["value"] for row in spread_rows} == {"Alpha"}
 
@@ -409,7 +416,9 @@ def test_filter_detail_overlapping_rows_flag(tmp_path):
     assert bet_side_resp.get_json()["overlapping_rows"] is False
 
     # core:team on a total system: Alpha home / Beta away -> overlapping.
-    team_resp = app.test_client().get("/filter-detail?candidate_id=core:team&bet_type=total")
+    team_resp = app.test_client().get(
+        "/filter-detail?candidate_id=core:team&bet_type=total"
+    )
     assert team_resp.status_code == 200
     team_payload = team_resp.get_json()
     assert team_payload["overlapping_rows"] is True
@@ -422,7 +431,9 @@ def test_filter_detail_overlapping_rows_flag(tmp_path):
     )
 
     # core:team on a spread system: bet-side only, no overlap.
-    team_spread_resp = app.test_client().get("/filter-detail?candidate_id=core:team&bet_type=spread")
+    team_spread_resp = app.test_client().get(
+        "/filter-detail?candidate_id=core:team&bet_type=spread"
+    )
     assert team_spread_resp.status_code == 200
     assert team_spread_resp.get_json()["overlapping_rows"] is False
 
@@ -440,7 +451,11 @@ def test_aggregate_filter_value_rows_categorical_sorted():
         "team_scoped": False,
     }
     rows = aggregate_filter_value_rows(
-        games, SystemFilter(side="home"), descriptor, feature_map={}, perspective="single"
+        games,
+        SystemFilter(side="home"),
+        descriptor,
+        feature_map={},
+        perspective="single",
     )
     assert [row["description"] for row in rows] == ["2022", "2023", "2024"]
 
@@ -464,7 +479,9 @@ def test_filter_detail_boolean_and_candidate_removal(tmp_path):
     client = app.test_client()
 
     # Candidate seasons={2023} removed → domain still includes 2024/2025
-    response = client.get("/filter-detail?candidate_id=core:season&side=home&filter_seasons=2023")
+    response = client.get(
+        "/filter-detail?candidate_id=core:season&side=home&filter_seasons=2023"
+    )
     assert response.status_code == 200
     assert response.is_json
     payload = response.get_json()
@@ -482,7 +499,10 @@ def test_filter_detail_boolean_and_candidate_removal(tmp_path):
     bool_payload = bool_resp.get_json()
     assert bool_payload["control"] == "bool"
     assert [row["description"] for row in bool_payload["rows"]] == ["No", "Yes"]
-    assert bool_payload["lookahead_warning"] in (False, "", None) or bool_payload["lookahead_warning"] is False
+    assert (
+        bool_payload["lookahead_warning"] in (False, "", None)
+        or bool_payload["lookahead_warning"] is False
+    )
 
     cat_resp = client.get("/filter-detail?candidate_id=feature:venue&side=home")
     assert cat_resp.status_code == 200
@@ -490,14 +510,25 @@ def test_filter_detail_boolean_and_candidate_removal(tmp_path):
     assert cat_payload["control"] == "categorical"
     assert len(cat_payload["rows"]) >= 2
     for row in cat_payload["rows"]:
-        assert set(row) >= {"value", "description", "wins", "losses", "pushes", "record", "roi", "money"}
+        assert set(row) >= {
+            "value",
+            "description",
+            "wins",
+            "losses",
+            "pushes",
+            "record",
+            "roi",
+            "money",
+        }
 
 
 def test_filter_detail_unknown_candidate_is_400(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
-    response = app.test_client().get("/filter-detail?candidate_id=core:not_real&side=home")
+    response = app.test_client().get(
+        "/filter-detail?candidate_id=core:not_real&side=home"
+    )
     assert response.status_code == 400
     payload = response.get_json()
     assert "error" in payload
@@ -543,7 +574,12 @@ def test_index_has_grouped_launchers_and_fallback(tmp_path):
         tmp_path,
         {str(game.game_id): {"neutralSite": False, "venue": "Dome"} for game in games},
     )
-    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
+    html = (
+        create_app(data_dir=tmp_path)
+        .test_client()
+        .get("/system")
+        .get_data(as_text=True)
+    )
     for candidate in (
         "core:season",
         "core:week",
@@ -564,7 +600,9 @@ def test_index_has_grouped_launchers_and_fallback(tmp_path):
     assert 'name="ff_enable"' in html
     assert 'data-fallback-for="core:season"' in html
     assert "lookahead — analysis only" in html
-    assert 'class="feature-group lookahead"' in html or "feature-group lookahead" in html
+    assert (
+        'class="feature-group lookahead"' in html or "feature-group lookahead" in html
+    )
 
 
 def test_filter_modal_js_has_table_search_sort_and_commit():
@@ -657,7 +695,15 @@ def test_downsample_chart_points_caps_at_60_preserves_domain_extremes():
 
 def test_filter_detail_numeric_domain_rows_and_chart_points(tmp_path):
     games = [
-        _game(i, season=2023, week=i, home_points=28, away_points=21, spread=-float(i), total=40.0 + i)
+        _game(
+            i,
+            season=2023,
+            week=i,
+            home_points=28,
+            away_points=21,
+            spread=-float(i),
+            total=40.0 + i,
+        )
         for i in range(1, 71)
     ]
     save_processed_games(tmp_path, games)
@@ -666,7 +712,9 @@ def test_filter_detail_numeric_domain_rows_and_chart_points(tmp_path):
     app = create_app(data_dir=tmp_path)
     client = app.test_client()
 
-    feature_resp = client.get("/filter-detail?candidate_id=feature:weather_temperature&side=home")
+    feature_resp = client.get(
+        "/filter-detail?candidate_id=feature:weather_temperature&side=home"
+    )
     assert feature_resp.status_code == 200
     feature_payload = feature_resp.get_json()
     assert feature_payload["control"] == "numeric"
@@ -716,12 +764,17 @@ def test_filter_modal_js_numeric_range_chart_between_and_save():
     assert source.count('type = "range"') >= 2
     assert "BETWEEN" in source
     assert "AND" in source
-    assert 'data-view="chart"' in Path("cfb_system_maker/templates/index.html").read_text(encoding="utf-8")
+    assert 'data-view="chart"' in Path(
+        "cfb_system_maker/templates/index.html"
+    ).read_text(encoding="utf-8")
     html = Path("cfb_system_maker/templates/index.html").read_text(encoding="utf-8")
     assert ">Chart<" in html and ">List<" in html
     assert 'view = "chart"' in source and 'view = "list"' in source
     assert "writeNumericToForm" in source
     assert "boundsAreValid" in source
+    assert "pickNumericListRow" in source
+    assert "Number(row.value)" in source
+    assert "singleValuePick = true" in source
     assert "Max must be greater than or equal to min." in source
     assert "filter-modal__chart" in source or "createElementNS" in source
     save_block = source.split("function saveAndSubmit")[1].split("function ")[0]
@@ -734,7 +787,12 @@ def test_filter_modal_js_numeric_range_chart_between_and_save():
 def test_index_has_chart_list_toggle_markup(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
-    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
+    html = (
+        create_app(data_dir=tmp_path)
+        .test_client()
+        .get("/system")
+        .get_data(as_text=True)
+    )
     assert 'id="filter-modal-view-toggle"' in html
     assert ">Chart<" in html
     assert ">List<" in html
@@ -751,7 +809,7 @@ def test_numeric_save_commit_serialization_contract():
     write_block = source.split("function writeNumericToForm")[1].split("function ")[0]
     assert "min_spread" in write_block or "CORE_RANGE_FIELDS" in source
     assert 'data-bound="min"' in source or "data-bound" in write_block
-    assert 'op", "gte"' in source or 'op\', \'gte\'' in source or '"gte"' in write_block
+    assert 'op", "gte"' in source or "op', 'gte'" in source or '"gte"' in write_block
     save_block = source.split("function saveAndSubmit")[1].split("function ")[0]
     assert "writeNumericToForm" in save_block
     assert "requestSubmit" in save_block or "filtersForm.submit" in save_block
@@ -768,7 +826,12 @@ def test_numeric_feature_fallback_has_paired_gte_lte_slots(tmp_path):
         tmp_path,
         {str(game.game_id): {"weather_temperature": 55.0} for game in games},
     )
-    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
+    html = (
+        create_app(data_dir=tmp_path)
+        .test_client()
+        .get("/system")
+        .get_data(as_text=True)
+    )
     assert 'data-fallback-for="feature:weather_temperature"' in html
     assert 'data-bound="min"' in html
     assert 'data-bound="max"' in html
@@ -845,7 +908,10 @@ def test_edit_metadata_for_core_and_feature_sentences():
                 FeatureFilter("running_win_pct", "lte", 0.7, perspective="opponent"),
             )
         ),
-        {"text": "Opponent Win % (to date) is between 0.4 and 0.7", "key": "ff:running_win_pct"},
+        {
+            "text": "Opponent Win % (to date) is between 0.4 and 0.7",
+            "key": "ff:running_win_pct",
+        },
     )
     assert feature is not None
     assert feature["candidate_id"] == "feature:running_win_pct"
@@ -867,13 +933,20 @@ def test_index_active_filters_have_edit_beside_remove(tmp_path):
     save_processed_games(tmp_path, games)
     save_features(
         tmp_path,
-        {str(game.game_id): {"neutralSite": True, "running_win_pct_home": 0.5} for game in games},
+        {
+            str(game.game_id): {"neutralSite": True, "running_win_pct_home": 0.5}
+            for game in games
+        },
     )
     app = create_app(data_dir=tmp_path)
-    html = app.test_client().get(
-        "/system?side=home&filter_seasons=2023"
-        "&ff_enable=neutralSite&ff_key=neutralSite&ff_op=eq&ff_value=true&ff_perspective=single"
-    ).get_data(as_text=True)
+    html = (
+        app.test_client()
+        .get(
+            "/system?side=home&filter_seasons=2023"
+            "&ff_enable=neutralSite&ff_key=neutralSite&ff_op=eq&ff_value=true&ff_perspective=single"
+        )
+        .get_data(as_text=True)
+    )
 
     assert ">Edit<" in html
     assert 'aria-label="Edit filter: the season is 2023"' in html
@@ -883,9 +956,11 @@ def test_index_active_filters_have_edit_beside_remove(tmp_path):
     assert 'aria-label="Remove filter: the season is 2023"' in html
     assert 'aria-label="Edit filter:' in html
     # Feature sentence also editable
-    assert "data-candidate-id=\"feature:neutralSite\"" in html
+    assert 'data-candidate-id="feature:neutralSite"' in html
     # Global toggles are not Edit-modal filters
-    fav_html = app.test_client().get("/system?side=home&favorite=on").get_data(as_text=True)
+    fav_html = (
+        app.test_client().get("/system?side=home&favorite=on").get_data(as_text=True)
+    )
     assert "the team is a favorite" in fav_html
     assert 'aria-label="Edit filter: the team is a favorite"' not in fav_html
     assert 'aria-label="Remove filter: the team is a favorite"' in fav_html
@@ -902,7 +977,11 @@ def test_filter_modal_js_edit_prefill_and_perspective_contract():
     assert "data-perspective" in source
     assert "defaultPerspective" in source or "bet_side" in source
     assert "opponent" in source
-    assert "team_scoped" in source or "team-scoped" in source or "data-team-scoped" in source
+    assert (
+        "team_scoped" in source
+        or "team-scoped" in source
+        or "data-team-scoped" in source
+    )
     assert "perspective" in source
 
     template = Path("cfb_system_maker/templates/index.html").read_text(encoding="utf-8")
@@ -993,7 +1072,9 @@ def test_blank_bound_row_is_ignored_not_rejected(tmp_path):
         "&ff_key=running_win_pct&ff_op=gte&ff_value=&ff_perspective=opponent"
         "&ff_key=running_win_pct&ff_op=lte&ff_value=0.45&ff_perspective=opponent"
     )
-    detail = client.get(f"/filter-detail?candidate_id=feature:running_win_pct&perspective=bet_side&{query}")
+    detail = client.get(
+        f"/filter-detail?candidate_id=feature:running_win_pct&perspective=bet_side&{query}"
+    )
     assert detail.status_code == 200
 
     api = client.get(f"/api/backtest?{query}")
@@ -1048,7 +1129,12 @@ def test_feature_sidebar_search_input_renders_without_a_name(tmp_path):
         tmp_path,
         {str(game.game_id): {"weather_temperature": 55.0} for game in games},
     )
-    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
+    html = (
+        create_app(data_dir=tmp_path)
+        .test_client()
+        .get("/system")
+        .get_data(as_text=True)
+    )
 
     tag = re.search(r"<input[^>]*filter-search[^>]*>", html)
     assert tag is not None
@@ -1062,7 +1148,9 @@ def test_feature_sidebar_js_search_collapse_contract():
     swallow Enter so typing a term does not submit the backtest form."""
     from pathlib import Path
 
-    source = Path("cfb_system_maker/static/feature_sidebar.js").read_text(encoding="utf-8")
+    source = Path("cfb_system_maker/static/feature_sidebar.js").read_text(
+        encoding="utf-8"
+    )
 
     # display:none inputs still serialize; disabled ones are dropped from
     # FormData, which would silently delete already-committed filters.
@@ -1088,7 +1176,9 @@ def test_feature_sidebar_search_matches_the_stat_name(tmp_path):
     stat name and match every team-scoped row on the term "opponent"."""
     from pathlib import Path
 
-    source = Path("cfb_system_maker/static/feature_sidebar.js").read_text(encoding="utf-8")
+    source = Path("cfb_system_maker/static/feature_sidebar.js").read_text(
+        encoding="utf-8"
+    )
     assert ".stat-row__label" in source
 
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
@@ -1097,7 +1187,12 @@ def test_feature_sidebar_search_matches_the_stat_name(tmp_path):
         tmp_path,
         {str(game.game_id): {"running_win_pct": 0.5} for game in games},
     )
-    html = create_app(data_dir=tmp_path).test_client().get("/system").get_data(as_text=True)
+    html = (
+        create_app(data_dir=tmp_path)
+        .test_client()
+        .get("/system")
+        .get_data(as_text=True)
+    )
 
     # The markup the matcher depends on is really emitted for team-scoped stats.
     assert 'class="stat-row__label"' in html
@@ -1111,5 +1206,7 @@ def test_feature_sidebar_collapse_yields_to_active_search():
     css = Path("cfb_system_maker/static/styles.css").read_text(encoding="utf-8")
     assert ".feature-filters:not(.is-searching) .feature-group.is-collapsed" in css
 
-    source = Path("cfb_system_maker/static/feature_sidebar.js").read_text(encoding="utf-8")
+    source = Path("cfb_system_maker/static/feature_sidebar.js").read_text(
+        encoding="utf-8"
+    )
     assert "is-searching" in source

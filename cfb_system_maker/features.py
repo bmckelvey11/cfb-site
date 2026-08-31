@@ -25,6 +25,7 @@ SourceKind = Literal[
     "raw_teams",
     "raw_coaches",
     "raw_havoc",
+    "raw_adv_ngt",
     "raw_venues",
     "raw_conferences",
     "raw_pregame_wp",
@@ -73,6 +74,20 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
     FeatureDef(
         "seasonType", "Season Type", "matchup", "raw_game", "seasonType", "game_id", "categorical",
         description="Season segment label (for example regular or postseason). Pregame schedule category.",
+    ),
+    FeatureDef(
+        "kickoff_hour",
+        "Kickoff Time (ET)",
+        "matchup",
+        "raw_game",
+        "kickoff_hour",
+        "game_id",
+        "numeric",
+        description=(
+            "Scheduled kickoff time in Eastern Time, stored as hour 0–23 and shown "
+            "as a clock time (for example 7:00 PM). Pregame schedule. "
+            "Null when the clock time is TBD."
+        ),
     ),
     # --- ratings (game_id) ---
     FeatureDef(
@@ -375,6 +390,21 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
             "Team-scoped; use perspective to pick which team. Preseason / prior-season value."
         ),
     ),
+    FeatureDef(
+        "preseasonRank",
+        "Preseason Poll Rank",
+        "team_preseason",
+        "raw_team_season",
+        "preseasonRank",
+        "team_season",
+        "numeric",
+        team_scoped=True,
+        source_file="coach_seasons",
+        description=(
+            "Preseason poll rank from the team's coach-season row (1 is best). "
+            "Team-scoped; use perspective to pick which team. Pregame ranking."
+        ),
+    ),
     # --- metadata ---
     FeatureDef(
         "team_state", "Team State", "metadata", "raw_teams", "location.state", "team_name", "categorical",
@@ -591,9 +621,115 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
             "and analysis, not as a discovered betting edge."
         ),
     ),
+    FeatureDef(
+        "core_overall",
+        "Core Rating (this season)",
+        "result_lookahead",
+        "raw_team_season",
+        "overall",
+        "team_season",
+        "numeric",
+        team_scoped=True,
+        source_file="core_ratings",
+        description=(
+            "CFBD core rating (overall) for THIS season. Season-final (through postseason). "
+            "Analysis-only / lookahead — not an entering-game value. For a pregame number use "
+            "Prior-Season Core Rating."
+        ),
+    ),
+    FeatureDef(
+        "defense_explosiveness",
+        "Def Explosiveness (this game, NGT)",
+        "result_lookahead",
+        "raw_adv_ngt",
+        "defense.explosiveness",
+        "game_id",
+        "numeric",
+        team_scoped=True,
+        source_file="advanced_game_stats_ngt",
+        description=(
+            "Defensive explosiveness allowed in this completed game, garbage time excluded. "
+            "Team-scoped. Analysis-only / lookahead — post-game, not available for live betting. "
+            "For an entering-game value use Def Explosiveness (to date)."
+        ),
+    ),
+    FeatureDef(
+        "defense_passingDowns_ppa",
+        "Def Passing-Downs PPA (this game, NGT)",
+        "result_lookahead",
+        "raw_adv_ngt",
+        "defense.passingDowns.ppa",
+        "game_id",
+        "numeric",
+        team_scoped=True,
+        source_file="advanced_game_stats_ngt",
+        description=(
+            "Defensive PPA allowed on passing downs in this completed game, garbage time excluded. "
+            "Team-scoped. Analysis-only / lookahead — post-game, not available for live betting."
+        ),
+    ),
+    FeatureDef(
+        "defense_ppa",
+        "Def PPA (this game, NGT)",
+        "result_lookahead",
+        "raw_adv_ngt",
+        "defense.ppa",
+        "game_id",
+        "numeric",
+        team_scoped=True,
+        source_file="advanced_game_stats_ngt",
+        description=(
+            "Defensive PPA allowed in this completed game, garbage time excluded. Team-scoped. "
+            "Analysis-only / lookahead — post-game, not available for live betting. "
+            "For an entering-game value use Def PPA (to date)."
+        ),
+    ),
+    FeatureDef(
+        "defense_rushingPlays_ppa",
+        "Def Rushing PPA (this game, NGT)",
+        "result_lookahead",
+        "raw_adv_ngt",
+        "defense.rushingPlays.ppa",
+        "game_id",
+        "numeric",
+        team_scoped=True,
+        source_file="advanced_game_stats_ngt",
+        description=(
+            "Defensive PPA allowed on rushing plays in this completed game, garbage time excluded. "
+            "Team-scoped. Analysis-only / lookahead — post-game, not available for live betting."
+        ),
+    ),
+    FeatureDef(
+        "defense_successRate",
+        "Def Success Rate (this game, NGT)",
+        "result_lookahead",
+        "raw_adv_ngt",
+        "defense.successRate",
+        "game_id",
+        "numeric",
+        team_scoped=True,
+        source_file="advanced_game_stats_ngt",
+        description=(
+            "Defensive success rate allowed in this completed game (0–1), garbage time excluded. "
+            "Team-scoped. Analysis-only / lookahead — post-game, not available for live betting. "
+            "For an entering-game value use Def Success Rate (to date)."
+        ),
+    ),
 )
 
 FEATURE_BY_KEY: dict[str, FeatureDef] = {feature.key: feature for feature in FEATURE_REGISTRY}
+
+
+def format_kickoff_hour(value: object) -> str:
+    """Display a 0–23 Eastern hour as a 12-hour clock time."""
+    try:
+        hour = int(value)
+    except (TypeError, ValueError):
+        return str(value)
+    hour = hour % 24
+    meridiem = "AM" if hour < 12 else "PM"
+    display = hour % 12 or 12
+    return f"{display}:00 {meridiem}"
 
 
 def registry_keys_unique() -> bool:

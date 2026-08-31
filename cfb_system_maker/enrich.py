@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from cfb_system_maker.coach_style import COACH_STYLE_CLUSTERS
 from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, get_nested, registry_version
@@ -96,6 +97,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         "raw_teams": {},
         "raw_coaches": {},
         "raw_havoc": {},
+        "raw_adv_ngt": {},
         "raw_venues": {},
         "raw_conferences": {},
         "raw_pregame_wp": {},
@@ -116,9 +118,12 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         _index_team_season_file(indexes["raw_team_season"], data_dir / "raw" / f"returning_production_{season}.json", "returning_production")
         _index_team_season_file(indexes["raw_team_season"], data_dir / "raw" / f"talent_{season}.json", "talent")
         _index_team_season_file(indexes["raw_team_season"], data_dir / "raw" / f"recruiting_teams_{season}.json", "recruiting_teams")
+        _index_coach_seasons(indexes["raw_team_season"], data_dir / "raw" / f"coach_seasons_{season}.json", "coach_seasons")
+        _index_team_season_file(indexes["raw_team_season"], data_dir / "raw" / f"core_ratings_{season}.json", "core_ratings")
         _index_team_name_file(indexes["raw_teams"], data_dir / "raw" / f"teams_{season}.json")
         _index_coaches(indexes["raw_coaches"], data_dir / "raw" / f"coaches_{season}.json", season)
         _index_havoc(indexes["raw_havoc"], data_dir / "raw" / f"game_havoc_stats_{season}.json")
+        _index_havoc(indexes["raw_adv_ngt"], data_dir / "raw" / f"advanced_game_stats_ngt_{season}.json")
         _index_raw_file(indexes["raw_pregame_wp"], data_dir / "raw" / f"pregame_win_prob_{season}.json", "gameId")
         _index_prior_player_agg(indexes["raw_player_agg"], data_dir / "raw" / f"adjusted_player_passing_{season - 1}.json", season)
         _index_prior_team_season(indexes["raw_prior_team_season"], data_dir / "raw" / f"core_ratings_{season - 1}.json", "core_ratings", season)
@@ -273,7 +278,7 @@ def _apply_feature(row: dict[str, Any], feature: FeatureDef, game: GameRecord, i
         return
     value = _lookup(feature, game, indexes)
     if feature.team_scoped and feature.join in {"team_season", "team_name", "game_id"}:
-        if feature.source_kind in {"raw_havoc", "graphql_game_team", "computed_running"}:
+        if feature.source_kind in {"raw_havoc", "raw_adv_ngt", "graphql_game_team", "computed_running"}:
             home_val, away_val = value if isinstance(value, tuple) else (None, None)
             row[f"home_{feature.key}"] = home_val
             row[f"away_{feature.key}"] = away_val
@@ -296,6 +301,8 @@ def _lookup_conference(feature: FeatureDef, conference: str | None, indexes: dic
 def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> Any:
     if feature.source_kind == "raw_game":
         record = indexes["raw_game"].get(game.game_id)
+        if feature.field == "kickoff_hour":
+            return _kickoff_hour_et(record)
         return _field_value(record, feature.field) if record else None
 
     if feature.source_kind == "raw_lines":
@@ -336,6 +343,12 @@ def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> A
         havoc = indexes["raw_havoc"]
         home_val = _field_value(havoc.get((game.game_id, game.home_team)), feature.field)
         away_val = _field_value(havoc.get((game.game_id, game.away_team)), feature.field)
+        return (home_val, away_val)
+
+    if feature.source_kind == "raw_adv_ngt":
+        adv = indexes["raw_adv_ngt"]
+        home_val = _field_value(adv.get((game.game_id, game.home_team)), feature.field)
+        away_val = _field_value(adv.get((game.game_id, game.away_team)), feature.field)
         return (home_val, away_val)
 
     if feature.source_kind == "computed_running":
@@ -436,6 +449,48 @@ def _index_raw_lines(bucket: dict[int, dict[str, Any]], path: Path) -> None:
         if not lines:
             continue
         bucket[int(game_id)] = lines[0]
+
+
+_ET = ZoneInfo("America/New_York")
+
+
+def _kickoff_hour_et(record: dict[str, Any] | None) -> int | None:
+    """Eastern hour (0–23) from a games-row startDate. TBD clock → None."""
+    if not record:
+        return None
+    if record.get("startTimeTBD") or record.get("start_time_tbd"):
+        return None
+    raw = record.get("startDate") or record.get("start_date")
+    if not raw:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(_ET).hour
+
+
+def _index_coach_seasons(
+    bucket: dict[str, dict[tuple[str, int], dict[str, Any]]], path: Path, name: str
+) -> None:
+    """Index coach_seasons rows; ``team`` is a nested {school} object on this endpoint."""
+    if not path.exists():
+        return
+    store = bucket.setdefault(name, {})
+    for row in json.loads(path.read_text(encoding="utf-8")):
+        team = row.get("team") or row.get("school")
+        if isinstance(team, dict):
+            team = team.get("school") or team.get("name")
+        season = row.get("year") or row.get("season")
+        if team is not None and season is not None:
+            store[(str(team), int(season))] = row
 
 
 def _index_team_season_file(bucket: dict[str, dict[tuple[str, int], dict[str, Any]]], path: Path, name: str) -> None:

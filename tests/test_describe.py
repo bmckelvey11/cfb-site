@@ -101,6 +101,17 @@ def test_describe_feature_filter_categorical_in_list():
     assert {"text": f"{label} is one of Michigan Stadium, The Horseshoe", "key": "ff:venue"} in result
 
 
+def test_describe_kickoff_hour_uses_clock_time():
+    system = SystemFilter(
+        feature_filters=(
+            FeatureFilter(key="kickoff_hour", op="gte", value=19.0),
+            FeatureFilter(key="kickoff_hour", op="lte", value=23.0),
+        )
+    )
+    result = describe(system)
+    assert {"text": "Kickoff Time (ET) is between 7:00 PM and 11:00 PM", "key": "ff:kickoff_hour"} in result
+
+
 def test_describe_feature_filter_numeric_gte_and_lte():
     label = FEATURE_BY_KEY["weather_temperature"].label
 
