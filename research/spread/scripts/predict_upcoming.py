@@ -4,7 +4,7 @@ READ THIS BEFORE USING THE OUTPUT.
 
   1. Against the CLOSING line there is no edge. Ten combination rules were tried; the best
      Holm-adjusted p is 0.4865. If the number you can actually bet is the close, this
-     predicts nothing. See docs/prediction-tracker-findings.md.
+     predicts nothing. See research/spread/docs/prediction-tracker-findings.md.
   2. Against the OPENING line the measured effect is real (-2.615 MSE, 20 of 20 seasons)
      but it is an UPPER BOUND, not a strategy: the historical archive carries no
      publication timestamp, so it cannot be shown the forecast existed before the open.
@@ -32,8 +32,8 @@ Serves E4, the screened equal-weighted consensus: pre-registered, never selected
 effect but is the selection-conditional winner of an eight-member family and is roughly
 half market proxying, so it is reported beside E4 rather than instead of it.
 
-    python scripts/predict_upcoming.py
-    python scripts/predict_upcoming.py --snapshot <path>
+    python research/spread/scripts/predict_upcoming.py
+    python research/spread/scripts/predict_upcoming.py --snapshot <path>
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ SNAP_DIR = base.cfb_paths.RAW / "pt_snapshots"
 LOG = base.OUT_DIR / "pt_upcoming_predictions.csv"
 
 # Not models. Both reproduce the market line under a model name, so they would top any
-# skill screen and consume slots in the K=20. See docs/prediction-tracker-findings.md.
+# skill screen and consume slots in the K=20. See research/spread/docs/prediction-tracker-findings.md.
 MARKET_LINES = {"lineca", "linemidweek"}
 
 

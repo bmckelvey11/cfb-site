@@ -7,7 +7,8 @@ import pytest
 
 _spec = importlib.util.spec_from_file_location(
     "collect_line_timing",
-    Path(__file__).resolve().parents[1] / "scripts" / "collect_line_timing.py",
+    Path(__file__).resolve().parents[1]
+    / "research" / "spread" / "scripts" / "collect_line_timing.py",
 )
 ct = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ct)

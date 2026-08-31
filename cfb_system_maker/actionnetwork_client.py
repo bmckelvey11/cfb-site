@@ -30,9 +30,9 @@ HISTORY_URL = "https://api.actionnetwork.com/web/v2/markets/event/{event_id}/his
 # CAVEAT: the scoreboard's embedded full-game markets are a SNAPSHOT, not history, so
 # this default means no full-game line history is ever written. The history endpoint
 # does serve it -- the full-game period is named "event" (not "game", which returns an
-# empty payload). `scripts/collect_line_timing.py` pulls that separately, into
+# empty payload). `research/spread/scripts/collect_line_timing.py` pulls that separately, into
 # history_event_{id}.json so it can't collide with the firsthalf/firstquarter files
-# this module writes. See docs/prediction-tracker-model-eval.md section 8.
+# this module writes. See research/spread/docs/prediction-tracker-model-eval.md section 8.
 DEFAULT_PERIODS: tuple[str, ...] = ("firsthalf", "firstquarter")
 FULL_GAME_PERIOD = "event"
 

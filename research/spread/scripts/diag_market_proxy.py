@@ -1,6 +1,6 @@
 """Is the opening-line result model skill, or models proxying the closing line?
 
-`docs/prediction-tracker-combination-sweep.md` section 1 claims the panel carries
+`research/spread/docs/prediction-tracker-combination-sweep.md` section 1 claims the panel carries
 information the OPENING line has not priced. The alternative reading is a tautology: some
 Prediction Tracker entries may be market-anchored -- "the opening line plus my adjustment",
 published mid-week once the number has already moved. Such a column beats the opening line
@@ -14,7 +14,7 @@ A genuine forecaster anticipates SOME of the move and lands modest-positive. A m
 that has already seen the moved number lands near 1. Drop the top decile by rho and re-run
 the opening-line result; if it survives, section 1 is about model skill.
 
-    python scripts/diag_market_proxy.py
+    python research/spread/scripts/diag_market_proxy.py
 
 Also reports two smaller checks the sweep did not cover:
   * how many rows in the common support have NO screened model, where Anchor.strip's

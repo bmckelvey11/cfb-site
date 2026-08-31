@@ -1,6 +1,6 @@
 """Was the screened consensus measuring model skill, or measuring the line?
 
-`docs/prediction-tracker-model-eval.md` section 10 established that `lineca` and
+`research/spread/docs/prediction-tracker-model-eval.md` section 10 established that `lineca` and
 `linemidweek` are market lines reprinted inside the model panel. They therefore top ANY
 skill ranking, which means every screened-consensus result published so far -- the parent
 plan's K=20 E4, and E3/E7/E10/E14 in the sweep -- was built on a top-20 whose two best
@@ -10,7 +10,7 @@ Section 10 measured the effect of dropping the top DECILE by movement correlatio
 columns). That is a different question. This asks the narrow one: remove exactly the two
 market lines, change nothing else, and see whether the screened-consensus family survives.
 
-    python scripts/diag_screen_decontam.py
+    python research/spread/scripts/diag_screen_decontam.py
 
 If E4's opening-line effect largely survives, the screen was measuring model skill and the
 published structure holds. If it collapses, the screen was a market feed.

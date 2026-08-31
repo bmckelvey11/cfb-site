@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cfb_totals_model.data import _REGISTRY_COLS, _entering_game_stats
-from cfb_totals_model.model import Backtest, FoldResult, permutation_test, walk_forward
+from models.totals.data import _REGISTRY_COLS, _entering_game_stats
+from models.totals.model import Backtest, FoldResult, permutation_test, walk_forward
 
 # Current-game havoc, reported attendance, and post-game winProb. Result lookahead.
 _LEAKED_REGISTRY = (

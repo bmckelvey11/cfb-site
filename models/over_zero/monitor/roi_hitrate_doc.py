@@ -304,7 +304,7 @@ Two things worth naming rather than leaving for the reader to find:
 
 ## Reproducing these tables
 
-Every row above comes out of `data/backtest_bets.csv` — one line per graded
+Every row above comes out of `backtest_bets.csv` — one line per graded
 walk-forward game, all of them, not just the ones clearing the filter. Group
 by `season` (filtering `passes_filter == 1`) for the first table, bucket
 `bias` on the bin edges for the second. The file's `threshold` column records

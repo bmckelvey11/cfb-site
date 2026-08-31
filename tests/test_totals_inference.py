@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cfb_totals_model.inference import (
+from models.totals.inference import (
     cluster_ids,
     cluster_mean,
     hit_delta_and_clv,
     paired_score_delta,
 )
-from cfb_totals_model.model import CITABLE_MIN_EDGE
+from models.totals.model import CITABLE_MIN_EDGE
 
 
 def test_citable_threshold_is_unselected_full_book():

@@ -29,7 +29,7 @@ The totals sibling produced 57% / +8.82% ROI in a leaked era from **this-game** 
 (havoc, attendance, post-game stats). The same trap is live here because `features.json` carries
 all 112 columns including those.
 
-- **Explicit allowlist only.** Features come from `cfb_totals_model.data._REGISTRY_COLS` plus
+- **Explicit allowlist only.** Features come from `models.totals.data._REGISTRY_COLS` plus
   entering-game `pre_*` aggregates. No "all columns minus known-bad".
 - **The entire `result_lookahead` group is excluded**, including `coach_style_cluster` and
   `pregame_win_prob`. A walk-forward market test on coach styles already found nothing

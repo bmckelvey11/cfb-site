@@ -1,12 +1,12 @@
 """Recency-weighted skill estimation and cohort-aware pooling.
 
-Implements docs/prediction-tracker-model-eval-plan-addendum.md section 11, committed before
+Implements research/spread/docs/prediction-tracker-model-eval-plan-addendum.md section 11, committed before
 any of this ran. Read section 11.0 first: recency enters only through the SCREEN, and against
 the closing line the correction coefficient is already zero, so nothing here can produce a
 closing-line edge. What it can move is the opening-line effect and which models get screened.
 
-    python scripts/eval_recency_screen.py            # full run
-    python scripts/eval_recency_screen.py --quick    # fewer bootstrap draws
+    python research/spread/scripts/eval_recency_screen.py            # full run
+    python research/spread/scripts/eval_recency_screen.py --quick    # fewer bootstrap draws
 
 The two market lines (section 10 of the parent results) are excluded throughout: lineca ranked
 #1 in the top-20 screen in 20 of 20 seasons, so leaving it in would tune a decay factor on a
@@ -31,7 +31,11 @@ warnings.filterwarnings("ignore", r"Mean of empty slice", RuntimeWarning)
 warnings.filterwarnings("ignore", r"invalid value encountered", RuntimeWarning)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+REPO = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "cfb_paths.py").is_file()
+)
+sys.path.insert(0, str(REPO))
 
 import cfb_paths  # noqa: E402
 import eval_prediction_tracker_models as base  # noqa: E402

@@ -1,8 +1,8 @@
 # Combination sweep — results
 
-Run 2026-08-29 by `scripts/eval_combination_sweep.py`, implementing
-`docs/prediction-tracker-model-eval-plan-addendum.md`, which was committed at `2fbc480`
-before any of this was fit. Parent results: `docs/prediction-tracker-model-eval.md`.
+Run 2026-08-29 by `research/spread/scripts/eval_combination_sweep.py`, implementing
+`prediction-tracker-model-eval-plan-addendum.md`, which was committed at `2fbc480`
+before any of this was fit. Parent results: `prediction-tracker-model-eval.md`.
 
 Nine estimators (E6–E14) drawn from the forecast-combination literature and run against
 the measured diagnostics rather than in the abstract. Walk-forward 2006–2025, every
@@ -269,13 +269,13 @@ survives at a price you could actually take. That still waits on
 ---
 ## 9. Robustness: is the opening-line result skill, or proxying?
 
-`scripts/diag_market_proxy.py`. §1's claim is that the panel carries information the opening
+`research/spread/scripts/diag_market_proxy.py`. §1's claim is that the panel carries information the opening
 line has not priced. The alternative is a tautology: a column that is really "the line plus my
 adjustment," published mid-week, beats the opening number mechanically.
 
 **It found something worse than proxying — two columns that are not forecasts at all.**
 `lineca` reproduces the closing line *exactly* on 65.6% of its games; `linemidweek` on 43.3%.
-Full write-up in `docs/prediction-tracker-model-eval.md` §10, which retracts the parent
+Full write-up in `prediction-tracker-model-eval.md` §10, which retracts the parent
 analysis's single-model claims.
 
 Dropping the top decile by `corr(f_i − open, close − open)` — 15 columns, including both:

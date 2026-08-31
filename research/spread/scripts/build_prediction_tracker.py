@@ -1,6 +1,6 @@
 """Union the Prediction Tracker season CSVs and attach a CFBD game_id to every row.
 
-Source: prediction-tracker/raw/ncaa*.csv  (seasons taken from the files present, so a
+Source: $CFB_DATA_ROOT/raw/prediction_tracker/ncaa*.csv (seasons come from files present, so a
         new ncaa{year}.csv is picked up without a code change)
 CFBD:   stg.game in data/cfb.duckdb -- the GraphQL-fed table. data/raw/games_*.json holds
         regular-season rows only, which would drop every bowl (~35/season); games.csv is
@@ -25,11 +25,14 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+REPO = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "cfb_paths.py").is_file()
+)
+sys.path.insert(0, str(REPO))
 import cfb_paths  # noqa: E402  (repo's CFB_DATA_ROOT resolver, honors the env override)
 
-REPO = Path(__file__).resolve().parents[1]
-DEFAULT_SRC = REPO / "prediction-tracker" / "raw"
+DEFAULT_SRC = cfb_paths.RAW / "prediction_tracker"
 DEFAULT_DB = cfb_paths.DB_PATH
 DEFAULT_OUT = cfb_paths.RAW / "prediction_tracker_lines.csv"
 

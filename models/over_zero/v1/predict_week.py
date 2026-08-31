@@ -60,7 +60,7 @@ def _cfbd_token():
     """CFBD API token from env vars or the hub repo's env.env (gitignored).
 
     The hub root is the only env.env -- per README, do not add a second one
-    under over_zero/."""
+    under models/over_zero/."""
     for key in ("CFBD_API_KEY", "CFBD-API", "BEARER_TOKEN"):
         if os.environ.get(key):
             return os.environ[key]

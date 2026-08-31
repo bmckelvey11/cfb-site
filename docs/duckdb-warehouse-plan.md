@@ -50,7 +50,7 @@ polish.
 | Consumer | What it needs |
 |---|---|
 | `cfb_system_maker` (Bet Labs parity backtester) | Game-level spread/total records + registry features — `GameRecord`, `games.csv`, `features.json` |
-| `cfb_totals_model` (totals-line CLV model) | The same games/lines data, read from the shared warehouse (`CFB_DATA_ROOT`) |
+| `models/totals` (totals-line CLV model) | The same games/lines data, read from the shared warehouse (`CFB_DATA_ROOT`) |
 | `over_zero` (Arscott floor-bias research) | Games/lines plus its own 1H-line and ActionNetwork snapshots not shared with the other two |
 
 (All three live in this repo as of 2026-08-28 — `consolidation.md` Phase 1 is merged;

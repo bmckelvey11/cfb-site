@@ -1,11 +1,11 @@
 """Rank the Prediction Tracker models and build a walk-forward ensemble spread.
 
-Implements docs/prediction-tracker-model-eval-plan.md. Read that first -- the estimand,
+Implements research/spread/docs/prediction-tracker-model-eval-plan.md. Read that first -- the estimand,
 the dual open/close benchmark, the pre-registration of E4, the volatility definition and
 the multiplicity budget are all fixed there, before any of this was fit.
 
-    python scripts/eval_prediction_tracker_models.py            # full run
-    python scripts/eval_prediction_tracker_models.py --quick    # skip the bootstrap
+    python research/spread/scripts/eval_prediction_tracker_models.py            # full run
+    python research/spread/scripts/eval_prediction_tracker_models.py --quick    # skip the bootstrap
 
 Everything is expressed as a predicted HOME MARGIN (= -spread), oriented to Prediction
 Tracker's home/road. Error = margin + spread.
@@ -25,7 +25,11 @@ import pandas as pd
 
 warnings.filterwarnings("ignore", r"Mean of empty slice", RuntimeWarning)
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+REPO = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "cfb_paths.py").is_file()
+)
+sys.path.insert(0, str(REPO))
 import cfb_paths  # noqa: E402
 
 SRC = cfb_paths.RAW / "prediction_tracker_lines.csv"

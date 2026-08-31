@@ -1,11 +1,11 @@
 """Market-anchored combination sweep -- E6 through E14.
 
-Implements docs/prediction-tracker-model-eval-plan-addendum.md. Read that first: the
+Implements research/spread/docs/prediction-tracker-model-eval-plan-addendum.md. Read that first: the
 repair/exploratory split, the hyperparameter grids, the nested selection rule, the
 stability gate and the multiplicity budget are all fixed there, before any of this ran.
 
-    python scripts/eval_combination_sweep.py            # full run
-    python scripts/eval_combination_sweep.py --quick    # fewer bootstrap draws
+    python research/spread/scripts/eval_combination_sweep.py            # full run
+    python research/spread/scripts/eval_combination_sweep.py --quick    # fewer bootstrap draws
 
 Everything below works in RESIDUAL space. For each game:
 
@@ -41,7 +41,11 @@ warnings.filterwarnings("ignore", r"All-NaN slice", RuntimeWarning)
 warnings.filterwarnings("ignore", module="sklearn")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+REPO = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "cfb_paths.py").is_file()
+)
+sys.path.insert(0, str(REPO))
 
 import cfb_paths  # noqa: E402
 import eval_prediction_tracker_models as base  # noqa: E402
@@ -112,7 +116,7 @@ def regressor_cols(tr, te, models, legacy=False):
     model set active in that season".
 
     `legacy=True` reproduces the original whole-history filter for the correction check in
-    `scripts/diag_regressor_filter.py`.
+    `research/spread/scripts/diag_regressor_filter.py`.
     """
     active = [m for m in models if te[m].notna().mean() >= 0.5]
     if legacy:

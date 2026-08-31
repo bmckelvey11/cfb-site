@@ -1,7 +1,7 @@
 # Prediction Tracker model evaluation and ensemble — results
 
-Implements `docs/prediction-tracker-model-eval-plan.md`, which was written and committed
-**before** anything was fit. Reproduce with `python scripts/eval_prediction_tracker_models.py`.
+Implements `prediction-tracker-model-eval-plan.md`, which was written and committed
+**before** anything was fit. Reproduce with `python research/spread/scripts/eval_prediction_tracker_models.py`.
 
 17,731 games, 2001–2025. 154 model columns, 113 with ≥200 clean-coverage games, **80 with
 ≥3 seasons** (below that a season-clustered bootstrap is degenerate and no inference is
@@ -417,7 +417,7 @@ That single number decides it. Nothing in the existing archive can.
 
 ## 9. The forward collector
 
-Built 2026-08-29 and **running** — `scripts/collect_line_timing.py`. It closes the §8
+Built 2026-08-29 and **running** — `research/spread/scripts/collect_line_timing.py`. It closes the §8
 blockers for games from here on. It cannot help the 2001–2025 archive; nothing can.
 
 ### What was actually wrong
@@ -441,8 +441,8 @@ payload, which is also why 9,129 of those files are `[]`.
 That asymmetry is the design: only the PT snapshot has to run on a schedule.
 
 ```bash
-python scripts/collect_line_timing.py snapshot                 # weekly, mid-week
-python scripts/collect_line_timing.py history --season 2026 --weeks 1-16
+python research/spread/scripts/collect_line_timing.py snapshot                 # weekly, mid-week
+python research/spread/scripts/collect_line_timing.py history --season 2026 --weeks 1-16
 ```
 
 Snapshots are content-hashed against the previous one, so running it often is harmless —
@@ -450,7 +450,7 @@ it writes only when PT actually changes.
 
 ### Scheduled, and running
 
-Registered on Windows Task Scheduler 2026-08-29 via `scripts/collect_line_timing.cmd`,
+Registered on Windows Task Scheduler 2026-08-29 via `research/spread/scripts/collect_line_timing.cmd`,
 which wraps the Python entry point and appends every run to
 `{CFB_DATA_ROOT}/logs/line_timing.log` — a silent failure in October is only discoverable
 if there is a log to read.
@@ -488,7 +488,7 @@ timestamp is a lookup, not an interpolation.
 
 The collector produces inputs, not an answer. Once a season of snapshots exists:
 
-1. Join each snapshot's games to `game_id` (reuse `scripts/build_prediction_tracker.py`).
+1. Join each snapshot's games to `game_id` (reuse `research/spread/scripts/build_prediction_tracker.py`).
 2. For each game, read the AN price at that snapshot's `captured_at`.
 3. Re-grade the §7 `|edge| > 2` bets at that price.
 
@@ -498,8 +498,8 @@ banked, treat §7 as an unreachable upper bound, per §8.
 ---
 ## 10. Correction: two panel columns are market lines, not models
 
-Added 2026-08-29, from `scripts/diag_market_proxy.py`, run as a robustness check on the
-combination sweep (`docs/prediction-tracker-combination-sweep.md`).
+Added 2026-08-29, from `research/spread/scripts/diag_market_proxy.py`, run as a robustness check on the
+combination sweep (`prediction-tracker-combination-sweep.md`).
 
 The check asks a question this analysis never asked: **is every column in the panel actually
 a forecast?** Prediction Tracker's `line*` naming is just its convention, and the build

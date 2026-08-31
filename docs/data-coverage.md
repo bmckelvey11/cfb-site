@@ -91,7 +91,7 @@ in `stg.game` are real season types, not mislabels — checked on dates and clas
 - 2023's 139 postseason rows span all divisions (FBS 42, DIII 43, DII 29, FCS 25). Filter
   on `homeClassification`/`awayClassification` or the counts look erratic across seasons.
 
-`scripts/build_prediction_tracker.py` already reads `stg.game` for this reason and is
+`research/spread/scripts/build_prediction_tracker.py` already reads `stg.game` for this reason and is
 correct as written.
 
 **Do not "add a postseason pass" to `scrapers.py`.** `_scrape_season` writes

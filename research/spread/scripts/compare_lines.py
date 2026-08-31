@@ -3,7 +3,7 @@
 This isolates the value of betting early. Any hit-rate gap here is line value,
 not model skill — the predictions are identical, only the number bet differs.
 
-    python scripts/compare_lines.py [--data-root PATH]
+    python research/spread/scripts/compare_lines.py [--data-root PATH]
 """
 
 from __future__ import annotations
@@ -12,13 +12,17 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+REPO = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "cfb_paths.py").is_file()
+)
+sys.path.insert(0, str(REPO))
 
 import pandas as pd
 
-from cfb_totals_model.data import load
-from cfb_totals_model.inference import cluster_ids, hit_delta_and_clv
-from cfb_totals_model.model import _fit_predict, iter_walk_forward_splits
+from models.totals.data import load
+from models.totals.inference import cluster_ids, hit_delta_and_clv
+from models.totals.model import _fit_predict, iter_walk_forward_splits
 
 
 def _fmt_inf(inf: dict, *, scale: float = 1.0) -> str:

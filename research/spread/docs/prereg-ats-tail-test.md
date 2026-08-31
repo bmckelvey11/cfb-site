@@ -18,7 +18,7 @@ market**. If it does, the actionable rule is "bet only when |edge| exceeds some 
 `pt_ensemble_spread_closing.csv` — 12,803 walk-forward out-of-sample predictions, 2006–2025.
 Already generated; this test adds no new fitting. Closing line only. The opening line is
 excluded on purpose: the timing problem makes it unactionable regardless of the result, and
-`scripts/predict_upcoming.py` week 1 shows `corr(line move, edge_vs_open) = +0.988`.
+`research/spread/scripts/predict_upcoming.py` week 1 shows `corr(line move, edge_vs_open) = +0.988`.
 
 ## Bet rule
 

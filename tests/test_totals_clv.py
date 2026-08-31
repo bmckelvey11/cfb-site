@@ -1,6 +1,6 @@
 """CLV sign and takeable-book selection. No network."""
 
-from cfb_totals_model.clv import clv_points, pick_takeable, summarize
+from models.totals.clv import clv_points, pick_takeable, summarize
 
 
 def test_clv_under_benefits_when_close_drops():

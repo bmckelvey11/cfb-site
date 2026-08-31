@@ -157,9 +157,9 @@ missing.
 
 ## over_zero
 
-Floor Bias / Arscott (2022) research, merged from the `over-zero` repo. Run its
-commands from [`over_zero/`](over_zero/README.md), not from this repo root.
-Score a game: `python over_zero/monitor/score_game.py 28 40.5` (cwd `over_zero/`).
+Floor Bias / Arscott (2022) research, merged from the `over-zero` repo. See
+[`models/over_zero/`](models/over_zero/README.md).
+Score a game: `python monitor/score_game.py 28 40.5` from `models/over_zero/`.
 
 ## Disclaimer
 

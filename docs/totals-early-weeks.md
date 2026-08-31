@@ -55,7 +55,7 @@ See [`totals-model.md`](totals-model.md) for features, no-lookahead guarantees, 
 
 Constraints for the analysis:
 
-- Use real data under `../cfb-site/data` via `cfb_totals_model.data.load()`.
+- Use external `CFB_DATA_ROOT` via `models.totals.data.load()`.
 - Respect no-lookahead: week *N* features = expanding mean of weeks 1…*N−1* only (`_entering_game_stats`).
 - Do not invent spreads or stats not in the data root.
 - Do not retune hyperparameters or ship new production code.
@@ -160,7 +160,7 @@ Line-only loses early — the “nudge off priors + market” story holds.
 
 ## Phase 2: Production code path verification
 
-Follow-up used **unmodified** `cfb_totals_model.model` functions (`_grade_split`, `_fit_predict`, `iter_walk_forward_splits`, `walk_forward`, `permutation_test`). Only the **test set** was filtered per bin; training always used full prior-season history.
+Follow-up used **unmodified** `models.totals.model` functions (`_grade_split`, `_fit_predict`, `iter_walk_forward_splits`, `walk_forward`, `permutation_test`). Only the **test set** was filtered per bin; training always used full prior-season history.
 
 ### CLI baselines
 
@@ -288,7 +288,7 @@ Production `_fit_predict` uses `train[x_cols].fillna(median)` only. When **all**
 
 ### Smallest code change (if pursuing early totals)
 
-Add optional CLI filters to `cfb_totals_model/cli.py`:
+Add optional CLI filters to `models/totals/cli.py`:
 
 - `--max-prior-games N` — include games where `min_n ≤ N`
 - `--early-only` — shorthand for `min_prior_games=0` + test filter `min_n ≤ 2`
@@ -314,10 +314,10 @@ From repo root with `../cfb-site/data` present:
 
 ```bash
 # Production baseline
-python -m cfb_totals_model backtest --line ou_open --permute
+python -m models.totals backtest --line ou_open --permute
 
 # Full pool including early games
-python -m cfb_totals_model backtest --line ou_open --min-prior-games 0 --permute
+python -m models.totals backtest --line ou_open --min-prior-games 0 --permute
 
 # Open vs close comparison
 python compare_lines.py

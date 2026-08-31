@@ -1,8 +1,8 @@
 # Recency-weighted screening — results
 
-Run 2026-08-29 by `scripts/eval_recency_screen.py`, implementing
-`docs/prediction-tracker-model-eval-plan-addendum.md` **§11**, committed at `3bedfc6` before
-any of this was fit. Prior results: `docs/prediction-tracker-combination-sweep.md`.
+Run 2026-08-29 by `research/spread/scripts/eval_recency_screen.py`, implementing
+`prediction-tracker-model-eval-plan-addendum.md` **§11**, committed at `3bedfc6` before
+any of this was fit. Prior results: `prediction-tracker-combination-sweep.md`.
 
 152 models — `lineca` and `linemidweek` excluded throughout as market lines (parent §10).
 Walk-forward 2006–2025, season-level wild cluster bootstrap, 2000 draws.

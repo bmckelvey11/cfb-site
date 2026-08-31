@@ -1,12 +1,12 @@
 # Analysis plan, addendum — market-anchored combination sweep
 
-Written 2026-08-29, **after** the results in `docs/prediction-tracker-model-eval.md` and
+Written 2026-08-29, **after** the results in `prediction-tracker-model-eval.md` and
 **before** fitting anything below. Extends
-`docs/prediction-tracker-model-eval-plan.md`; every rule in the parent plan that this file
+`prediction-tracker-model-eval-plan.md`; every rule in the parent plan that this file
 does not override still binds.
 
 Motivated by a literature review of forecast-combination methods
-(`docs/research-prompt-forecast-combination.md` and its answer), which was run against the
+(`research-prompt-forecast-combination.md` and its answer), which was run against the
 measured diagnostics rather than in the abstract.
 
 ## 0. Why this addendum exists, and what it cannot do
@@ -243,7 +243,7 @@ A run where ρ = 1 keeps winning closes this branch cleanly and confirms that th
 `lineca` and `linemidweek` are market lines (parent §10) and top **any** skill ranking. Every
 screened-consensus result published so far — the parent plan's K = 20 E4, and E3/E7/E10/E14 in
 this sweep — used a top-20 that included them. Measured by
-`scripts/diag_screen_decontam.py`, before writing the rest of this section:
+`research/spread/scripts/diag_screen_decontam.py`, before writing the rest of this section:
 
 - **`lineca` ranked #1 in the screen in 20 of 20 seasons.** `linemidweek` ranked #2 from 2023.
   Both were present in 12 of 20 seasons; at least one in all 20.

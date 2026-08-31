@@ -14,7 +14,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+SPREAD_SCRIPTS = (
+    Path(__file__).resolve().parents[1] / "research" / "spread" / "scripts"
+)
+sys.path.insert(0, str(SPREAD_SCRIPTS))
 
 rs = pytest.importorskip("eval_recency_screen")
 
@@ -87,7 +90,7 @@ def test_market_lines_are_excluded_by_name():
 
 def test_k_is_never_selected():
     """k must be a reported sensitivity, not a tuned parameter (addendum 11.3)."""
-    src = (Path(__file__).resolve().parents[1] / "scripts" / "eval_recency_screen.py").read_text(
+    src = (SPREAD_SCRIPTS / "eval_recency_screen.py").read_text(
         encoding="utf-8")
     assert "K_GRID" in src
     assert 'select_forward(df, models, bench_col, L, N, seasons, 20, "k"' not in src

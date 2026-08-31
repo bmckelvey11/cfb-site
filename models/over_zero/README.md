@@ -1,7 +1,7 @@
 # Floor Bias / over-zero
 
-Merged into cfb-site from the `over-zero` repo on 2026-08-28. **Run every
-command in this folder** (`over_zero/`), not from the hub repo root. The CFBD
+Merged into the shared CFB repo from the `over-zero` repo on 2026-08-28. Run commands from
+repository root using paths under `models/over_zero/`. The CFBD
 token comes from `CFBD_API_KEY` (or `CFBD-API` / `BEARER_TOKEN`); do not add a
 second `env.env` here.
 

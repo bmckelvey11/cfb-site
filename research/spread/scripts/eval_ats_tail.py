@@ -1,6 +1,6 @@
 """Is there an actionable ATS edge in the disagreement tail?
 
-Pre-registered in docs/prereg-ats-tail-test.md and committed BEFORE this ran. Buckets, bet
+Pre-registered in research/spread/docs/prereg-ats-tail-test.md and committed BEFORE this ran. Buckets, bet
 rule, breakeven, inference and the stopping rule are fixed there. One run, no re-cutting.
 
 The combination work measured squared error. Betting is decided by sign against a threshold,

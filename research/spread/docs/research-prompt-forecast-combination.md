@@ -1,7 +1,7 @@
 # Research prompt — forecast combination methods
 
 For Perplexity (or any deep-research tool). Grounded in the measured results in
-`docs/prediction-tracker-model-eval.md` so the answer engages with our actual regime
+`prediction-tracker-model-eval.md` so the answer engages with our actual regime
 rather than returning a generic combination-methods listicle.
 
 Paste everything below the line.

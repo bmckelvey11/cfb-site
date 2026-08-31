@@ -1,7 +1,7 @@
 # Research prompt — open questions after the model-panel analysis
 
 For Perplexity or any deep-research tool. Second prompt in this line; the first
-(`docs/research-prompt-forecast-combination.md`) asked which combination methods to try, was
+(`research-prompt-forecast-combination.md`) asked which combination methods to try, was
 answered, and the methods were implemented and run. This one asks about the problems that
 surfaced *from the results*.
 

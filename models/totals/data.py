@@ -162,7 +162,7 @@ def load(data_root: Path | str | None = None, *, min_prior_games: int = 3) -> Da
     root = Path(data_root) if data_root else DEFAULT_DATA_ROOT
     if not (root / "processed" / "games.csv").exists():
         raise FileNotFoundError(
-            f"No games.csv under {root}. Point --data-root at a cfb-site data directory."
+            f"No games.csv under {root}. Point --data-root at CFB_DATA_ROOT."
         )
 
     games = _read_games(root)

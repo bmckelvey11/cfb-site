@@ -243,7 +243,7 @@ sweep does not persist. It does not need to: the correction is bounded by
 `E[max_m Z] * se * sqrt(1 - rho)`, and both unknown inputs move it only one way. At the rho = 0
 corner -- candidates *independent*, the largest correction available -- the adjusted p is
 2.4e-4, still under the bootstrap's 1/2000 resolution floor, and the effect is no weaker than
--1.88. `scripts/akm_winner_bound.py`.
+-1.88. `research/spread/scripts/akm_winner_bound.py`.
 
 **A tightening I claimed and have retracted.** I first shrank the effective candidate count to
 6, calling E8 and E12 degenerate on opening. Wrong, and worth recording as defect 8: the
@@ -288,11 +288,11 @@ measure can see that. The live conjecture is that what matters is whether weight
 the target at all** — equal weighting cannot reconstruct the benchmark because its weights are
 frozen at 1/k, and CSR at k = 1 averages many single-regressor corrections, which behaves more
 like equal weighting than like a joint fit. That is a hypothesis, not a result.
-`scripts/diag_weight_concentration.py`.
+`research/spread/scripts/diag_weight_concentration.py`.
 
 **The betting objective, tested directly and pre-registered.** Everything above measures
 squared error; a bet is decided by sign against a threshold. Pre-registered in
-`docs/prereg-ats-tail-test.md` and committed before running: grade all 12,803 walk-forward
+`prereg-ats-tail-test.md` and committed before running: grade all 12,803 walk-forward
 predictions as ATS bets against the closing line, bucket by how far the consensus disagrees with
 the market, and ask whether any bucket clears the -110 breakeven of 52.38%.
 
@@ -316,7 +316,7 @@ That is a structural fact about the panel, not a power problem.
 Per the pre-registration's stopping rule this was one run: no re-bucketing, no switching to
 opening lines, no post-hoc filters. The secondary E14 comparison was not run — per-game subset
 regression predictions are not persisted and it would need a sweep re-run; it was never
-decisive. `scripts/eval_ats_tail.py`.
+decisive. `research/spread/scripts/eval_ats_tail.py`.
 
 **Methodological questions the results raised**, written up as a second research prompt in
 `research-prompt-open-questions.md`: selection-adjusted inference with no confirmation window;

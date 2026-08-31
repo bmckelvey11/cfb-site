@@ -5,7 +5,7 @@ weights predicts how exposed it is to a single anomalous column. Equal-weight to
 N_eff = K by construction; ridge and elastic net should "collapse toward 1-3" when one
 predictor's marginal correlation dominates -- which is what a benchmark clone produces. If
 true it needs no contamination measure, only training-window weights, and would have
-predicted the 73%-vs-27% retention split in docs/prediction-tracker-findings.md BEFORE that
+predicted the 73%-vs-27% retention split in research/spread/docs/prediction-tracker-findings.md BEFORE that
 split was measured.
 
 WHAT ACTUALLY DISCRIMINATES. That E4/E7/E10/E11 score high is a tautology -- they are

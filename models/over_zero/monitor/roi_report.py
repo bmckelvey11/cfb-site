@@ -268,8 +268,8 @@ def default_csv_path(threshold):
     234-bet ledger with a 681-bet one that looks identical.
     """
     if threshold == DEPLOYED_THRESHOLD:
-        return "docs/data/backtest_bets.csv"
-    return f"docs/data/backtest_bets_bias{threshold:g}.csv"
+        return "docs/backtest_bets.csv"
+    return f"docs/backtest_bets_bias{threshold:g}.csv"
 
 
 def _g(x):

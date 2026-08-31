@@ -3,7 +3,7 @@
 Two Windows scheduled tasks that capture the one field the Prediction Tracker archive is
 missing: **when each forecast was published**. Set up 2026-08-29.
 
-Read `docs/prediction-tracker-model-eval.md` §7–§9 for *why* this exists. This file is the
+Read `research/spread/docs/prediction-tracker-model-eval.md` §7–§9 for *why* this exists. This file is the
 operational side: what runs, how to check it, what to do when it breaks.
 
 ## The one thing to understand
@@ -115,7 +115,7 @@ Collected data is untouched by either.
 
 Nothing until roughly a season has accumulated. Then:
 
-1. Join each snapshot's games to `game_id` (reuse `scripts/build_prediction_tracker.py`).
+1. Join each snapshot's games to `game_id` (reuse `research/spread/scripts/build_prediction_tracker.py`).
 2. For each game, read the Action Network price at that snapshot's `captured_at`.
 3. Re-grade the `|edge| > 2` bets from §7 at that price.
 

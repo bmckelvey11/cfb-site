@@ -134,7 +134,7 @@ not as a recommendation.
 
 ### Raw backtest CSV
 
-`docs/data/backtest_bets.csv` — one row per graded walk-forward game, **all
+`docs/backtest_bets.csv` — one row per graded walk-forward game, **all
 10,255 of them**, not just the 234 clearing the filter, so the bias-bin table
 in [ROI_HITRATE.md](../docs/ROI_HITRATE.md) is reproducible from the file
 alone. Columns: game identity (`game_id`, `season`, `week`, `date`, teams),

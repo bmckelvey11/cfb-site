@@ -1,6 +1,6 @@
 """Collect the two things needed to answer the timing question, going forward.
 
-`docs/prediction-tracker-model-eval.md` §8 could not run the timing test because the
+`research/spread/docs/prediction-tracker-model-eval.md` §8 could not run the timing test because the
 archive is missing one field that no amount of scraping can recover retrospectively:
 **when each Prediction Tracker forecast was published**. This script captures it from now on.
 
@@ -14,9 +14,9 @@ Two halves, with very different urgency:
                endpoint replays the whole path (ticks back to April on a week-1 game), so
                one call any time before the odds are pulled down gets everything.
 
-    python scripts/collect_line_timing.py snapshot     # run weekly, mid-week
-    python scripts/collect_line_timing.py history --season 2026
-    python scripts/collect_line_timing.py both --season 2026
+    python research/spread/scripts/collect_line_timing.py snapshot
+    python research/spread/scripts/collect_line_timing.py history --season 2026
+    python research/spread/scripts/collect_line_timing.py both --season 2026
 
 The full-game period on Action Network is **`event`** -- not `game`, which returns an empty
 payload. `actionnetwork_client.DEFAULT_PERIODS` asks only for firsthalf/firstquarter, which
@@ -36,7 +36,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+REPO = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "cfb_paths.py").is_file()
+)
+sys.path.insert(0, str(REPO))
 import cfb_paths  # noqa: E402
 
 PT_URL = "http://www.thepredictiontracker.com/ncaapredictions.csv"

@@ -9,6 +9,7 @@ post-fix value, since eight specification defects were found mid-analysis.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -17,7 +18,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from akm_winner_bound import bound  # noqa: E402
 
-SRC = Path(r"C:/Users/mckel/data/cfb/processed")
+SRC = Path(os.environ["CFB_DATA_ROOT"]) / "processed"
 OUT = Path(__file__).resolve().parents[1] / "docs" / "prediction-tracker-research-bundle.json"
 
 METHODS = {
@@ -376,7 +377,7 @@ def main():
                                                       "seasons and resumed is not penalised. "
                                                       "Only 25 of 154 models have gap seasons. "
                                                       "Not yet tested which is better.",
-            "script": "scripts/diag_eligibility_tenure.py",
+            "script": "research/spread/scripts/diag_eligibility_tenure.py",
         },
         "Neff_diagnostic_TESTED_AND_FALSIFIED": {
             "claim": "A reviewer proposed the inverse Herfindahl of a method's own fitted "
@@ -386,7 +387,7 @@ def main():
                      "marginal correlation dominates -- which is what a benchmark clone "
                      "produces. If true it would have predicted the 73%-vs-27% retention "
                      "split BEFORE that split was measured.",
-            "status": "TESTED. It does not work. scripts/diag_weight_concentration.py",
+            "status": "TESTED. It does not work. research/spread/scripts/diag_weight_concentration.py",
             "method": "Replayed the outer fits using the hyperparameters the sweep had "
                       "already selected and persisted. Weights normalised by absolute sum "
                       "(ridge coefficients are signed, so raw weights are not comparable to "

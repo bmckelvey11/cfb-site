@@ -30,12 +30,12 @@ to adopt and the sample is your own money.
 | moneyline | yes | no |
 | team totals (`core_bet_type_6_team_score`) | yes | no |
 
-Every conclusion in `docs/prediction-tracker-findings.md` is about the first row only. Totals,
+Every conclusion in `research/spread/docs/prediction-tracker-findings.md` is about the first row only. Totals,
 moneylines and team totals are untested here, and your bet history says totals is where the
 profit was.
 
 The files also carry the **full tick path** — 2,421 updates on one August game reaching back to
-2 April — which is what a CLV study needs and what `cfb_totals_model/clv.py` was built for.
+2 April — which is what a CLV study needs and what `models/totals/clv.py` was built for.
 
 ## 3. Line shopping — promising, not yet established
 
@@ -64,7 +64,7 @@ tail explained.**
 
 The panel beats the **opening** line by -2.615 MSE in 20 of 20 seasons. That was dismissed as
 unreachable because the archive has no publication timestamps — but the constraint is
-historical, not permanent. `scripts/collect_line_timing.py` now captures timestamped snapshots,
+historical, not permanent. `research/spread/scripts/collect_line_timing.py` now captures timestamped snapshots,
 and `pt_upcoming_predictions.csv` logs every prediction against the line available at that
 instant.
 

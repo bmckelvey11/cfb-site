@@ -3,7 +3,8 @@ from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
     "build_prediction_tracker",
-    Path(__file__).resolve().parents[1] / "scripts" / "build_prediction_tracker.py",
+    Path(__file__).resolve().parents[1]
+    / "research" / "spread" / "scripts" / "build_prediction_tracker.py",
 )
 pt = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pt)
