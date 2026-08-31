@@ -4,6 +4,7 @@ waitress>=3.0,<4
 anthropic==0.111.0
 pytest>=8,<9
 duckdb>=1.1,<2
+pytz
 numpy>=1.26,<3
 scipy>=1.11,<2
 pandas
