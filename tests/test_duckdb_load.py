@@ -10,8 +10,33 @@ from cfb_system_maker.duckdb_load import (
     rename_stg_id_columns,
     reorder_stg_columns,
     stg_column_order,
+    stg_dest_name,
     stg_id_renames,
 )
+
+
+def test_stg_dest_name_is_order_independent():
+    # The old helper took a `taken` set populated as loads proceeded, so whether the
+    # GraphQL or the REST table won an unsuffixed name depended on load order. The
+    # new one is a pure function: same input, same output, always.
+    assert stg_dest_name("calendar") == "gql_calendar"
+    assert stg_dest_name("calendar") == "gql_calendar"
+    assert stg_dest_name("gameLines") == "gql_game_lines"
+
+
+def test_stg_dest_name_passes_rest_names_through():
+    assert stg_dest_name("games") == "games"
+    assert stg_dest_name("draft_picks") == "draft_picks"
+    assert stg_dest_name("advanced_box_score") == "advanced_box_score"
+
+
+def test_gql_destinations_never_collide_with_rest_destinations():
+    from cfb_system_maker.graphql_client import GQL_ENTITY_TO_STG
+
+    rest_names = {"games", "coaches", "conferences", "draft_picks", "recruits",
+                  "recruiting_teams", "coach_seasons", "predicted_points", "talent",
+                  "lines", "calendar", "draft_positions", "draft_teams"}
+    assert not (set(GQL_ENTITY_TO_STG.values()) & rest_names)
 
 
 def test_parse_dump_stem_splits_season_and_week():
@@ -114,7 +139,7 @@ def test_build_duckdb_loads_raw_and_graphql_payloads(tmp_path):
     assert "graphql" not in schemas
 
 
-def test_build_duckdb_renames_graphql_calendar_clash_in_raw(tmp_path):
+def test_build_duckdb_names_graphql_calendar_with_explicit_prefix(tmp_path):
     raw = tmp_path / "raw"
     raw.mkdir()
     (raw / "calendar_2023.json").write_text(
@@ -129,7 +154,7 @@ def test_build_duckdb_renames_graphql_calendar_clash_in_raw(tmp_path):
     db_path, reports = build_duckdb(tmp_path, include_actionnetwork=False)
     by_name = {(r.schema, r.name): r for r in reports}
     assert by_name[("raw", "calendar")].rows == 1
-    assert by_name[("raw", "calendar_gql")].rows == 1
+    assert by_name[("raw", "gql_calendar")].rows == 1
 
     import duckdb
 
@@ -142,7 +167,7 @@ def test_build_duckdb_renames_graphql_calendar_clash_in_raw(tmp_path):
     )
     assert (
         con.execute(
-            "SELECT json_extract_string(payload, '$.week') FROM raw.calendar_gql"
+            "SELECT json_extract_string(payload, '$.week') FROM raw.gql_calendar"
         ).fetchone()[0]
         == "9"
     )
@@ -203,7 +228,7 @@ def test_explode_payloads_writes_stg_columns(tmp_path):
     reports = explode_payloads(db_path)
     by_name = {r.name: r for r in reports if r.error is None}
     assert by_name["games"].rows == 2
-    assert by_name["game"].rows == 1
+    assert by_name["gql_game"].rows == 1
 
     import duckdb
 
@@ -211,7 +236,7 @@ def test_explode_payloads_writes_stg_columns(tmp_path):
     homes = con.execute("SELECT homeTeam FROM stg.games ORDER BY gameId").fetchall()
     assert homes == [("A",), ("B",)]
     assert con.execute("SELECT COUNT(*) FROM raw.games").fetchone()[0] == 2
-    assert con.execute("SELECT gameId FROM stg.game").fetchone()[0] == 9
+    assert con.execute("SELECT gameId FROM stg.gql_game").fetchone()[0] == 9
     cols = {row[0] for row in con.execute("DESCRIBE stg.games").fetchall()}
     assert "_season" not in cols and "_week" not in cols
     assert "_source_file" in cols
@@ -555,6 +580,16 @@ def test_stg_id_renames_matches_what_the_value_is():
     assert stg_id_renames("calendar") == {}
 
 
+def test_stg_id_renames_resolves_gql_destinations_back_to_their_entity():
+    """`_BARE_ID_RENAME` is keyed by GraphQL entity name, not by stg destination. Without
+    the reverse lookup, `gql_game` misses the table and keeps a bare `id` column instead
+    of `gameId` — silently, since nothing else asserts on it."""
+    assert stg_id_renames("gql_game") == {"id": "gameId"}
+    assert stg_id_renames("gql_coach") == {"id": "coachId"}
+    assert stg_id_renames("gql_lines_provider") == {"id": "linesProviderId"}
+    assert stg_id_renames("gql_historical_team") == {"id": "teamId"}
+
+
 def test_rename_stg_id_columns_rewrites_bare_id_and_skips_existing_dest(tmp_path):
     import duckdb
 
@@ -767,7 +802,7 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     con.execute("INSERT INTO stg.games VALUES (99, 2025, 1, 'Alpha', 'Beta')")
     con.execute(
         """
-        CREATE TABLE stg.gameLines (
+        CREATE TABLE stg.gql_game_lines (
           gameId INTEGER, linesProviderId INTEGER,
           moneylineAway INTEGER, moneylineHome INTEGER,
           overUnder DOUBLE, overUnderOpen DOUBLE,
@@ -777,19 +812,19 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     )
     con.execute(
         """
-        INSERT INTO stg.gameLines VALUES
+        INSERT INTO stg.gql_game_lines VALUES
           (99, 888888, NULL, NULL, 45.5, NULL, -7.0, -6.5, 'cfbd.json')
         """
     )
     con.execute(
         """
-        CREATE TABLE stg.linesProvider (
+        CREATE TABLE stg.gql_lines_provider (
           id INTEGER, name VARCHAR, _source_file VARCHAR
         )
         """
     )
     con.execute(
-        "INSERT INTO stg.linesProvider VALUES (888888, 'DraftKings', 'cfbd.json')"
+        "INSERT INTO stg.gql_lines_provider VALUES (888888, 'DraftKings', 'cfbd.json')"
     )
     con.execute(
         """
@@ -872,12 +907,12 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     assert report is not None and report.error is None
 
     con = duckdb.connect(str(db_path), read_only=True)
-    cols = {row[0] for row in con.execute("DESCRIBE stg.gameLines").fetchall()}
+    cols = {row[0] for row in con.execute("DESCRIBE stg.gql_game_lines").fetchall()}
     assert "period" in cols and "line_source" in cols
     fg = con.execute(
         """
         SELECT spread, spreadOpen, overUnder, moneylineHome, moneylineAway, period
-        FROM stg.gameLines
+        FROM stg.gql_game_lines
         WHERE gameId = 99 AND linesProviderId = 888888 AND period = 'game'
         """
     ).fetchone()
@@ -885,12 +920,12 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     half = con.execute(
         """
         SELECT spread, overUnder, period, line_source
-        FROM stg.gameLines
+        FROM stg.gql_game_lines
         WHERE gameId = 99 AND period = 'firsthalf'
         """
     ).fetchone()
     assert half[0] == -3.5 and half[1] == 24.5 and half[3] == "actionnetwork"
     names = {
-        row[0] for row in con.execute("SELECT name FROM stg.linesProvider").fetchall()
+        row[0] for row in con.execute("SELECT name FROM stg.gql_lines_provider").fetchall()
     }
     assert "DraftKings" in names and "FanDuel" in names

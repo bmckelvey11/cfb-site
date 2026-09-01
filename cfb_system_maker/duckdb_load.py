@@ -16,6 +16,8 @@ from typing import Any, Callable, Iterable
 
 import duckdb
 
+from cfb_system_maker.graphql_client import GQL_ENTITY_TO_STG
+
 # Skip account-metering telemetry (docs/data-coverage.md).
 _SKIP_STEMS = frozenset({"user_info"})
 
@@ -168,7 +170,11 @@ def stg_id_renames(table: str) -> dict[str, str]:
     """Map current column names → names that match what the id actually is."""
     base = table[:-4] if table.endswith("_ngt") else table
     out: dict[str, str] = {}
-    dest = _BARE_ID_RENAME.get(base)
+    source_name = next(
+        (entity for entity, destination in GQL_ENTITY_TO_STG.items() if destination == base),
+        base,
+    )
+    dest = _BARE_ID_RENAME.get(source_name)
     if dest:
         out["id"] = dest
     out.update(_EXTRA_ID_RENAMES.get(base, {}))
@@ -490,17 +496,14 @@ def explode_payloads(
             ORDER BY table_schema DESC, table_name
             """
         ).fetchall()
-        taken: set[str] = set()
-        # REST first so a leftover graphql.calendar loses the clash, not raw.calendar.
-        sources.sort(key=lambda row: (0 if row[0] == "raw" else 1, row[1]))
+        # No `taken` set and no REST-first sort: destinations are disjoint by
+        # construction now, so load order cannot change which table wins a name.
         for schema, name in sources:
             if only is not None and name not in only:
                 continue
-            dest = _stg_dest_name(name, taken)
+            dest = stg_dest_name(name)
             report = _explode_table(con, schema, name, dest)
             reports.append(report)
-            if report.error is None:
-                taken.add(dest.lower())
             if progress is not None:
                 progress(report)
             con.execute("CHECKPOINT")
@@ -544,7 +547,7 @@ _AN_SCHOOL_ALIAS = {
 def backfill_gamelines_from_actionnetwork(
     db: str | Path | duckdb.DuckDBPyConnection,
 ) -> TableLoad | None:
-    """Merge Action Network period + extra-book lines into ``stg.gameLines``.
+    """Merge Action Network period + extra-book lines into ``stg.gql_game_lines``.
 
     CFBD ``gameLines`` is full-game only. AN history is 1H/1Q; scoreboard
     ``markets`` is full-game per book. Existing CFBD numbers win; AN fills
@@ -559,14 +562,14 @@ def backfill_gamelines_from_actionnetwork(
                 "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
             ).fetchall()
         }
-        needed = {"gameLines", "games", "actionnetwork_scoreboard"}
+        needed = {"gql_game_lines", "games", "actionnetwork_scoreboard"}
         if not needed.issubset(tables):
             return None
         return _backfill_gamelines(con, tables)
     except Exception as exc:
         detail = str(exc).split("\n", 1)[0]
         return TableLoad(
-            "stg", "gameLines", 0, 0, error=f"{type(exc).__name__}: {detail}"
+            "stg", "gql_game_lines", 0, 0, error=f"{type(exc).__name__}: {detail}"
         )
     finally:
         if owns_connection:
@@ -577,12 +580,12 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
     game_cols = {row[0] for row in con.execute("DESCRIBE stg.games").fetchall()}
     game_id = "gameId" if "gameId" in game_cols else "id"
     gl_types = {
-        row[0]: row[1] for row in con.execute("DESCRIBE stg.gameLines").fetchall()
+        row[0]: row[1] for row in con.execute("DESCRIBE stg.gql_game_lines").fetchall()
     }
     gid_type = gl_types.get("gameId", "BIGINT")
     prov_type = gl_types.get("linesProviderId", "BIGINT")
     has_history = "actionnetwork_history" in tables
-    has_provider = "linesProvider" in tables
+    has_provider = "gql_lines_provider" in tables
     alias_sql = " ".join(
         f"WHEN '{src.replace(chr(39), chr(39) + chr(39))}' THEN '{dst.replace(chr(39), chr(39) + chr(39))}'"
         for src, dst in _AN_SCHOOL_ALIAS.items()
@@ -613,10 +616,10 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
         """
     )
 
-    con.execute("DROP TABLE IF EXISTS stg.gameLines__backfill")
+    con.execute("DROP TABLE IF EXISTS stg.gql_game_lines__backfill")
     con.execute(
         f"""
-        CREATE TABLE stg.gameLines__backfill AS
+        CREATE TABLE stg.gql_game_lines__backfill AS
         WITH map AS (
           SELECT
             sb.event_id,
@@ -692,7 +695,7 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
             moneylineHome,
             moneylineAway,
             _source_file
-          FROM stg.gameLines
+          FROM stg.gql_game_lines
         )
         SELECT
           COALESCE(c.gameId, a.gameId) AS gameId,
@@ -717,12 +720,12 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
          AND c.period = a.period
         """
     )
-    con.execute("DROP TABLE stg.gameLines")
-    con.execute("ALTER TABLE stg.gameLines__backfill RENAME TO gameLines")
+    con.execute("DROP TABLE stg.gql_game_lines")
+    con.execute("ALTER TABLE stg.gql_game_lines__backfill RENAME TO gql_game_lines")
 
     if has_provider:
         prov_cols = {
-            row[0] for row in con.execute("DESCRIBE stg.linesProvider").fetchall()
+            row[0] for row in con.execute("DESCRIBE stg.gql_lines_provider").fetchall()
         }
         pid_col = "linesProviderId" if "linesProviderId" in prov_cols else "id"
         name_rows = ", ".join(
@@ -731,14 +734,14 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
         )
         con.execute(
             f"""
-            INSERT INTO stg.linesProvider ({_ident(pid_col)}, name, _source_file)
+            INSERT INTO stg.gql_lines_provider ({_ident(pid_col)}, name, _source_file)
             SELECT v.id, v.name, v.src
             FROM (VALUES {name_rows}) v(id, name, src)
-            WHERE v.id NOT IN (SELECT {_ident(pid_col)} FROM stg.linesProvider)
+            WHERE v.id NOT IN (SELECT {_ident(pid_col)} FROM stg.gql_lines_provider)
             """
         )
 
-    return _finish_stg_table(con, "gameLines", _qualify("stg", "gameLines"))
+    return _finish_stg_table(con, "gql_game_lines", _qualify("stg", "gql_game_lines"))
 
 # Kickoff strings land in three shapes: REST "2023-09-02 16:00:00+00:00",
 # GraphQL naive "2023-09-02T16:00:00", Action Network "...T23:30:00.000Z".
@@ -1083,13 +1086,15 @@ def _json_keys_are_numeric(
     return bool(row and row[0])
 
 
-def _stg_dest_name(name: str, taken: set[str]) -> str:
-    if name.lower() not in taken:
-        return name
-    suffix = name + "_gql"
-    if suffix.lower() not in taken:
-        return suffix
-    return "gql_" + name
+def stg_dest_name(name: str) -> str:
+    """`stg` destination for a source table name.
+
+    Pure function of the name alone. GraphQL entities map through the explicit table
+    in `graphql_client`; REST endpoint names pass through unchanged. The previous
+    implementation took a `taken` set and resolved clashes by load order, which made a
+    table's provenance depend on the order loads happened to run in.
+    """
+    return GQL_ENTITY_TO_STG.get(name, name)
 
 
 def _payload_structure(con: duckdb.DuckDBPyConnection, source: str) -> str | None:
@@ -1484,7 +1489,6 @@ def _plan_loads(
                 }
             )
 
-    taken = {job["name"].lower() for job in jobs}
     gql_dir = data_dir / "graphql"
     if gql_dir.is_dir():
         gql_groups: dict[str, list[Path]] = {}
@@ -1492,13 +1496,12 @@ def _plan_loads(
             name, _, _, _ = parse_dump_stem(path.stem)
             gql_groups.setdefault(name, []).append(path)
         for name, paths in sorted(gql_groups.items()):
-            dest = _stg_dest_name(name, taken)
+            dest = stg_dest_name(name)
             if only is not None and name not in only and dest not in only:
                 continue
             jobs.append(
                 {"schema": "raw", "name": dest, "paths": paths, "format": "array"}
             )
-            taken.add(dest.lower())
 
     if include_actionnetwork:
         an_dir = data_dir / "raw" / "actionnetwork"
