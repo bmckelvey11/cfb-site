@@ -298,11 +298,16 @@ Runbook (write before Phase 2 Flask+MotherDuck):
    that would push, pushes nothing.
 3. `python scripts/promote_to_motherduck.py --yes` — attaches `md:cfb` (requires
    `motherduck_token` / `MOTHERDUCK_TOKEN` env var, or an interactive login on first
-   use), CTAS-replaces each table per schema (`raw`, `graphql`, `stg`, `core`, `meta`
+   use), CTAS-replaces each table per schema (`raw`, `stg`, `stg_gql`, `core`, `meta`
    by default; `--schemas` to override), verifies row counts match, and stamps
    `meta.warehouse_version` (git sha + `promoted_at`) on **both** local and `md:cfb`.
 4. Never use loader `--only` as "refresh one table" — it is a **destructive full-file
    replace**. Never assume `--explode-only` updates `meta.load_report`.
+5. The promote only `CREATE OR REPLACE`s tables that exist locally; it never drops a
+   remote table with no local counterpart. After the first promote following the
+   `stg` → `stg_gql` migration (`scripts/migrate_gql_stg_names.py`), the stale
+   `md.stg.gql_*` tables are not produced locally anymore and are left behind on
+   `md:cfb` — manually drop them.
 
 ## Revised phase plan
 

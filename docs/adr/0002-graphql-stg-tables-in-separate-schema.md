@@ -54,8 +54,12 @@ script is `CREATE TABLE stg_gql.<x> AS SELECT * FROM stg.gql_<x>` followed by `D
 a metadata rename — more work per table (~1.8M rows total, a minute or two) and different
 failure semantics (must not leave a table live in both schemas on a mid-run failure).
 
-**`--only <name>` can now match both schemas for the 3 colliding concepts.** `--only draft_picks`
-selects `stg.draft_picks` and `stg_gql.draft_picks` together. Documented in
+**`--only <name>` can now match both schemas for the 3 colliding concepts, but only at the
+`--explode-lists` phase.** `cli.py` has three consumers, each matching a different spelling:
+the `duckdb` load step matches the GraphQL entity name or the raw table name;
+`--explode-only` matches the raw table name only; `--explode-lists` matches the bare
+`stg`/`stg_gql` destination name only, so `--only draft_picks` there selects
+`stg.draft_picks` and `stg_gql.draft_picks` together. Documented per-phase in
 `cfb_system_maker/CLAUDE.md` rather than given disambiguation syntax nothing currently needs.
 
 Nothing in the live warehouse changes until the migration script (a separate, explicitly

@@ -93,9 +93,11 @@ Canonical data dir is required `CFB_DATA_ROOT`, resolved by root `cfb_paths.py`.
   `stg.gql_game`). `raw` stays a single schema for both sources: GraphQL raw dumps keep a
   `gql_` prefix (`raw.gql_game`) so they don't collide with REST raw dumps of the same
   snake_case name (`draft_picks`, `predicted_points`, `calendar` all would). `--only <name>`
-  matches a bare destination name in either schema, so `--only draft_picks` touches both
-  `stg.draft_picks` and `stg_gql.draft_picks` together — use the GraphQL entity spelling
-  (`--only draftPicks`) to select only the GraphQL raw dump/table.
+  matching differs per phase in `cli.py`: the `duckdb` load step matches the GraphQL
+  entity name (`draftPicks`) OR the raw table name (`gql_draft_picks`); `--explode-only`
+  matches the raw table name only (`gql_draft_picks`); `--explode-lists` matches the bare
+  `stg`/`stg_gql` destination name only (`draft_picks`), touching both `stg.draft_picks`
+  and `stg_gql.draft_picks` together at that phase.
 - **Exploded staging:** `stg.plays` rebuilds with
   `python -m cfb_system_maker duckdb --explode-only --only plays`. Infer JSON shape from a
   sample; grouping structure across all `raw.plays` can exhaust memory. Browse order is
