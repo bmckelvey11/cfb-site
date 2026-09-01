@@ -33,3 +33,6 @@ models/over_zero/site/
 
 # Regenerable chart exports dropped at the repo root.
 /hit-rate-graph*.png
+
+# Generated DB summary embeds sample rows from the warehouse (see scripts/gen_db_summary.py)
+docs/db-summary.html
