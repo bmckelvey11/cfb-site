@@ -15,70 +15,73 @@ import duckdb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# (concept, gql_table, rest_table) — pairs spec identified.
+# (concept, gql_table, rest_table) — gql_table is bare (lives in stg_gql), rest_table
+# lives in stg. A concept whose two spellings collide once bare (draft_pick) still has
+# distinct entries here because the two tables live in different schemas.
 PAIRS = [
-    ("game", "gql_game", "games"),
-    ("coach", "gql_coach", "coaches"),
-    ("conference", "gql_conference", "conferences"),
-    ("draft_pick", "gql_draft_picks", "draft_picks"),
-    ("draft_position", "gql_draft_position", "draft_positions"),
-    ("draft_team", "gql_draft_team", "draft_teams"),
-    ("recruit", "gql_recruit", "recruits"),
-    ("recruiting_team", "gql_recruiting_team", "recruiting_teams"),
-    ("coach_season", "gql_coach_season", "coach_seasons"),
-    ("predicted_points", "gql_predicted_points", "predicted_points"),
-    ("talent", "gql_team_talent", "talent"),
-    ("lines", "gql_game_lines", "lines"),
-    ("calendar", "gql_calendar", "calendar"),
+    ("game", "game", "games"),
+    ("coach", "coach", "coaches"),
+    ("conference", "conference", "conferences"),
+    ("draft_pick", "draft_picks", "draft_picks"),
+    ("draft_position", "draft_position", "draft_positions"),
+    ("draft_team", "draft_team", "draft_teams"),
+    ("recruit", "recruit", "recruits"),
+    ("recruiting_team", "recruiting_team", "recruiting_teams"),
+    ("coach_season", "coach_season", "coach_seasons"),
+    ("predicted_points", "predicted_points", "predicted_points"),
+    ("talent", "team_talent", "talent"),
+    ("lines", "game_lines", "lines"),
+    ("calendar", "calendar", "calendar"),
 ]
 
 
-def _cols(con: duckdb.DuckDBPyConnection, table: str) -> list[str]:
+def _cols(con: duckdb.DuckDBPyConnection, schema: str, table: str) -> list[str]:
     return [
         row[0]
         for row in con.execute(
             "SELECT column_name FROM information_schema.columns "
-            "WHERE table_schema = 'stg' AND table_name = ?",
-            [table],
+            "WHERE table_schema = ? AND table_name = ?",
+            [schema, table],
         ).fetchall()
     ]
 
 
 def _seasons(
-    con: duckdb.DuckDBPyConnection, table: str, cols: list[str]
+    con: duckdb.DuckDBPyConnection, schema: str, table: str, cols: list[str]
 ) -> tuple[int, int] | None:
     if "season" not in cols:
         return None
-    row = con.execute(f'SELECT MIN(season), MAX(season) FROM stg."{table}"').fetchone()
+    row = con.execute(f'SELECT MIN(season), MAX(season) FROM "{schema}"."{table}"').fetchone()
     return None if row is None or row[0] is None else (int(row[0]), int(row[1]))
 
 
 def _null_rate(
-    con: duckdb.DuckDBPyConnection, table: str, cols: list[str]
+    con: duckdb.DuckDBPyConnection, schema: str, table: str, cols: list[str]
 ) -> float | None:
     if not cols:
         return None
-    total = con.execute(f'SELECT COUNT(*) FROM stg."{table}"').fetchone()[0]
+    total = con.execute(f'SELECT COUNT(*) FROM "{schema}"."{table}"').fetchone()[0]
     if not total:
         return None
     parts = " + ".join(f'COUNT("{c}")' for c in cols)
-    filled = con.execute(f'SELECT {parts} FROM stg."{table}"').fetchone()[0]
+    filled = con.execute(f'SELECT {parts} FROM "{schema}"."{table}"').fetchone()[0]
     return round(1 - (filled / (total * len(cols))), 4)
 
 
 def concept_metrics(
     con: duckdb.DuckDBPyConnection, gql_table: str, rest_table: str
 ) -> dict:
-    gcols, rcols = _cols(con, gql_table), _cols(con, rest_table)
+    gcols = _cols(con, "stg_gql", gql_table)
+    rcols = _cols(con, "stg", rest_table)
     return {
-        "gql_rows": con.execute(f'SELECT COUNT(*) FROM stg."{gql_table}"').fetchone()[0],
-        "rest_rows": con.execute(f'SELECT COUNT(*) FROM stg."{rest_table}"').fetchone()[0],
+        "gql_rows": con.execute(f'SELECT COUNT(*) FROM "stg_gql"."{gql_table}"').fetchone()[0],
+        "rest_rows": con.execute(f'SELECT COUNT(*) FROM "stg"."{rest_table}"').fetchone()[0],
         "gql_cols": len(gcols),
         "rest_cols": len(rcols),
-        "gql_seasons": _seasons(con, gql_table, gcols),
-        "rest_seasons": _seasons(con, rest_table, rcols),
-        "gql_null_rate": _null_rate(con, gql_table, gcols),
-        "rest_null_rate": _null_rate(con, rest_table, rcols),
+        "gql_seasons": _seasons(con, "stg_gql", gql_table, gcols),
+        "rest_seasons": _seasons(con, "stg", rest_table, rcols),
+        "gql_null_rate": _null_rate(con, "stg_gql", gql_table, gcols),
+        "rest_null_rate": _null_rate(con, "stg", rest_table, rcols),
     }
 
 
@@ -87,7 +90,13 @@ def main() -> int:
     ap.add_argument("--db", default="data/cfb.duckdb")
     args = ap.parse_args()
     con = duckdb.connect(args.db, read_only=True)
-    present = {
+    gql_present = {
+        row[0]
+        for row in con.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'stg_gql'"
+        ).fetchall()
+    }
+    rest_present = {
         row[0]
         for row in con.execute(
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'stg'"
@@ -97,7 +106,7 @@ def main() -> int:
           "| gql cols | rest cols | gql null | rest null |")
     print("|---|---|---|---|---|---|---|---|---|")
     for concept, g, r in PAIRS:
-        if g not in present or r not in present:
+        if g not in gql_present or r not in rest_present:
             print(f"| {concept} | MISSING ({g} or {r}) | | | | | | | |")
             continue
         m = concept_metrics(con, g, r)
