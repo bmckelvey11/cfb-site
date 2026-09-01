@@ -97,6 +97,45 @@ Not a `stg` issue, found while verifying the above. All 38,689 rows in
 build never carries it across. `meta.warehouse_version` is also absent locally, so this
 `core` predates the documented build.
 
+## Nested columns exploded (2026-08-31)
+
+`explode_payloads` flattened objects but left 45 array/JSON columns as lists, so anything
+inside them needed hand-written `unnest`. `explode_stg_lists` now walks those leftovers and
+writes a child table per nested column: `stg.<parent>__<column>`, one row per element,
+parent scalars carried down, `<column>_idx` holding the position. Parents are untouched —
+`_backfill_gamelines` still reads `actionnetwork_scoreboard.teams` and `markets` as JSON.
+
+54 children built, `stg` 119 → 173 tables, file 4.6 GB → 4.9 GB. Every child's row count
+equals `sum(len(<parent column>))`; verified for all 54.
+
+Largest children:
+
+| Child | Rows |
+|---|---:|
+| `game_player_stats__teams__teams_categories__teams_categories_types__teams_categories_types_athletes` | 5,528,960 |
+| `game_player_stats__teams__teams_categories__teams_categories_types` | 1,249,445 |
+| `game_team_stats__teams__teams_stats` | 873,037 |
+| `gameTeam__lineScores` | 362,224 |
+| `game__homeLineScores` / `game__awayLineScores` | 181,112 each |
+| `advanced_box_score__players_ppa` / `__players_usage` | 191,566 each |
+| `team_stats__statValue_any_of_schemas` | 224,484 |
+| `roster__recruitIds` | 90,420 |
+
+Notes:
+
+- Deep nests get a table per level, not one leaf: `game_player_stats.teams` →
+  `teams` → `categories` → `types` → `athletes`. Siblings never share a table, so two list
+  columns on one parent cannot cross-product.
+- Action Network `markets` is keyed by `book_id`. Those keys are data, so they land in
+  `markets_key` rather than becoming column names; each bet type under it then gets its own
+  child (`__markets__markets_event_moneyline` and siblings).
+- **Not exploded:** `ratings.spOffense` and `ratings.spOverall` are JSON scalars
+  (`json_type` returns DOUBLE / VARCHAR / UBIGINT), not containers. They are numbers stored
+  as JSON strings and want a retype to DOUBLE, not an explode. Reported and skipped.
+- **Likely duplicate:** the `game_player_stats` leaf (5.5M rows, REST) covers the same
+  ground as `stg.gamePlayerStat` (5.5M rows, GraphQL). Not deduped — worth a reconciliation
+  before either is treated as canonical.
+
 ## Mirror drift
 
 `md:cfb` disagrees with the source of truth and should not be audited in its place:

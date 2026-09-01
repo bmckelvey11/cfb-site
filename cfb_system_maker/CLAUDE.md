@@ -91,6 +91,14 @@ Canonical data dir is required `CFB_DATA_ROOT`, resolved by root `cfb_paths.py`.
   `python -m cfb_system_maker duckdb --explode-only --only plays`. Infer JSON shape from a
   sample; grouping structure across all `raw.plays` can exhaust memory. Browse order is
   identity → time → home/offense → away/defense → leftovers → `_source_file`.
+- **Exploded arrays:** the payload explode leaves arrays as lists so a parent keeps its
+  row grain. `--explode-lists` (also run by `--explode`) writes every leftover LIST/JSON
+  column to `stg.<table>__<column>` at element grain, carrying the parent's scalars down
+  and adding `<column>_idx` for the 1-based position. It recurses a level at a time, so
+  `game_player_stats.teams` yields a table per level rather than one cross-producted leaf.
+  Parents are never modified. Numeric JSON keys (Action Network `markets` book ids) become
+  a `<column>_key` column, not column names. Scalar JSON (`ratings.spOffense`,
+  `spOverall`) is reported and skipped.
 - **Staging IDs:** primary `id` columns take the foreign-key name they join on (`gameId`,
   `playId`, `driveId`, `teamId`, `athleteId`, `conferenceId`, `venueId`, etc.). Explode and
   `--rename-ids` reapply this.

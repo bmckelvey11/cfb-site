@@ -23,6 +23,7 @@ from cfb_system_maker.duckdb_load import (
     TableLoad,
     build_duckdb,
     explode_payloads,
+    explode_stg_lists,
     flatten_stg_nested,
     promote_timestamp_columns,
     rename_stg_id_columns,
@@ -551,6 +552,23 @@ def _duckdb(args: argparse.Namespace) -> int:
         print(f"Wrote nested columns into {db_path}")
         return 1 if failed and not ok else 0
 
+    if args.explode_lists:
+        db_path = (
+            Path(args.output) if args.output else Path(args.data_dir) / "cfb.duckdb"
+        )
+        if not db_path.exists():
+            print(
+                f"No DuckDB file at {db_path}. Run `duckdb` without --explode-lists first."
+            )
+            return 1
+        reports = explode_stg_lists(db_path, only=only, progress=_progress)
+        ok = [r for r in reports if r.error is None]
+        failed = [r for r in reports if r.error is not None]
+        print()
+        print(f"{len(ok)} child table(s) written, {len(failed)} skipped.")
+        print(f"Wrote nested columns into {db_path}")
+        return 1 if failed and not ok else 0
+
     if args.promote_timestamps:
         db_path = (
             Path(args.output) if args.output else Path(args.data_dir) / "cfb.duckdb"
@@ -824,6 +842,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--promote-timestamps",
         action="store_true",
         help="retype stg.* VARCHAR date/time columns as TIMESTAMPTZ",
+    )
+    duckdb_parser.add_argument(
+        "--explode-lists",
+        action="store_true",
+        help="explode leftover LIST/JSON stg.* columns into stg.<table>__<column>",
     )
     duckdb_parser.add_argument(
         "--flatten-nested",

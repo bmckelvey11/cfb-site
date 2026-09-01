@@ -510,6 +510,9 @@ def explode_payloads(
             if progress is not None:
                 progress(extra)
             con.execute("CHECKPOINT")
+        for report in explode_stg_lists(con, only=only, progress=progress):
+            reports.append(report)
+        con.execute("CHECKPOINT")
         for report in promote_timestamp_columns(con, progress=progress):
             reports.append(report)
         con.execute("CHECKPOINT")
@@ -851,6 +854,229 @@ def flatten_stg_nested(
         if owns_connection:
             con.close()
     return reports
+
+
+_EXPLODE_MAX_DEPTH = 6
+_CHILD_SEP = "__"
+
+
+def explode_stg_lists(
+    db: str | Path | duckdb.DuckDBPyConnection,
+    *,
+    only: set[str] | None = None,
+    progress: Callable[[TableLoad], None] | None = None,
+) -> list[TableLoad]:
+    """Explode leftover nested ``stg.*`` columns into child tables.
+
+    ``explode_payloads`` flattens objects but leaves arrays as lists so parents
+    keep their row grain. Each remaining LIST column becomes
+    ``stg.<parent>__<column>`` at one row per element -- parent scalars carried
+    down, ``<column>_idx`` holding the 1-based position -- and each JSON column
+    is typed through ``json_group_structure`` first. Children are built one
+    level at a time and then recursed on, so a four-deep nest such as
+    ``game_player_stats.teams`` yields a table per level instead of one
+    cross-producted leaf. Parents are never touched: ``_backfill_gamelines``
+    still reads ``actionnetwork_scoreboard.teams`` and ``markets`` as JSON.
+    """
+    owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
+    con = duckdb.connect(str(db)) if owns_connection else db
+    reports: list[TableLoad] = []
+    try:
+        con.execute("SET preserve_insertion_order = false")
+        con.execute("SET threads = 1")
+        for (stale,) in con.execute(
+            f"""
+            SELECT table_name FROM duckdb_tables()
+            WHERE schema_name = 'stg'
+              AND contains(table_name, '{_CHILD_SEP}')
+              AND NOT ends_with(table_name, '{_CHILD_SEP}backfill')
+            ORDER BY table_name
+            """
+        ).fetchall():
+            con.execute(f"DROP TABLE IF EXISTS {_qualify('stg', stale)}")
+        roots = [
+            row[0]
+            for row in con.execute(
+                "SELECT table_name FROM duckdb_tables()"
+                " WHERE schema_name = 'stg' ORDER BY table_name"
+            ).fetchall()
+        ]
+        for name in roots:
+            if only is not None and name not in only:
+                continue
+            _explode_nested_columns(con, name, 0, reports, progress)
+    finally:
+        if owns_connection:
+            con.close()
+    return reports
+
+
+def _is_nested_type(dtype: object) -> str | None:
+    text = str(dtype).strip()
+    if text.endswith("[]"):
+        return "list"
+    if text.upper() == "JSON":
+        return "json"
+    return None
+
+
+def _explode_nested_columns(
+    con: duckdb.DuckDBPyConnection,
+    table: str,
+    depth: int,
+    reports: list[TableLoad],
+    progress: Callable[[TableLoad], None] | None,
+) -> None:
+    if depth >= _EXPLODE_MAX_DEPTH:
+        return
+    nested = []
+    for row in con.execute(f"DESCRIBE {_qualify('stg', table)}").fetchall():
+        kind = _is_nested_type(row[1])
+        if kind is not None:
+            nested.append((row[0], kind))
+    siblings = [col for col, _ in nested]
+    for col, kind in nested:
+        dest = f"{table}{_CHILD_SEP}{col}"
+        report = _explode_nested_column(con, table, col, kind, dest, siblings)
+        reports.append(report)
+        if progress is not None:
+            progress(report)
+        con.execute("CHECKPOINT")
+        if report.error is None and report.rows:
+            _explode_nested_columns(con, dest, depth + 1, reports, progress)
+
+
+def _explode_nested_column(
+    con: duckdb.DuckDBPyConnection,
+    parent: str,
+    col: str,
+    kind: str,
+    dest: str,
+    siblings: list[str],
+) -> TableLoad:
+    source = _qualify("stg", parent)
+    target = _qualify("stg", dest)
+    exclude = ", ".join(_ident(name) for name in siblings)
+    col_id = _ident(col)
+    idx_id = _ident(f"{col}_idx")
+    try:
+        con.execute(f"DROP TABLE IF EXISTS {target}")
+        if kind == "json":
+            if not _explode_json_column(con, source, target, col, exclude):
+                return TableLoad(
+                    "stg", dest, 0, 0, error="scalar JSON; nothing to explode"
+                )
+        else:
+            con.execute(
+                f"""
+                CREATE TABLE {target} AS
+                SELECT * EXCLUDE ({exclude}),
+                  unnest(range(1, len({col_id}) + 1)) AS {idx_id},
+                  unnest({col_id}) AS {col_id}
+                FROM {source}
+                WHERE {col_id} IS NOT NULL AND len({col_id}) > 0
+                """
+            )
+        leftover = _flatten_struct_columns(con, "stg", dest)
+        if leftover is not None and leftover.error:
+            return leftover
+        rows = con.execute(f"SELECT COUNT(*) FROM {target}").fetchone()[0]
+        return TableLoad("stg", dest, 1, int(rows))
+    except Exception as exc:
+        return _explode_failed(con, target, dest, exc)
+
+
+def _explode_json_column(
+    con: duckdb.DuckDBPyConnection,
+    source: str,
+    target: str,
+    col: str,
+    exclude: str,
+) -> bool:
+    """Type a JSON column, then explode it. False when it holds only scalars."""
+    col_id = _ident(col)
+    idx_id = _ident(f"{col}_idx")
+    key_id = _ident(f"{col}_key")
+    kinds = {
+        row[0]
+        for row in con.execute(
+            f"SELECT DISTINCT json_type({col_id}) FROM {source}"
+            f" WHERE {col_id} IS NOT NULL"
+        ).fetchall()
+        if row[0] is not None
+    }
+    if kinds == {"ARRAY"}:
+        keep = f"{col_id} IS NOT NULL AND json_array_length({col_id}) > 0"
+        structure = con.execute(
+            f"SELECT json_group_structure({col_id}) FROM {source} WHERE {keep}"
+        ).fetchone()[0]
+        if structure is None:
+            return False
+        con.execute(
+            f"""
+            CREATE TABLE {target} AS
+            SELECT * EXCLUDE ({exclude}),
+              unnest(range(1, CAST(json_array_length({col_id}) AS BIGINT) + 1)) AS {idx_id},
+              unnest(json_transform({col_id}, ?)) AS {col_id}
+            FROM {source}
+            WHERE {keep}
+            """,
+            [structure],
+        )
+        return True
+    if kinds != {"OBJECT"}:
+        return False
+    if _json_keys_are_numeric(con, source, col_id):
+        # Action Network `markets` is keyed by book_id, so those keys are data,
+        # not a schema. Unnest them into a column instead of into column names.
+        value = "json_extract(p." + col_id + ", '$.\"' || t.k || '\"')"
+        frm = f"FROM {source} p, unnest(json_keys(p.{col_id})) AS t(k)"
+        structure = con.execute(
+            f"SELECT json_group_structure({value}) {frm}"
+            f" WHERE p.{col_id} IS NOT NULL"
+        ).fetchone()[0]
+        if structure is None:
+            return False
+        con.execute(
+            f"""
+            CREATE TABLE {target} AS
+            SELECT p.* EXCLUDE ({exclude}),
+              t.k AS {key_id},
+              json_transform({value}, ?) AS {col_id}
+            {frm}
+            WHERE p.{col_id} IS NOT NULL
+            """,
+            [structure],
+        )
+        return True
+    structure = con.execute(
+        f"SELECT json_group_structure({col_id}) FROM {source}"
+        f" WHERE {col_id} IS NOT NULL"
+    ).fetchone()[0]
+    if structure is None:
+        return False
+    con.execute(
+        f"""
+        CREATE TABLE {target} AS
+        SELECT * EXCLUDE ({exclude}),
+          json_transform({col_id}, ?) AS {col_id}
+        FROM {source}
+        WHERE {col_id} IS NOT NULL
+        """,
+        [structure],
+    )
+    return True
+
+
+def _json_keys_are_numeric(
+    con: duckdb.DuckDBPyConnection, source: str, col_id: str
+) -> bool:
+    row = con.execute(
+        f"SELECT bool_and(regexp_full_match(k, '[0-9]+')) FROM ("
+        f" SELECT DISTINCT unnest(json_keys({col_id})) AS k FROM {source}"
+        f" WHERE {col_id} IS NOT NULL)"
+    ).fetchone()
+    return bool(row and row[0])
 
 
 def _stg_dest_name(name: str, taken: set[str]) -> str:
