@@ -58,3 +58,24 @@ def test_migrate_is_idempotent_and_resumable():
     second = migrate(con)  # must not error re-processing already-moved tables
     assert all(report.error is None for report in second)
     assert con.execute("SELECT gameId FROM stg_gql.game").fetchone()[0] == 1
+
+
+def test_migrate_resumes_child_after_parent_only_partial_run():
+    con = _seeded_con()
+    # Simulate a prior run that crashed between the parent's move and its child's:
+    # the parent already sits at its destination and is gone from `stg`, but the
+    # child is still un-migrated in `stg`.
+    con.execute("CREATE SCHEMA stg_gql")
+    con.execute("CREATE TABLE stg_gql.game AS SELECT * FROM stg.gql_game")
+    con.execute("DROP TABLE stg.gql_game")
+
+    reports = migrate(con)
+
+    assert all(report.error is None for report in reports)
+    assert con.execute(
+        "SELECT COUNT(*) FROM information_schema.tables"
+        " WHERE table_schema = 'stg' AND table_name = 'gql_game__away_line_scores'"
+    ).fetchone()[0] == 0
+    assert con.execute(
+        "SELECT gameId FROM stg_gql.game__away_line_scores"
+    ).fetchone()[0] == 1

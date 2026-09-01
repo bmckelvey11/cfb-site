@@ -42,10 +42,12 @@ def plan_moves(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, str, str]
         ).fetchall()
     }
     for entity, raw_name in GQL_ENTITY_TO_RAW.items():
-        if raw_name not in existing:
-            continue
         dest_name = GQL_ENTITY_TO_STG[entity]
-        moves.append(("stg", raw_name, "stg_gql", dest_name))
+        if raw_name in existing:
+            moves.append(("stg", raw_name, "stg_gql", dest_name))
+        # Child scan is independent of the parent's presence in `stg`: a prior run may
+        # have moved the parent and then died before reaching its children, which
+        # would otherwise strand them in `stg` forever on every future re-run.
         prefix = raw_name + "__"
         for child in sorted(name for name in existing if name.startswith(prefix)):
             dest_child = dest_name + "__" + child[len(prefix):]
