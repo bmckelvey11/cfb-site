@@ -39,6 +39,10 @@ migration is incomplete.
    - Only then diff against the old pull: report added keys, removed keys, duplicate keys, and a
      sample of changed rows. A pagination repair shows additions and no removals; removals or
      changed values on stable keys indicate upstream drift and stop the run.
+   - **Version selection is explicit.** The loader reads a version manifest naming exactly which
+     dump file each entity loads from; it never globs a directory that now holds two generations
+     of the same entity. The new version is promoted in the manifest only after steps 5-7 pass,
+     so a failed run leaves the previous version selected and the warehouse rebuildable from it.
 4. **Prune scaffolding columns.** `prune_null_scaffolding` runs inside `_finish_stg_table`, so it
    is loader-level and survives rebuilds by construction. Rebuild `stg`, then rebuild a second
    time and assert the pruned set is identical — a rebuild that restores a pruned column means
@@ -69,12 +73,12 @@ recomputes it at run time and step 8 obeys the recomputed value.
 | Concept | GraphQL | REST | Join key | Target | Prior disposition |
 |---|---|---|---|---|---|
 | game | `gql_game` | `games` | `gameId` | `core.fact_game` (+`_postgame`, `_historical`) | merge |
-| lines | `gql_game_lines` | `lines` | line grain `(gameId, linesProviderId, period)`; `lines` is `gameId` | `core.fact_game_line` | merge, differing grain |
+| lines | `gql_game_lines` | `lines__lines` (exploded) | `(gameId, provider, period)` after id↔name bridge | `core.fact_game_line` | merge, see correspondence |
 | draft pick | `gql_draft_picks` | `draft_picks` | `(year, round, pick)` — unique both sides | `core.dim_draft_pick` | merge |
 | conference | `gql_conference` | `conferences` | `conferenceId` | `core.dim_conference` | merge |
 | calendar | `gql_calendar` | `calendar` | `(season, week)` — 16/16 overlap | `core.dim_week` | merge |
 | coach | `gql_coach` | — | `coachId` | `core.dim_coach` + `core.coach_name_conflicts` | dimension, D3 |
-| coach season | `gql_coach_season` | `coaches`, `coach_seasons` | `(coachId, season)` after step 3 | `core.fact_coach_season` | merge at season grain |
+| coach season | `gql_coach_season` | `coaches`, `coach_seasons` | `(coachId, teamId, season)` after step 3 | `core.fact_coach_season` | merge at season grain |
 | recruiting team | `gql_recruiting_team` | `recruiting_teams` | **none — no bridge** | — | deferred |
 | draft position | `gql_draft_position` | `draft_positions` | `name` | — | drop REST |
 | draft team | `gql_draft_team` | `draft_teams` | `name` | — | drop REST |
@@ -98,6 +102,30 @@ collapsed:
   is coach-**season** grain, not coach grain, and carries `hireDate` plus a nested `seasons`
   list. Folding it into `dim_coach` would collapse ~4.8 rows per coach. It therefore pairs with
   `gql_coach_season` at season grain, while `gql_coach` alone forms the dimension.
+  The one non-unique row is **Blake Anderson, 2021: two byte-identical rows** (same `hireDate`,
+  same `_source_file`), so it deduplicates with `DISTINCT` and needs no quarantine. Verified, not
+  assumed — a non-identical pair would have gone to `core.value_conflicts` instead.
+  **`teamId` stays in the coach-season key** regardless: `coach_seasons` contains a genuine
+  coach-season with two distinct `team_id`s, and `(coachId, season)` alone would silently collapse
+  a real mid-season team change — the same class of error `CONTEXT.md` forbids for head coaches.
+
+### Lines correspondence
+
+Uniqueness at each side's own grain proves nothing about correspondence, so the merge is defined
+concretely. The REST explode already exists: `stg.lines__lines`, produced by
+`explode_stg_lists()`, holds 38,689 rows unique on `(gameId, lines_provider)` with
+`lines_spread`, `lines_overUnder`, `lines_provider` and friends flattened out. So:
+
+- REST offers come from `lines__lines`, not from the nested `lines` column on `lines`.
+- `gql_game_lines` carries `linesProviderId` (an id); `lines__lines` carries `lines_provider`
+  (a name). They join through the provider dimension — `gql_lines_provider` / the existing
+  `core.dim_lines_provider`. If a provider name fails to resolve to an id, that offer is
+  unmatched and reported, never dropped.
+- Shared key is `(gameId, provider_key, period)`. REST offers carry no period and are treated as
+  full-game; `gql_game_lines` supplies 1H/1Q rows that REST has no counterpart for, which is
+  expected and is not an error.
+- Unmatched offers on either side land in `core.fact_game_line` with a `_provenance` value naming
+  the single source, and are counted in the step 6 report.
 
 ## What may be dropped (reconciles step 8 with D1)
 
@@ -158,11 +186,18 @@ So the separation is physical:
 | `status` | `core.fact_game_postgame` |
 
 `core.fact_game_postgame` keys on `gameId`. "Never joined by feature-building code" is a claim,
-so it ships with a gate rather than a promise: a test scans the feature-building modules for any
-reference to `fact_game_postgame` or to the six column names, and asserts the built feature frame
-contains none of them. A feature that genuinely needs one must be registered in the
-`result_lookahead` group the way `pregame_win_prob` is, which the test allows by exception. A
-column whose timing is unclear goes to `_postgame`.
+so it ships with two gates rather than a promise:
+
+1. **Static** — a test scans the feature-building modules for any reference to
+   `fact_game_postgame` or the six column names, allowing registered `result_lookahead` features
+   by exception.
+2. **Mutation** — perturb only the `_postgame` values, rebuild the feature frame, and require
+   byte-identical pregame output. The static scan alone cannot catch a helper or view that
+   derives a renamed pregame column from postgame data; the mutation test catches it by
+   construction, because leakage of any shape changes the output.
+
+A feature that genuinely needs one of these columns must be registered in the `result_lookahead`
+group the way `pregame_win_prob` is. A column whose timing is unclear goes to `_postgame`.
 
 ## The 12 dead payload columns
 

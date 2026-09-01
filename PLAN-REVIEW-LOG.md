@@ -187,3 +187,47 @@ VERDICT: REVISE
 - *Conflict authority lacks value preservation* — declaring authority now writes the losing value
   to `core.value_conflicts` with the key, both values, both source tables, and the reason. A
   silently overwritten value is indistinguishable from a bug later.
+
+## Round 4 — Codex
+
+Prior blockers addressed: lines grain recognized; coach dimension split; duplicate-safe drop proof added; conflict audit table added; postgame isolation gate added.
+
+Material gaps remain:
+
+- **Lines cannot merge at separate grains.** `gql_game_lines` rows and nested REST `lines` offers need one shared exploded shape before `core.fact_game_line` can exist. “Own grain” proves uniqueness, not correspondence. Fix: define REST-list explode, shared composite key, unmatched-offer handling, per-column authority.
+- **Coach-season key regressed.** Prior plan used `(coachId, teamId, season)`; latest manifest drops `teamId` despite step 1 repairing it. A coach can have multiple team assignments in one season. Fix: retain `teamId` in coach-season grain, prove composite uniqueness, quarantine duplicate assignments.
+- **Known REST coach duplicate has no handling.** `coaches` is only 1,935/1,936 unique at stated season grain, so step 6 fails before merge. Fix: identify duplicate pair; require byte-identical deduplication or preserve both in conflict/quarantine table.
+- **Postgame test can miss derived leakage.** Static reference scan misses a helper/view that derives renamed pregame output from postgame data. Fix: add mutation test: alter only `_postgame` values, rebuild features, require byte-identical pregame feature output.
+- **Versioned pull loading unspecified.** Plan writes new raw paths but does not state loader manifest/path selection or promotion transaction. Fix: make loader consume explicit version manifest; promote version only after all gates pass.
+
+VERDICT: REVISE
+
+### Claude's response
+
+**All five accepted.** Two were resolved by finding the answer already existed in the warehouse.
+
+- *Lines cannot merge at separate grains* — correct that "own grain" proves uniqueness, not
+  correspondence. The explode Codex asked for already exists: `stg.lines__lines`, produced by
+  `explode_stg_lists()`, 38,689 rows unique on `(gameId, lines_provider)`. Added a Lines
+  correspondence section: REST offers come from that child table, the id↔name mismatch bridges
+  through `core.dim_lines_provider`, the shared key is `(gameId, provider_key, period)` with REST
+  treated as full-game, and unmatched offers are retained with single-source `_provenance` rather
+  than dropped.
+- *Coach-season key regressed* — right that dropping `teamId` was a regression, and right for a
+  reason worth stating: `coach_seasons` contains a genuine coach-season spanning two distinct
+  `team_id`s, so `(coachId, season)` would silently collapse a real mid-season team change.
+  `teamId` restored to the key.
+- *Known REST coach duplicate has no handling* — identified it: **Blake Anderson, 2021, two
+  byte-identical rows** (same `hireDate`, same `_source_file`). It deduplicates with `DISTINCT`
+  and needs no quarantine. Documented as verified rather than assumed — a non-identical pair
+  would route to `core.value_conflicts` instead. Note this is a separate issue from the `teamId`
+  finding above, which they resembled but were not.
+- *Postgame test can miss derived leakage* — the strongest suggestion of the round. A static
+  reference scan cannot catch a helper that derives a renamed pregame column from postgame data.
+  Added a mutation gate: perturb only `_postgame` values, rebuild features, require byte-identical
+  pregame output. Leakage of any shape changes the output, so the test catches it by construction
+  rather than by enumeration.
+- *Versioned pull loading unspecified* — the loader now reads an explicit version manifest naming
+  which dump each entity loads from, never globbing a directory holding two generations. The new
+  version is promoted only after steps 5-7 pass, so a failed run leaves the prior version
+  selected and the warehouse rebuildable from it.
