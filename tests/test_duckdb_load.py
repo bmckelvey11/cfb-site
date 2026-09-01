@@ -867,6 +867,7 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     db_path = tmp_path / "cfb.duckdb"
     con = duckdb.connect(str(db_path))
     con.execute("CREATE SCHEMA stg")
+    con.execute("CREATE SCHEMA stg_gql")
     con.execute(
         """
         CREATE TABLE stg.games (
@@ -878,7 +879,7 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     con.execute("INSERT INTO stg.games VALUES (99, 2025, 1, 'Alpha', 'Beta')")
     con.execute(
         """
-        CREATE TABLE stg.gql_game_lines (
+        CREATE TABLE stg_gql.game_lines (
           gameId INTEGER, linesProviderId INTEGER,
           moneylineAway INTEGER, moneylineHome INTEGER,
           overUnder DOUBLE, overUnderOpen DOUBLE,
@@ -888,19 +889,19 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     )
     con.execute(
         """
-        INSERT INTO stg.gql_game_lines VALUES
+        INSERT INTO stg_gql.game_lines VALUES
           (99, 888888, NULL, NULL, 45.5, NULL, -7.0, -6.5, 'cfbd.json')
         """
     )
     con.execute(
         """
-        CREATE TABLE stg.gql_lines_provider (
+        CREATE TABLE stg_gql.lines_provider (
           id INTEGER, name VARCHAR, _source_file VARCHAR
         )
         """
     )
     con.execute(
-        "INSERT INTO stg.gql_lines_provider VALUES (888888, 'DraftKings', 'cfbd.json')"
+        "INSERT INTO stg_gql.lines_provider VALUES (888888, 'DraftKings', 'cfbd.json')"
     )
     con.execute(
         """
@@ -983,12 +984,12 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     assert report is not None and report.error is None
 
     con = duckdb.connect(str(db_path), read_only=True)
-    cols = {row[0] for row in con.execute("DESCRIBE stg.gql_game_lines").fetchall()}
+    cols = {row[0] for row in con.execute("DESCRIBE stg_gql.game_lines").fetchall()}
     assert "period" in cols and "line_source" in cols
     fg = con.execute(
         """
         SELECT spread, spreadOpen, overUnder, moneylineHome, moneylineAway, period
-        FROM stg.gql_game_lines
+        FROM stg_gql.game_lines
         WHERE gameId = 99 AND linesProviderId = 888888 AND period = 'game'
         """
     ).fetchone()
@@ -996,12 +997,13 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     half = con.execute(
         """
         SELECT spread, overUnder, period, line_source
-        FROM stg.gql_game_lines
+        FROM stg_gql.game_lines
         WHERE gameId = 99 AND period = 'firsthalf'
         """
     ).fetchone()
     assert half[0] == -3.5 and half[1] == 24.5 and half[3] == "actionnetwork"
     names = {
-        row[0] for row in con.execute("SELECT name FROM stg.gql_lines_provider").fetchall()
+        row[0]
+        for row in con.execute("SELECT name FROM stg_gql.lines_provider").fetchall()
     }
     assert "DraftKings" in names and "FanDuel" in names

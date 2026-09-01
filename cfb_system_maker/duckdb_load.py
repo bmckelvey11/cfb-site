@@ -560,7 +560,7 @@ _AN_SCHOOL_ALIAS = {
 def backfill_gamelines_from_actionnetwork(
     db: str | Path | duckdb.DuckDBPyConnection,
 ) -> TableLoad | None:
-    """Merge Action Network period + extra-book lines into ``stg.gql_game_lines``.
+    """Merge Action Network period + extra-book lines into ``stg_gql.game_lines``.
 
     CFBD ``gameLines`` is full-game only. AN history is 1H/1Q; scoreboard
     ``markets`` is full-game per book. Existing CFBD numbers win; AN fills
@@ -569,36 +569,47 @@ def backfill_gamelines_from_actionnetwork(
     owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
     con = duckdb.connect(str(db)) if owns_connection else db
     try:
-        tables = {
+        stg_tables = {
             row[0]
             for row in con.execute(
                 "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
             ).fetchall()
         }
-        needed = {"gql_game_lines", "games", "actionnetwork_scoreboard"}
-        if not needed.issubset(tables):
+        gql_tables = {
+            row[0]
+            for row in con.execute(
+                "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg_gql'"
+            ).fetchall()
+        }
+        if not (
+            "game_lines" in gql_tables
+            and "games" in stg_tables
+            and "actionnetwork_scoreboard" in stg_tables
+        ):
             return None
-        return _backfill_gamelines(con, tables)
+        return _backfill_gamelines(con, stg_tables, gql_tables)
     except Exception as exc:
         detail = str(exc).split("\n", 1)[0]
         return TableLoad(
-            "stg", "gql_game_lines", 0, 0, error=f"{type(exc).__name__}: {detail}"
+            "stg_gql", "game_lines", 0, 0, error=f"{type(exc).__name__}: {detail}"
         )
     finally:
         if owns_connection:
             con.close()
 
 
-def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> TableLoad:
+def _backfill_gamelines(
+    con: duckdb.DuckDBPyConnection, stg_tables: set[str], gql_tables: set[str]
+) -> TableLoad:
     game_cols = {row[0] for row in con.execute("DESCRIBE stg.games").fetchall()}
     game_id = "gameId" if "gameId" in game_cols else "id"
     gl_types = {
-        row[0]: row[1] for row in con.execute("DESCRIBE stg.gql_game_lines").fetchall()
+        row[0]: row[1] for row in con.execute("DESCRIBE stg_gql.game_lines").fetchall()
     }
     gid_type = gl_types.get("gameId", "BIGINT")
     prov_type = gl_types.get("linesProviderId", "BIGINT")
-    has_history = "actionnetwork_history" in tables
-    has_provider = "gql_lines_provider" in tables
+    has_history = "actionnetwork_history" in stg_tables
+    has_provider = "lines_provider" in gql_tables
     alias_sql = " ".join(
         f"WHEN '{src.replace(chr(39), chr(39) + chr(39))}' THEN '{dst.replace(chr(39), chr(39) + chr(39))}'"
         for src, dst in _AN_SCHOOL_ALIAS.items()
@@ -629,10 +640,10 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
         """
     )
 
-    con.execute("DROP TABLE IF EXISTS stg.gql_game_lines__backfill")
+    con.execute("DROP TABLE IF EXISTS stg_gql.game_lines__backfill")
     con.execute(
         f"""
-        CREATE TABLE stg.gql_game_lines__backfill AS
+        CREATE TABLE stg_gql.game_lines__backfill AS
         WITH map AS (
           SELECT
             sb.event_id,
@@ -708,7 +719,7 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
             moneylineHome,
             moneylineAway,
             _source_file
-          FROM stg.gql_game_lines
+          FROM stg_gql.game_lines
         )
         SELECT
           COALESCE(c.gameId, a.gameId) AS gameId,
@@ -733,12 +744,12 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
          AND c.period = a.period
         """
     )
-    con.execute("DROP TABLE stg.gql_game_lines")
-    con.execute("ALTER TABLE stg.gql_game_lines__backfill RENAME TO gql_game_lines")
+    con.execute("DROP TABLE stg_gql.game_lines")
+    con.execute("ALTER TABLE stg_gql.game_lines__backfill RENAME TO game_lines")
 
     if has_provider:
         prov_cols = {
-            row[0] for row in con.execute("DESCRIBE stg.gql_lines_provider").fetchall()
+            row[0] for row in con.execute("DESCRIBE stg_gql.lines_provider").fetchall()
         }
         pid_col = "linesProviderId" if "linesProviderId" in prov_cols else "id"
         name_rows = ", ".join(
@@ -747,14 +758,14 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
         )
         con.execute(
             f"""
-            INSERT INTO stg.gql_lines_provider ({_ident(pid_col)}, name, _source_file)
+            INSERT INTO stg_gql.lines_provider ({_ident(pid_col)}, name, _source_file)
             SELECT v.id, v.name, v.src
             FROM (VALUES {name_rows}) v(id, name, src)
-            WHERE v.id NOT IN (SELECT {_ident(pid_col)} FROM stg.gql_lines_provider)
+            WHERE v.id NOT IN (SELECT {_ident(pid_col)} FROM stg_gql.lines_provider)
             """
         )
 
-    return _finish_stg_table(con, "gql_game_lines", _qualify("stg", "gql_game_lines"))
+    return _finish_stg_table(con, "stg_gql", "game_lines", _qualify("stg_gql", "game_lines"))
 
 # Kickoff strings land in three shapes: REST "2023-09-02 16:00:00+00:00",
 # GraphQL naive "2023-09-02T16:00:00", Action Network "...T23:30:00.000Z".
