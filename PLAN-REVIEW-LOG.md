@@ -367,7 +367,7 @@ prefixed values) so `raw` keeps behaving exactly as it does today regardless of 
 **Two further plan gaps turned up during execution, both closed inside the task that hit them
 rather than left for someone downstream to trip over.** Task 3's brief named only one pre-existing
 test as needing the new required `schema` argument on `stg_id_renames`/`stg_column_order`; the
-controller's ruling caught three more REST-only assertions exercising the same functions and
+controller's ruling caught four more REST-only assertions exercising the same functions and
 extended the task to cover them — mechanical, no behavior change. Task 7 is the heavier one: its
 implementer, unprompted and not from review, noticed that the migration script's child-table
 discovery was gated on the parent still being present in `stg` — meaning a crash between moving a
@@ -382,8 +382,10 @@ these and every other controller ruling made during the build is in
 
 **Test baseline was 696 passed / 6 deselected** (this plan's stated starting point, matching Act
 3's final count). The full suite after Task 10's documentation-only changes is **701 passed, 6
-deselected** — the net of tests added across the ten tasks (Task 3's four extended assertions,
-Task 7's new regression test, Task 9's schema-membership test, and others) with no regressions.
+deselected** — a net gain of 5, reflecting new tests added along the way (Task 7's
+parent-then-child-crash regression test, Task 9's schema-membership test, among others) with no
+regressions. Task 3's four fixed tests are not part of that net figure — they already existed and
+only needed the new `schema` keyword argument to keep compiling, not new coverage.
 
 **The live warehouse migration itself was not run in this build.** `scripts/migrate_gql_stg_names.py`
 was rewritten and its behavior verified only against synthetic `:memory:` fixtures, exactly as the
