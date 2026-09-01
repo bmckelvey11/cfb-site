@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 
 import duckdb
 
-DEFAULT_SCHEMAS = ["raw", "stg", "core", "meta"]
+DEFAULT_SCHEMAS = ["raw", "stg", "stg_gql", "core", "meta"]
 
 
 def git_sha() -> str | None:
