@@ -342,3 +342,51 @@ uncommitted build sits in the working tree.** The correct move is to snapshot th
 the build; it does nothing for the tree during review.
 
 Rounds used: 0 of MAX_FIX_ROUNDS=2. No fix round was needed.
+
+## Act 4 — Build (schema separation supersedes the `gql_` prefix)
+
+Spec: `docs/superpowers/plans/2026-09-01-warehouse-schema-separation.md`. This build replaced the
+`gql_`-prefix destination scheme from Act 3 — shipped in commits `3027774`/`54987b1`/`a7be132`
+but never applied to the live warehouse — with schema separation: GraphQL-sourced `stg` tables
+move to a new `stg_gql` schema under bare `snake_case` names, REST-sourced `stg` tables are
+untouched, and `raw` keeps a single schema with GraphQL dumps still `gql_`-prefixed. The decision
+and its two rejected alternatives (keep the prefix; use bare names with no disambiguation at all)
+are recorded in `docs/adr/0002-graphql-stg-tables-in-separate-schema.md`. Executed via
+Subagent-Driven Development rather than another Codex round-trip loop: ten tasks, each dispatched
+to one implementer subagent and reviewed by one reviewer subagent before the next task started,
+with the controller (this session) adjudicating gaps between the two.
+
+**A design gap surfaced before any code was written, not during review.** `raw`'s GraphQL-dump
+naming has always reused the same resolver function that names the `stg` destination — harmless
+under the `gql_` prefix, since that resolver could only ever produce a collision-free `gql_`-
+prefixed value. Naming `raw` from a bare `stg_gql` value instead would have collided
+`raw.draft_picks`, `raw.predicted_points`, and `raw.calendar` with the REST raw dumps of the same
+names. Task 1 decoupled `raw` naming into its own mapping (`GQL_ENTITY_TO_RAW`, unchanged `gql_`-
+prefixed values) so `raw` keeps behaving exactly as it does today regardless of what `stg` does.
+
+**Two further plan gaps turned up during execution, both closed inside the task that hit them
+rather than left for someone downstream to trip over.** Task 3's brief named only one pre-existing
+test as needing the new required `schema` argument on `stg_id_renames`/`stg_column_order`; the
+controller's ruling caught three more REST-only assertions exercising the same functions and
+extended the task to cover them — mechanical, no behavior change. Task 7 is the heavier one: its
+implementer, unprompted and not from review, noticed that the migration script's child-table
+discovery was gated on the parent still being present in `stg` — meaning a crash between moving a
+parent and moving its child would silently and permanently strand that child on every future
+re-run, directly contradicting the script's own claim of being safely resumable. Judged
+load-bearing rather than cosmetic, because this script's purpose is to eventually run unattended
+against the real 4.9 GB warehouse file with no one watching for a false resumability guarantee.
+Fixed in-task, with a genuine (non-vacuous) parent-then-child-crash regression test proving the
+fix actually closes the gap rather than merely padding coverage. Full adjudication detail for
+these and every other controller ruling made during the build is in
+`.superpowers/sdd/2026-09-01-warehouse-schema-separation/progress.md`.
+
+**Test baseline was 696 passed / 6 deselected** (this plan's stated starting point, matching Act
+3's final count). The full suite after Task 10's documentation-only changes is **701 passed, 6
+deselected** — the net of tests added across the ten tasks (Task 3's four extended assertions,
+Task 7's new regression test, Task 9's schema-membership test, and others) with no regressions.
+
+**The live warehouse migration itself was not run in this build.** `scripts/migrate_gql_stg_names.py`
+was rewritten and its behavior verified only against synthetic `:memory:` fixtures, exactly as the
+plan required. Applying it to `data/cfb.duckdb` remains a separate, explicit, user-initiated step —
+the same posture Act 3's shipped-but-unapplied prefix scheme was left in, which is part of why the
+scheme could still be swapped out for schema separation before that step was ever taken.

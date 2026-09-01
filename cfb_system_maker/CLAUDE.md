@@ -63,7 +63,9 @@ Canonical data dir is required `CFB_DATA_ROOT`, resolved by root `cfb_paths.py`.
 
 `actionnetwork` is a fourth acquire path (no CFBD token): per-book odds including 1H/1Q markets CFBD lacks → `data/raw/actionnetwork/`. Browser-ish UA required.
 
-`duckdb` loads `data/raw/` + `data/graphql/` into `data/cfb.duckdb` (one file; both land in `raw` as JSON payloads — GraphQL `calendar` becomes `raw.calendar_gql` on name clash — optional `stg` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`.
+`duckdb` loads `data/raw/` + `data/graphql/` into `data/cfb.duckdb` (one file; REST lands in
+`raw`/`stg` under its endpoint names, GraphQL lands in `raw` under a `gql_`-prefixed name and
+`stg_gql` under its bare name — optional `stg`/`stg_gql` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`.
 
 **MotherDuck (`md:cfb`) is a manual mirror, local file is source of truth.** Never write to `md:cfb` directly — rebuild and verify local first (`python -m pytest -m slow tests/test_core_agreement.py`), then promote with `python scripts/promote_to_motherduck.py --dry-run` (lists tables/rows, pushes nothing) followed by `--yes` (CTAS-replaces each table, stamps `meta.warehouse_version` on both sides). See `docs/duckdb-warehouse-plan.md` (`## MotherDuck promote`) for the full runbook.
 
@@ -86,7 +88,14 @@ Canonical data dir is required `CFB_DATA_ROOT`, resolved by root `cfb_paths.py`.
 - **Warehouse working copy:** use `$CFB_DATA_ROOT/cfb.duckdb`
   (`C:\Users\mckel\dev\cfb\data`), not MotherDuck, for catalogs, explode, and schema work.
   Catalogs describe tables, exploded columns, and named box/play stats, not app features.
-  GraphQL dumps land in `raw`, not a separate `graphql` schema.
+- **Two staging schemas:** `stg` holds REST-sourced tables (snake_case, unchanged names);
+  `stg_gql` holds GraphQL-sourced tables (bare snake_case — `stg_gql.game`, not
+  `stg.gql_game`). `raw` stays a single schema for both sources: GraphQL raw dumps keep a
+  `gql_` prefix (`raw.gql_game`) so they don't collide with REST raw dumps of the same
+  snake_case name (`draft_picks`, `predicted_points`, `calendar` all would). `--only <name>`
+  matches a bare destination name in either schema, so `--only draft_picks` touches both
+  `stg.draft_picks` and `stg_gql.draft_picks` together — use the GraphQL entity spelling
+  (`--only draftPicks`) to select only the GraphQL raw dump/table.
 - **Exploded staging:** `stg.plays` rebuilds with
   `python -m cfb_system_maker duckdb --explode-only --only plays`. Infer JSON shape from a
   sample; grouping structure across all `raw.plays` can exhaust memory. Browse order is
