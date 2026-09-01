@@ -277,3 +277,68 @@ narrowed from structural to specificational across the five rounds, and 30 of 31
 were accepted — one rejected with reason (concurrency machinery for a single-writer local file).
 
 Round 5's fixes are **applied but not re-reviewed**. That is the one genuinely open item.
+
+## Act 3 — Build
+
+Spec: `docs/superpowers/plans/2026-08-31-warehouse-naming-rationalization.md` (the naming plan,
+built first because the source-rationalization plan's step 0 preflight blocks on it). Scope:
+Tasks 1-4 and 6. Tasks 5, 7, 8 are human-run and out of scope. Builder: Codex, model
+gpt-5.6-terra, codex-cli 0.151.0, launched by the user after the auto-mode classifier declined
+`codex exec --yolo` from this session.
+
+### Round 1 — Codex build
+
+Files changed: `cfb_system_maker/graphql_client.py`, `cfb_system_maker/duckdb_load.py`,
+`tests/test_graphql.py`, `tests/test_duckdb_load.py` (modified); `scripts/migrate_gql_stg_names.py`,
+`scripts/audit_canonical_sources.py`, `tests/test_migrate_gql_stg_names.py`,
+`tests/test_audit_canonical_sources.py` (new). Reported 695 passed, 6 deselected.
+
+### Claude's verdict — accepted with one addition
+
+Verified independently rather than taking the report on trust:
+
+- **Scope clean.** 4 modified + 4 new, all in-scope. Nothing under `data/`, nothing in
+  `cfbd-python/`, no git operations, no network calls.
+- **The API contract survived.** `GQL_DEFAULT_TABLES` is untouched — the diff shows only context
+  around it. Every remaining camelCase string in live code is either a GraphQL entity name, a
+  `_BARE_ID_RENAME` key, or a migration-test fixture, and each is correct in place. This was the
+  build's single largest risk and Codex did not trip it.
+- **Proof re-run by Claude:** 695 passed, 6 deselected, 120s. Matches the report. Baseline was
+  679, so +16 — exactly the count the spec's five task sections call for.
+- **Dry-run against the live warehouse (read-only):** 38 renames — 34 parents plus the 4 child
+  tables — matching the count independently derived during planning. `calendar_gql -> gql_calendar`
+  resolved correctly and REST `calendar` was left alone. No REST table appears on the left side.
+- **Audit script degrades correctly** pre-migration, reporting `MISSING` per pair rather than
+  raising.
+
+**Codex found a spec gap and fixed it correctly.** `_BARE_ID_RENAME` is keyed by GraphQL *entity*
+name (`"game": "gameId"`), so once destinations became `gql_*`, `stg_id_renames("gql_game")` would
+have missed the table and left a bare `id` column instead of `gameId`. The spec never mentioned
+this. Codex added a reverse lookup from destination back to entity. Verified across `gql_game`,
+`gql_coach`, `gql_lines_provider`, `gql_historical_team`, and confirmed REST names still resolve.
+
+**Claude's addition:** `test_stg_id_renames_resolves_gql_destinations_back_to_their_entity`. The
+reverse lookup was only indirectly covered — reverting it fails `test_explode_payloads_writes_stg_columns`
+with a confusing column-list mismatch, but nothing named the actual cause. Confirmed the new test
+guards it by patching the reverse lookup out and watching it fail, then restoring. Added directly
+rather than through a Codex fix round: a four-line test is trivia, and the skill warns against
+ping-ponging trivia through delegation. Final suite: 696 passed.
+
+### Incident — reviewer error, recovered
+
+While proving the new test guards the regression, Claude patched the reverse lookup out and then
+ran `git checkout cfb_system_maker/duckdb_load.py` to restore it. That restores from HEAD, and
+Codex's changes were uncommitted, so the file was reverted and Codex's work on it was lost. The
+other seven files were unaffected.
+
+Recovered by reconstructing all 19 hunks from the diff captured earlier in the review, each
+applied under an assertion that it matched exactly once. `git diff --stat` returned 65 changed
+lines, identical to Codex's original stat, and the suite passed at 696. No Codex re-run was
+needed.
+
+Lesson recorded because it will recur: **never `git checkout` a file while an unreviewed,
+uncommitted build sits in the working tree.** The correct move is to snapshot the file first
+(`cp`) and restore from the snapshot, or to stash. The clean-tree gate protects the tree before
+the build; it does nothing for the tree during review.
+
+Rounds used: 0 of MAX_FIX_ROUNDS=2. No fix round was needed.
