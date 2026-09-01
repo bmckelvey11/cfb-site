@@ -1,6 +1,35 @@
 import json
+import re
 
-from cfb_system_maker.graphql_client import graphql_scrape, pull_game_player_stats
+from cfb_system_maker.graphql_client import (
+    GQL_DEFAULT_TABLES,
+    GQL_ENTITY_TO_STG,
+    graphql_scrape,
+    pull_game_player_stats,
+)
+
+
+def test_gql_entity_to_stg_is_total_and_injective():
+    # Every GraphQL entity we pull must have an explicit destination — no fallback,
+    # no clash detection. That totality is what removes the load-order dependence.
+    assert set(GQL_ENTITY_TO_STG) == set(GQL_DEFAULT_TABLES)
+    assert len(set(GQL_ENTITY_TO_STG.values())) == len(GQL_ENTITY_TO_STG)
+
+
+def test_gql_destinations_are_snake_case_and_prefixed():
+    for entity, dest in GQL_ENTITY_TO_STG.items():
+        assert dest.startswith("gql_"), f"{entity} -> {dest} lacks gql_ prefix"
+        assert re.fullmatch(r"[a-z0-9_]+", dest), f"{entity} -> {dest} is not snake_case"
+
+
+def test_gql_destinations_match_spec_examples():
+    # Spot-check the transformations the spec's rename map fixes, including the
+    # multi-word and acronym-adjacent cases where a naive splitter goes wrong.
+    assert GQL_ENTITY_TO_STG["game"] == "gql_game"
+    assert GQL_ENTITY_TO_STG["gameLines"] == "gql_game_lines"
+    assert GQL_ENTITY_TO_STG["adjustedPlayerMetrics"] == "gql_adjusted_player_metrics"
+    assert GQL_ENTITY_TO_STG["playerStatCategory"] == "gql_player_stat_category"
+    assert GQL_ENTITY_TO_STG["calendar"] == "gql_calendar"
 
 
 def _scalar(name="String"):

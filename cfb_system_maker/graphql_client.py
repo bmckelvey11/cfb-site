@@ -10,6 +10,7 @@ from REST ``data/raw/`` because the GraphQL row shapes differ).
 from __future__ import annotations
 
 import json
+import re
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +37,20 @@ GQL_DEFAULT_TABLES: list[str] = [
     "playerStatType", "pollType", "position", "recruitPosition", "recruitSchool",
     "weatherCondition",
 ]
+
+
+def _snake(name: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+
+
+# Destination `stg` table name for each GraphQL entity. Explicit and total on purpose:
+# `stg` is fed by REST (snake_case) and GraphQL (camelCase API field names), and the
+# previous clash-resolution helper picked a winner by load order. The `gql_` prefix is
+# disjoint from every REST destination, so a clash is impossible by construction.
+# The keys are the upstream API contract and must not be renamed.
+GQL_ENTITY_TO_STG: dict[str, str] = {
+    entity: "gql_" + _snake(entity) for entity in GQL_DEFAULT_TABLES
+}
 
 # Tables whose scalar columns do not identify a row: the identity lives in a to-one
 # relation. For each, the relation and the few columns lifted from it — enough to join,
