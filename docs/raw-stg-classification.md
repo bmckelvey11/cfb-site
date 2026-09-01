@@ -169,10 +169,13 @@ did not exist locally at all, which is why the pre-fix `core` looked undated.
 
 Two caveats for the next promote:
 
-- **One leftover remains.** `md.stg.ppa_games_defense` has no local counterpart, so `stg`
-  is 120 against 119. The script uses `CREATE OR REPLACE TABLE` per table and never drops,
-  so tables retired locally survive on the mirror indefinitely. Dropping it is a
-  destructive remote change and was left alone deliberately.
+- **The script never drops.** It uses `CREATE OR REPLACE TABLE` per table, so anything
+  retired locally survives on the mirror indefinitely. `md.stg.ppa_games_defense` was one
+  such leftover (21,392 rows sourced from the retired `cfb-site` repo) and was dropped
+  manually after checking every row already existed in local `stg.ppa_games`; its only 10
+  divergent values were stale pre-revision PPA for five multi-overtime games. Table counts
+  now match exactly at 120/119/8/2. A view, `md.stg.venue_orientation_labeled` (497 rows),
+  still has no local counterpart — views are outside the promote's table-only contract.
 - **The copy needs a memory budget.** The first attempt died with
   `OutOfMemoryException: Allocation failure` partway through `raw`, leaving the mirror
   half-updated (`core` new, `stg` stale) — the promote is not atomic, and a failure
