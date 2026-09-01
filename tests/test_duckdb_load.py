@@ -452,7 +452,7 @@ def test_stg_column_order_puts_keys_and_sides_before_leftover_json():
         ("venueId", "UBIGINT"),
         ("week", "UBIGINT"),
     ]
-    ordered = stg_column_order(columns)
+    ordered = stg_column_order(columns, schema="stg")
     assert ordered[0] == "id"
     assert ordered[1:5] == ["season", "week", "seasonType", "startDate"]
     home = ordered.index("homeId")
@@ -471,6 +471,7 @@ def test_stg_column_order_puts_renamed_pk_before_entity_name():
             ("name", "VARCHAR"),
             ("venueId", "UBIGINT"),
         ],
+        schema="stg",
         table="venues",
     )
     assert ordered[0] == "venueId"
@@ -487,7 +488,7 @@ def test_stg_column_order_groups_offense_before_defense():
         ("team", "VARCHAR"),
         ("week", "UBIGINT"),
     ]
-    assert stg_column_order(columns) == [
+    assert stg_column_order(columns, schema="stg") == [
         "gameId",
         "season",
         "week",
@@ -562,19 +563,19 @@ def test_reorder_stg_columns_rewrites_existing_table_and_restores_views(tmp_path
 
 
 def test_stg_id_renames_matches_what_the_value_is():
-    assert stg_id_renames("games") == {
+    assert stg_id_renames("games", schema="stg") == {
         "id": "gameId",
         "homeId": "homeTeamId",
         "awayId": "awayTeamId",
     }
-    assert stg_id_renames("plays") == {"id": "playId"}
-    assert stg_id_renames("ppa_players_games_ngt") == {"id": "athleteId"}
-    assert stg_id_renames("cfp_games") == {"id": "matchupId"}
-    assert stg_id_renames("win_probability") == {
+    assert stg_id_renames("plays", schema="stg") == {"id": "playId"}
+    assert stg_id_renames("ppa_players_games_ngt", schema="stg") == {"id": "athleteId"}
+    assert stg_id_renames("cfp_games", schema="stg") == {"id": "matchupId"}
+    assert stg_id_renames("win_probability", schema="stg") == {
         "homeId": "homeTeamId",
         "awayId": "awayTeamId",
     }
-    assert stg_id_renames("calendar") == {}
+    assert stg_id_renames("calendar", schema="stg") == {}
 
 
 def test_stg_id_renames_resolves_gql_destinations_back_to_their_entity():
