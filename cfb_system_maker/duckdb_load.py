@@ -893,6 +893,10 @@ def explode_stg_lists(
             ORDER BY table_name
             """
         ).fetchall():
+            # Scoped to the selected roots: an --only run must not drop the
+            # children of every table it is not rebuilding.
+            if only is not None and stale.split(_CHILD_SEP, 1)[0] not in only:
+                continue
             con.execute(f"DROP TABLE IF EXISTS {_qualify('stg', stale)}")
         roots = [
             row[0]

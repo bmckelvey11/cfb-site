@@ -129,6 +129,9 @@ Notes:
 - Action Network `markets` is keyed by `book_id`. Those keys are data, so they land in
   `markets_key` rather than becoming column names; each bet type under it then gets its own
   child (`__markets__markets_event_moneyline` and siblings).
+  Those four children's column sets are re-derived from `json_group_structure` on every
+  run, so `markets_event_*` names follow whatever bet types the data holds at that moment.
+  Treat them as run-dependent; the LIST-derived children are not.
 - **Not exploded:** `ratings.spOffense` and `ratings.spOverall` are JSON scalars
   (`json_type` returns DOUBLE / VARCHAR / UBIGINT), not containers. They are numbers stored
   as JSON strings and want a retype to DOUBLE, not an explode. Reported and skipped.

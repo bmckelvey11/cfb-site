@@ -113,3 +113,12 @@ def test_rerun_is_idempotent(con):
     first = explode_stg_lists(con)
     second = explode_stg_lists(con)
     assert [(r.name, r.rows) for r in first] == [(r.name, r.rows) for r in second]
+
+
+def test_only_leaves_other_tables_children_alone(con):
+    con.execute("CREATE TABLE stg.keep AS SELECT 1 AS id, [1, 2] AS a")
+    con.execute("CREATE TABLE stg.redo AS SELECT 1 AS id, [1, 2, 3] AS a")
+    explode_stg_lists(con)
+    explode_stg_lists(con, only={"redo"})
+    assert _rows(con, "keep__a") == 2
+    assert _rows(con, "redo__a") == 3
