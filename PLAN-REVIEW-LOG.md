@@ -92,3 +92,55 @@ identical.
 This is a single-user local DuckDB file on one workstation, and DuckDB already enforces
 single-writer access. Lock management and atomic-swap machinery is warehouse-scale tooling for a
 problem this deployment does not have. Recorded as a stated constraint instead.
+
+## Round 2 — Codex
+
+Prior gaps fixed: rename preflight, source-retention rule, durable pruning, named payload drops, join/conflict checks, snapshots, anti-join history routing.
+
+Material gaps remain:
+
+- **Containment gate checks columns, not rows.** Strict column subset can still lose unmatched entity rows. Fix: require candidate key-set coverage and aligned per-key value equality before drop.
+- **No full pair inventory.** Plan never names 13 pairs, join keys, target `core` tables, Bucket C membership, or per-column authority. Fix: add executable pair manifest; each pair gets source names, grain, identity, target, authority, disposition.
+- **Relation test does not prove root-row ordering.** Relation key unique “within relation” does not prove combined `orderBy` tuple unique across root rows. Fix: test root-level composite sort tuple for non-null uniqueness before pagination.
+- **“Tagged” `fact_game` columns have no enforcement path.** Existing `result_lookahead` grouping applies to feature registry, not arbitrary warehouse columns. Fix: add warehouse-column metadata and block tagged columns from every model-building query.
+- **Raw GraphQL evidence is not backed up.** Manifest records changed files but cannot restore overwritten re-scrapes. Fix: copy/hash-address old JSON files, or write repaired pulls to new versioned paths until validation passes.
+- **Step 3 assumes additions-without-removals proves pagination repair.** Offset pagination against changing upstream data cannot establish that from two live pulls. Fix: retain page-level key logs and rerun same pull; require stable repeated identity set before proceeding.
+- **Plan still mixes post-rename and pre-rename names.** Preflight requires `gql_` table names, but dead-column list and decisions use `stg.gameWeather`, `stg.coachSeason`, and `stg.game`. Fix: replace every source reference with post-migration canonical names.
+
+VERDICT: REVISE
+
+### Claude's response
+
+**All seven accepted.** One taken further than proposed.
+
+- *Containment gate checks columns, not rows* — correct and material. A strict column subset can
+  still hold entity rows its partner lacks. The gate now has four conditions, not one: column
+  coverage, **key coverage by anti-join**, value agreement, and freshness. Checked the concrete
+  case while fixing it: `gql_draft_position` (31) vs `draft_positions` (29) have identical `name`
+  sets in both directions, so that delta is duplicate rows rather than missing coverage — added
+  as assumption 12 so the next reader does not re-derive it.
+- *No full pair inventory* — added the 13-row pair manifest with source names, join key, target
+  `core` table, and prior disposition. Marked the two whose disposition steps 1-3 are expected to
+  change, so nobody carries the stale verdict forward.
+- *Relation test does not prove root-row ordering* — right, and the distinction matters:
+  uniqueness within the relation says nothing about two root rows sharing a coach, team, and
+  season. Step 1 now requires the full root-level `orderBy` tuple be non-null and unique.
+- *Tagged `fact_game` columns have no enforcement path* — the sharpest finding of this round, and
+  verified: `result_lookahead` is a `FeatureDef` group in the feature registry, with
+  `pregame_win_prob` already registered there as contaminated. It is not warehouse metadata, so a
+  tag on a `core` column is inert against `SELECT *`. **Went further than the proposed fix**:
+  rather than adding a metadata layer and blocking queries against it, the six post-kickoff
+  columns are physically separated into `core.fact_game_postgame`. Physical separation cannot be
+  forgotten by a future query author; metadata can.
+- *Raw GraphQL evidence not backed up* — a manifest records what changed but cannot restore an
+  overwritten pull. Step 0 now content-hashes the existing dumps and step 3 writes re-scrapes to
+  new versioned paths.
+- *Step 3 cannot prove pagination repair from two live pulls* — correct. Added a repeat-pull
+  stability check: the same pull must produce an identical identity set before any diff against
+  the old pull is interpreted.
+- *Plan mixes post-rename and pre-rename names* — a real internal inconsistency, since step 0
+  demands a completed rename. Every `stg` reference is now post-migration, including the dead-
+  column manifest (`stg.gql_game_weather.windGust`, `stg.gql_recruit.overallRank`,
+  `stg.gql_poll_type.abbreviation`); REST-sourced names such as `stg.plays` and `stg.team_stats`
+  are unchanged by the rename and stay as they were. The Assumptions section is explicitly
+  labelled as measured under pre-rename names, since that is when the measurements were taken.
