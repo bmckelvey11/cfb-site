@@ -144,3 +144,46 @@ VERDICT: REVISE
   `stg.gql_poll_type.abbreviation`); REST-sourced names such as `stg.plays` and `stg.team_stats`
   are unchanged by the rename and stay as they were. The Assumptions section is explicitly
   labelled as measured under pre-rename names, since that is when the measurements were taken.
+
+## Round 3 — Codex
+
+Prior blockers addressed: naming consistent; raw pull backup added; root sort uniqueness added; pair manifest added; postgame data physically separated; row coverage added.
+
+Material flaws:
+
+- **`lines` join rule impossible.** Manifest says `gameId` one-to-many; step 6 requires key uniqueness on both sides. Fix: define line-grain composite key, likely `gameId` plus provider/timestamp/market fields, then test uniqueness there.
+- **Coach merge loses grain.** REST has 1,936 rows but only 405 names; mapping names to `coachId` cannot make it fit `dim_coach` without collapsing records. Fix: define REST row grain and create separate coach-season/history target, or keep REST outside merge.
+- **Drop gate ignores duplicate multiplicity.** Draft-position rows differ 31 vs 29 while name sets match; key-set checks can still delete distinct duplicate records. Fix: compare normalized full-row multisets with `EXCEPT ALL`, or explicitly deduplicate under documented business rule.
+- **Postgame isolation has no proof.** “Never joined by feature-building code” is assertion, not gate. Fix: add test scanning feature-build SQL/code and prove output never contains `_postgame` fields.
+- **Conflict authority lacks value-preservation rule.** Declaring source authority can silently discard disagreeing populated values. Fix: retain non-authoritative conflicting value in source-specific audit table with key, both values, authority reason.
+
+VERDICT: REVISE
+
+### Claude's response
+
+**All five accepted.** Two changed the plan's shape rather than its wording.
+
+- *`lines` join rule impossible* — a genuine internal contradiction: the manifest declared
+  one-to-many while step 6 demanded uniqueness on both sides. Measured the real grains:
+  `gql_game_lines` is unique on `(gameId, linesProviderId, period)` (63,293 of 63,293, across
+  13,743 games); `lines` is unique on `gameId` (15,384 of 15,384) with per-book offers nested.
+  Step 6 now checks uniqueness at each side's own grain, never at a shared one.
+- *Coach merge loses grain* — correct, and it refines a decision the user had already locked.
+  `coaches` is unique on `(firstName, lastName, season)` — 1,935 of 1,936 — so it is coach-season
+  grain and would have collapsed ~4.8 rows per coach into `dim_coach`. D3's ruling is untouched
+  (`coachId` is identity; the 2 collisions are quarantined); its *target* moved. `gql_coach`
+  alone builds `core.dim_coach`; `coaches` conforms with `gql_coach_season` and `coach_seasons`
+  into `core.fact_coach_season`. Flagged for the user at Resolution because it touches a locked
+  decision.
+- *Drop gate ignores duplicate multiplicity* — right that a distinct-key anti-join passes when
+  one side holds duplicate records the other lacks. Gate now uses `EXCEPT ALL` over normalized
+  shared columns. Ran it on the concrete case: `draft_positions EXCEPT ALL gql_draft_position`
+  returns 0 and the reverse returns 2, so REST is a strict multiset subset and the drop is safe —
+  which the weaker check could not have established.
+- *Postgame isolation has no proof* — "never joined" was an assertion. It now ships with a test
+  that scans the feature-building modules for `fact_game_postgame` and the six column names and
+  asserts the built feature frame contains none, with registered `result_lookahead` features
+  allowed by exception.
+- *Conflict authority lacks value preservation* — declaring authority now writes the losing value
+  to `core.value_conflicts` with the key, both values, both source tables, and the reason. A
+  silently overwritten value is indistinguishable from a bug later.

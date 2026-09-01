@@ -52,8 +52,9 @@ migration is incomplete.
 7. **Conform into `core`.** `fact_game` keeps its REST spine and row count, gaining only the four
    pre-game GraphQL columns. The six post-kickoff columns go to a **separate**
    `core.fact_game_postgame` (see below). Rows are routed to `core.fact_game_historical` by
-   **anti-join on validated `gameId`**, never by year boundary. Coach conforms on `coachId` with
-   a published match-rate and an unmatched-rows report.
+   **anti-join on validated `gameId`**, never by year boundary. `core.dim_coach` is built from
+   `gql_coach` alone (coach grain); REST `coaches` conforms into `core.fact_coach_season` at
+   season grain, with a published match-rate and an unmatched-rows report.
 8. **Drop only what step 5 proves superseded**, within the bounds of D1 (see "What may be
    dropped"). Then drop the 12 named dead payload columns after a dependent-object check. Remove
    dropped sources from the scraper.
@@ -68,21 +69,35 @@ recomputes it at run time and step 8 obeys the recomputed value.
 | Concept | GraphQL | REST | Join key | Target | Prior disposition |
 |---|---|---|---|---|---|
 | game | `gql_game` | `games` | `gameId` | `core.fact_game` (+`_postgame`, `_historical`) | merge |
-| lines | `gql_game_lines` | `lines` | `gameId` (one-to-many) | `core.fact_game_line` | merge |
+| lines | `gql_game_lines` | `lines` | line grain `(gameId, linesProviderId, period)`; `lines` is `gameId` | `core.fact_game_line` | merge, differing grain |
 | draft pick | `gql_draft_picks` | `draft_picks` | `(year, round, pick)` — unique both sides | `core.dim_draft_pick` | merge |
 | conference | `gql_conference` | `conferences` | `conferenceId` | `core.dim_conference` | merge |
 | calendar | `gql_calendar` | `calendar` | `(season, week)` — 16/16 overlap | `core.dim_week` | merge |
-| coach | `gql_coach` | `coaches` | `coachId` via name resolution | `core.dim_coach` + `core.coach_name_conflicts` | merge, D3 |
+| coach | `gql_coach` | — | `coachId` | `core.dim_coach` + `core.coach_name_conflicts` | dimension, D3 |
+| coach season | `gql_coach_season` | `coaches`, `coach_seasons` | `(coachId, season)` after step 3 | `core.fact_coach_season` | merge at season grain |
 | recruiting team | `gql_recruiting_team` | `recruiting_teams` | **none — no bridge** | — | deferred |
 | draft position | `gql_draft_position` | `draft_positions` | `name` | — | drop REST |
 | draft team | `gql_draft_team` | `draft_teams` | `name` | — | drop REST |
 | predicted points | `gql_predicted_points` | `predicted_points` | `(down, distance, yardLine)` | — | drop REST |
-| coach season | `gql_coach_season` | `coach_seasons` | `(coachId, teamId, season)` after step 3 | — | drop GQL — **re-measure** |
 | talent | `gql_team_talent` | `talent` | `(teamId, season)` after step 3 | — | drop GQL — **re-measure** |
 | recruit | `gql_recruit` | `recruits` | `recruitId` | — | drop GQL |
 
-The two marked **re-measure** are the ones steps 1–3 repair; their disposition is expected to
-change and must not be carried forward from this table.
+The row marked **re-measure** (`talent`) and the coach-season row are the ones steps 1–3 repair;
+their disposition is expected to change and must not be carried forward from this table.
+
+### Grain is not assumed — it is measured
+
+Two pairs turned out to have mismatched grain, which a `gameId`-style join would have silently
+collapsed:
+
+- **lines.** `gql_game_lines` is unique on `(gameId, linesProviderId, period)` — 63,293 of 63,293
+  — across 13,743 distinct games. `lines` is unique on `gameId` — 15,384 of 15,384 — and holds
+  its per-book offers in a nested `lines` list. The join is one-to-many by construction, so step
+  6's uniqueness check runs at each side's **own** grain, never at a shared one.
+- **coach.** REST `coaches` is unique on `(firstName, lastName, season)` — 1,935 of 1,936 — so it
+  is coach-**season** grain, not coach grain, and carries `hireDate` plus a nested `seasons`
+  list. Folding it into `dim_coach` would collapse ~4.8 rows per coach. It therefore pairs with
+  `gql_coach_season` at season grain, while `gql_coach` alone forms the dimension.
 
 ## What may be dropped (reconciles step 8 with D1)
 
@@ -105,11 +120,16 @@ table can hold a strict column subset and still carry entity rows its partner la
   Names compared case-insensitively with underscores stripped (`season_type` matches
   `seasonType`). A column with zero non-NULL values is excluded from both sides — this is why
   `gql_recruit` is superseded despite two exclusive columns: both are 100% NULL.
-- **Key coverage** — every candidate key value it holds is present on the other side. Verified by
-  anti-join, not by row count. (`gql_draft_position` has 31 rows to `draft_positions`' 29, but
-  the `name` sets are identical in both directions — the delta is duplicate rows, not coverage.)
+- **Row coverage** — every row it holds is present on the other side at equal or greater
+  multiplicity, verified by `EXCEPT ALL` over the normalized shared columns. A distinct-key
+  anti-join is insufficient: it passes when both sides share a key set but one holds duplicate
+  records the other lacks. Measured on the concrete case — `draft_positions EXCEPT ALL
+  gql_draft_position` returns **0** rows and the reverse returns 2, so REST is a strict multiset
+  subset and droppable; had it returned any row, it would not be.
 - **Value agreement** — for shared keys, per-column values agree, or a per-column authority is
-  declared.
+  declared. Declaring authority never discards the loser: the disagreeing value is written to
+  `core.value_conflicts` with the key, both values, both source tables, and the authority reason.
+  A silently overwritten value is indistinguishable from a bug six months later.
 - **Freshness** — the measurement post-dates the last load of both tables. A stale measurement is
   refused rather than used.
 
@@ -137,9 +157,12 @@ So the separation is physical:
 | `excitement` | `core.fact_game_postgame` |
 | `status` | `core.fact_game_postgame` |
 
-`core.fact_game_postgame` keys on `gameId` and is never joined by feature-building code. A
-feature needing one of its columns must be registered in the `result_lookahead` group the way
-`pregame_win_prob` is. A column whose timing is unclear goes to `_postgame`.
+`core.fact_game_postgame` keys on `gameId`. "Never joined by feature-building code" is a claim,
+so it ships with a gate rather than a promise: a test scans the feature-building modules for any
+reference to `fact_game_postgame` or to the six column names, and asserts the built feature frame
+contains none of them. A feature that genuinely needs one must be registered in the
+`result_lookahead` group the way `pregame_win_prob` is, which the test allows by exception. A
+column whose timing is unclear goes to `_postgame`.
 
 ## The 12 dead payload columns
 
@@ -180,6 +203,12 @@ not been played.
   rows resolve to a `coachId` by name; the 2 ambiguous names go to `core.coach_name_conflicts`.
   Rejected: a plain name join, which blends two distinct coaches and violates `CONTEXT.md`'s
   "Head coaches … not file-order last-write-wins".
+  **Refined after D3 was locked, by measurement:** `coaches` is unique on
+  `(firstName, lastName, season)` — 1,935 of 1,936 — so it is coach-*season* grain and cannot
+  feed a coach dimension without collapsing ~4.8 rows per coach. D3's ruling stands unchanged
+  (`coachId` is identity, the 2 collisions are quarantined); what changed is its target.
+  `gql_coach` alone builds `core.dim_coach`; `coaches` joins `gql_coach_season` and
+  `coach_seasons` at `core.fact_coach_season`.
 - **`gql_recruiting_team` is not mergeable — settled by evidence.** 3,901 of its
   `recruitingTeamId`s are absent from `core.dim_team` (701 rows); the "id" is a row surrogate,
   not a team id, and REST carries only a team name. No bridge exists. Deferred.
