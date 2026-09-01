@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eval_prediction_tracker_models as base  # noqa: E402
 import eval_combination_sweep as sweep  # noqa: E402
 
-OUT = base.OUT_DIR if hasattr(base, "OUT_DIR") else Path(r"C:/Users/mckel/data/cfb/processed")
+OUT = base.OUT_DIR if hasattr(base, "OUT_DIR") else Path(r"C:/Users/mckel/dev/cfb/data/processed")
 
 # Retention under decontamination, from the findings doc. The four methods for which the
 # market-proxy check was run. These are what any real diagnostic has to line up against.

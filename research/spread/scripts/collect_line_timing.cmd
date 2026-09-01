@@ -13,7 +13,7 @@ REM user environment; the Python side resolves paths through cfb_paths.
 setlocal
 set "REPO=%~dp0..\..\.."
 if "%PYTHON%"=="" set "PYTHON=C:\Python314\python.exe"
-if "%CFB_DATA_ROOT%"=="" set "CFB_DATA_ROOT=%USERPROFILE%\data\cfb"
+if "%CFB_DATA_ROOT%"=="" set "CFB_DATA_ROOT=%REPO%\data"
 set "LOGDIR=%CFB_DATA_ROOT%\logs"
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
 set "LOG=%LOGDIR%\line_timing.log"

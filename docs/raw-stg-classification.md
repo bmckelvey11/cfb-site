@@ -3,7 +3,7 @@
 Audit of every `stg` table against its `raw` counterpart, to answer whether `stg` earns
 its footprint or is passthrough duplication.
 
-Run 2026-08-31 against **local `C:\Users\mckel\data\cfb\cfb.duckdb`** (source of truth per
+Run 2026-08-31 against **local `C:\Users\mckel\dev\cfb\data\cfb.duckdb`** (source of truth per
 root `CLAUDE.md`), not the `md:cfb` mirror. The mirror is stale and gives different
 answers — see "Mirror drift" below.
 

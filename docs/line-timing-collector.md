@@ -31,7 +31,7 @@ Both run as `mckel`, unelevated, **only while that user is logged on** (see Limi
 
 ## What lands where
 
-Everything is under `%CFB_DATA_ROOT%` (`C:\Users\mckel\data\cfb`), which the tasks inherit
+Everything is under `%CFB_DATA_ROOT%` (`C:\Users\mckel\dev\cfb\data`), which the tasks inherit
 as a persisted user environment variable.
 
 ```

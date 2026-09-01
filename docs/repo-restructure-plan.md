@@ -67,10 +67,11 @@ cfb/
 └── archive/                   superseded. never cited. see rule below.
 ```
 
-Data lives outside the repo, unchanged in location:
+Data moved into the repo directory on 2026-08-31. It is still never committed -- the
+`data/` rule in `.gitignore` matches at any depth:
 
 ```
-C:\Users\mckel\data\cfb\          (CFB_DATA_ROOT, 14 GB)
+C:\Users\mckel\dev\cfb\data\      (CFB_DATA_ROOT, 14 GB)
 ├── cfb.duckdb
 ├── raw/
 │   ├── prediction_tracker/       ← prediction-tracker/raw/ncaa*.csv
@@ -375,9 +376,9 @@ Reopen the project from its new path. Update local editor/workspace shortcuts if
 point at `cfb-site`; those machine-local files do not belong in git.
 
 **Verify E:** `git status --short` is clean; `git worktree list` reports
-`C:\Users\mckel\dev\cfb`; `python -m pytest` is green; `CFB_DATA_ROOT` still resolves to
-`C:\Users\mckel\data\cfb`; no live code or current instructions contain the old absolute
-checkout path.
+`C:\Users\mckel\dev\cfb`; `python -m pytest` is green; `CFB_DATA_ROOT` resolves to
+`C:\Users\mckel\dev\cfb\data` (moved there 2026-08-31); no live code or current
+instructions contain the old absolute checkout path.
 
 ---
 
