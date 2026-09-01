@@ -31,3 +31,11 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Hook loss** — a spread bet with cover margin of exactly −0.5: lost by the half point.
 - **Key number** — a spread line on or adjacent to 3 or 7 (2.5–3.5, 6.5–7.5), where NFL/CFB final-margin mass concentrates and books shade hardest.
 - **Betting day** — the ET calendar date of kickoff (a 1am UTC kickoff belongs to the previous ET evening).
+
+## Warehouse layers
+
+- **Pair** — one concept arriving from both CFBD APIs as two `stg` tables (GraphQL and REST), under different names and different column sets. A pair is two sources of the same subject, **not** a duplicate; measurement decides whether either side is redundant.
+- **Canonical source** — for a given pair, the side designated authoritative after measuring column containment and coverage. Established by measurement per concept, never by row count alone.
+- **Scaffolding column** — `season`, `week`, or `season_type` bound from a dump's filename rather than its payload. Where the filename does not carry one it arrives NULL and stays NULL; these are pruned at load. Distinct from a payload column that happens to be empty, which is a finding and is never auto-dropped.
+- **Relation-only entity** — a GraphQL root whose identity lives in a to-one relation rather than in its own scalars. It must be nest-selected, or its dump cannot be joined to anything and its sort is not a total order.
+- **Merged table** — a `core` table conforming both sides of a pair, carrying every populated column from each and a `_provenance` marker. Merged tables live in `core`; the `stg` sources they were built from stay in place.
