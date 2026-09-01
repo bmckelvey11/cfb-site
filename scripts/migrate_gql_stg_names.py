@@ -1,90 +1,120 @@
-"""Rename GraphQL-sourced stg tables to explicit gql_ destinations.
+"""One-shot migration: move stg.gql_<x> tables into stg_gql.<x>.
 
-One-shot and idempotent. `meta.load_report` keys on (schema, name), so renaming a table
-without repairing report desyncs bookkeeping; both happen in one transaction.
+DuckDB has no `ALTER TABLE ... SET SCHEMA` (verified 1.5.2), so each table is a
+`CREATE TABLE ... AS SELECT * FROM ...` copy followed by a `DROP TABLE`, not a
+metadata rename. Resumable: a table already present at its destination is skipped,
+so a partial prior run (or a re-run after this script itself failed partway) is safe.
 """
 
 from __future__ import annotations
 
 import argparse
-import sys
-from pathlib import Path
+from dataclasses import dataclass
 
 import duckdb
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from cfb_system_maker.graphql_client import GQL_ENTITY_TO_STG  # noqa: E402
+from cfb_system_maker.graphql_client import GQL_ENTITY_TO_RAW, GQL_ENTITY_TO_STG
 
 
-def plan_renames(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str]]:
+@dataclass(frozen=True)
+class MoveReport:
+    src_schema: str
+    src_name: str
+    dest_schema: str
+    dest_name: str
+    rows: int = 0
+    error: str | None = None
+
+
+def plan_moves(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, str, str]]:
+    """``(src_schema, src_name, dest_schema, dest_name)`` for every table to move.
+
+    Parents come from the mapping (the source of truth for which raw name maps to
+    which bare destination). Children are discovered by scanning `stg` for
+    `<parent>__%` tables rather than hand-listed, so a new nested column doesn't
+    silently strand its child table in `stg`.
+    """
+    moves: list[tuple[str, str, str, str]] = []
     existing = {
         row[0]
         for row in con.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'stg'"
+            "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
         ).fetchall()
     }
-    pairs: list[tuple[str, str]] = []
-    for entity, dest in GQL_ENTITY_TO_STG.items():
-        # `calendar_gql` is legacy suffix order-dependent helper produced when REST
-        # table won bare name. Prefer it over bare entity name, which then belongs to
-        # REST and must not be touched.
-        legacy_source = f"{entity}_gql"
-        if legacy_source in existing:
-            source = legacy_source
-        elif entity in existing and dest not in existing:
-            source = entity
-        else:
-            source = None
-        if source is not None and source != dest:
-            pairs.append((source, dest))
-        for name in sorted(existing):
-            if name.startswith(f"{entity}__"):
-                child = name[len(entity):]
-                pairs.append((name, dest + _snake_child(child)))
-    return sorted(set(pairs))
+    for entity, raw_name in GQL_ENTITY_TO_RAW.items():
+        if raw_name not in existing:
+            continue
+        dest_name = GQL_ENTITY_TO_STG[entity]
+        moves.append(("stg", raw_name, "stg_gql", dest_name))
+        prefix = raw_name + "__"
+        for child in sorted(name for name in existing if name.startswith(prefix)):
+            dest_child = dest_name + "__" + child[len(prefix):]
+            moves.append(("stg", child, "stg_gql", dest_child))
+    return moves
 
 
-def _snake_child(suffix: str) -> str:
-    import re
-
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", suffix).lower()
-
-
-def migrate(
-    con: duckdb.DuckDBPyConnection, *, dry_run: bool
-) -> list[tuple[str, str]]:
-    pairs = plan_renames(con)
-    if dry_run or not pairs:
-        return pairs
-    con.execute("BEGIN TRANSACTION")
-    try:
-        for old, new in pairs:
-            con.execute(f'ALTER TABLE stg."{old}" RENAME TO "{new}"')
+def migrate(con: duckdb.DuckDBPyConnection) -> list[MoveReport]:
+    con.execute("CREATE SCHEMA IF NOT EXISTS stg_gql")
+    reports: list[MoveReport] = []
+    for src_schema, src_name, dest_schema, dest_name in plan_moves(con):
+        already_moved = con.execute(
+            "SELECT COUNT(*) FROM duckdb_tables()"
+            f" WHERE schema_name = '{dest_schema}' AND table_name = '{dest_name}'"
+        ).fetchone()[0]
+        if already_moved:
+            reports.append(MoveReport(src_schema, src_name, dest_schema, dest_name))
+            continue
+        try:
+            con.execute("BEGIN TRANSACTION")
             con.execute(
-                "UPDATE meta.load_report SET name = ? WHERE schema = 'stg' AND name = ?",
-                [new, old],
+                f'CREATE TABLE "{dest_schema}"."{dest_name}" AS'
+                f' SELECT * FROM "{src_schema}"."{src_name}"'
             )
-        con.execute("COMMIT")
-    except Exception:
-        con.execute("ROLLBACK")
-        raise
-    return pairs
+            con.execute(f'DROP TABLE "{src_schema}"."{src_name}"')
+            con.execute(
+                "UPDATE meta.load_report SET schema = ?, name = ?"
+                " WHERE schema = ? AND name = ?",
+                [dest_schema, dest_name, src_schema, src_name],
+            )
+            con.execute("COMMIT")
+            rows = con.execute(
+                f'SELECT COUNT(*) FROM "{dest_schema}"."{dest_name}"'
+            ).fetchone()[0]
+            reports.append(MoveReport(src_schema, src_name, dest_schema, dest_name, rows=int(rows)))
+        except Exception as exc:
+            con.execute("ROLLBACK")
+            detail = str(exc).split("\n", 1)[0]
+            reports.append(
+                MoveReport(
+                    src_schema, src_name, dest_schema, dest_name,
+                    error=f"{type(exc).__name__}: {detail}",
+                )
+            )
+    return reports
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--db", default="data/cfb.duckdb")
-    ap.add_argument("--apply", action="store_true", help="without this, dry-run only")
-    args = ap.parse_args()
-    con = duckdb.connect(args.db, read_only=not args.apply)
-    pairs = migrate(con, dry_run=not args.apply)
-    verb = "renamed" if args.apply else "would rename"
-    for old, new in pairs:
-        print(f"  {old} -> {new}")
-    print(f"{verb} {len(pairs)} tables")
-    return 0
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, help="Path to cfb.duckdb")
+    parser.add_argument("--yes", action="store_true", help="Apply the migration (default: dry run)")
+    args = parser.parse_args()
+
+    con = duckdb.connect(args.db)
+    moves = plan_moves(con)
+    print(f"{len(moves)} tables to move (stg -> stg_gql):")
+    for src_schema, src_name, dest_schema, dest_name in moves:
+        print(f"  {src_schema}.{src_name} -> {dest_schema}.{dest_name}")
+    if not args.yes:
+        print("\nDry run only. Re-run with --yes to apply.")
+        con.close()
+        return
+    reports = migrate(con)
+    con.close()
+    failed = [r for r in reports if r.error]
+    print(f"\n{len(reports) - len(failed)} moved, {len(failed)} failed")
+    for r in failed:
+        print(f"  FAILED {r.src_schema}.{r.src_name}: {r.error}")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
