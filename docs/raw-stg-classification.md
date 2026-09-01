@@ -74,6 +74,11 @@ this layer filters or dedupes. `stg` is a pure shred.
    to the session timezone. The three remaining VARCHARs (`venues.timezone`,
    `teams.location_timezone`, `fbs_teams.location_timezone`) hold IANA zone names and are
    correctly excluded: promotion requires every non-null value to parse.
+
+   Five of the 20 are ad-hoc snapshot dumps (`lines_2026_week1`,
+   `lines_2026_week1_20260826`, and siblings). They have no `raw` counterpart and are
+   outside the shred contract, so they were promoted opportunistically and will drift
+   back to VARCHAR if something recreates them by another path.
 2. **`actionnetwork_odds` is never staged.** It is the only `raw` table already flat
    (23 typed columns, live odds shape). No `stg` counterpart, so it is invisible to
    anything reading the staged layer.
