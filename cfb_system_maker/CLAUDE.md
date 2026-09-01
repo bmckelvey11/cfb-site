@@ -84,7 +84,7 @@ Canonical data dir is required `CFB_DATA_ROOT`, resolved by root `cfb_paths.py`.
 ### Key conventions
 
 - **Warehouse working copy:** use `$CFB_DATA_ROOT/cfb.duckdb`
-  (`C:\Users\mckel\data\cfb`), not MotherDuck, for catalogs, explode, and schema work.
+  (`C:\Users\mckel\dev\cfb\data`), not MotherDuck, for catalogs, explode, and schema work.
   Catalogs describe tables, exploded columns, and named box/play stats, not app features.
   GraphQL dumps land in `raw`, not a separate `graphql` schema.
 - **Exploded staging:** `stg.plays` rebuilds with

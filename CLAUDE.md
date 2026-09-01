@@ -17,10 +17,10 @@ human-facing product intent. None should duplicate another file's rules.
 ## Shared rules
 
 - `CFB_DATA_ROOT` is required and resolves through root `cfb_paths.py`. Working data is
-  `C:\Users\mckel\data\cfb`; local `cfb.duckdb` is source of truth. MotherDuck `md:cfb`
-  is a manual mirror.
-- Data stays outside every git tree. Keep only explicit fixtures, examples, research
-  records, and documentation artifacts in git.
+  `C:\Users\mckel\dev\cfb\data`; local `cfb.duckdb` is source of truth. MotherDuck
+  `md:cfb` is a manual mirror.
+- Data is never committed. It lives in `data/`, which `.gitignore` excludes. Keep only
+  explicit fixtures, examples, research records, and documentation artifacts in git.
 - Do not edit `cfbd-python/`; it is vendored upstream.
 - No lookahead: pre-game features use only information available before kickoff. Any
   result-informed feature must be tagged `result_lookahead` and quarantined in UI.
