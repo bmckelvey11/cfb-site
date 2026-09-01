@@ -35,7 +35,12 @@ whole-dataset miss.
 Nothing else in the warehouse carries air yards, aDOT, or YAC. `raw.plays` has play text
 but not the parsed passing charting fields.
 
-**Fix:** bump `cfbd-python`, add 5 `Endpoint(...)` rows to `ENDPOINTS`, backfill.
+**Status (2026-08-31):** closed at the registry. `cfbd-python` bumped 5.24.2 → 5.25.0
+(adds `PassingApi`), and all 5 are registered in `ENDPOINTS` with `min_season=2025` —
+CFBD has no passing-charting data before 2025 (2024 and earlier return an empty list;
+verified against the live API). `audit_endpoints.py` now reports
+`78 registered + 1 client-only + 0 no-client`. **Tables do not exist yet** — the backfill
+scrape has not been run.
 
 ## 3. Field drift — 24 tables flagged, 22 are false positives
 

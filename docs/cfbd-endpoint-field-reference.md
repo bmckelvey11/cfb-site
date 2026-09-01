@@ -718,6 +718,142 @@ Same schema as its base endpoint above. `excludeGarbageTime=true` — drops garb
 
 Same schema as its base endpoint above. `excludeGarbageTime=true` — drops garbage-time plays before aggregating, so values differ from the unfiltered twin.
 
+## Passing charting (air yards, aDOT, yards after catch)
+
+### `passing_plays`
+
+- **CFBD method:** `PassingApi.get_passing_plays`
+- **Scrape mode:** per season x week
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `playId` | str | Play ID. |
+| `driveId` | str | Drive ID. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `offenseId` | int | Offense ID. |
+| `offense` | str | Offensive-side breakdown. |
+| `offenseConference` | str | Offense team's conference. |
+| `defenseId` | int | Defense ID. |
+| `defense` | str | Defensive-side breakdown. |
+| `defenseConference` | str | Defense team's conference. |
+| `period` | int | Quarter/period number. |
+| `clock` | PassingPlayClock | Game clock at the time of the play/event. — see [PassingPlayClock](#passingplayclock) |
+| `down` | int | Down number (1-4). |
+| `distance` | int | Yards to go for a first down. |
+| `playText` | str | Human-readable play description. |
+| `passerId` | str | Passer ID. |
+| `passer` | str | Passer. |
+| `targetId` | str | Target ID. |
+| `target` | str | Target. |
+| `outcome` | PassOutcome | Outcome. (`completion`, `incompletion`, `interception`) |
+| `airYards` | int | Air yards. |
+| `passDepth` | PassDepth | Pass depth. (`short`, `deep`) |
+| `passDirection` | PassDirection | Pass direction. (`left`, `middle`, `right`) |
+| `passLocation` | PassLocation | Pass location. (`short left`, `short middle`, `short right`, `deep left`, `deep middle`, `deep right`) |
+| `totalYards` | int | Total yards. |
+| `yardsAfterCatch` | int | Yards after catch. |
+| `startYardline` | int | Start yardline. |
+| `startYardsToGoal` | int | Start yards to goal. |
+| `targetYardsToGoal` | int | Target yards to goal. |
+| `isSpike` | bool | Is spike. |
+| `isThrowaway` | bool | Is throwaway. |
+| `isIntentionalGrounding` | bool | Is intentional grounding. |
+| `parseStatus` | PassParseStatus | Parse status. (`complete`, `partial`, `invalid`) |
+
+### `passing_players_games`
+
+- **CFBD method:** `PassingApi.get_player_passing_by_game`
+- **Scrape mode:** per season x week
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `completions` | int | Completions. |
+| `incompletions` | int | Incompletions. |
+| `interceptions` | int | Interceptions. |
+| `completionRate` | float | Completion rate. |
+| `airYardsAttemptsAvailable` | int | Air yards attempts available. |
+| `totalAirYards` | int | Total air yards. |
+| `averageDepthOfTarget` | float | Average depth of target. |
+| `totalYardsAttemptsAvailable` | int | Total yards attempts available. |
+| `totalYards` | int | Total yards. |
+| `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
+| `totalYardsAfterCatch` | int | Total yards after catch. |
+| `averageYardsAfterCatch` | float | Average yards after catch. |
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `playerId` | str | Player ID. |
+| `player` | str | Player. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `opponent` | str | Opponent team name. |
+
+### `passing_players_season`
+
+- **CFBD method:** `PassingApi.get_player_passing_by_season`
+- **Scrape mode:** per season
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `completions` | int | Completions. |
+| `incompletions` | int | Incompletions. |
+| `interceptions` | int | Interceptions. |
+| `completionRate` | float | Completion rate. |
+| `airYardsAttemptsAvailable` | int | Air yards attempts available. |
+| `totalAirYards` | int | Total air yards. |
+| `averageDepthOfTarget` | float | Average depth of target. |
+| `totalYardsAttemptsAvailable` | int | Total yards attempts available. |
+| `totalYards` | int | Total yards. |
+| `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
+| `totalYardsAfterCatch` | int | Total yards after catch. |
+| `averageYardsAfterCatch` | float | Average yards after catch. |
+| `season` | int | Season year. |
+| `playerId` | str | Player ID. |
+| `player` | str | Player. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+
+### `passing_teams_games`
+
+- **CFBD method:** `PassingApi.get_team_passing_by_game`
+- **Scrape mode:** per season x week
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `opponent` | str | Opponent team name. |
+| `offense` | PassingProduction | Offensive-side breakdown. — see [PassingProduction](#passingproduction) |
+| `defense` | PassingProduction | Defensive-side breakdown. — see [PassingProduction](#passingproduction) |
+
+### `passing_teams_season`
+
+- **CFBD method:** `PassingApi.get_team_passing_by_season`
+- **Scrape mode:** per season
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `season` | int | Season year. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `offense` | PassingProduction | Offensive-side breakdown. — see [PassingProduction](#passingproduction) |
+| `defense` | PassingProduction | Defensive-side breakdown. — see [PassingProduction](#passingproduction) |
+
 ## Players
 
 ### `player_season_overview`
@@ -2336,6 +2472,91 @@ Enum values: `scheduled`, `in_progress`, `completed`
 
 Enum values: `tv`, `radio`, `web`, `ppv`, `mobile`
 
+### PassDepth
+
+Enum values: `short`, `deep`
+
+### PassDirection
+
+Enum values: `left`, `middle`, `right`
+
+### PassLocation
+
+Enum values: `short left`, `short middle`, `short right`, `deep left`, `deep middle`, `deep right`
+
+### PassOutcome
+
+Enum values: `completion`, `incompletion`, `interception`
+
+### PassParseStatus
+
+Enum values: `complete`, `partial`, `invalid`
+
+### PassingPlay
+
+| Field | Type | Description |
+|---|---|---|
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `playId` | str | Play ID. |
+| `driveId` | str | Drive ID. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `offenseId` | int | Offense ID. |
+| `offense` | str | Offensive-side breakdown. |
+| `offenseConference` | str | Offense team's conference. |
+| `defenseId` | int | Defense ID. |
+| `defense` | str | Defensive-side breakdown. |
+| `defenseConference` | str | Defense team's conference. |
+| `period` | int | Quarter/period number. |
+| `clock` | PassingPlayClock | Game clock at the time of the play/event. — see [PassingPlayClock](#passingplayclock) |
+| `down` | int | Down number (1-4). |
+| `distance` | int | Yards to go for a first down. |
+| `playText` | str | Human-readable play description. |
+| `passerId` | str | Passer ID. |
+| `passer` | str | Passer. |
+| `targetId` | str | Target ID. |
+| `target` | str | Target. |
+| `outcome` | PassOutcome | Outcome. (`completion`, `incompletion`, `interception`) |
+| `airYards` | int | Air yards. |
+| `passDepth` | PassDepth | Pass depth. (`short`, `deep`) |
+| `passDirection` | PassDirection | Pass direction. (`left`, `middle`, `right`) |
+| `passLocation` | PassLocation | Pass location. (`short left`, `short middle`, `short right`, `deep left`, `deep middle`, `deep right`) |
+| `totalYards` | int | Total yards. |
+| `yardsAfterCatch` | int | Yards after catch. |
+| `startYardline` | int | Start yardline. |
+| `startYardsToGoal` | int | Start yards to goal. |
+| `targetYardsToGoal` | int | Target yards to goal. |
+| `isSpike` | bool | Is spike. |
+| `isThrowaway` | bool | Is throwaway. |
+| `isIntentionalGrounding` | bool | Is intentional grounding. |
+| `parseStatus` | PassParseStatus | Parse status. (`complete`, `partial`, `invalid`) |
+
+### PassingPlayClock
+
+| Field | Type | Description |
+|---|---|---|
+| `minutes` | int | Minutes. |
+| `seconds` | int | Seconds. |
+
+### PassingProduction
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `completions` | int | Completions. |
+| `incompletions` | int | Incompletions. |
+| `interceptions` | int | Interceptions. |
+| `completionRate` | float | Completion rate. |
+| `airYardsAttemptsAvailable` | int | Air yards attempts available. |
+| `totalAirYards` | int | Total air yards. |
+| `averageDepthOfTarget` | float | Average depth of target. |
+| `totalYardsAttemptsAvailable` | int | Total yards attempts available. |
+| `totalYards` | int | Total yards. |
+| `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
+| `totalYardsAfterCatch` | int | Total yards after catch. |
+| `averageYardsAfterCatch` | float | Average yards after catch. |
+
 ### Play
 
 | Field | Type | Description |
@@ -2479,6 +2700,56 @@ Enum values: `tv`, `radio`, `web`, `ppv`, `mobile`
 | `opponent` | str | Opponent team name. |
 | `passing` | PlayerSuccessRateSplit | Passing. — see [PlayerSuccessRateSplit](#playersuccessratesplit) |
 | `rushing` | PlayerSuccessRateSplit | Rushing. — see [PlayerSuccessRateSplit](#playersuccessratesplit) |
+
+### PlayerPassingGame
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `completions` | int | Completions. |
+| `incompletions` | int | Incompletions. |
+| `interceptions` | int | Interceptions. |
+| `completionRate` | float | Completion rate. |
+| `airYardsAttemptsAvailable` | int | Air yards attempts available. |
+| `totalAirYards` | int | Total air yards. |
+| `averageDepthOfTarget` | float | Average depth of target. |
+| `totalYardsAttemptsAvailable` | int | Total yards attempts available. |
+| `totalYards` | int | Total yards. |
+| `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
+| `totalYardsAfterCatch` | int | Total yards after catch. |
+| `averageYardsAfterCatch` | float | Average yards after catch. |
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `playerId` | str | Player ID. |
+| `player` | str | Player. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `opponent` | str | Opponent team name. |
+
+### PlayerPassingSeason
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `completions` | int | Completions. |
+| `incompletions` | int | Incompletions. |
+| `interceptions` | int | Interceptions. |
+| `completionRate` | float | Completion rate. |
+| `airYardsAttemptsAvailable` | int | Air yards attempts available. |
+| `totalAirYards` | int | Total air yards. |
+| `averageDepthOfTarget` | float | Average depth of target. |
+| `totalYardsAttemptsAvailable` | int | Total yards attempts available. |
+| `totalYards` | int | Total yards. |
+| `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
+| `totalYardsAfterCatch` | int | Total yards after catch. |
+| `averageYardsAfterCatch` | float | Average yards after catch. |
+| `season` | int | Season year. |
+| `playerId` | str | Player ID. |
+| `player` | str | Player. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
 
 ### PlayerSearchResult
 
@@ -3031,6 +3302,30 @@ Enum values: `allstar`, `postseason`, `preseason`, `regular`, `spring_postseason
 | `rushing` | float | Rushing. |
 | `passing` | float | Passing. |
 | `overall` | float | Overall (combined) rating. |
+
+### TeamPassingGame
+
+| Field | Type | Description |
+|---|---|---|
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `opponent` | str | Opponent team name. |
+| `offense` | PassingProduction | Offensive-side breakdown. — see [PassingProduction](#passingproduction) |
+| `defense` | PassingProduction | Defensive-side breakdown. — see [PassingProduction](#passingproduction) |
+
+### TeamPassingSeason
+
+| Field | Type | Description |
+|---|---|---|
+| `season` | int | Season year. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `offense` | PassingProduction | Offensive-side breakdown. — see [PassingProduction](#passingproduction) |
+| `defense` | PassingProduction | Defensive-side breakdown. — see [PassingProduction](#passingproduction) |
 
 ### TeamRecord
 

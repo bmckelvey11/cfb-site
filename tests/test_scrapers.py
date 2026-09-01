@@ -118,12 +118,12 @@ def test_registry_is_complete_and_unique():
     names = [e.name for e in ENDPOINTS]
     assert len(set(names)) == len(names)
 
-    # 73 base entries, one per CFBD spec path, plus 9 `_ngt` variants that reuse a
+    # 78 base entries, one per CFBD spec path, plus 9 `_ngt` variants that reuse a
     # base endpoint's method with `excludeGarbageTime` on. Counting them together
     # would hide a real duplicate spec path behind the variants.
     base = [e for e in ENDPOINTS if not e.name.endswith("_ngt")]
     variants = [e for e in ENDPOINTS if e.name.endswith("_ngt")]
-    assert len(base) == 73
+    assert len(base) == 78
     assert len(variants) == 9
 
     # Every variant shadows a registered base endpoint and differs only by the flag.

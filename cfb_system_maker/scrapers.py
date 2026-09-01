@@ -86,6 +86,13 @@ ENDPOINTS: list[Endpoint] = [
     Endpoint("ppa_teams", "MetricsApi", "get_predicted_points_added_by_team", SEASON),
     Endpoint("pregame_win_prob", "MetricsApi", "get_pregame_win_probabilities", SEASON),
     Endpoint("win_probability", "MetricsApi", "get_win_probability", PER_GAME),
+    # Passing (charting: air yards, aDOT, YAC. CFBD has no data before 2025 - 2024 and
+    # earlier return an empty list, so earlier seasons are skipped rather than scraped.)
+    Endpoint("passing_plays", "PassingApi", "get_passing_plays", SEASON_WEEK, min_season=2025),
+    Endpoint("passing_players_games", "PassingApi", "get_player_passing_by_game", SEASON_WEEK, min_season=2025),
+    Endpoint("passing_players_season", "PassingApi", "get_player_passing_by_season", SEASON, min_season=2025),
+    Endpoint("passing_teams_games", "PassingApi", "get_team_passing_by_game", SEASON_WEEK, min_season=2025),
+    Endpoint("passing_teams_season", "PassingApi", "get_team_passing_by_season", SEASON, min_season=2025),
     # Players
     Endpoint("player_season_overview", "PlayersApi", "get_player_season_overview", PER_PLAYER),
     Endpoint("player_usage", "PlayersApi", "get_player_usage", SEASON),
