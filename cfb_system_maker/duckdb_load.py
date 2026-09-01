@@ -166,14 +166,22 @@ _EXTRA_ID_RENAMES = {
 }
 
 
-def stg_id_renames(table: str) -> dict[str, str]:
-    """Map current column names → names that match what the id actually is."""
+def stg_id_renames(table: str, *, schema: str) -> dict[str, str]:
+    """Map current column names → names that match what the id actually is.
+
+    `schema` picks which id-rename spelling applies: only `stg_gql` tables reverse-
+    resolve through `GQL_ENTITY_TO_STG` to a GraphQL entity name. A `stg` (REST) table
+    that happens to share a bare name with a GraphQL entity (`draft_picks`,
+    `predicted_points`, `calendar`) must not pick up the GraphQL entity's id rename.
+    """
     base = table[:-4] if table.endswith("_ngt") else table
+    source_name = base
+    if schema == "stg_gql":
+        source_name = next(
+            (entity for entity, destination in GQL_ENTITY_TO_STG.items() if destination == base),
+            base,
+        )
     out: dict[str, str] = {}
-    source_name = next(
-        (entity for entity, destination in GQL_ENTITY_TO_STG.items() if destination == base),
-        base,
-    )
     dest = _BARE_ID_RENAME.get(source_name)
     if dest:
         out["id"] = dest
@@ -183,10 +191,12 @@ def stg_id_renames(table: str) -> dict[str, str]:
 
 def stg_column_order(
     columns: list[tuple[str, str]],
+    *,
+    schema: str,
     table: str | None = None,
 ) -> list[str]:
     """Return column names in browse order. ``columns`` is ``(name, type)``."""
-    pk = stg_id_renames(table).get("id") if table else None
+    pk = stg_id_renames(table, schema=schema).get("id") if table else None
     ranked: list[tuple[tuple[int, int, int, int], str]] = []
     for orig, (name, dtype) in enumerate(columns):
         ranked.append((_stg_nav_key(name, dtype, orig, pk), name))
@@ -293,18 +303,18 @@ def reorder_stg_columns(
     return reports
 
 
-def _reorder_stg_table(con: duckdb.DuckDBPyConnection, name: str) -> TableLoad:
-    table = _qualify("stg", name)
+def _reorder_stg_table(con: duckdb.DuckDBPyConnection, schema: str, name: str) -> TableLoad:
+    table = _qualify(schema, name)
     described = [
         (row[0], str(row[1])) for row in con.execute(f"DESCRIBE {table}").fetchall()
     ]
-    ordered = stg_column_order(described, table=name)
+    ordered = stg_column_order(described, schema=schema, table=name)
     current = [col for col, _dtype in described]
     if ordered == current:
         rows = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-        return TableLoad("stg", name, 0, int(rows))
+        return TableLoad(schema, name, 0, int(rows))
     tmp_name = name + "__reordering"
-    tmp = _qualify("stg", tmp_name)
+    tmp = _qualify(schema, tmp_name)
     select_list = ", ".join(_ident(col) for col in ordered)
     try:
         con.execute(f"DROP TABLE IF EXISTS {tmp}")
@@ -312,14 +322,14 @@ def _reorder_stg_table(con: duckdb.DuckDBPyConnection, name: str) -> TableLoad:
         con.execute(f"DROP TABLE {table}")
         con.execute(f"ALTER TABLE {tmp} RENAME TO {_ident(name)}")
         rows = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-        return TableLoad("stg", name, 1, int(rows))
+        return TableLoad(schema, name, 1, int(rows))
     except Exception as exc:
         try:
             con.execute(f"DROP TABLE IF EXISTS {tmp}")
         except Exception:
             pass
         detail = str(exc).split("\n", 1)[0]
-        return TableLoad("stg", name, 0, 0, error=f"{type(exc).__name__}: {detail}")
+        return TableLoad(schema, name, 0, 0, error=f"{type(exc).__name__}: {detail}")
 
 
 def rename_stg_id_columns(
@@ -380,11 +390,11 @@ def rename_stg_id_columns(
     return reports
 
 
-def _rename_stg_table_ids(con: duckdb.DuckDBPyConnection, name: str) -> int:
-    table = _qualify("stg", name)
+def _rename_stg_table_ids(con: duckdb.DuckDBPyConnection, schema: str, name: str) -> int:
+    table = _qualify(schema, name)
     present = {row[0] for row in con.execute(f"DESCRIBE {table}").fetchall()}
     changed = 0
-    for old, new in stg_id_renames(name).items():
+    for old, new in stg_id_renames(name, schema=schema).items():
         if old not in present or new in present:
             continue
         con.execute(f"ALTER TABLE {table} RENAME COLUMN {_ident(old)} TO {_ident(new)}")

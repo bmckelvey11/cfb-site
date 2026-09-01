@@ -578,13 +578,25 @@ def test_stg_id_renames_matches_what_the_value_is():
 
 
 def test_stg_id_renames_resolves_gql_destinations_back_to_their_entity():
-    """`_BARE_ID_RENAME` is keyed by GraphQL entity name, not by stg destination. Without
-    the reverse lookup, `gql_game` misses the table and keeps a bare `id` column instead
-    of `gameId` — silently, since nothing else asserts on it."""
-    assert stg_id_renames("gql_game") == {"id": "gameId"}
-    assert stg_id_renames("gql_coach") == {"id": "coachId"}
-    assert stg_id_renames("gql_lines_provider") == {"id": "linesProviderId"}
-    assert stg_id_renames("gql_historical_team") == {"id": "teamId"}
+    """`_BARE_ID_RENAME` is keyed by GraphQL entity name, not by the stg_gql destination.
+    Without the reverse lookup, a bare `game` in stg_gql misses the table and keeps a
+    bare `id` column instead of `gameId` — silently, since nothing else asserts on it."""
+    assert stg_id_renames("game", schema="stg_gql") == {"id": "gameId"}
+    assert stg_id_renames("coach", schema="stg_gql") == {"id": "coachId"}
+    assert stg_id_renames("lines_provider", schema="stg_gql") == {"id": "linesProviderId"}
+    assert stg_id_renames("historical_team", schema="stg_gql") == {"id": "teamId"}
+
+
+def test_stg_id_renames_does_not_apply_graphql_renames_to_rest_tables_in_stg():
+    # A bare name that exists in both schemas (draft_picks, predicted_points, calendar)
+    # must not pick up a GraphQL-entity id rename when it's actually the REST table.
+    assert stg_id_renames("draft_picks", schema="stg") == {}
+    assert stg_id_renames("draft_picks", schema="stg_gql") == {}
+    assert stg_id_renames("games", schema="stg") == {
+        "id": "gameId",
+        "homeId": "homeTeamId",
+        "awayId": "awayTeamId",
+    }
 
 
 def test_rename_stg_id_columns_rewrites_bare_id_and_skips_existing_dest(tmp_path):
