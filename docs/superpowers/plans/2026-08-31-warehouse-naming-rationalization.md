@@ -16,7 +16,7 @@
 - Data is never committed. Only code, tests, and docs enter git.
 - Do not edit `cfbd-python/` — vendored upstream.
 - Run all commands from repository root.
-- Default verification: `python -m pytest` (672 tests currently pass; the suite must still pass at every commit).
+- Default verification: `python -m pytest`. The suite must pass at every commit. The plan quotes absolute counts (675 → 678 → 685 → 688) against a **672-test baseline measured 2026-08-31**. If that baseline has drifted, treat every quoted count as a **delta** (+3, +3, +7, +3) rather than an absolute, and check that the delta matches the tests the task adds. A mismatched absolute is not a failure; a mismatched delta is.
 - `raw` schema names never change — `raw` preserves source fidelity by design.
 - GraphQL field names (`GQL_DEFAULT_TABLES`, `GQL_RELATION_KEYS`, query text, `data/graphql/*.json` filenames) never change. Only `stg` destination table names change.
 - Tasks 1–4 touch code and docs only. **Task 5 mutates the warehouse and must not be auto-committed or auto-run** — it is executed by the user explicitly.
@@ -610,17 +610,21 @@ print('orphan load_report rows:', c.sql(\"select name from meta.load_report wher
 
 Expected: same table count and row total as Step 3; `camelCase left: []`; `orphan load_report rows: []`.
 
-- [ ] **Step 6: Confirm a reload is a no-op**
+- [ ] **Step 6: Confirm a re-explode targets the new name**
 
-Re-run the loader's stg build for one GraphQL entity and confirm it targets the new name rather than recreating the old one:
+The subcommand is `duckdb`, not `load` (`cfb_system_maker/cli.py:815`). `--explode-only` re-runs `explode_payloads` (raw → stg) without re-ingesting `raw`, which is the cheap check here. It **rewrites `stg.gql_game_lines` in place**; the Step 1 backup is what makes that safe, so do not delete it before this step passes.
+
+`--only` matches on the **source** name in `raw`, not the destination — `raw` names are unchanged by this plan (R6), so `gameLines` is correct here. Do not "fix" it to `gql_game_lines`; after Task 2 the filter is `name not in only and dest not in only`, so either spelling happens to match, but `raw` is what is being read.
 
 ```bash
-python -m cfb_system_maker load --only gameLines --verbose 2>&1 | tail -20
+python -m cfb_system_maker duckdb --explode-only --only gameLines 2>&1 | tail -20
 ```
 
-Expected: the report names `gql_game_lines`. If a table named `gameLines` reappears in `stg`, Task 2 missed a call site — stop and fix before continuing.
+Expected: the report names `gql_game_lines`. If a table named `gameLines` reappears in `stg`, Task 2 missed a call site — restore from the backup and fix before continuing.
 
-- [ ] **Step 7: Remove the backup once satisfied**
+- [ ] **Step 7: Remove the backup once every check above has passed**
+
+Only after Steps 5 and 6 are both green:
 
 ```bash
 rm data/cfb.duckdb.pre-gql-rename
@@ -968,15 +972,13 @@ Expected: the 34 parents plus 4 children, matching Task 5 Step 2's left column.
 python scripts/promote_to_motherduck.py --schema stg
 ```
 
-- [ ] **Step 3: Drop the stale camelCase tables from the mirror**
+- [ ] **Step 3: Verify parity before dropping anything**
 
-For each name listed in Step 1, confirm the `gql_`-prefixed replacement exists on the mirror with a matching row count, then drop the old one. Do not drop a table whose replacement is absent or has a different count.
-
-- [ ] **Step 4: Verify mirror parity**
+Parity is checked *before* the drop, so the drop list is derived from proof rather than judgement. `extra on mirror` is the candidate drop list; `missing on mirror` must be empty before proceeding.
 
 ```bash
 python -c "
-import re, duckdb
+import duckdb
 loc = duckdb.connect('data/cfb.duckdb', read_only=True)
 rem = duckdb.connect('md:cfb')
 q = \"select table_name, estimated_size from duckdb_tables() where schema_name='stg'\"
@@ -986,6 +988,75 @@ print('extra on mirror:', sorted(set(r) - set(l)))
 print('count mismatches:', {k: (l[k], r[k]) for k in set(l) & set(r) if l[k] != r[k]})
 "
 ```
+
+Expected: `missing on mirror: []` and `count mismatches: {}`. `extra on mirror` should list exactly the 38 old camelCase names from Step 1.
+
+**If `missing on mirror` is non-empty, stop.** Step 2 did not promote everything, and dropping now would lose data the local DB would have to re-promote.
+
+- [ ] **Step 4: Drop only the proven-superseded tables**
+
+This drops a table only when its `gql_` replacement exists on the mirror with a matching row count. Anything else is reported and left alone.
+
+The stale list is derived from `GQL_ENTITY_TO_STG`, not from a casing regex. A regex misses both `calendar_gql` (no camelCase) and the eleven all-lowercase entities (`game`, `coach`, `poll`, `athlete`, `recruit`, `ratings`, `transfer`, `conference`, `hometown`, `position`, `calendar`). Intersecting with `extra on mirror` is what keeps the REST `calendar`, which the local DB still has, from being considered.
+
+Save as `scripts/drop_stale_mirror_tables.py` and run it — it is too long to be a safe one-liner:
+
+```python
+"""Drop mirror tables superseded by the gql_ rename. Proof-gated: a table is dropped
+only when its replacement exists on the mirror with a matching local row count."""
+
+import re
+import sys
+from pathlib import Path
+
+import duckdb
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from cfb_system_maker.graphql_client import GQL_ENTITY_TO_STG  # noqa: E402
+
+loc = duckdb.connect("data/cfb.duckdb", read_only=True)
+rem = duckdb.connect("md:cfb")
+Q = "select table_name, estimated_size from duckdb_tables() where schema_name='stg'"
+local = dict(loc.sql(Q).fetchall())
+mirror = dict(rem.sql(Q).fetchall())
+extra = set(mirror) - set(local)
+
+
+def snake(x: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", x).lower()
+
+
+# old mirror name -> new name, for parents and their __ children
+expected: dict[str, str] = {}
+for entity, dst in GQL_ENTITY_TO_STG.items():
+    expected[entity] = dst
+    expected[f"{entity}_gql"] = dst           # legacy clash suffix, e.g. calendar_gql
+    for name in mirror:
+        if name.startswith(f"{entity}__"):
+            expected[name] = dst + snake(name[len(entity):])
+
+dropped = kept = 0
+for name in sorted(extra):
+    new = expected.get(name)
+    if new and new in mirror and new in local and mirror[new] == local[new]:
+        rem.execute(f'DROP TABLE stg."{name}"')
+        print(f"dropped {name} (superseded by {new})")
+        dropped += 1
+    else:
+        print(f"KEPT {name} - replacement {new or '(unmapped)'} absent or count mismatch")
+        kept += 1
+print(f"\n{dropped} dropped, {kept} kept")
+```
+
+```bash
+python scripts/drop_stale_mirror_tables.py
+```
+
+Expected: `38 dropped, 0 kept`. Investigate any `KEPT` line before rerunning — an unmapped name means the mirror holds something this plan did not create.
+
+- [ ] **Step 5: Re-verify parity**
+
+Re-run the Step 3 command.
 
 Expected: all three empty.
 
