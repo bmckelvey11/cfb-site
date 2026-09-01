@@ -862,6 +862,22 @@ def _stg_dest_name(name: str, taken: set[str]) -> str:
     return "gql_" + name
 
 
+def _fill_null_types(sampled: Any, wide: Any) -> Any:
+    """Take ``sampled`` types everywhere, except ``"NULL"`` leaves that ``wide`` types.
+
+    Only unseen keys are repaired. A key the sample already typed keeps that type even
+    if the wide scan disagrees -- widening those would retype genuinely mixed keys
+    (``gameLines.overUnder`` is 8.8% ``"NaN"`` strings) from DOUBLE to JSON.
+    """
+    if sampled == "NULL" and wide is not None:
+        return wide
+    if isinstance(sampled, dict) and isinstance(wide, dict):
+        return {k: _fill_null_types(v, wide.get(k)) for k, v in sampled.items()}
+    if isinstance(sampled, list) and isinstance(wide, list) and sampled and wide:
+        return [_fill_null_types(sampled[0], wide[0])]
+    return sampled
+
+
 def _payload_structure(con: duckdb.DuckDBPyConnection, source: str) -> str | None:
     # LIMIT must wrap the scan. json_group_structure is an aggregate, so a top-level
     # LIMIT still unions every row and OOMs on plays / gamePlayerStat.
@@ -875,7 +891,30 @@ def _payload_structure(con: duckdb.DuckDBPyConnection, source: str) -> str | Non
         )
         """
     ).fetchone()
-    return None if row is None else row[0]
+    if row is None or row[0] is None:
+        return None
+    structure = row[0]
+    if '"NULL"' not in structure:
+        return structure
+
+    # Raw rows load season-ordered, so the prefix sample sees only the oldest schema and
+    # types keys the API added later as "NULL" -- json_transform then silently nulls the
+    # whole column (this cost stg.lines every spreadOpen / overUnderOpen / moneyline).
+    # Re-infer just those keys over the full table; fall back to the sample when the
+    # scan will not fit in memory (plays / gamePlayerStat).
+    try:
+        wide = con.execute(
+            f"SELECT json_group_structure(payload) FROM {source} WHERE payload IS NOT NULL"
+        ).fetchone()
+    except duckdb.OutOfMemoryException:
+        return structure
+    if wide is None or wide[0] is None:
+        return structure
+    try:
+        merged = _fill_null_types(json.loads(structure), json.loads(wide[0]))
+    except json.JSONDecodeError:
+        return structure
+    return json.dumps(merged)
 
 
 def _structure_top_keys(structure: str) -> set[str]:

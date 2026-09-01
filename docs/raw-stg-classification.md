@@ -88,14 +88,68 @@ this layer filters or dedupes. `stg` is a pure shred.
 
 Remaining, ordered by payoff: (2) then (3).
 
-## Separately: `core.fact_game_line.spread_open` is entirely NULL
+## Separately: prefix-sampled structure inference silently nulled whole columns
 
-Not a `stg` issue, found while verifying the above. All 38,689 rows in
-`core.fact_game_line` have `spread_open IS NULL` (against 89 NULL `spread_close`), so
-`tests/test_core_agreement.py::test_live_warehouse_agreement_4_5_6` fails on
-`assert row[1] == moves["spread_open"]`. The opening number exists in `stg`; the core
-build never carries it across. `meta.warehouse_version` is also absent locally, so this
-`core` predates the documented build.
+**Fixed 2026-08-31.** Found while verifying the above, and it *was* a `stg` issue — the
+first reading here ("the opening number exists in `stg`; the core build never carries it
+across") was wrong on both halves. `duckdb_core.py` reads `spreadOpen` correctly, and
+`stg` did not hold the value to carry: `stg.lines.lines.spreadOpen` and
+`stg.gameLines.spreadOpen` were 0 non-null, so no `core` rebuild could have fixed it.
+
+`_payload_structure` typed each `raw` table from `json_group_structure` over a
+`LIMIT 5000` **prefix**. Raw rows load season-ordered, so that sample saw only the oldest
+seasons, where the sportsbook API had not yet returned opening numbers or moneylines. Keys
+absent from the sample come back typed `"NULL"`, and `json_transform` then materializes
+the column as all-NULL — discarding every value in the other 33,689 rows without an error.
+
+Five `core` columns were empty, not one:
+
+| table.column | before | after |
+|---|---:|---:|
+| `fact_game_line.spread_open` | 0 | 8,413 |
+| `fact_game_line.total_open` | 0 | 6,917 |
+| `fact_game_line.moneyline_home` | 0 | 7,908 |
+| `fact_game_line.moneyline_away` | 0 | 7,899 |
+| `fact_game.venue_id` | 0 | 46,794 |
+
+`spread_close` (38,600) and row counts (38,689 / 54,264) are unchanged, confirming the
+rebuild restored columns without disturbing what already worked.
+
+Diffing sampled-vs-repaired structure across all 119 `raw` tables that carry `payload`,
+5 have keys to repair — the rest are unaffected:
+
+| raw table | keys repaired |
+|---|---:|
+| `games` | 9 (`venueId`, `attendance`, `notes`, line scores, postgame win prob, …) |
+| `game` | 9 (GraphQL twin of the above) |
+| `lines` | 4 |
+| `gameLines` | 4 |
+| `pollRank` | 2 (`firstPlaceVotes`, `points`) |
+
+`stg.games`, `stg.game`, `stg.pollRank`, `stg.lines`, and `stg.gameLines` were re-exploded
+and `core` rebuilt. Nine further tables keep `"NULL"` keys after the repair — either the
+key is genuinely always null, or the table is too large to scan (`plays`,
+`gamePlayerStat`); those keep today's behavior rather than regressing.
+
+Restored `stg.games` columns include result-informed ones (`homePostgameWinProbability`,
+`excitementIndex`, line scores). `core` does not read them, but anything that starts to
+must respect the root `CLAUDE.md` no-lookahead rule.
+
+Watch out when re-running: `explode_payloads` already calls
+`backfill_gamelines_from_actionnetwork` and `promote_timestamp_columns` at the end, and
+that backfill is **not idempotent** — calling it again on an already-backfilled
+`stg.gameLines` re-adds the Action Network rows (63,293 → 79,821). Re-explode `gameLines`
+in the same run rather than invoking the backfill directly.
+
+The fix keeps the cheap prefix sample and repairs **only** keys it typed `"NULL"`,
+re-inferring those from a full-table scan (falling back to the sample when it will not fit
+in memory — `raw.plays` and `raw.gamePlayerStat` still OOM a full scan). Widening the
+sample wholesale would have been wrong: `raw.gameLines.overUnder` is 8.8% `"NaN"` strings,
+so any broader sample retypes it from DOUBLE to JSON. Repairing unseen keys only cannot
+retype a key the sample already resolved.
+
+`meta.warehouse_version` is still absent locally, so this `core` predates the documented
+build — but that was a red herring, not the cause.
 
 ## Mirror drift
 

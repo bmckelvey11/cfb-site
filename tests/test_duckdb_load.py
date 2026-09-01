@@ -217,6 +217,32 @@ def test_explode_payloads_writes_stg_columns(tmp_path):
     assert "_source_file" in cols
 
 
+def test_explode_payloads_types_keys_missing_from_the_prefix_sample(tmp_path):
+    """A key absent from the first 5000 rows must not null the whole column.
+
+    Raw rows load season-ordered, so a prefix sample sees only the oldest schema and
+    types later-added keys as "NULL" -- json_transform then drops every value. The
+    repair must not retype a key the sample already resolved: ``mixed`` picks up a
+    string later on, and widening it would turn DOUBLE into JSON.
+    """
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    rows = [{"id": i, "lateKey": None, "mixed": 1.5} for i in range(5000)]
+    rows += [{"id": 5000 + i, "lateKey": -3.5, "mixed": "NaN"} for i in range(3)]
+    (raw / "games_2023.json").write_text(json.dumps(rows), encoding="utf-8")
+
+    db_path, _ = build_duckdb(tmp_path, include_actionnetwork=False)
+    explode_payloads(db_path, only={"games"})
+
+    import duckdb
+
+    con = duckdb.connect(str(db_path), read_only=True)
+    dtypes = {row[0]: row[1] for row in con.execute("DESCRIBE stg.games").fetchall()}
+    assert dtypes["lateKey"] == "DOUBLE"
+    assert dtypes["mixed"] == "DOUBLE"
+    assert con.execute("SELECT COUNT(lateKey) FROM stg.games").fetchone()[0] == 3
+
+
 def test_explode_payloads_only_skips_other_tables(tmp_path):
     raw = tmp_path / "raw"
     raw.mkdir()
