@@ -3,7 +3,9 @@ import re
 
 from cfb_system_maker.graphql_client import (
     GQL_DEFAULT_TABLES,
+    GQL_ENTITY_TO_RAW,
     GQL_ENTITY_TO_STG,
+    GQL_RAW_TO_ENTITY,
     graphql_scrape,
     pull_game_player_stats,
 )
@@ -16,20 +18,51 @@ def test_gql_entity_to_stg_is_total_and_injective():
     assert len(set(GQL_ENTITY_TO_STG.values())) == len(GQL_ENTITY_TO_STG)
 
 
-def test_gql_destinations_are_snake_case_and_prefixed():
+def test_gql_destinations_are_bare_snake_case():
+    # stg_gql destinations carry no gql_ prefix — the schema is the disambiguator now.
     for entity, dest in GQL_ENTITY_TO_STG.items():
-        assert dest.startswith("gql_"), f"{entity} -> {dest} lacks gql_ prefix"
+        assert not dest.startswith("gql_"), f"{entity} -> {dest} still carries gql_ prefix"
         assert re.fullmatch(r"[a-z0-9_]+", dest), f"{entity} -> {dest} is not snake_case"
 
 
 def test_gql_destinations_match_spec_examples():
-    # Spot-check the transformations the spec's rename map fixes, including the
-    # multi-word and acronym-adjacent cases where a naive splitter goes wrong.
-    assert GQL_ENTITY_TO_STG["game"] == "gql_game"
-    assert GQL_ENTITY_TO_STG["gameLines"] == "gql_game_lines"
-    assert GQL_ENTITY_TO_STG["adjustedPlayerMetrics"] == "gql_adjusted_player_metrics"
-    assert GQL_ENTITY_TO_STG["playerStatCategory"] == "gql_player_stat_category"
-    assert GQL_ENTITY_TO_STG["calendar"] == "gql_calendar"
+    assert GQL_ENTITY_TO_STG["game"] == "game"
+    assert GQL_ENTITY_TO_STG["gameLines"] == "game_lines"
+    assert GQL_ENTITY_TO_STG["adjustedPlayerMetrics"] == "adjusted_player_metrics"
+    assert GQL_ENTITY_TO_STG["playerStatCategory"] == "player_stat_category"
+    assert GQL_ENTITY_TO_STG["calendar"] == "calendar"
+
+
+def test_gql_entity_to_raw_is_total_injective_and_prefixed():
+    # raw naming must stay decoupled from the stg_gql scheme: same shape the old
+    # (prefixed) GQL_ENTITY_TO_STG had, so raw tables keep colliding with nothing.
+    assert set(GQL_ENTITY_TO_RAW) == set(GQL_DEFAULT_TABLES)
+    assert len(set(GQL_ENTITY_TO_RAW.values())) == len(GQL_ENTITY_TO_RAW)
+    for entity, raw_name in GQL_ENTITY_TO_RAW.items():
+        assert raw_name.startswith("gql_"), f"{entity} -> {raw_name} lacks gql_ prefix"
+
+
+def test_gql_entity_to_raw_matches_shipped_prefix_scheme():
+    # These are the exact values the (unapplied) gql_ prefix build shipped for `stg`.
+    # raw keeps them verbatim even though stg_gql no longer does.
+    assert GQL_ENTITY_TO_RAW["game"] == "gql_game"
+    assert GQL_ENTITY_TO_RAW["gameLines"] == "gql_game_lines"
+    assert GQL_ENTITY_TO_RAW["draftPicks"] == "gql_draft_picks"
+    assert GQL_ENTITY_TO_RAW["calendar"] == "gql_calendar"
+
+
+def test_gql_raw_to_entity_is_exact_inverse_of_gql_entity_to_raw():
+    assert GQL_RAW_TO_ENTITY == {raw: entity for entity, raw in GQL_ENTITY_TO_RAW.items()}
+    assert len(GQL_RAW_TO_ENTITY) == len(GQL_ENTITY_TO_RAW)
+
+
+def test_gql_raw_names_never_collide_with_rest_raw_names():
+    # The bug this whole scheme exists to prevent, one layer up: raw dumps for REST
+    # endpoints that snake-case to the same bare name as a GraphQL entity.
+    rest_raw_stems = {"games", "coaches", "conferences", "draft_picks", "recruits",
+                       "recruiting_teams", "coach_seasons", "predicted_points", "talent",
+                       "lines", "calendar", "draft_positions", "draft_teams"}
+    assert not (set(GQL_ENTITY_TO_RAW.values()) & rest_raw_stems)
 
 
 def _scalar(name="String"):

@@ -43,14 +43,25 @@ def _snake(name: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
 
-# Destination `stg` table name for each GraphQL entity. Explicit and total on purpose:
-# `stg` is fed by REST (snake_case) and GraphQL (camelCase API field names), and the
-# previous clash-resolution helper picked a winner by load order. The `gql_` prefix is
-# disjoint from every REST destination, so a clash is impossible by construction.
+# Destination table name for each GraphQL entity, per schema. Explicit and total on
+# purpose: a clash resolver that picks a winner by load order previously caused
+# `stg.calendar` (REST, 258 rows) and `stg.calendar_gql` (GraphQL, 424 rows) to swap
+# provenance across a rebuild with nothing recording which was which.
+#
+# GQL_ENTITY_TO_STG: bare `stg_gql` destination. GraphQL lives in its own schema, so
+# no prefix is needed to stay disjoint from REST's `stg` destinations.
+#
+# GQL_ENTITY_TO_RAW: `raw` destination, decoupled from the above on purpose. `raw`
+# mixes REST and GraphQL dumps in one schema (no `raw_gql`), so it keeps the `gql_`
+# prefix that keeps it collision-free with REST raw dumps of the same snake_case name
+# (`draft_picks`, `predicted_points`, `calendar` all collide once GraphQL is bare).
+#
 # The keys are the upstream API contract and must not be renamed.
-GQL_ENTITY_TO_STG: dict[str, str] = {
+GQL_ENTITY_TO_STG: dict[str, str] = {entity: _snake(entity) for entity in GQL_DEFAULT_TABLES}
+GQL_ENTITY_TO_RAW: dict[str, str] = {
     entity: "gql_" + _snake(entity) for entity in GQL_DEFAULT_TABLES
 }
+GQL_RAW_TO_ENTITY: dict[str, str] = {raw: entity for entity, raw in GQL_ENTITY_TO_RAW.items()}
 
 # Tables whose scalar columns do not identify a row: the identity lives in a to-one
 # relation. For each, the relation and the few columns lifted from it — enough to join,
