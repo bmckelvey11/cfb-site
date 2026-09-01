@@ -153,14 +153,29 @@ build — but that was a red herring, not the cause.
 
 ## Mirror drift
 
-`md:cfb` disagrees with the source of truth and should not be audited in its place:
+~~`md:cfb` disagrees with the source of truth.~~ **Re-synced 2026-08-31** via
+`scripts/promote_to_motherduck.py --yes`, after the structure-inference fix above and a
+`core` rebuild. All 248 tables promoted, every row count matching:
 
-| | local (truth) | `md:cfb` |
-|---|---:|---:|
-| `raw` tables | 120 | 115 |
-| `stg` tables | 119 | 116 |
-| `stg.gamePlayerStat` rows | 5,541,660 | 1,696,159 |
+| | local (truth) | `md:cfb` before | `md:cfb` after |
+|---|---:|---:|---:|
+| `raw` tables | 120 | 115 | 120 |
+| `stg` tables | 119 | 116 | 120 |
+| `stg.gamePlayerStat` rows | 5,541,660 | 1,696,159 | 5,541,660 |
+| `core.fact_game_line.spread_open` | 8,413 | 0 | 8,413 |
 
-The mirror is missing five `raw` tables and is 69% short on `gamePlayerStat`. It also
-carries `ppa_games_defense` and the `venue_orientation_labeled` view, which have no
-counterpart locally. Re-sync before anyone reads `md:cfb` as current.
+Both sides are now stamped `meta.warehouse_version` = `70e163c` — that table previously
+did not exist locally at all, which is why the pre-fix `core` looked undated.
+
+Two caveats for the next promote:
+
+- **One leftover remains.** `md.stg.ppa_games_defense` has no local counterpart, so `stg`
+  is 120 against 119. The script uses `CREATE OR REPLACE TABLE` per table and never drops,
+  so tables retired locally survive on the mirror indefinitely. Dropping it is a
+  destructive remote change and was left alone deliberately.
+- **The copy needs a memory budget.** The first attempt died with
+  `OutOfMemoryException: Allocation failure` partway through `raw`, leaving the mirror
+  half-updated (`core` new, `stg` stale) — the promote is not atomic, and a failure
+  mid-run is a mixed state, not a no-op. The script now sets `memory_limit`,
+  `preserve_insertion_order=false`, and a `temp_directory` so million-row tables spill
+  instead of aborting.

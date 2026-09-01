@@ -72,6 +72,11 @@ def main() -> int:
         "--dry-run", action="store_true", help="list tables, push nothing"
     )
     parser.add_argument("--yes", action="store_true", help="required to actually push")
+    parser.add_argument(
+        "--memory-limit",
+        default="2GB",
+        help="DuckDB memory budget for the copy (default 2GB; the rest spills to disk)",
+    )
     args = parser.parse_args()
 
     src_path = f"{args.data_dir}/cfb.duckdb"
@@ -94,6 +99,13 @@ def main() -> int:
         )
 
     con = duckdb.connect()
+    # Streaming a multi-million-row table into md is what blows up: without these,
+    # gamePlayerStat-sized copies hit "Out of Memory Error: Allocation failure" and
+    # abort the promote half-done. Dropping insertion order lets the copy run in
+    # bounded chunks, and a temp dir gives it somewhere to spill.
+    con.execute(f"SET memory_limit='{args.memory_limit}'")
+    con.execute("SET preserve_insertion_order=false")
+    con.execute(f"SET temp_directory='{os.path.join(args.data_dir, '.duckdb_tmp')}'")
     # Not READ_ONLY: the warehouse_version stamp below writes back to src too.
     con.execute(f"ATTACH '{src_path}' AS src")
 
