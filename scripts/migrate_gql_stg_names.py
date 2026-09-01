@@ -64,7 +64,23 @@ def migrate(con: duckdb.DuckDBPyConnection) -> list[MoveReport]:
             f" WHERE schema_name = '{dest_schema}' AND table_name = '{dest_name}'"
         ).fetchone()[0]
         if already_moved:
-            reports.append(MoveReport(src_schema, src_name, dest_schema, dest_name))
+            # plan_moves() only includes an entry when the source is still present in
+            # `stg`, so reaching this branch means BOTH the source and destination exist
+            # at once -- a resumed run would have already dropped the source once moved.
+            # That state means something is wrong (e.g. a rebuild regenerated the source
+            # while a prior partial migration already created the destination from an
+            # older copy). Report it as a failure rather than silently folding it into
+            # "moved" -- never overwrite the destination and never abandon the source.
+            reports.append(
+                MoveReport(
+                    src_schema, src_name, dest_schema, dest_name,
+                    error=(
+                        f"destination {dest_schema}.{dest_name} already exists but "
+                        f"source {src_schema}.{src_name} is still present -- "
+                        "not overwriting; investigate before re-running"
+                    ),
+                )
+            )
             continue
         try:
             con.execute("BEGIN TRANSACTION")
@@ -95,13 +111,13 @@ def migrate(con: duckdb.DuckDBPyConnection) -> list[MoveReport]:
     return reports
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", required=True, help="Path to cfb.duckdb")
     parser.add_argument("--yes", action="store_true", help="Apply the migration (default: dry run)")
     args = parser.parse_args()
 
-    con = duckdb.connect(args.db)
+    con = duckdb.connect(args.db, read_only=not args.yes)
     moves = plan_moves(con)
     print(f"{len(moves)} tables to move (stg -> stg_gql):")
     for src_schema, src_name, dest_schema, dest_name in moves:
@@ -109,14 +125,15 @@ def main() -> None:
     if not args.yes:
         print("\nDry run only. Re-run with --yes to apply.")
         con.close()
-        return
+        return 0
     reports = migrate(con)
     con.close()
     failed = [r for r in reports if r.error]
     print(f"\n{len(reports) - len(failed)} moved, {len(failed)} failed")
     for r in failed:
         print(f"  FAILED {r.src_schema}.{r.src_name}: {r.error}")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

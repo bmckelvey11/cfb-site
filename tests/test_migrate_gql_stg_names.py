@@ -60,6 +60,30 @@ def test_migrate_is_idempotent_and_resumable():
     assert con.execute("SELECT gameId FROM stg_gql.game").fetchone()[0] == 1
 
 
+def test_migrate_reports_error_when_source_and_destination_both_present():
+    # This is NOT the ordinary resumed-run case (plan_moves only lists a table when its
+    # source is still in `stg`, so a real resumed run never sees a destination that
+    # already exists -- the source was already dropped when it moved). Seeding both here
+    # simulates something going wrong, e.g. a rebuild regenerating `stg.gql_game` while
+    # an earlier partial migration already created `stg_gql.game` from an older copy.
+    con = _seeded_con()
+    con.execute("CREATE SCHEMA stg_gql")
+    con.execute("CREATE TABLE stg_gql.game AS SELECT 999 AS gameId, 2020 AS season")
+
+    reports = migrate(con)
+
+    game_report = next(r for r in reports if r.src_name == "gql_game")
+    assert game_report.error is not None
+    # Source must be left untouched, not silently dropped or overwritten.
+    assert con.execute(
+        "SELECT gameId FROM stg.gql_game"
+    ).fetchone()[0] == 1
+    # Destination must also be left untouched (not overwritten by the stranded source).
+    assert con.execute(
+        "SELECT gameId FROM stg_gql.game"
+    ).fetchone()[0] == 999
+
+
 def test_migrate_resumes_child_after_parent_only_partial_run():
     con = _seeded_con()
     # Simulate a prior run that crashed between the parent's move and its child's:
