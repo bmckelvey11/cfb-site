@@ -9,11 +9,15 @@ so a partial prior run (or a re-run after this script itself failed partway) is 
 from __future__ import annotations
 
 import argparse
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import duckdb
 
-from cfb_system_maker.graphql_client import GQL_ENTITY_TO_RAW, GQL_ENTITY_TO_STG
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from cfb_system_maker.graphql_client import GQL_ENTITY_TO_RAW, GQL_ENTITY_TO_STG  # noqa: E402
 
 
 @dataclass(frozen=True)
