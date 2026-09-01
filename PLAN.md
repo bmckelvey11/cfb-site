@@ -11,25 +11,108 @@ this plan does not act on it.
 
 ## Approach
 
-1. **Probe the GraphQL schema.** One-shot introspection confirming `coachSeason.coach` exposes
-   a selectable `id` and that `coachSeason.team` / `teamTalent.team` expose `teamId`. Gates step 2.
-2. **Add relation keys** for `coachSeason` and `teamTalent` to `GQL_RELATION_KEYS`. These feed
-   both the selection (identity) and the sort (total order), so this repairs joinability and
-   pagination stability in one change.
-3. **Re-scrape** those two entities; reload; confirm the FK columns landed. Row counts may rise
-   — the old sort was not total. A fall is a stop condition.
-4. **Prune scaffolding columns.** `prune_null_scaffolding` drops `season`/`week`/`season_type`
-   from a `stg` table when entirely NULL. Payload columns are never auto-dropped. Rebuild `stg`.
-5. **Re-measure containment** on the repaired warehouse and record the verdicts. Hard gate on
-   step 8.
-6. **Conform into `core`.** `fact_game` keeps its REST spine and row count, gaining GraphQL-only
-   columns joined on `gameId`. Pre-1992 GraphQL rows go to `core.fact_game_historical`. Coach
-   conforms on `coachId` with ambiguous names quarantined.
-7. **Verify** no key and no populated column was lost, and that the existing agreement gates
-   still pass.
-8. **Drop** the superseded side of each pair, proof-gated at run time, plus the 12 dead payload
-   columns. Remove dropped sources from the scraper.
-9. **Document** — `CONTEXT.md` glossary terms, ADR 0001, `docs/warehouse-sources.md`.
+0. **Preflight.** Assert the naming migration is complete (every GraphQL entity resolves to its
+   `gql_` name and no camelCase `stg` table remains) and record the resolved names. A partial
+   rename state aborts the run. Snapshot `data/cfb.duckdb` and the `data/graphql/*.json`
+   manifest; the snapshot is retained until step 9 validates.
+1. **Probe the GraphQL schema.** Introspect the exact field paths for `coachSeason.coach`,
+   `coachSeason.team`, and `teamTalent.team`. Each must be **to-one** (a to-many relation cannot
+   produce a total order and is rejected outright), and the selected key must be non-null and
+   unique within the relation. Confirm whether the team relation is named `team` or resolves via
+   `currentTeams`. Gates step 2; failure stops the run rather than guessing.
+2. **Add relation keys** for `coachSeason` and `teamTalent` to `GQL_RELATION_KEYS`, using only
+   paths step 1 proved to-one. These feed both the selection (identity) and the sort (total
+   order), repairing joinability and pagination stability in one change.
+3. **Re-scrape** those two entities; reload; confirm the FK columns landed. Compare pulls by
+   **identity-set diff**, not row count: record the API schema hash and pull timestamp, then
+   report added keys, removed keys, duplicate keys, and a sample of changed rows. A pure
+   pagination repair shows additions and no removals; removals or changed values on stable keys
+   indicate upstream drift and stop the run.
+4. **Prune scaffolding columns.** `prune_null_scaffolding` runs inside `_finish_stg_table`, so it
+   is loader-level and survives rebuilds by construction. Rebuild `stg`, then rebuild a second
+   time and assert the pruned set is identical — a rebuild that restores a pruned column means
+   the rule is in the wrong place.
+5. **Re-measure containment** on the repaired warehouse against the formal gate below, and record
+   the verdicts. Hard gate on step 8.
+6. **Prove the join before conforming.** For each pair bound for `core`, verify bidirectional key
+   coverage: keys present on both sides, keys unique on each side, and a **value-conflict report**
+   for every column both sides populate. No pair is conformed until its conflict report is empty
+   or its per-column authority is declared.
+7. **Conform into `core`.** `fact_game` keeps its REST spine and row count, gaining only the
+   GraphQL-only columns on the pre-game allowlist; result-informed columns are tagged
+   `result_lookahead` and excluded from model inputs. Rows are routed to
+   `core.fact_game_historical` by **anti-join on validated `gameId`**, never by year boundary.
+   Coach conforms on `coachId` with a published match-rate and an unmatched-rows report.
+8. **Drop only what step 5 proves superseded**, within the bounds of D1 (see "What may be
+   dropped"). Then drop the 12 named dead payload columns after a dependent-object check.
+   Remove dropped sources from the scraper.
+9. **Validate and document** — agreement gates re-run, snapshot released, `CONTEXT.md` glossary,
+   ADR 0001, `docs/warehouse-sources.md`.
+
+## What may be dropped (reconciles step 8 with D1)
+
+D1 locked "`stg` sources stay" for **paired sources being conformed into `core`**. It did not
+license dropping a table merely because a `core` table now covers it. Precisely:
+
+- **Never dropped:** either side of a pair conformed into `core` (Bucket C). `core` is derived;
+  `stg` remains the per-source shred it was built from.
+- **Eligible:** a pair side with **zero populated exclusive columns** — it is a strict subset of
+  its partner, so dropping it loses no information. Eligibility is computed at run time by
+  `verdict()`, never read from this document.
+- **Eligible:** the 12 named dead payload columns below.
+- **Scraper removal** follows a table drop, never precedes it.
+
+## Result-lookahead allowlist for `fact_game`
+
+The repo forbids result-informed data entering pre-game features untagged. Of the ten
+GraphQL-only columns:
+
+| Column | Disposition |
+|---|---|
+| `homeStartElo`, `awayStartElo` | pre-game — added plainly |
+| `homeConferenceId`, `awayConferenceId` | pre-game — added plainly |
+| `homeEndElo`, `awayEndElo` | post-kickoff — tagged `result_lookahead` |
+| `homePostgameWinProb`, `awayPostgameWinProb` | post-kickoff — tagged `result_lookahead` |
+| `excitement` | post-kickoff — tagged `result_lookahead` |
+| `status` | post-kickoff — tagged `result_lookahead` |
+
+Tagged columns follow the existing mechanism in `cfb_system_maker/features.py:15` and are
+quarantined from model inputs. A column whose timing is unclear is treated as result-informed.
+
+## Containment gate (formal)
+
+A side is superseded only when, for every column it holds:
+
+- **Normalization** — names compared case-insensitively with underscores stripped
+  (`season_type` matches `seasonType`).
+- **Populated** — a column with zero non-NULL values is not evidence of anything and is excluded
+  from both sides of the comparison. This is why `stg.recruit` is superseded despite holding two
+  exclusive columns: both are 100% NULL.
+- **Tolerance** — zero. There is no partial-supersession verdict; anything else is `MERGE`.
+- **Freshness** — the measurement must post-date the last load of both tables; a stale
+  measurement is refused rather than used.
+
+## The 12 dead payload columns
+
+Dropped only after confirming no view, `core` build, or test references them:
+
+```
+stg.plays.defenseTimeouts
+stg.plays.offenseTimeouts
+stg.plays.wallclock
+stg.gameWeather.windGust
+stg.pollType.abbreviation
+stg.recruit.overallRank
+stg.recruit.positionRank
+stg.team_stats.statValue_anyof_schema_1_validator
+stg.team_stats__statValue_any_of_schemas.statValue_anyof_schema_1_validator
+stg.actionnetwork_scoreboard__teams.teams_standings_overtime_losses
+stg.actionnetwork_scoreboard__markets__markets_event_moneyline.markets_event_moneyline_odds_coefficient_score
+stg.actionnetwork_scoreboard__markets__markets_event_core_bet_type_6_team_score.markets_event_core_bet_type_6_team_score_odds_coefficient_score
+```
+
+The twelve 2026-week `homeScore`/`awayScore` columns are **not** in this list — those games have
+not been played.
 
 ## Key decisions & tradeoffs
 
@@ -112,6 +195,10 @@ Assumed, unmeasured:
   26,827). `core.fact_game_historical` must not be treated as classification-accurate for its era.
 - The 2 coach name conflicts need one manual resolution pass; the plan quarantines rather than
   resolves them.
+- **Single-writer assumption, stated not engineered.** This runs against a local DuckDB file on
+  one workstation; DuckDB enforces single-writer access. The plan therefore does not add lock
+  management, versioned build tables, or atomic swap. If this warehouse ever gains concurrent
+  writers or a second operator, every destructive step here needs revisiting first.
 
 ## Out of scope
 
