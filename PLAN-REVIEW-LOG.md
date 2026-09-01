@@ -231,3 +231,49 @@ VERDICT: REVISE
   which dump each entity loads from, never globbing a directory holding two generations. The new
   version is promoted only after steps 5-7 pass, so a failed run leaves the prior version
   selected and the warehouse rebuildable from it.
+
+## Round 5 — Codex
+
+Prior blockers addressed: shared line correspondence defined; coach-season `teamId` restored; duplicate coach row resolved; version manifest added; postgame mutation test added.
+
+Material gaps remain:
+
+- **Coach-season merge still lacks team bridge.** `coaches` has name+season grain; target needs `coachId+teamId+season`. Real mid-season team change means one REST row can match multiple GraphQL rows. Fix: define team resolution from REST payload, or preserve unmatched/ambiguous REST row outside merged fact.
+- **Line period normalization missing.** REST offers have no period; GraphQL period encoding may be `NULL`, `0`, enum, or string. Wrong mapping creates false unmatched rows and duplicates. Fix: define canonical full-game period value, normalize both sides, and gate on expected matched full-game offer count.
+- **New raw version promoted too early.** Manifest promotes after steps 5–7, before drops, agreement gates, and final validation in step 9. A step-8/9 failure leaves new source active. Fix: stage new manifest through all steps; atomically promote only after every validation passes.
+- **Coach target omits `coach_seasons` source grain.** Three-source merge names `coaches` and `coach_seasons`, but only describes deduplication for `coaches`; no grain, authority, or key proof for second REST table. Fix: add each source’s exact grain, bridge, conflict policy, and row-preservation gate.
+
+VERDICT: REVISE
+
+### Claude's response
+
+**All four accepted and applied.** Two dissolved once the warehouse was checked.
+
+- *Coach-season merge lacks team bridge* — the bridge already exists in the REST payload.
+  `stg.coaches__seasons` holds 1,937 rows carrying `seasons_school` beside `seasons_year`, so a
+  REST coach-season resolves to a team without inference. Replaced the flat `coaches` with
+  `coaches__seasons` as the merge source; `coaches` contributes only `hireDate` at coach grain,
+  and its lack of a team is precisely why the Blake Anderson row looked duplicated. Added a
+  three-source grain table and `core.coach_season_unmatched` for rows that resolve ambiguously.
+- *Line period normalization missing* — checked the encoding rather than defending against every
+  possibility: `gql_game_lines.period` is `VARCHAR` with exactly three values and no NULLs —
+  `game` (46,765), `firsthalf` (8,274), `firstquarter` (8,254). Canonical full-game value is
+  `game`; REST normalizes to it; step 6 gates on the expected match count.
+- *New raw version promoted too early* — correct and I had it wrong. Promotion moved from "after
+  steps 5-7" to "after step 9 validates in full", so a failure in the drops or the agreement
+  gates cannot leave a new source active.
+- *Coach target omits `coach_seasons` grain* — added: `(coach_id, team_id, season)`, 1,961 rows,
+  72 columns, bridging directly.
+
+## Resolution — MAX_ROUNDS reached without APPROVED
+
+The loop terminated at its cap. Codex never returned `VERDICT: APPROVED`, so this is recorded as
+a deadlock rather than a convergence, per the skill's rule against faking one.
+
+Honest reading of the trajectory: round 1 returned 15 findings including a hard-rule violation
+(untagged result-informed columns entering `fact_game`) and a self-contradiction between step 8
+and D1. Round 5 returned 4, of which 2 were answered by tables that already existed. Findings
+narrowed from structural to specificational across the five rounds, and 30 of 31 total findings
+were accepted — one rejected with reason (concurrency machinery for a single-writer local file).
+
+Round 5's fixes are **applied but not re-reviewed**. That is the one genuinely open item.

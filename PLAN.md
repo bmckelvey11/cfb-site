@@ -41,8 +41,11 @@ migration is incomplete.
      changed values on stable keys indicate upstream drift and stop the run.
    - **Version selection is explicit.** The loader reads a version manifest naming exactly which
      dump file each entity loads from; it never globs a directory that now holds two generations
-     of the same entity. The new version is promoted in the manifest only after steps 5-7 pass,
-     so a failed run leaves the previous version selected and the warehouse rebuildable from it.
+     of the same entity. The new version is **staged** through every subsequent step and promoted
+     only after step 9's validation passes in full — including the drops and the agreement gates.
+     Promoting after steps 5-7 would leave a new source active when a step 8 or 9 failure means it
+     should not be. A failed run at any point leaves the previous version selected and the
+     warehouse rebuildable from it.
 4. **Prune scaffolding columns.** `prune_null_scaffolding` runs inside `_finish_stg_table`, so it
    is loader-level and survives rebuilds by construction. Rebuild `stg`, then rebuild a second
    time and assert the pruned set is identical — a rebuild that restores a pruned column means
@@ -78,7 +81,7 @@ recomputes it at run time and step 8 obeys the recomputed value.
 | conference | `gql_conference` | `conferences` | `conferenceId` | `core.dim_conference` | merge |
 | calendar | `gql_calendar` | `calendar` | `(season, week)` — 16/16 overlap | `core.dim_week` | merge |
 | coach | `gql_coach` | — | `coachId` | `core.dim_coach` + `core.coach_name_conflicts` | dimension, D3 |
-| coach season | `gql_coach_season` | `coaches`, `coach_seasons` | `(coachId, teamId, season)` after step 3 | `core.fact_coach_season` | merge at season grain |
+| coach season | `gql_coach_season` | `coaches__seasons`, `coach_seasons` | `(coachId, teamId, season)` after step 3 | `core.fact_coach_season` | merge at season grain |
 | recruiting team | `gql_recruiting_team` | `recruiting_teams` | **none — no bridge** | — | deferred |
 | draft position | `gql_draft_position` | `draft_positions` | `name` | — | drop REST |
 | draft team | `gql_draft_team` | `draft_teams` | `name` | — | drop REST |
@@ -126,6 +129,33 @@ concretely. The REST explode already exists: `stg.lines__lines`, produced by
   expected and is not an error.
 - Unmatched offers on either side land in `core.fact_game_line` with a `_provenance` value naming
   the single source, and are counted in the step 6 report.
+
+**Period normalization.** `gql_game_lines.period` is a clean `VARCHAR` with exactly three values
+and no NULLs: `game` (46,765), `firsthalf` (8,274), `firstquarter` (8,254). Canonical full-game
+value is therefore `game`, and REST offers — which carry no period — normalize to it. Step 6
+gates on the expected full-game match count: `lines__lines`' 38,689 offers resolve against the
+46,765 `game` rows, and a match count outside the reported bound fails the step rather than
+silently producing unmatched rows on both sides.
+
+### Coach-season sources and grain
+
+Three sources, each with its grain stated and proven before merge:
+
+| Source | Grain | Bridge to `(coachId, teamId, season)` |
+|---|---|---|
+| `gql_coach_season` | one row per coach-season-team, after step 3 supplies `coach.id` and `team.teamId` | direct |
+| `coaches__seasons` | `(firstName, lastName, seasons_year, seasons_school)` — 1,937 rows | name → `coachId` via `gql_coach`; `seasons_school` → `teamId` via `core.dim_team` |
+| `coach_seasons` | `(coach_id, team_id, season)` — 1,961 rows, 72 columns | direct |
+
+The REST team bridge Codex asked for already exists in the payload: `coaches__seasons` carries
+`seasons_school` alongside `seasons_year`, so a REST coach-season resolves to a team without
+inference. The flat `coaches` table is **not** a merge source — it lacks a team entirely and is
+the one whose Blake Anderson duplicate arises from that omission; it contributes only `hireDate`,
+joined at coach grain.
+
+A REST row whose name resolves to more than one `coachId`, or whose `seasons_school` fails to
+resolve to a `teamId`, is preserved in `core.coach_season_unmatched` with its source keys and is
+never guessed into the fact.
 
 ## What may be dropped (reconciles step 8 with D1)
 
