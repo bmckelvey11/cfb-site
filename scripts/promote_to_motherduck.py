@@ -8,7 +8,8 @@ Usage:
     python scripts/promote_to_motherduck.py --dry-run   # show what would push
     python scripts/promote_to_motherduck.py --yes       # actually push
 
-Requires `motherduck_token` (or `MOTHERDUCK_TOKEN`) env var, or a prior
+Requires `motherduck_token` (or `MOTHERDUCK_TOKEN`) in the environment or as a
+line in the gitignored hub-root `env.env`, or a prior
 `duckdb -c "ATTACH 'md:'"` interactive login on this machine.
 """
 
@@ -18,10 +19,39 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import duckdb
 
 DEFAULT_SCHEMAS = ["raw", "stg", "core", "meta"]
+
+
+_MD_TOKEN_KEYS = ("motherduck_token", "MOTHERDUCK_TOKEN")
+
+
+def load_md_token() -> bool:
+    """Put the MotherDuck token in the environment. True if one was found.
+
+    Same resolution order as ``cfbd_client.find_cfbd_token``: env first, then the
+    gitignored hub-root ``env.env``. Without this, ATTACH falls back to browser SSO,
+    which cannot complete in a non-interactive run.
+    """
+    for key in _MD_TOKEN_KEYS:
+        if os.environ.get(key):
+            os.environ["motherduck_token"] = os.environ[key]
+            return True
+    for parent in Path(__file__).resolve().parents:
+        env = parent / "env.env"
+        if not env.exists():
+            continue
+        for line in env.read_text(encoding="utf-8").splitlines():
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if key.strip() in _MD_TOKEN_KEYS and value.strip():
+                os.environ["motherduck_token"] = value.strip()
+                return True
+    return False
 
 
 def git_sha() -> str | None:
@@ -57,9 +87,10 @@ def main() -> int:
         print("Run with --dry-run first to see what would be pushed.", file=sys.stderr)
         return 1
 
-    if not (os.environ.get("motherduck_token") or os.environ.get("MOTHERDUCK_TOKEN")):
+    if not load_md_token():
         print(
-            "No motherduck_token/MOTHERDUCK_TOKEN set — ATTACH 'md:' will prompt to login."
+            "No motherduck_token found in env or env.env — ATTACH 'md:' will prompt "
+            "for browser SSO, which times out in a non-interactive run."
         )
 
     con = duckdb.connect()
