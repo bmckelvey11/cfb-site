@@ -27,3 +27,9 @@ graphify-out/
 /2026-08-28 10-22-03.txt
 .solopreneur/observer-log.md
 **/.solopreneur/
+
+# Standalone repo with its own remote; not vendored, not a submodule.
+models/over_zero/site/
+
+# Regenerable chart exports dropped at the repo root.
+/hit-rate-graph*.png
