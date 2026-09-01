@@ -496,6 +496,7 @@ def explode_payloads(
         con.execute("SET preserve_insertion_order = false")
         con.execute("SET threads = 1")
         con.execute("CREATE SCHEMA IF NOT EXISTS stg")
+        con.execute("CREATE SCHEMA IF NOT EXISTS stg_gql")
         sources = con.execute(
             """
             SELECT table_schema, table_name
@@ -511,8 +512,8 @@ def explode_payloads(
         for schema, name in sources:
             if only is not None and name not in only:
                 continue
-            dest = stg_dest_name(name)
-            report = _explode_table(con, schema, name, dest)
+            dest_schema, dest = stg_destination(name)
+            report = _explode_table(con, schema, name, dest_schema, dest)
             reports.append(report)
             if progress is not None:
                 progress(report)
@@ -1206,9 +1207,9 @@ def _explode_actionnetwork_history(
               AND json_array_length(json_keys(t.payload)) > 0
             """
         )
-        return _finish_stg_table(con, dest, target)
+        return _finish_stg_table(con, "stg", dest, target)
     except Exception as exc:
-        return _explode_failed(con, target, dest, exc)
+        return _explode_failed(con, "stg", target, dest, exc)
 
 
 def _explode_actionnetwork_scoreboard(
@@ -1314,38 +1315,38 @@ def _explode_actionnetwork_scoreboard(
             WHERE json_extract(t.payload, '$.games') IS NOT NULL
             """
         )
-        return _finish_stg_table(con, dest, target)
+        return _finish_stg_table(con, "stg", dest, target)
     except Exception as exc:
-        return _explode_failed(con, target, dest, exc)
+        return _explode_failed(con, "stg", target, dest, exc)
 
 
 def _finish_stg_table(
-    con: duckdb.DuckDBPyConnection, dest: str, target: str
+    con: duckdb.DuckDBPyConnection, schema: str, dest: str, target: str
 ) -> TableLoad:
-    _rename_stg_table_ids(con, dest)
-    ordered = _reorder_stg_table(con, dest)
+    _rename_stg_table_ids(con, schema, dest)
+    ordered = _reorder_stg_table(con, schema, dest)
     if ordered.error:
         return ordered
     rows = con.execute(f"SELECT COUNT(*) FROM {target}").fetchone()[0]
-    return TableLoad("stg", dest, 1, int(rows))
+    return TableLoad(schema, dest, 1, int(rows))
 
 
 def _explode_failed(
-    con: duckdb.DuckDBPyConnection, target: str, dest: str, exc: Exception
+    con: duckdb.DuckDBPyConnection, schema: str, target: str, dest: str, exc: Exception
 ) -> TableLoad:
     try:
         con.execute(f"DROP TABLE IF EXISTS {target}")
     except Exception:
         pass
     detail = str(exc).split("\n", 1)[0]
-    return TableLoad("stg", dest, 0, 0, error=f"{type(exc).__name__}: {detail}")
+    return TableLoad(schema, dest, 0, 0, error=f"{type(exc).__name__}: {detail}")
 
 
 def _explode_table(
-    con: duckdb.DuckDBPyConnection, schema: str, name: str, dest: str
+    con: duckdb.DuckDBPyConnection, schema: str, name: str, dest_schema: str, dest: str
 ) -> TableLoad:
     source = _qualify(schema, name)
-    target = _qualify("stg", dest)
+    target = _qualify(dest_schema, dest)
     if name == "actionnetwork_history":
         return _explode_actionnetwork_history(con, source, target, dest)
     if name == "actionnetwork_scoreboard":
@@ -1353,7 +1354,7 @@ def _explode_table(
     try:
         structure = _payload_structure(con, source)
         if structure is None:
-            return TableLoad("stg", dest, 0, 0, error="empty payload")
+            return TableLoad(dest_schema, dest, 0, 0, error="empty payload")
         spine = _spine_select(con, source, structure)
         con.execute(f"DROP TABLE IF EXISTS {target}")
         con.execute(
@@ -1371,22 +1372,22 @@ def _explode_table(
             [structure],
         )
         _rename_dotted_columns(con, target)
-        leftover = _flatten_struct_columns(con, "stg", dest)
+        leftover = _flatten_struct_columns(con, dest_schema, dest)
         if leftover is not None and leftover.error:
             return leftover
-        _rename_stg_table_ids(con, dest)
-        ordered = _reorder_stg_table(con, dest)
+        _rename_stg_table_ids(con, dest_schema, dest)
+        ordered = _reorder_stg_table(con, dest_schema, dest)
         if ordered.error:
             return ordered
         rows = con.execute(f"SELECT COUNT(*) FROM {target}").fetchone()[0]
-        return TableLoad("stg", dest, 1, int(rows))
+        return TableLoad(dest_schema, dest, 1, int(rows))
     except Exception as exc:
         try:
             con.execute(f"DROP TABLE IF EXISTS {target}")
         except Exception:
             pass
         detail = str(exc).split("\n", 1)[0]
-        return TableLoad("stg", dest, 0, 0, error=f"{type(exc).__name__}: {detail}")
+        return TableLoad(dest_schema, dest, 0, 0, error=f"{type(exc).__name__}: {detail}")
 
 
 def _flatten_struct_columns(
@@ -1429,8 +1430,8 @@ def _flatten_struct_columns(
             rewrote = True
         if not rewrote:
             return None
-        _rename_stg_table_ids(con, name)
-        ordered = _reorder_stg_table(con, name)
+        _rename_stg_table_ids(con, schema, name)
+        ordered = _reorder_stg_table(con, schema, name)
         if ordered.error:
             return ordered
         rows = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]

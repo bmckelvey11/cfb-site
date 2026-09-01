@@ -223,9 +223,9 @@ def test_explode_payloads_writes_stg_columns(tmp_path):
 
     db_path, _ = build_duckdb(tmp_path, include_actionnetwork=False)
     reports = explode_payloads(db_path)
-    by_name = {r.name: r for r in reports if r.error is None}
-    assert by_name["games"].rows == 2
-    assert by_name["gql_game"].rows == 1
+    by_key = {(r.schema, r.name): r for r in reports if r.error is None}
+    assert by_key[("stg", "games")].rows == 2
+    assert by_key[("stg_gql", "game")].rows == 1
 
     import duckdb
 
@@ -233,10 +233,46 @@ def test_explode_payloads_writes_stg_columns(tmp_path):
     homes = con.execute("SELECT homeTeam FROM stg.games ORDER BY gameId").fetchall()
     assert homes == [("A",), ("B",)]
     assert con.execute("SELECT COUNT(*) FROM raw.games").fetchone()[0] == 2
-    assert con.execute("SELECT gameId FROM stg.gql_game").fetchone()[0] == 9
+    assert con.execute("SELECT gameId FROM stg_gql.game").fetchone()[0] == 9
     cols = {row[0] for row in con.execute("DESCRIBE stg.games").fetchall()}
     assert "_season" not in cols and "_week" not in cols
     assert "_source_file" in cols
+
+
+def test_flatten_struct_columns_renames_and_reorders_in_the_stg_gql_schema(tmp_path):
+    """`_flatten_struct_columns` (pre-existing, schema-parameterized) has two internal
+    calls to `_rename_stg_table_ids`/`_reorder_stg_table` that must thread its own
+    `schema` argument through rather than the old 2-arg form. A payload nested one
+    level deep (as in `explode_payloads`) never reaches these lines: DuckDB's
+    `unnest(..., recursive := true)` already flattens simple nested objects before
+    `_flatten_struct_columns` ever sees a STRUCT column, so this constructs a STRUCT
+    column directly the way `test_flatten_stg_nested_rewrites_existing_struct_columns`
+    does, but in `stg_gql` to prove the schema argument is actually used."""
+    import duckdb
+
+    from cfb_system_maker.duckdb_load import _flatten_struct_columns
+
+    db_path = tmp_path / "cfb.duckdb"
+    con = duckdb.connect(str(db_path))
+    con.execute("CREATE SCHEMA stg_gql")
+    con.execute(
+        """
+        CREATE TABLE stg_gql.game AS
+        SELECT
+          9 AS id,
+          2023 AS season,
+          {'id': 5, 'name': 'X'} AS venue
+        """
+    )
+
+    report = _flatten_struct_columns(con, "stg_gql", "game")
+    assert report is not None and report.error is None
+
+    cols = [row[0] for row in con.execute("DESCRIBE stg_gql.game").fetchall()]
+    assert "venue" not in cols
+    assert "venue_id" in cols and "venue_name" in cols
+    assert cols[0] == "gameId"
+    con.close()
 
 
 def test_explode_payloads_only_skips_other_tables(tmp_path):
