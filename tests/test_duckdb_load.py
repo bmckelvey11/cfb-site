@@ -5,6 +5,7 @@ from cfb_system_maker.duckdb_load import (
     backfill_gamelines_from_actionnetwork,
     build_duckdb,
     explode_payloads,
+    explode_stg_lists,
     flatten_stg_nested,
     parse_dump_stem,
     rename_stg_id_columns,
@@ -595,7 +596,7 @@ def test_reorder_stg_columns_rewrites_existing_table_and_restores_views(tmp_path
     cols = [row[0] for row in con.execute("DESCRIBE stg.games").fetchall()]
     assert cols == ["id", "season", "attendance", "_source_file"]
     assert con.execute("SELECT id FROM stg.games_ids").fetchone()[0] == 1
-    assert stg_column_order([(c, "VARCHAR") for c in cols]) == cols
+    assert stg_column_order([(c, "VARCHAR") for c in cols], schema="stg") == cols
 
 
 def test_stg_id_renames_matches_what_the_value_is():
@@ -678,6 +679,35 @@ def test_rename_stg_id_columns_rewrites_bare_id_and_skips_existing_dest(tmp_path
     assert con.execute("SELECT playId, gameId FROM stg.plays").fetchone() == ("10", 99)
     line_cols = {row[0] for row in con.execute("DESCRIBE stg.lines").fetchall()}
     assert line_cols == {"id", "gameId"}
+
+
+def test_explode_stg_lists_explodes_both_stg_and_stg_gql():
+    import duckdb
+
+    con = duckdb.connect(":memory:")
+    con.execute("CREATE SCHEMA stg")
+    con.execute("CREATE SCHEMA stg_gql")
+    con.execute("CREATE TABLE stg.games AS SELECT 1 AS gameId, [1, 2]::INTEGER[] AS scores")
+    con.execute("CREATE TABLE stg_gql.game AS SELECT 1 AS gameId, [3, 4]::INTEGER[] AS scores")
+    reports = explode_stg_lists(con)
+    by_key = {(r.schema, r.name): r for r in reports}
+    assert by_key[("stg", "games__scores")].rows == 2
+    assert by_key[("stg_gql", "game__scores")].rows == 2
+
+
+def test_reorder_stg_columns_reorders_both_schemas():
+    import duckdb
+
+    con = duckdb.connect(":memory:")
+    con.execute("CREATE SCHEMA stg")
+    con.execute("CREATE SCHEMA stg_gql")
+    con.execute("CREATE TABLE stg.games AS SELECT 'x' AS extra, 1 AS gameId")
+    con.execute("CREATE TABLE stg_gql.game AS SELECT 'x' AS extra, 1 AS gameId")
+    reorder_stg_columns(con)
+    stg_cols = [r[0] for r in con.execute("DESCRIBE stg.games").fetchall()]
+    gql_cols = [r[0] for r in con.execute("DESCRIBE stg_gql.game").fetchall()]
+    assert stg_cols[0] == "gameId"
+    assert gql_cols[0] == "gameId"
 
 
 def test_duckdb_cli_writes_db(tmp_path, capsys):

@@ -268,35 +268,36 @@ def reorder_stg_columns(
     con = duckdb.connect(str(db)) if owns_connection else db
     reports: list[TableLoad] = []
     try:
-        views = con.execute(
-            """
-            SELECT view_name, sql
-            FROM duckdb_views()
-            WHERE schema_name = 'stg'
-            ORDER BY view_name
-            """
-        ).fetchall()
-        for view_name, _sql in views:
-            con.execute(f"DROP VIEW IF EXISTS {_qualify('stg', view_name)}")
-        tables = [
-            row[0]
-            for row in con.execute(
-                """
-                SELECT table_name
-                FROM duckdb_tables()
-                WHERE schema_name = 'stg'
-                ORDER BY table_name
+        for schema in _STG_SCHEMAS:
+            views = con.execute(
+                f"""
+                SELECT view_name, sql
+                FROM duckdb_views()
+                WHERE schema_name = '{schema}'
+                ORDER BY view_name
                 """
             ).fetchall()
-        ]
-        for name in tables:
-            report = _reorder_stg_table(con, name)
-            reports.append(report)
-            if progress is not None:
-                progress(report)
-            con.execute("CHECKPOINT")
-        for view_name, sql in views:
-            con.execute(sql)
+            for view_name, _sql in views:
+                con.execute(f"DROP VIEW IF EXISTS {_qualify(schema, view_name)}")
+            tables = [
+                row[0]
+                for row in con.execute(
+                    f"""
+                    SELECT table_name
+                    FROM duckdb_tables()
+                    WHERE schema_name = '{schema}'
+                    ORDER BY table_name
+                    """
+                ).fetchall()
+            ]
+            for name in tables:
+                report = _reorder_stg_table(con, schema, name)
+                reports.append(report)
+                if progress is not None:
+                    progress(report)
+                con.execute("CHECKPOINT")
+            for view_name, sql in views:
+                con.execute(sql)
     finally:
         if owns_connection:
             con.close()
@@ -342,48 +343,49 @@ def rename_stg_id_columns(
     con = duckdb.connect(str(db)) if owns_connection else db
     reports: list[TableLoad] = []
     try:
-        views = con.execute(
-            """
-            SELECT view_name, sql
-            FROM duckdb_views()
-            WHERE schema_name = 'stg'
-            ORDER BY view_name
-            """
-        ).fetchall()
-        for view_name, _sql in views:
-            con.execute(f"DROP VIEW IF EXISTS {_qualify('stg', view_name)}")
-        tables = [
-            row[0]
-            for row in con.execute(
-                """
-                SELECT table_name
-                FROM duckdb_tables()
-                WHERE schema_name = 'stg'
-                ORDER BY table_name
+        for schema in _STG_SCHEMAS:
+            views = con.execute(
+                f"""
+                SELECT view_name, sql
+                FROM duckdb_views()
+                WHERE schema_name = '{schema}'
+                ORDER BY view_name
                 """
             ).fetchall()
-        ]
-        for name in tables:
-            renamed = _rename_stg_table_ids(con, name)
-            if renamed:
-                ordered = _reorder_stg_table(con, name)
-                if ordered.error:
-                    reports.append(ordered)
+            for view_name, _sql in views:
+                con.execute(f"DROP VIEW IF EXISTS {_qualify(schema, view_name)}")
+            tables = [
+                row[0]
+                for row in con.execute(
+                    f"""
+                    SELECT table_name
+                    FROM duckdb_tables()
+                    WHERE schema_name = '{schema}'
+                    ORDER BY table_name
+                    """
+                ).fetchall()
+            ]
+            for name in tables:
+                renamed = _rename_stg_table_ids(con, schema, name)
+                if renamed:
+                    ordered = _reorder_stg_table(con, schema, name)
+                    if ordered.error:
+                        reports.append(ordered)
+                    else:
+                        reports.append(TableLoad(schema, name, renamed, ordered.rows))
                 else:
-                    reports.append(TableLoad("stg", name, renamed, ordered.rows))
-            else:
-                rows = con.execute(
-                    f"SELECT COUNT(*) FROM {_qualify('stg', name)}"
-                ).fetchone()[0]
-                reports.append(TableLoad("stg", name, 0, int(rows)))
-            if progress is not None:
-                progress(reports[-1])
-            con.execute("CHECKPOINT")
-        for view_name, sql in views:
-            try:
-                con.execute(sql)
-            except Exception:
-                pass
+                    rows = con.execute(
+                        f"SELECT COUNT(*) FROM {_qualify(schema, name)}"
+                    ).fetchone()[0]
+                    reports.append(TableLoad(schema, name, 0, int(rows)))
+                if progress is not None:
+                    progress(reports[-1])
+                con.execute("CHECKPOINT")
+            for view_name, sql in views:
+                try:
+                    con.execute(sql)
+                except Exception:
+                    pass
     finally:
         if owns_connection:
             con.close()
@@ -789,16 +791,16 @@ def promote_timestamp_columns(
     try:
         candidates = con.execute(
             """
-            SELECT table_name, column_name
+            SELECT table_schema, table_name, column_name
             FROM information_schema.columns
-            WHERE table_schema = 'stg'
+            WHERE table_schema IN ('stg', 'stg_gql')
               AND data_type = 'VARCHAR'
               AND (lower(column_name) LIKE '%date%' OR lower(column_name) LIKE '%time%')
-            ORDER BY table_name, column_name
+            ORDER BY table_schema, table_name, column_name
             """
         ).fetchall()
-        for table, column in candidates:
-            target = _qualify("stg", table)
+        for schema, table, column in candidates:
+            target = _qualify(schema, table)
             expr = _timestamp_expr(column)
             label = f"{table}.{column}"
             try:
@@ -819,10 +821,10 @@ def promote_timestamp_columns(
             except Exception as exc:
                 detail = str(exc).splitlines()[0] if str(exc) else ""
                 report = TableLoad(
-                    "stg", label, 0, 0, error=f"{type(exc).__name__}: {detail}"
+                    schema, label, 0, 0, error=f"{type(exc).__name__}: {detail}"
                 )
             else:
-                report = TableLoad("stg", label, 1, int(parsed))
+                report = TableLoad(schema, label, 1, int(parsed))
             reports.append(report)
             if progress is not None:
                 progress(report)
@@ -850,14 +852,14 @@ def flatten_stg_nested(
         con.execute("SET threads = 1")
         tables = con.execute(
             """
-            SELECT table_name
+            SELECT table_schema, table_name
             FROM information_schema.tables
-            WHERE table_schema = 'stg'
-            ORDER BY table_name
+            WHERE table_schema IN ('stg', 'stg_gql')
+            ORDER BY table_schema, table_name
             """
         ).fetchall()
-        for (name,) in tables:
-            report = _flatten_struct_columns(con, "stg", name)
+        for schema, name in tables:
+            report = _flatten_struct_columns(con, schema, name)
             if report is None:
                 continue
             reports.append(report)
@@ -872,6 +874,7 @@ def flatten_stg_nested(
 
 _EXPLODE_MAX_DEPTH = 6
 _CHILD_SEP = "__"
+_STG_SCHEMAS = ("stg", "stg_gql")
 
 
 def explode_stg_lists(
@@ -898,31 +901,32 @@ def explode_stg_lists(
     try:
         con.execute("SET preserve_insertion_order = false")
         con.execute("SET threads = 1")
-        for (stale,) in con.execute(
-            f"""
-            SELECT table_name FROM duckdb_tables()
-            WHERE schema_name = 'stg'
-              AND contains(table_name, '{_CHILD_SEP}')
-              AND NOT ends_with(table_name, '{_CHILD_SEP}backfill')
-            ORDER BY table_name
-            """
-        ).fetchall():
-            # Scoped to the selected roots: an --only run must not drop the
-            # children of every table it is not rebuilding.
-            if only is not None and stale.split(_CHILD_SEP, 1)[0] not in only:
-                continue
-            con.execute(f"DROP TABLE IF EXISTS {_qualify('stg', stale)}")
-        roots = [
-            row[0]
-            for row in con.execute(
-                "SELECT table_name FROM duckdb_tables()"
-                " WHERE schema_name = 'stg' ORDER BY table_name"
-            ).fetchall()
-        ]
-        for name in roots:
-            if only is not None and name not in only:
-                continue
-            _explode_nested_columns(con, name, 0, reports, progress)
+        for schema in _STG_SCHEMAS:
+            for (stale,) in con.execute(
+                f"""
+                SELECT table_name FROM duckdb_tables()
+                WHERE schema_name = '{schema}'
+                  AND contains(table_name, '{_CHILD_SEP}')
+                  AND NOT ends_with(table_name, '{_CHILD_SEP}backfill')
+                ORDER BY table_name
+                """
+            ).fetchall():
+                # Scoped to the selected roots: an --only run must not drop the
+                # children of every table it is not rebuilding.
+                if only is not None and stale.split(_CHILD_SEP, 1)[0] not in only:
+                    continue
+                con.execute(f"DROP TABLE IF EXISTS {_qualify(schema, stale)}")
+            roots = [
+                row[0]
+                for row in con.execute(
+                    f"SELECT table_name FROM duckdb_tables()"
+                    f" WHERE schema_name = '{schema}' ORDER BY table_name"
+                ).fetchall()
+            ]
+            for name in roots:
+                if only is not None and name not in only:
+                    continue
+                _explode_nested_columns(con, schema, name, 0, reports, progress)
     finally:
         if owns_connection:
             con.close()
@@ -940,6 +944,7 @@ def _is_nested_type(dtype: object) -> str | None:
 
 def _explode_nested_columns(
     con: duckdb.DuckDBPyConnection,
+    schema: str,
     table: str,
     depth: int,
     reports: list[TableLoad],
@@ -948,32 +953,33 @@ def _explode_nested_columns(
     if depth >= _EXPLODE_MAX_DEPTH:
         return
     nested = []
-    for row in con.execute(f"DESCRIBE {_qualify('stg', table)}").fetchall():
+    for row in con.execute(f"DESCRIBE {_qualify(schema, table)}").fetchall():
         kind = _is_nested_type(row[1])
         if kind is not None:
             nested.append((row[0], kind))
     siblings = [col for col, _ in nested]
     for col, kind in nested:
         dest = f"{table}{_CHILD_SEP}{col}"
-        report = _explode_nested_column(con, table, col, kind, dest, siblings)
+        report = _explode_nested_column(con, schema, table, col, kind, dest, siblings)
         reports.append(report)
         if progress is not None:
             progress(report)
         con.execute("CHECKPOINT")
         if report.error is None and report.rows:
-            _explode_nested_columns(con, dest, depth + 1, reports, progress)
+            _explode_nested_columns(con, schema, dest, depth + 1, reports, progress)
 
 
 def _explode_nested_column(
     con: duckdb.DuckDBPyConnection,
+    schema: str,
     parent: str,
     col: str,
     kind: str,
     dest: str,
     siblings: list[str],
 ) -> TableLoad:
-    source = _qualify("stg", parent)
-    target = _qualify("stg", dest)
+    source = _qualify(schema, parent)
+    target = _qualify(schema, dest)
     exclude = ", ".join(_ident(name) for name in siblings)
     col_id = _ident(col)
     idx_id = _ident(f"{col}_idx")
@@ -982,7 +988,7 @@ def _explode_nested_column(
         if kind == "json":
             if not _explode_json_column(con, source, target, col, exclude):
                 return TableLoad(
-                    "stg", dest, 0, 0, error="scalar JSON; nothing to explode"
+                    schema, dest, 0, 0, error="scalar JSON; nothing to explode"
                 )
         else:
             con.execute(
@@ -995,13 +1001,13 @@ def _explode_nested_column(
                 WHERE {col_id} IS NOT NULL AND len({col_id}) > 0
                 """
             )
-        leftover = _flatten_struct_columns(con, "stg", dest)
+        leftover = _flatten_struct_columns(con, schema, dest)
         if leftover is not None and leftover.error:
             return leftover
         rows = con.execute(f"SELECT COUNT(*) FROM {target}").fetchone()[0]
-        return TableLoad("stg", dest, 1, int(rows))
+        return TableLoad(schema, dest, 1, int(rows))
     except Exception as exc:
-        return _explode_failed(con, target, dest, exc)
+        return _explode_failed(con, schema, target, dest, exc)
 
 
 def _explode_json_column(
