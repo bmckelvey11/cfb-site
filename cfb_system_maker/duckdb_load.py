@@ -510,6 +510,9 @@ def explode_payloads(
             if progress is not None:
                 progress(extra)
             con.execute("CHECKPOINT")
+        for report in promote_timestamp_columns(con, progress=progress):
+            reports.append(report)
+        con.execute("CHECKPOINT")
     finally:
         if owns_connection:
             con.close()
@@ -733,6 +736,83 @@ def _backfill_gamelines(con: duckdb.DuckDBPyConnection, tables: set[str]) -> Tab
         )
 
     return _finish_stg_table(con, "gameLines", _qualify("stg", "gameLines"))
+
+# Kickoff strings land in three shapes: REST "2023-09-02 16:00:00+00:00",
+# GraphQL naive "2023-09-02T16:00:00", Action Network "...T23:30:00.000Z".
+# Naive values are UTC at the source, so stamp the zone instead of letting the
+# session timezone decide.
+_TS_OFFSET_RE = "(Z|[+-][0-9]{2}:?[0-9]{2})$"
+
+
+def _timestamp_expr(column: str) -> str:
+    col = _ident(column)
+    return (
+        f"TRY_CAST(CASE WHEN regexp_matches({col}, '{_TS_OFFSET_RE}')"
+        f" THEN {col} ELSE {col} || '+00:00' END AS TIMESTAMPTZ)"
+    )
+
+
+def promote_timestamp_columns(
+    db: str | Path | duckdb.DuckDBPyConnection,
+    *,
+    progress: Callable[[TableLoad], None] | None = None,
+) -> list[TableLoad]:
+    """Retype ``stg.*`` VARCHAR date/time columns as ``TIMESTAMPTZ``.
+
+    ``json_group_structure`` sees a kickoff timestamp as a JSON string, so the
+    shred lands it as VARCHAR and every downstream date comparison becomes
+    string math. A column is promoted only when every non-null value parses,
+    which leaves name-alikes such as ``location_timezone`` (an IANA zone name)
+    and ``venues.timezone`` alone without needing a deny-list. Idempotent:
+    already-typed columns no longer match the VARCHAR filter.
+    """
+    owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
+    con = duckdb.connect(str(db)) if owns_connection else db
+    reports: list[TableLoad] = []
+    try:
+        candidates = con.execute(
+            """
+            SELECT table_name, column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'stg'
+              AND data_type = 'VARCHAR'
+              AND (lower(column_name) LIKE '%date%' OR lower(column_name) LIKE '%time%')
+            ORDER BY table_name, column_name
+            """
+        ).fetchall()
+        for table, column in candidates:
+            target = _qualify("stg", table)
+            expr = _timestamp_expr(column)
+            label = f"{table}.{column}"
+            try:
+                parsed, unparsed = con.execute(
+                    f"""
+                    SELECT
+                      count(*) FILTER (WHERE {_ident(column)} IS NOT NULL),
+                      count(*) FILTER (WHERE {_ident(column)} IS NOT NULL AND {expr} IS NULL)
+                    FROM {target}
+                    """
+                ).fetchone()
+                if not parsed or unparsed:
+                    continue
+                con.execute(
+                    f"ALTER TABLE {target} ALTER COLUMN {_ident(column)} "
+                    f"TYPE TIMESTAMPTZ USING {expr}"
+                )
+            except Exception as exc:
+                detail = str(exc).splitlines()[0] if str(exc) else ""
+                report = TableLoad(
+                    "stg", label, 0, 0, error=f"{type(exc).__name__}: {detail}"
+                )
+            else:
+                report = TableLoad("stg", label, 1, int(parsed))
+            reports.append(report)
+            if progress is not None:
+                progress(report)
+    finally:
+        if owns_connection:
+            con.close()
+    return reports
 
 
 def flatten_stg_nested(

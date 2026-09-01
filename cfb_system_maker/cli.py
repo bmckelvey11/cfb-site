@@ -24,6 +24,7 @@ from cfb_system_maker.duckdb_load import (
     build_duckdb,
     explode_payloads,
     flatten_stg_nested,
+    promote_timestamp_columns,
     rename_stg_id_columns,
     reorder_stg_columns,
 )
@@ -550,6 +551,23 @@ def _duckdb(args: argparse.Namespace) -> int:
         print(f"Wrote nested columns into {db_path}")
         return 1 if failed and not ok else 0
 
+    if args.promote_timestamps:
+        db_path = (
+            Path(args.output) if args.output else Path(args.data_dir) / "cfb.duckdb"
+        )
+        if not db_path.exists():
+            print(
+                f"No DuckDB file at {db_path}. Run `duckdb` without --promote-timestamps first."
+            )
+            return 1
+        reports = promote_timestamp_columns(db_path, progress=_progress)
+        ok = [r for r in reports if r.error is None]
+        failed = [r for r in reports if r.error is not None]
+        print()
+        print(f"{len(ok)} column(s) retyped to TIMESTAMPTZ, {len(failed)} failed.")
+        print(f"Wrote column types into {db_path}")
+        return 1 if failed and not ok else 0
+
     if args.explode_only:
         db_path = (
             Path(args.output) if args.output else Path(args.data_dir) / "cfb.duckdb"
@@ -801,6 +819,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--explode-only",
         action="store_true",
         help="explode payloads in an existing DuckDB file; do not reload JSON",
+    )
+    duckdb_parser.add_argument(
+        "--promote-timestamps",
+        action="store_true",
+        help="retype stg.* VARCHAR date/time columns as TIMESTAMPTZ",
     )
     duckdb_parser.add_argument(
         "--flatten-nested",

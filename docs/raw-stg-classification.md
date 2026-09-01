@@ -66,8 +66,14 @@ this layer filters or dedupes. `stg` is a pure shred.
 
 ## Gaps
 
-1. **No temporal types at all.** Zero `DATE` or `TIMESTAMP` columns exist in `stg`,
-   against 34 columns named for a date or time. `startDate` is a VARCHAR.
+1. ~~**No temporal types at all.**~~ **Fixed 2026-08-31.** 20 VARCHAR date/time columns
+   were promoted to `TIMESTAMPTZ` by `promote_timestamp_columns` in `duckdb_load.py`,
+   which also runs at the end of every `explode_payloads`. Source strings arrive in three
+   shapes — REST `2023-09-02 16:00:00+00:00`, GraphQL naive `2023-09-02T16:00:00`, and
+   Action Network `...T23:30:00.000Z` — and naive values are stamped UTC rather than left
+   to the session timezone. The three remaining VARCHARs (`venues.timezone`,
+   `teams.location_timezone`, `fbs_teams.location_timezone`) hold IANA zone names and are
+   correctly excluded: promotion requires every non-null value to parse.
 2. **`actionnetwork_odds` is never staged.** It is the only `raw` table already flat
    (23 typed columns, live odds shape). No `stg` counterpart, so it is invisible to
    anything reading the staged layer.
@@ -75,8 +81,16 @@ this layer filters or dedupes. `stg` is a pure shred.
    straight from the source JSON keys. Defensible in `raw`; a real cost in `stg`, where
    it forces quoting and blocks generated SQL.
 
-Ordered by payoff: (1) is the cheapest fix with the widest blast radius — every date
-comparison downstream is currently string math.
+Remaining, ordered by payoff: (2) then (3).
+
+## Separately: `core.fact_game_line.spread_open` is entirely NULL
+
+Not a `stg` issue, found while verifying the above. All 38,689 rows in
+`core.fact_game_line` have `spread_open IS NULL` (against 89 NULL `spread_close`), so
+`tests/test_core_agreement.py::test_live_warehouse_agreement_4_5_6` fails on
+`assert row[1] == moves["spread_open"]`. The opening number exists in `stg`; the core
+build never carries it across. `meta.warehouse_version` is also absent locally, so this
+`core` predates the documented build.
 
 ## Mirror drift
 
