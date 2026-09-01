@@ -16,7 +16,7 @@ from typing import Any, Callable, Iterable
 
 import duckdb
 
-from cfb_system_maker.graphql_client import GQL_ENTITY_TO_STG
+from cfb_system_maker.graphql_client import GQL_ENTITY_TO_RAW, GQL_ENTITY_TO_STG, GQL_RAW_TO_ENTITY
 
 # Skip account-metering telemetry (docs/data-coverage.md).
 _SKIP_STEMS = frozenset({"user_info"})
@@ -1086,15 +1086,18 @@ def _json_keys_are_numeric(
     return bool(row and row[0])
 
 
-def stg_dest_name(name: str) -> str:
-    """`stg` destination for a source table name.
+def stg_destination(name: str) -> tuple[str, str]:
+    """``(schema, name)`` in `stg`/`stg_gql` for a raw table name.
 
-    Pure function of the name alone. GraphQL entities map through the explicit table
-    in `graphql_client`; REST endpoint names pass through unchanged. The previous
-    implementation took a `taken` set and resolved clashes by load order, which made a
-    table's provenance depend on the order loads happened to run in.
+    Pure function of the raw table name alone. A GraphQL raw table (named through
+    `GQL_ENTITY_TO_RAW`, e.g. `gql_game`) resolves through `GQL_RAW_TO_ENTITY` back to
+    its entity, then through `GQL_ENTITY_TO_STG` to its bare `stg_gql` destination.
+    Anything else is a REST raw table name and passes through unchanged into `stg`.
     """
-    return GQL_ENTITY_TO_STG.get(name, name)
+    entity = GQL_RAW_TO_ENTITY.get(name)
+    if entity is None:
+        return "stg", name
+    return "stg_gql", GQL_ENTITY_TO_STG[entity]
 
 
 def _payload_structure(con: duckdb.DuckDBPyConnection, source: str) -> str | None:
@@ -1496,7 +1499,7 @@ def _plan_loads(
             name, _, _, _ = parse_dump_stem(path.stem)
             gql_groups.setdefault(name, []).append(path)
         for name, paths in sorted(gql_groups.items()):
-            dest = stg_dest_name(name)
+            dest = GQL_ENTITY_TO_RAW.get(name, name)
             if only is not None and name not in only and dest not in only:
                 continue
             jobs.append(

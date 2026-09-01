@@ -10,33 +10,30 @@ from cfb_system_maker.duckdb_load import (
     rename_stg_id_columns,
     reorder_stg_columns,
     stg_column_order,
-    stg_dest_name,
+    stg_destination,
     stg_id_renames,
 )
 
 
-def test_stg_dest_name_is_order_independent():
-    # The old helper took a `taken` set populated as loads proceeded, so whether the
-    # GraphQL or the REST table won an unsuffixed name depended on load order. The
-    # new one is a pure function: same input, same output, always.
-    assert stg_dest_name("calendar") == "gql_calendar"
-    assert stg_dest_name("calendar") == "gql_calendar"
-    assert stg_dest_name("gameLines") == "gql_game_lines"
+def test_stg_destination_resolves_graphql_raw_names_to_stg_gql():
+    assert stg_destination("gql_calendar") == ("stg_gql", "calendar")
+    assert stg_destination("gql_game_lines") == ("stg_gql", "game_lines")
+    assert stg_destination("gql_draft_picks") == ("stg_gql", "draft_picks")
 
 
-def test_stg_dest_name_passes_rest_names_through():
-    assert stg_dest_name("games") == "games"
-    assert stg_dest_name("draft_picks") == "draft_picks"
-    assert stg_dest_name("advanced_box_score") == "advanced_box_score"
+def test_stg_destination_passes_rest_names_through_to_stg():
+    assert stg_destination("games") == ("stg", "games")
+    assert stg_destination("draft_picks") == ("stg", "draft_picks")
+    assert stg_destination("advanced_box_score") == ("stg", "advanced_box_score")
 
 
-def test_gql_destinations_never_collide_with_rest_destinations():
-    from cfb_system_maker.graphql_client import GQL_ENTITY_TO_STG
+def test_gql_destinations_never_collide_with_rest_destinations_in_the_same_schema():
+    from cfb_system_maker.graphql_client import GQL_ENTITY_TO_RAW
 
-    rest_names = {"games", "coaches", "conferences", "draft_picks", "recruits",
-                  "recruiting_teams", "coach_seasons", "predicted_points", "talent",
-                  "lines", "calendar", "draft_positions", "draft_teams"}
-    assert not (set(GQL_ENTITY_TO_STG.values()) & rest_names)
+    rest_raw_names = {"games", "coaches", "conferences", "draft_picks", "recruits",
+                       "recruiting_teams", "coach_seasons", "predicted_points", "talent",
+                       "lines", "calendar", "draft_positions", "draft_teams"}
+    assert not (set(GQL_ENTITY_TO_RAW.values()) & rest_raw_names)
 
 
 def test_parse_dump_stem_splits_season_and_week():
