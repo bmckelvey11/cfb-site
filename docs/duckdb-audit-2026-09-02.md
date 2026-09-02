@@ -18,13 +18,13 @@ Findings below are empirical, from the live database, and cross-checked against
 **Scope note.** No index or normalization recommendations are given. DuckDB is columnar with
 automatic zone maps, and `raw`/`stg` are deliberate 1:1 JSON mirrors with no relational contract —
 normal-form and B-tree analysis would produce hundreds of findings, all noise. The only layer with
-a designed contract is `core`, and per S1 it does not exist.
+a designed contract is `core`, and per S1 it is empty.
 
 ## Findings, worst first
 
 | # | Severity | Finding |
 |---|---|---|
-| S1 | **Critical** | `core` layer absent; `build_core` is broken and its test can't see it |
+| S1 | **Critical** | `core` empty; `build_core` fails daily and its test can't see it |
 | S2 | **High** | `season_type` 100% NULL on 25 `stg` tables including `stg.games` |
 | S3 | **High** | The REST week spine (`raw.calendar`) never reaches `stg` |
 | S4 | Medium | Documented `game_lines` grain is wrong — 12,991 apparent dupes |
@@ -35,31 +35,59 @@ a designed contract is `core`, and per S1 it does not exist.
 
 ---
 
-### S1 — Critical: `core` does not exist, and `build_core` cannot build it
+### S1 — Critical: `core` is empty, and `build_core` fails on every refresh
 
-Live schemas are `raw` (120), `stg` (134), `stg_gql` (38), `meta` (1). There is **no `core`
-schema, no `mart`, and zero views** — see §1. The warehouse is an unconformed staging mirror.
+Live schemas are `raw` (120), `stg` (134), `stg_gql` (38), `meta` (1) and an **empty `core`** —
+0 tables, plus no `mart` and zero views (§1). The warehouse is an unconformed staging mirror.
 
-Root cause: [`cfb_system_maker/duckdb_core.py:87`](../cfb_system_maker/duckdb_core.py:87)
-builds `core.dim_week` with `FROM stg.calendar`. That table does not exist. The GraphQL staging
-rename on 2026-09-01 moved it to `stg_gql.calendar`, and the REST calendar was never exploded
-into `stg` at all (S3). `_build_dim_week` is the **first** builder `build_core` calls, so the
-whole build aborts before a single `core` table is created.
+Root cause, confirmed by the refresh log — not inferred. `data/logs/cfbd_refresh.log`,
+2026-09-01 05:00:
 
-Two reasons this went unnoticed:
+```
+=== rebuild cfb.duckdb ===
+  File "scripts/refresh_cfbd.py", line 69, in main
+    built = build_core(db_path)
+  File "cfb_system_maker/duckdb_core.py", line 43, in build_core
+    _build_dim_week(con)
+_duckdb.CatalogException: Catalog Error: Table with name calendar does not exist!
+Did you mean "raw.calendar"?
+LINE 18:           FROM stg.calendar
+---- exited 1 ----
+```
 
-- [`tests/test_core_agreement.py:87`](../tests/test_core_agreement.py:87) creates its own
-  `stg.calendar` fixture — the pre-migration name. The agreement gates pass against a schema
-  the warehouse no longer has.
-- [`scripts/refresh_cfbd.py:69`](../scripts/refresh_cfbd.py:69) calls `build_core` on every
-  daily refresh, so this fails daily.
+[`duckdb_core.py:87`](../cfb_system_maker/duckdb_core.py:87) builds `core.dim_week` with
+`FROM stg.calendar`. That table does not exist: the GraphQL staging rename on 2026-09-01 moved
+it to `stg_gql.calendar`, and the REST calendar was never exploded into `stg` at all (S3).
+`_build_dim_week` is the first call in `build_core`'s body
+([`duckdb_core.py:43`](../cfb_system_maker/duckdb_core.py:43)), so the run aborts before any
+`core` table is created. The `CREATE SCHEMA IF NOT EXISTS core` on the line above committed —
+which is why an empty `core` schema sits in the live file — and nothing after it did.
 
-Blast radius — unresolvable references in committed code: `core.fact_game` (10),
-`core.fact_game_line` (5), `core.fact_game_team` (4), `core.dim_team` (4),
-`core.dim_conference` (4), plus `dim_week` / `dim_venue` / `dim_lines_provider`.
+Why nobody noticed: [`tests/test_core_agreement.py:87`](../tests/test_core_agreement.py:87)
+creates its own `stg.calendar` fixture, the pre-migration name. All 703 tests pass against a
+schema the warehouse no longer has, so the agreement gates cannot see this class of break.
 
-**Fix:** repoint `_build_dim_week` at the surviving calendar source, and change the test fixture
-to build the same table name the loader produces so the gate can fail for real.
+Blast radius is narrower than it first looks: **nothing in production reads `core`.** Every
+reference outside the builder lives in `tests/test_core_agreement.py`, and its
+live-warehouse tests `pytest.skip` when `core.fact_game` is missing
+([line 605](../tests/test_core_agreement.py:605)) — so they skip silently rather than fail.
+`cfb_system_maker`, `models/` and `research/` all still read the Python
+`GameRecord` / `features.json` path. The accurate statement is: the layer three design docs
+treat as the conformance target has never existed in a shipped build, and the daily refresh has
+been failing to create it since the rename.
+
+**Fix:** `_build_dim_week` needs a source carrying `(season, week, seasonType)`. Neither
+surviving calendar table offers that — `stg_gql.calendar` has `season` 100% NULL with the value
+in `year` (S3), so this is a re-source, not a repoint. `raw.calendar` is the right source: its
+JSON payload has exactly `season` / `seasonType` / `week` / `startDate` / `endDate` across
+2012–2026 (258 rows), readable via `json_extract` the way `_build_dim_team` already reads
+`raw.teams`. Then change the test fixture to build whatever the loader actually produces, so the
+gate can fail for real.
+
+**Separately, the 2026-09-02 05:00 refresh never reached `build_core`.** The log records that run
+starting and nothing after it, and `data/cfb.duckdb.building` was left at 2.2 GB holding 53 of
+120 `raw` tables with a 30 MB uncheckpointed WAL, stamped 05:07 (S8). That is a second,
+independent failure inside the raw rebuild — investigate it separately from the `dim_week` break.
 
 ### S2 — High: `season_type` is 100% NULL on `stg.games` and 24 other tables
 
@@ -74,7 +102,9 @@ file, the filename-derived column is NULL while the payload twin holds the truth
 
 `stg.games.seasonType` splits regular 52,984 / postseason 751 / spring_regular 504 /
 spring_postseason 28. A query filtering `season_type = 'postseason'` returns **zero rows,
-silently** — the failure mode is an empty result set, not an error. Same shape on `stg.lines`,
+silently** — the failure mode is an empty result set, not an error. No committed code reads
+`season_type` off DuckDB today, so this is a latent trap rather than active breakage; it will
+bite the first `core`/`mart` query or ad-hoc analysis that trusts the column name. Same shape on `stg.lines`,
 `stg.weather`, `stg.media`, `stg.ppa_games`, `stg.rankings*`, `stg.advanced_game_stats`, and on
 nine `stg_gql` tables where `season` is NULL and `year` is populated (`recruit` 93,363,
 `ratings` 14,730, `draft_picks` 13,080, `coach_season` 12,564, …).

@@ -312,7 +312,11 @@ CREATE TABLE game_lines (
     over_under_open     NUMERIC,
     moneyline_home      INT,
     moneyline_away      INT,
-    PRIMARY KEY (game_id, lines_provider_id)
+    -- CORRECTED 2026-09-02, see duckdb-audit-2026-09-02.md S4: this key is not unique.
+    -- Live stg_gql.game_lines has 12,991 dupes on (game_id, lines_provider_id) over
+    -- 59,627 rows; adding `period` makes it unique. Any core fact built on the key
+    -- below fans out 22% of its rows.
+    PRIMARY KEY (game_id, lines_provider_id, period)
 );
 
 -- surrogate id not exposed by the API — synthesize one on load (e.g. serial),
