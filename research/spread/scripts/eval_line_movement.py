@@ -156,7 +156,7 @@ def main() -> int:
                   "margin": margin, **{k: preds[k] for k in ["R0", "E4"] + METHODS}})[sup].to_csv(
         OUT / f"pt_movement_preds{suffix}.csv", index=False)
     (OUT / f"pt_movement{suffix}.json").write_text(json.dumps(out, indent=2, default=float))
-    print(f"\nwrote {OUT / 'pt_movement_preds.csv'} and {OUT / 'pt_movement.json'}")
+    print(f"\nwrote {OUT / f'pt_movement_preds{suffix}.csv'} and {OUT / f'pt_movement{suffix}.json'}")
     return 0
 
 
