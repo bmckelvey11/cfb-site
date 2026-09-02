@@ -214,7 +214,7 @@ violate rather than being a surprise.
 | 4 | snake_case `gameMedia` / `gamePlayerStat` (§2) | 3 | 4 tables; trivial once there is one schema |
 | 5 | `source_file` → `_source_file` in `raw` (§4) | 1 | column rename, 120 tables |
 | 6 | ADR 0003 superseding 0002 + write down the casing boundary (§3, §5) | 3 | docs only |
-| 7 | Evict PFF + move ad-hoc snapshots out of the loader glob (§7) | — | drops 15 tables; needs your say-so on the files |
+| 7 | ~~Evict PFF + move ad-hoc snapshots out of the loader glob (§7)~~ | — | **DONE `e2e9e5d`** — `data/ingest/` split; drops 15 tables on next rebuild |
 | 8 | Action Network `an_` rename + strip child column prefixes (§8) | 1, 2 | 8 tables, ~60 columns; 1 consumer |
 | 9 | Decide the Massey 72 MB question (§7) | — | in or out, but not neither |
 | 10 | Source rationalization → suffix count goes to zero (§3) | 3 | the real project |
@@ -222,7 +222,34 @@ violate rather than being a surprise.
 1–9 land in the next rebuild. 10 is what removes the last transport-named thing from the schema,
 and it is a data-merge project, not a naming pass.
 
-## 7. Foreign data that leaked into the warehouse
+## 7. Foreign data that leaked into the warehouse — FIXED 2026-09-02 (`e2e9e5d`)
+
+**Done.** `data/` now separates the two jobs `data/raw/` was doing:
+
+```
+data/raw/      warehouse inputs only -- everything here is meant to load
+data/ingest/   landed data the warehouse does not read
+  vendor/      the PFF export
+  snapshots/   7 dated lines_2026_* captures
+  massey/  prediction_tracker/  pt_snapshots/  prediction_tracker_lines.csv
+```
+
+12 items moved by `scripts/split_ingest_staging.py` (reversible; `--revert`). The loader now
+plans **114 raw groups with zero leaked ones**, Action Network intact. `cfb_paths.INGEST` added
+and 6 consumers repointed through it; 715 tests pass and the three moved-data scripts
+(`build_prediction_tracker`, `massey_flatten`, `eval_prediction_tracker_models`) all run.
+
+`data/raw/` deliberately keeps its name rather than becoming `data/staging/`: it feeds the `raw`
+DuckDB schema, so folder and schema stay 1:1, and renaming it would touch 137 call sites — the
+same silent-breakage pattern as §0. The subdirectories were never a leak (the glob is not
+recursive); they moved because they are ingestion-only by nature.
+
+**Still open from this section:** the Massey question below — 496 files, 72 MB, now sitting in
+`data/ingest/massey/`, correctly *out* of the warehouse but still not loaded into it.
+
+The original finding follows.
+
+### Original finding
 
 Checked every `raw`/`stg` table for provenance. Three things do not belong.
 
