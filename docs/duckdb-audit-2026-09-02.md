@@ -75,10 +75,20 @@ feature path disagree on 2,383 games, with the warehouse wrong.
 is zeroed table-wide. It means S8's "74 payload columns 100% NULL" cannot be read as "these
 fields are empty upstream" — an unknown share are sampling casualties holding real data.
 
-**Fix (not yet applied — needs a call on load cost):** when the sampled structure contains a
-`"NULL"`-typed key, re-infer that table's structure over the full column instead of the sample.
-Only tables that actually trip the condition pay for a full scan. The alternative — raising
-`_STRUCTURE_SAMPLE_ROWS` — narrows the window without closing it.
+**Fixed 2026-09-02 (`b3e4eb9`).** `_payload_structure` now collects the JSONPaths that came back
+`"NULL"`-typed and adds one targeted sample per path — rows where *that* path is populated — then
+lets `json_group_structure` merge types across the union.
+
+Two simpler alternatives were measured and rejected:
+
+| Approach | Result |
+|---|---|
+| Re-scan the full column | **OOMs** on `raw.plays` — 12 GiB, 21.8s to fail. This is what the original `LIMIT` was guarding against. |
+| Widen `_STRUCTURE_SAMPLE_ROWS` | Narrows the window without closing it: `plays.wallclock` is still `"NULL"`-typed at a 500,000-row sample. |
+| **Targeted union (shipped)** | Bounded and exact for any key that appears at all. `lines` 0.7s, `plays` 3.0s; every lost field recovered. |
+
+Recovered on the live warehouse after a re-explode: 8,413 opening spreads, 6,917 opening totals
+and 7,899 moneylines in `stg.lines__lines`, all previously zero.
 
 ### S1 — Critical: `core` is empty, and `build_core` fails on every refresh
 

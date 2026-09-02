@@ -116,7 +116,7 @@ phase.
   `Path.replace` overwrites on Windows, so the unlink bought nothing and opened a window where a
   crash left **no warehouse at all**.
 
-## Step 5 — S9: stop the loader discarding all-null-in-sample fields — NOT STARTED
+## Step 5 — S9: stop the loader discarding all-null-in-sample fields — DONE 2026-09-02
 
 **Discovered by step 1.** Building `core` un-skipped the live agreement tests, and they fail on
 2,383 games: `core.fact_game_line.spread_open` / `total_open` / both moneylines are 100% NULL
@@ -126,17 +126,22 @@ while the raw JSON has the values. Root cause and evidence in the audit's S9.
 from that then drops the field for the whole table. Confirmed on `raw.lines`: a 5000-row sample
 types four fields `"NULL"`; a full scan types them `DOUBLE`/`HUGEINT`.
 
-**Proposed fix:** in `_explode_table`, if the sampled structure contains a `"NULL"`-typed key,
-re-infer over the full column. Only tables that trip it pay a full scan. Raising
-`_STRUCTURE_SAMPLE_ROWS` is not a fix — it narrows the window without closing it.
+**Signed off: (a), the conditional re-infer.** Implementing it exposed a wrinkle worth
+recording: the plain full-column re-scan **OOMs on `raw.plays`** (12 GiB, 21.8s to fail) — the
+exact failure the original `LIMIT` comment warned about. Widening the sample is not a fix either:
+`plays.wallclock` is still `"NULL"`-typed at a 500,000-row sample despite being populated in
+1,628,388 rows.
 
-**Needs a call:** full-table inference on the biggest tables (`gamePlayerStat` 5.5M,
-`plays` 2.6M) adds load time to a job that already runs ~2 hours. Options: (a) conditional
-re-infer as above, (b) conditional re-infer with a row cap and a logged warning above it,
-(c) an explicit per-table opt-in list starting with `lines`.
+**Shipped instead, keeping (a)'s semantics:** `_payload_structure` collects the `"NULL"`-typed
+JSONPaths and adds one targeted sample per path — rows where that path is populated — then lets
+`json_group_structure` merge types across the union. Bounded, exact for any key that appears at
+all, and measured at `lines` 0.7s / `plays` 3.0s. Falls back to the sampled structure if the
+union query fails, so a pathological table degrades to today's behavior instead of killing the
+load.
 
-**Check:** `test_live_warehouse_agreement_4_5_6` currently fails; it should pass. Add a unit test
-that a field null in the first N rows and populated later survives the explode.
+**Check (done):** `tests/test_structure_inference.py`, 6 cases — the load-bearing one asserts a
+value past the sample window survives the explode. On the live warehouse a re-explode recovered
+8,413 opening spreads, 6,917 opening totals and 7,899 moneylines, all previously zero.
 
 ## Backlog — real, not urgent
 
@@ -170,5 +175,7 @@ Two operational notes:
 
 - **Step 3 only takes effect on a full rebuild.** The live warehouse still carries its dead spine
   columns until the next `duckdb --explode` run.
-- **Step 5 (S9) is open and is the most serious thing in this document.** Opening lines and
-  moneylines are missing warehouse-wide, which is the input to the active line-movement work.
+- **Step 5 (S9) is fixed, but only a full rebuild propagates it warehouse-wide.** The live file
+  has had `lines` re-exploded; every other table keeps its sampling losses until the next
+  `duckdb --explode`. Anything reading `stg.*` for a field that looks empty should re-check
+  after that run.
