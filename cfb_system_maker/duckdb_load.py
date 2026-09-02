@@ -1187,20 +1187,99 @@ def stg_destination(name: str) -> tuple[str, str]:
     return "stg_gql", GQL_ENTITY_TO_STG[entity]
 
 
+def _null_typed_paths(structure: str) -> list[str]:
+    """JSONPaths that ``json_group_structure`` typed ``"NULL"``, at any depth.
+
+    That is what it returns for a key whose every *sampled* value was null, and
+    the struct built from such a type silently discards the real values in every
+    row outside the sample. `lines.spreadOpen`, `overUnderOpen` and both
+    moneylines were lost warehouse-wide this way, as were `plays.wallclock` and
+    the two timeout counts -- see docs/duckdb-audit-2026-09-02.md S9.
+
+    Array levels come back as ``[*]``: ``$."lines"[*]."spreadOpen"``.
+    """
+    found: list[str] = []
+
+    def walk(node: Any, path: str) -> None:
+        if isinstance(node, str):
+            if node == "NULL":
+                found.append(path)
+        elif isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f'{path}."{key}"')
+        elif isinstance(node, list):
+            for value in node:
+                walk(value, f"{path}[*]")
+
+    try:
+        walk(json.loads(structure), "$")
+    except json.JSONDecodeError:
+        return []
+    return found
+
+
+def _has_null_typed_key(structure: str) -> bool:
+    return bool(_null_typed_paths(structure))
+
+
+def _path_populated_predicate(path: str) -> str:
+    """SQL that is true for rows where ``path`` holds a real (non-null) value."""
+    if "[*]" in path:
+        # json_extract on a wildcard path yields a JSON array of the matches;
+        # keep rows where at least one element is not JSON null.
+        return (
+            f"json_extract(payload, '{path}') IS NOT NULL"
+            f" AND len(list_filter(json_extract(payload, '{path}')::JSON[],"
+            f" x -> json_type(x) <> 'NULL')) > 0"
+        )
+    return f"json_type(payload, '{path}') <> 'NULL'"
+
+
 def _payload_structure(con: duckdb.DuckDBPyConnection, source: str) -> str | None:
     # LIMIT must wrap the scan. json_group_structure is an aggregate, so a top-level
     # LIMIT still unions every row and OOMs on plays / gamePlayerStat.
-    row = con.execute(
-        f"""
-        SELECT json_group_structure(payload)
-        FROM (
-          SELECT payload FROM {source}
-          WHERE payload IS NOT NULL
-          LIMIT {_STRUCTURE_SAMPLE_ROWS}
+    base = (
+        f"SELECT payload FROM {source} WHERE payload IS NOT NULL"
+        f" LIMIT {_STRUCTURE_SAMPLE_ROWS}"
+    )
+    row = con.execute(f"SELECT json_group_structure(payload) FROM ({base})").fetchone()
+    structure = None if row is None else row[0]
+    if structure is None:
+        return None
+
+    paths = _null_typed_paths(structure)
+    if not paths:
+        return structure
+
+    # Those keys were null through the whole sample, so the sample cannot type
+    # them. Widening the sample only narrows the window; scanning the full column
+    # OOMs on plays (measured). Instead add a targeted sample per lost path --
+    # rows where THAT path is populated -- and let json_group_structure merge the
+    # types across the union. Bounded, and exact for any key that appears at all.
+    selects = [base]
+    for path in paths:
+        try:
+            predicate = _path_populated_predicate(path)
+            con.execute(
+                f"SELECT 1 FROM {source} WHERE {predicate} LIMIT 1"
+            ).fetchone()
+        except duckdb.Error:
+            continue  # unsupported path shape; keep the sampled type for it
+        selects.append(
+            f"SELECT payload FROM {source} WHERE payload IS NOT NULL AND {predicate}"
+            f" LIMIT {_STRUCTURE_SAMPLE_ROWS}"
         )
-        """
-    ).fetchone()
-    return None if row is None else row[0]
+    if len(selects) == 1:
+        return structure
+
+    union = " UNION ALL ".join(f"({s})" for s in selects)
+    try:
+        merged = con.execute(
+            f"SELECT json_group_structure(payload) FROM ({union})"
+        ).fetchone()
+    except (duckdb.Error, MemoryError):
+        return structure
+    return structure if merged is None or merged[0] is None else merged[0]
 
 
 def _structure_top_keys(structure: str) -> set[str]:
