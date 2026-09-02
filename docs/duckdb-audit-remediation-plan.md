@@ -116,6 +116,28 @@ phase.
   `Path.replace` overwrites on Windows, so the unlink bought nothing and opened a window where a
   crash left **no warehouse at all**.
 
+## Step 5 — S9: stop the loader discarding all-null-in-sample fields — NOT STARTED
+
+**Discovered by step 1.** Building `core` un-skipped the live agreement tests, and they fail on
+2,383 games: `core.fact_game_line.spread_open` / `total_open` / both moneylines are 100% NULL
+while the raw JSON has the values. Root cause and evidence in the audit's S9.
+
+`json_group_structure` types a key `"NULL"` when every sampled value is null, and the struct built
+from that then drops the field for the whole table. Confirmed on `raw.lines`: a 5000-row sample
+types four fields `"NULL"`; a full scan types them `DOUBLE`/`HUGEINT`.
+
+**Proposed fix:** in `_explode_table`, if the sampled structure contains a `"NULL"`-typed key,
+re-infer over the full column. Only tables that trip it pay a full scan. Raising
+`_STRUCTURE_SAMPLE_ROWS` is not a fix — it narrows the window without closing it.
+
+**Needs a call:** full-table inference on the biggest tables (`gamePlayerStat` 5.5M,
+`plays` 2.6M) adds load time to a job that already runs ~2 hours. Options: (a) conditional
+re-infer as above, (b) conditional re-infer with a row cap and a logged warning above it,
+(c) an explicit per-table opt-in list starting with `lines`.
+
+**Check:** `test_live_warehouse_agreement_4_5_6` currently fails; it should pass. Add a unit test
+that a field null in the first N rows and populated later survives the explode.
+
 ## Backlog — real, not urgent
 
 | Finding | Why it waits | Trigger to do it |
@@ -144,5 +166,9 @@ step 1 if you pick option (b), since dropping columns changes what `fact_game` c
 The backlog table above. Nothing else is open — steps 1–4 are committed and the suite is green
 at 709 tests.
 
-One operational note: **step 3 only takes effect on a full rebuild.** The live warehouse still
-carries its dead spine columns until the next `duckdb --explode` run.
+Two operational notes:
+
+- **Step 3 only takes effect on a full rebuild.** The live warehouse still carries its dead spine
+  columns until the next `duckdb --explode` run.
+- **Step 5 (S9) is open and is the most serious thing in this document.** Opening lines and
+  moneylines are missing warehouse-wide, which is the input to the active line-movement work.

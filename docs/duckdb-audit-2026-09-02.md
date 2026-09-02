@@ -33,8 +33,52 @@ a designed contract is `core`, and per S1 it is empty.
 | S6 | Low | 998 season-less rows in `stg.gamePlayerStat` from a stale source file |
 | S7 | Low | REST/GraphQL game coverage diverges (542 + 3 games in the shared era) |
 | S8 | Low | Dead columns, and 12 GB of `data/` across three database files |
+| **S9** | **Critical** | **Sampled JSON structure inference silently discards whole fields — opening lines and moneylines are 100% NULL warehouse-wide** |
 
 ---
+
+### S9 — Critical: the loader silently discards fields that are all-NULL in its 5000-row sample
+
+**Found 2026-09-02, after the S1 fix.** Not visible to the original audit: the live-warehouse
+agreement tests `pytest.skip` when `core` is missing, so they had never run. With `core` built
+they run, and `test_live_warehouse_agreement_4_5_6` fails on **2,383 games**.
+
+`_explode_table` infers each payload's shape with `json_group_structure` over
+`_STRUCTURE_SAMPLE_ROWS = 5000` rows. **When every sampled value for a key is null,
+`json_group_structure` types that key `"NULL"`** — and the resulting struct then discards the real
+values in every row outside the sample. Measured on `raw.lines`:
+
+```
+sample=5000: "spreadOpen":"NULL",   "overUnderOpen":"NULL",   "awayMoneyline":"NULL",   "homeMoneyline":"NULL"
+sample=ALL:  "spreadOpen":"DOUBLE", "overUnderOpen":"DOUBLE", "awayMoneyline":"HUGEINT","homeMoneyline":"HUGEINT"
+```
+
+The data is in the source files. `data/raw/lines_2021.json` for game 401287890 carries
+`"spreadOpen": -38` and `"overUnderOpen": 55`; `stg.lines` has NULL for both. Five columns are
+**100% NULL across all 38,689 staged line rows, every season 2013–2026** — and `core.fact_game_line`
+inherits all five:
+
+| column | non-null of 38,689 |
+|---|---:|
+| `spread_close` | 38,600 |
+| `total_close` | 35,098 |
+| `spread_open` | **0** |
+| `total_open` | **0** |
+| `moneyline_home` / `moneyline_away` | **0** |
+
+**Why this one matters most.** Opening lines are the input to the line-movement and CLV work.
+The Python path (`enrich._build_line_move_index`) reads the raw JSON directly and *does* see the
+opens — it is correct, and its fail-closed contract holds. So the SQL warehouse and the Python
+feature path disagree on 2,383 games, with the warehouse wrong.
+
+**This is not specific to `lines`.** Any payload key that is null throughout the first 5000 rows
+is zeroed table-wide. It means S8's "74 payload columns 100% NULL" cannot be read as "these
+fields are empty upstream" — an unknown share are sampling casualties holding real data.
+
+**Fix (not yet applied — needs a call on load cost):** when the sampled structure contains a
+`"NULL"`-typed key, re-infer that table's structure over the full column instead of the sample.
+Only tables that actually trip the condition pay for a full scan. The alternative — raising
+`_STRUCTURE_SAMPLE_ROWS` — narrows the window without closing it.
 
 ### S1 — Critical: `core` is empty, and `build_core` fails on every refresh
 
