@@ -316,6 +316,7 @@ Key-number half-points: Wyoming +3.5 (Caesars), Florida State +3.5 (BetMGM), SMU
 | `predict_upcoming.py [--snapshot path]` | E4/E14 vs the line at capture; appends the forward log |
 | `eval_line_shopping.py` | §5.3 |
 | `eval_line_movement.py` | §5.5 (≈10 min, 2,000 draws) |
+| `weekly_slate.py` | every movement model on the latest snapshot + live book fair and best numbers; appends `movement_forward_log.csv` (version B data) |
 
 **Data outputs** (`{CFB_DATA_ROOT}/processed/`): `pt_upcoming_predictions.csv` (forward log,
 105 rows, four snapshots), `line_shopping_sides.csv`, `line_shopping.json`,
