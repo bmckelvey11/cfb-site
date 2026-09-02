@@ -203,12 +203,14 @@ rebuild that stalled mid-transaction this morning. **Not deleted; that is your c
 
 Separately, `meta.load_report` is internally clean — 120/120 tables present, 0 row-count
 mismatches, 0 recorded errors (§2) — but it is stamped `2026-09-01 09:11:55` while `cfb.duckdb`
-was last written `2026-09-02 07:10`. The writer is
-[`scripts/promote_to_motherduck.py:67`](../scripts/promote_to_motherduck.py:67), which runs
-`ATTACH '{src_path}' AS src` with no `READ_ONLY` and so opens the local warehouse read-write on
-every promote (`mirror_duckdb_to_sqlite.py:27` gets the same attach right). Provenance is
-accounted for, but `load_report` still is not a reliable freshness signal, and the attach should
-be read-only — see the remediation plan's step 4.
+was last written `2026-09-02 07:10`. The only read-write opener of the live
+file outside the loader is [`scripts/promote_to_motherduck.py:67`](../scripts/promote_to_motherduck.py:67),
+whose `ATTACH '{src_path}' AS src` is **deliberately** not `READ_ONLY` — the script stamps
+`src.meta.warehouse_version` on a real promote, and `--dry-run` correctly returns before that
+write. Since no `warehouse_version` table exists in the live file, the most likely explanation
+is a read-write attach that touched the header without changing content. Nothing to fix; the
+practical takeaway stands either way — `load_report` is not a reliable freshness signal, because
+writers other than the loader can open this file.
 
 ## Prior-doc status
 

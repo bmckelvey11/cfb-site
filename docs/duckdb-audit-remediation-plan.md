@@ -1,7 +1,10 @@
 # DuckDB audit remediation plan — 2026-09-02
 
 Plan for the findings in [`duckdb-audit-2026-09-02.md`](duckdb-audit-2026-09-02.md).
-Ordered by **what breaks next**, not by audit severity. Nothing here is implemented yet.
+Ordered by **what breaks next**, not by audit severity.
+
+**Status 2026-09-02: steps 1-4 implemented and committed (`e169ed7`).** Sign-off was
+*explicit 2012+* and *drop the column*. Backlog below is untouched by design.
 
 **Architecture is not in scope.** Single-node DuckDB, atomic full-refresh, one nightly
 Windows Task Scheduler job, three in-repo consumers. No orchestrator, no streaming layer, no
@@ -18,12 +21,15 @@ running, the log has no `---- exited N ----` line (the `.cmd` wrapper always wri
 non-zero exit), and `.building` froze at 05:07 with the machine idle after. That is a killed
 process — sleep or shutdown — not a crash. There is no raw-load bug to hunt.
 
-**The unexplained `cfb.duckdb` mtime is `promote_to_motherduck.py`.**
-[`scripts/promote_to_motherduck.py:67`](../scripts/promote_to_motherduck.py:67) runs
-`ATTACH '{src_path}' AS src` with **no `READ_ONLY`**, so promoting to MotherDuck opens the local
-warehouse read-write and touches it. `mirror_duckdb_to_sqlite.py:27` does the same attach
-correctly with `(READ_ONLY)`. That accounts for the 2026-09-02 07:10 write against a
-`meta.load_report` stamped 09-01 09:11. Warehouse provenance is now fully accounted for.
+**The unexplained `cfb.duckdb` mtime is a read-write attach, and it is not a bug.**
+[`scripts/promote_to_motherduck.py:67`](../scripts/promote_to_motherduck.py:67) is the only
+read-write opener of the live file outside the loader, and its `ATTACH '{src_path}' AS src` is
+**deliberately** not `READ_ONLY` — the script stamps `src.meta.warehouse_version` on a real
+promote, guarded by an early `return 0` on `--dry-run`. No `warehouse_version` table exists in
+the live file, so the 07:10 write was most likely an attach touching the header without changing
+content. **Step 4a of an earlier draft of this plan proposed adding `READ_ONLY` here; that was
+wrong and is withdrawn.** The takeaway that survives: `meta.load_report` is not a freshness
+signal, because writers other than the loader can open this file.
 
 ## Two things NOT worth fixing
 
@@ -39,7 +45,7 @@ WAL is 30 MB of dead disk, nothing more. No code change.
 
 ---
 
-## Step 1 — Make `build_core` run (S1)
+## Step 1 — Make `build_core` run (S1) — DONE 2026-09-02
 
 The whole point. Fails nightly today; `core` has never existed in a shipped build.
 
@@ -52,22 +58,24 @@ staged calendar has it — `stg_gql.calendar` carries the value in `year` with `
 `json_extract` the same way `_build_dim_team` already reads `raw.teams`. REST-canonical, which
 matches the entity map in `graphql-schema-draft.md`.
 
-One judgement call worth your sign-off: **`raw.calendar` starts at 2012, `stg.games` at 1992.**
-`dim_week` will only cover 2012+. Every consumer today is 2012+ (`stg.lines` 2012–2026, plays and
-drives 2012–2025), so this is not a regression — but if `fact_game` joins `dim_week` on an inner
-join, games from 1992–2011 silently vanish. Decide: left-join and allow a null week key, or
-declare `core` a 2012+ layer and filter explicitly. **Recommend the second** — explicit and
-matches actual coverage.
+**Signed off: explicit 2012+.** `raw.calendar` starts at 2012, `stg.games` at 1992.
+`_build_fact_game` now bounds on `(SELECT min(season) FROM core.dim_week)` and
+`_build_fact_game_line` inherits that bound rather than carrying orphan lines.
 
-**Check:** change the `stg.calendar` fixture in
-[`tests/test_core_agreement.py:87`](../tests/test_core_agreement.py:87) to build whatever the
-loader actually produces. Without that, the suite stays green over a broken build — which is the
-entire reason this went unnoticed for a day. The fixture change *is* the check.
+**Found while testing, and it constrains every future join:** the bound is by *season*, not by
+per-week joinability. The CFBD calendar carries **one `postseason` row per season** (15 rows for
+15 seasons) while games carry real postseason week numbers (11–20). Measured on live data,
+**154 of 34,645** 2012+ games have no exact `(season, week, season_type)` partner in `dim_week` —
+all postseason. `fact_game` keeps them. Anything joining `dim_week` must LEFT JOIN, or match on
+`season` + `season_type` only; an inner join on `week` silently drops those 154 games. A first
+draft of the new test asserted zero such orphans and failed against real data — the test was
+wrong, not the code.
 
-Then run `python -m cfb_system_maker.cli duckdb --core-only` against a copy of the warehouse and
-confirm all 8 tables build before pointing it at the live file.
+**Check (done):** the `stg.calendar` fixture in `tests/test_core_agreement.py` now seeds
+`raw.calendar` as the loader does, plus `test_core_is_bounded_to_the_calendar_first_season`.
+709 tests pass (was 703).
 
-## Step 2 — Stop losing the traceback (root cause of the silence)
+## Step 2 — Stop losing the traceback (root cause of the silence) — DONE 2026-09-02
 
 The 09-01 failure logged its traceback because the process exited normally. The 09-02 one logged
 nothing because the process was killed with output still buffered — Python block-buffers stdout
@@ -80,33 +88,33 @@ blank.
 
 **Check:** run the wrapper, kill it mid-load, confirm the log holds the lines written so far.
 
-## Step 3 — Kill the `season_type` trap before `core` consumes it (S2)
+## Step 3 — Kill the `season_type` trap before `core` consumes it (S2) — DONE 2026-09-02
 
 `stg.games.season_type` is 100% NULL while `seasonType` holds regular 52,984 / postseason 751 /
 spring_regular 504 / spring_postseason 28. Nothing reads it off DuckDB today, so it is latent —
 but step 1 puts `core` back in business and `fact_game` is exactly the kind of query that would
 trust the name. 36 tables share the collision (audit §10).
 
-Two options, pick one:
+**Signed off: (b), drop the column.** A filter on a missing column errors; a filter on an
+all-NULL column returns nothing. `drop_dead_spine_columns` runs as a post-pass in
+`explode_payloads` and drops `season`/`week`/`season_type` from any `stg`/`stg_gql` table where
+they are entirely NULL. `raw` keeps its spine columns — there they are load provenance, not a
+query surface.
 
-- **(a) Coalesce at explode time** — `COALESCE(season, year)` / `COALESCE(season_type, seasonType)`
-  when the partition column is unpopulated. Keeps one canonical name, hides the split.
-- **(b) Drop the partition column where it is entirely NULL.** A filter on a missing column
-  errors; a filter on an all-NULL column returns nothing. **Recommend (b)** — loud beats silent,
-  and it deletes code instead of adding it.
+**Check (done):** `tests/test_drop_dead_spine.py`, 5 cases. The load-bearing one asserts the
+dropped-column filter now raises instead of returning zero rows.
 
-**Check:** assert no `stg`/`stg_gql` table has a 100%-NULL partition column alongside a populated
-payload twin — that is audit check `twin_columns`, already written. Wire it as a test.
+**Takes effect on the next full rebuild**, not on `--core-only` — the drop is part of the explode
+phase.
 
-## Step 4 — One-word and one-line fixes
+## Step 4 — One-line fix — DONE 2026-09-02
 
-- `promote_to_motherduck.py:67` → `ATTACH '{src_path}' AS src (READ_ONLY)`. Matches
-  `mirror_duckdb_to_sqlite.py`. Stops a promote run from writing the source warehouse.
-- `duckdb_load.py:466-468` → drop the `db_path.unlink()` before `tmp_path.replace(db_path)`.
-  `Path.replace` overwrites on Windows, so the unlink buys nothing and opens a window where a
-  crash leaves **no warehouse at all**.
-
-Both trivially reviewable; one commit.
+- ~~`promote_to_motherduck.py:67` → add `READ_ONLY`~~ **Withdrawn.** Reading the surrounding code
+  showed the read-write attach is deliberate (it stamps `src.meta.warehouse_version`) and
+  `--dry-run` already returns before that write. Nothing to fix.
+- `duckdb_load.py` → dropped the `db_path.unlink()` before `tmp_path.replace(db_path)`.
+  `Path.replace` overwrites on Windows, so the unlink bought nothing and opened a window where a
+  crash left **no warehouse at all**.
 
 ## Backlog — real, not urgent
 
@@ -120,17 +128,21 @@ Both trivially reviewable; one commit.
 
 ## Order and commits
 
-| # | Change | Commit |
+| # | Change | Status |
 |---|---|---|
-| 0 | Correct the two audit claims above in the report | docs |
-| 1 | `_build_dim_week` re-source + test fixture | fix |
-| 2 | `-u` in `refresh_cfbd.cmd` | fix |
-| 3 | `season_type` decision + `twin_columns` as a test | fix |
-| 4 | `READ_ONLY` attach + drop the unlink | fix |
+| 0 | Correct the audit claims in the report | done — `94d9a3a`, amended again for step 4a |
+| 1 | `_build_dim_week` re-source + 2012+ bound + test fixture | done — `e169ed7` |
+| 2 | `-u` in `refresh_cfbd.cmd` | done — `e169ed7` |
+| 3 | `drop_dead_spine_columns` + 5 tests | done — `e169ed7` |
+| 4 | Drop the unlink (READ_ONLY half withdrawn) | done — `e169ed7` |
 
 Steps 2 and 4 are independent of 1 and 3 and can land first. Step 3 should land before or with
 step 1 if you pick option (b), since dropping columns changes what `fact_game` can select.
 
-**Needs your sign-off before I start:**
-1. `dim_week` 2012+ — filter `core` explicitly, or left-join and allow null week keys?
-2. `season_type` — coalesce (a) or drop (b)?
+## Remaining
+
+The backlog table above. Nothing else is open — steps 1–4 are committed and the suite is green
+at 709 tests.
+
+One operational note: **step 3 only takes effect on a full rebuild.** The live warehouse still
+carries its dead spine columns until the next `duckdb --explode` run.
