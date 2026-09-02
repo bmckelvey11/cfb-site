@@ -51,7 +51,7 @@ FULL_GAME_PERIOD = "event"
 # Cloudflare 403s urllib's default User-Agent.
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
-SNAP_DIR = cfb_paths.RAW / "pt_snapshots"
+SNAP_DIR = cfb_paths.INGEST / "pt_snapshots"
 AN_DIR = cfb_paths.RAW / "actionnetwork"
 
 

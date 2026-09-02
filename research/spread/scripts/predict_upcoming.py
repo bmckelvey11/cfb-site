@@ -52,7 +52,7 @@ import eval_prediction_tracker_models as base  # noqa: E402
 import eval_combination_sweep as sweep  # noqa: E402
 from build_prediction_tracker import UNSIGNED_LINES  # noqa: E402
 
-SNAP_DIR = base.cfb_paths.RAW / "pt_snapshots"
+SNAP_DIR = base.cfb_paths.INGEST / "pt_snapshots"
 LOG = base.OUT_DIR / "pt_upcoming_predictions.csv"
 
 # Not models. Both reproduce the market line under a model name, so they would top any

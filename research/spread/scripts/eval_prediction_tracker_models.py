@@ -32,7 +32,7 @@ REPO = next(
 sys.path.insert(0, str(REPO))
 import cfb_paths  # noqa: E402
 
-SRC = cfb_paths.RAW / "prediction_tracker_lines.csv"
+SRC = cfb_paths.INGEST / "prediction_tracker_lines.csv"
 OUT_DIR = cfb_paths.PROCESSED
 BURN_IN_THROUGH = 2005  # seasons <= this are fitting-only; evaluation starts 2006
 SCREEN_K = 20  # E3/E4 keep the top-K models by prior-season skill (fixed in the plan)

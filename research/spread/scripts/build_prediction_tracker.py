@@ -1,11 +1,11 @@
 """Union the Prediction Tracker season CSVs and attach a CFBD game_id to every row.
 
-Source: $CFB_DATA_ROOT/raw/prediction_tracker/ncaa*.csv (seasons come from files present, so a
+Source: $CFB_DATA_ROOT/ingest/prediction_tracker/ncaa*.csv (seasons come from files present, so a
         new ncaa{year}.csv is picked up without a code change)
 CFBD:   stg_gql.game in data/cfb.duckdb -- the GraphQL-fed table. data/raw/games_*.json holds
         regular-season rows only, which would drop every bowl (~35/season); games.csv is
         additionally 2013+ only.
-Out:    data/raw/prediction_tracker_lines.csv
+Out:    data/ingest/prediction_tracker_lines.csv
 
 Spreads are negated on the way in: Prediction Tracker writes them positive when the home
 team is favored, the opposite of GameRecord.spread everywhere else in this repo.
@@ -32,9 +32,9 @@ REPO = next(
 sys.path.insert(0, str(REPO))
 import cfb_paths  # noqa: E402  (repo's CFB_DATA_ROOT resolver, honors the env override)
 
-DEFAULT_SRC = cfb_paths.RAW / "prediction_tracker"
+DEFAULT_SRC = cfb_paths.INGEST / "prediction_tracker"
 DEFAULT_DB = cfb_paths.DB_PATH
-DEFAULT_OUT = cfb_paths.RAW / "prediction_tracker_lines.csv"
+DEFAULT_OUT = cfb_paths.INGEST / "prediction_tracker_lines.csv"
 
 # Prediction Tracker name -> extra CFBD candidates. Each name resolves against that
 # season's own CFBD team set, so era drift (Central Florida -> UCF) resolves itself.

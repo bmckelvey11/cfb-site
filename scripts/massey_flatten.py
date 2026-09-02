@@ -1,6 +1,6 @@
 """Flatten scraped Massey Ratings editions into tidy CSVs, mapped to CFBD teams.
 
-Reads $CFB_DATA_ROOT/raw/massey/ranks_*.json (see massey_ranks.py) and writes
+Reads $CFB_DATA_ROOT/ingest/massey/ranks_*.json (see massey_ranks.py) and writes
 four normalized tables to $CFB_DATA_ROOT/processed/massey/:
 
   massey_teams.csv    137 rows  massey_id -> CFBD school, with match provenance
@@ -28,7 +28,8 @@ from pathlib import Path
 
 DATA_ROOT = Path(os.environ.get("CFB_DATA_ROOT", Path(__file__).resolve().parent.parent / "data"))
 RAW_DIR = DATA_ROOT / "raw"
-IN_DIR = RAW_DIR / "massey"
+INGEST_DIR = DATA_ROOT / "ingest"
+IN_DIR = INGEST_DIR / "massey"
 OUT_DIR = DATA_ROOT / "processed" / "massey"
 
 # Fixed column positions in every edition's DI rows.

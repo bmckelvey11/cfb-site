@@ -3,7 +3,7 @@
 Written 2026-08-29, **before** fitting any ensemble. Build implements this; Audit grades
 against it. Results land in `prediction-tracker-model-eval.md`.
 
-Data: `{CFB_DATA_ROOT}/raw/prediction_tracker_lines.csv` (see `prediction-tracker.md`).
+Data: `{CFB_DATA_ROOT}/ingest/prediction_tracker_lines.csv` (see `prediction-tracker.md`).
 17,731 rows with `match_status=matched` and a real score; 154 model columns; 25 seasons.
 
 ## 1. Estimand

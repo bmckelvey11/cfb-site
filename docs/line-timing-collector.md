@@ -39,7 +39,7 @@ Everything is under `%CFB_DATA_ROOT%` (`C:\Users\mckel\data\cfb`), which the tas
 as a persisted user environment variable.
 
 ```
-raw/pt_snapshots/
+ingest/pt_snapshots/
     ncaapredictions_20260829T134307Z.csv        the forecasts as published at that instant
     ncaapredictions_20260829T134307Z.meta.json  captured_at, sha256, byte count, row count
 raw/actionnetwork/

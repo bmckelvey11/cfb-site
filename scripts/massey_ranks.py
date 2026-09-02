@@ -29,7 +29,7 @@ UA = (
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 )
 DATA_ROOT = Path(os.environ.get("CFB_DATA_ROOT", Path(__file__).resolve().parent.parent / "data"))
-OUT_DIR = DATA_ROOT / "raw" / "massey"
+OUT_DIR = DATA_ROOT / "ingest" / "massey"
 
 _TOKEN_RE = re.compile(r'stamp\.jsonURL = "([^"]*)"')
 _OBFU_RE = re.compile(r'stamp\.obfu = "([^"]*)"')
