@@ -1,4 +1,4 @@
-"""Book-line composite and line-shopping backtest.
+"""Book fair and line-shopping backtest.
 
 Implements research/spread/docs/prereg-line-shopping.md. Read that first; the thresholds,
 book set and cluster definition below are fixed there and are not tuning knobs.

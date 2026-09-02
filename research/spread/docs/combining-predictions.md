@@ -1,11 +1,11 @@
-# Review — the book composite, and how the predictions combine
+# Review — the book fair, and how the predictions combine
 
-2026-09-02. Reviews the fair-value composite in `eval_line_shopping.py` and specifies how the
+2026-09-02. Reviews the book fair in `eval_line_shopping.py` and specifies how the
 model numbers (E4, E14, raw consensus) and the book numbers should be combined into one fair
 spread and one bet decision. Evidence cited is in `prediction-tracker-findings.md`,
 `line-shopping-results.md`, and `review-2026-09-02-composite-spread.md`.
 
-## 1. The book composite as built
+## 1. The book fair as built
 
 `fair = median of closing home spread over real books {49, 68, 69, 71, 75}`, ≥ 2 books required.
 
@@ -39,7 +39,7 @@ line-shopping attempt got wrong twice. Odds window kills alt lines.
    compare each book's last pre-kickoff tick to the scoreboard number for the same event.
 
 None of the four changes the result (+1.26 → +1.15 with the tail out; juice is second-order),
-but 1 and 2 are required before this composite drives a live bet.
+but 1 and 2 are required before the book fair drives a live bet.
 
 ## 2. How the model predictions combine — the evidence, then the rule
 
@@ -107,5 +107,5 @@ in this tree suggests any spread pipeline will.
    pre-registered amendment (record the threshold first).
 2. Verify snapshot = close on 2026 histories after ~4 weeks.
 3. Let the forward log accumulate; fit γ against the Monday line when ~300 graded games exist.
-4. Only then wire §3 into anything that produces a slip. Until then the composite is a
+4. Only then wire §3 into anything that produces a slip. Until then the book fair is a
    reference number, and the actionable content is: shop, and respect 3 and 7.

@@ -27,6 +27,8 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Core bet** — NCAAF full-game straight bet (spread, total, or moneyline). Excludes first-half/second-half/live/team-total bets, parlays, and teasers.
 - **Break-even rate** — 52.38%, the win rate needed to profit at −110 juice.
 - **CLV (closing line value)** — the difference between the number taken and the consensus closing number, signed so positive = better than close.
+- **Model consensus** — screened, equal-weighted average of Prediction Tracker model spreads (E4 input). Not "composite".
+- **Book fair** — median closing spread across real sportsbooks (FanDuel, BetMGM, Caesars, Bet365, Pinnacle). Not "composite".
 - **Cover margin** — bet team's score plus the line taken, minus the opponent's score. Positive = covered by that much; negative = missed by that much. Defined for spread bets only.
 - **Hook loss** — a spread bet with cover margin of exactly −0.5: lost by the half point.
 - **Key number** — a spread line on or adjacent to 3 or 7 (2.5–3.5, 6.5–7.5), where NFL/CFB final-margin mass concentrates and books shade hardest.

@@ -17,8 +17,8 @@ forecasts appear. On the archive, same 24 seasons, unshrunk all-model median:
 |---|---|---|
 | noise: sd of target minus anchor | 15.61 | **2.37** |
 | variance ratio | | **43×** |
-| corr(composite deviation, target) | −0.008 | **+0.395** (0.546 for the screened E4 consensus) |
-| slope of target on composite deviation | ≈ 0 | **0.29**, positive in **24 of 24** seasons |
+| corr(model-median deviation, target) | −0.008 | **+0.395** (0.546 for the screened E4 consensus) |
+| slope of target on model-median deviation | ≈ 0 | **0.29**, positive in **24 of 24** seasons |
 
 Weight-estimation noise was the whole problem in the sweep; on this target it is roughly forty
 times smaller. Which models lead the market becomes estimable. That is a new question, not a
@@ -82,7 +82,7 @@ Primary, version B, once ≥ 300 graded games exist (about week 8):
 - B5: CLV positive but under 0.3 points; ATS at Monday's number within noise of 50%.
 
 If B4 comes back ≥ 0.3, the right move is to bet earlier than PT publishes: pull the leading
-models from their own sites Sunday night, since the composite's constituents are public before
+models from their own sites Sunday night, since the model consensus's constituents are public before
 PT compiles them.
 
 ## Stopping rules

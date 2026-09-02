@@ -1,11 +1,11 @@
-# Pre-registration — book-line composite and line-shopping backtest
+# Pre-registration — book fair and line-shopping backtest
 
 **Committed before `eval_line_shopping.py` is run.** Follows §5 item 1 of
 `review-2026-09-02-composite-spread.md`.
 
 ## Question
 
-The closing market cannot be beaten with model composites. Can it be beaten *at one book*, by
+The closing market cannot be beaten with the model consensus. Can it be beaten *at one book*, by
 taking the best number across books instead of the consensus? Two sub-questions:
 
 1. **Dispersion.** How far apart are real books at close, and is the tail real or artifact?

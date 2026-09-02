@@ -1,4 +1,4 @@
-# Book-line composite and line shopping — results
+# Book fair and line shopping — results
 
 Run 2026-09-02 by `research/spread/scripts/eval_line_shopping.py`, implementing
 `prereg-line-shopping.md`, committed at `57637a4` before the run. Outputs:

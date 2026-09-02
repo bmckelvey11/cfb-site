@@ -1,11 +1,11 @@
-# Review — handoff of 2026-09-02 and the "composite spread" goal
+# Review — handoff of 2026-09-02 and the "model consensus spread" goal
 
 Reviewer pass over `handoffEQaszm.md` and the spread research tree, against the stated goal:
 **build a composite point spread from all the models to gain an edge over the books.**
 
 ## Verdict on the goal
 
-A composite of the Prediction Tracker panel against the closing spread is closed, and the
+A model consensus of the Prediction Tracker panel against the closing spread is closed, and the
 evidence is stronger than the handoff states. Ten combination rules (E1–E14) were tried
 walk-forward on 12.8–14.3K games; best Holm p = 0.49; the ATS record is 50.31% on 12,560 bets,
 p = 0.002 *below* the −110 break-even. Nothing here should be reopened without a new information
@@ -19,11 +19,11 @@ The handoff says a threshold rule cannot work because 89% of games sit within on
 close. That is true of **E4**, whose fitted tilt is γ ≈ 0.07 — E4 is the closing line plus 7% of
 the consensus deviation, so it hugs the close by construction. It is not true of the panel.
 
-Raw composite: per-season median of every model with ≥95% within-season coverage, `lineca` and
+Raw model median: per-season median of every model with ≥95% within-season coverage, `lineca` and
 `linemidweek` excluded, no fitting, no shrinkage (~39 models per season). Graded ATS against the
 PT closing line, 2001–2025, pushes dropped, season-clustered SE.
 
-| \|composite − close\| | n | ATS win | SE (25 seasons) |
+| \|raw model median − close\| | n | ATS win | SE (25 seasons) |
 |---|---|---|---|
 | [0, 1) | 4,051 | 50.0% | 0.9% |
 | [1, 2) | 4,160 | 49.4% | 0.8% |
@@ -80,11 +80,11 @@ eight-member family. On a margin variance of ~242, that is 0.006 RMSE. Even if i
 survives pre-registration, it is not a bettable number. Leave it as a pre-registration candidate;
 do not spend the 2026 season on it.
 
-## 5. Direction — where "composite" still earns something
+## 5. Direction — where averaging still earns something
 
-The word *composite* is right; the inputs are wrong. Compose **book lines**, not model outputs.
+Average **book lines**, not model outputs: the book fair, not the model consensus.
 
-1. **Composite of books = fair value; the outlier book = the bet.** Seven-book Action Network
+1. **Book fair = median of books; the outlier book = the bet.** Seven-book Action Network
    feed, 2024–2026. Fair = median of books with `line_status = 'normal'` and
    `is_alt_market = false`. Flag any book ≥ 1.0 point off fair, and any pair straddling 3 or 7.
    Backtest: ATS win rate at the outlier book's number versus at the consensus number,
@@ -107,8 +107,8 @@ is wrong when it does (§1).
 
 ## 6. Addendum, same day — "predictions come out early in the week"
 
-The user's live question is claim 2, not claim 1: not *does the composite beat the close as a
-forecast* (closed), but *does the composite forecast where the close goes*, bet at Monday's
+The user's live question is claim 2, not claim 1: not *does the model consensus beat the close as a
+forecast* (closed), but *does the model consensus forecast where the close goes*, bet at Monday's
 line. Historically the panel beat the opener by 2.6 MSE in 20 of 20 seasons and bets at the
 opener with ≥2 points of edge won 55.9%; the edge was at break-even once ~25% of the
 open-to-close move had happened (`prediction-tracker-model-eval.md` §8). So everything

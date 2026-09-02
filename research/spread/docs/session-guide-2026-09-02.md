@@ -18,9 +18,9 @@ Over the session the goal sharpened three times, each time because a measurement
 
 | stage | question | answer |
 |---|---|---|
-| 1 | Can a composite of the models out-forecast the closing line? | No. Closed harder than the handoff said (§5.1). |
-| 2 | Can a composite of the *books* beat any one book? | Yes, mechanically: +1.26 win-rate points per bet by taking the best number (§5.3). |
-| 3 | Can the model composite forecast **where the line goes**, so a bet placed early has closing line value? | Yes, strongly, at the opener (§5.5). Whether the opener is reachable is the open question. |
+| 1 | Can the model consensus out-forecast the closing line? | No. Closed harder than the handoff said (§5.1). |
+| 2 | Can the book fair beat any one book? | Yes, mechanically: +1.26 win-rate points per bet by taking the best number (§5.3). |
+| 3 | Can the model consensus forecast **where the line goes**, so a bet placed early has closing line value? | Yes, strongly, at the opener (§5.5). Whether the opener is reachable is the open question. |
 
 The last framing is the user's thesis in their own words: *if I can get points early on the
 closing line, the obvious closing line value is very valuable.* Everything from §5.4 onward
@@ -32,12 +32,12 @@ serves that.
 
 | commit | what |
 |---|---|
-| `0d5383f` | Review of the handoff. New check: raw unshrunk composite vs close, 17,166 games. |
+| `0d5383f` | Review of the handoff. New check: raw unshrunk model median vs close, 17,166 games. |
 | `7aac642` | Collector now runs the predictor whenever a new PT snapshot lands. |
 | `4437d67` | Week-1 2026 timing: how much of the open→close move is left on Monday (none). |
-| `57637a4` | Pre-registration: book-line composite and line-shopping backtest. |
+| `57637a4` | Pre-registration: book fair and line-shopping backtest. |
 | `61d746f` | Line-shopping backtest script and results. |
-| `0d3da6c` | Review of the book composite; how predictions should combine; juice measured. |
+| `0d3da6c` | Review of the book fair; how predictions should combine; juice measured. |
 | `c9bbab5` | Pre-registration: retarget the panel at line movement. |
 | `313e3cd` | Line-movement sweep (version A) and results. |
 
@@ -123,9 +123,9 @@ All combination work is in **market-residual form**: anchor `m_t` (a line), regr
 
 Plus, this session:
 
-- **Raw composite**: per-season median of every model with ≥95% within-season coverage, no
+- **Raw model median**: per-season median of every model with ≥95% within-season coverage, no
   fitting. Used to test whether *unshrunk* disagreement with the close carries information.
-- **Book composite**: `fair = median of closing home spread over real books`, ≥2 books.
+- **Book fair**: `fair = median of closing home spread over real books`, ≥2 books.
 - **Movement retarget**: the same E4/E6/E7/E14 with target `y = close` (margin space) and
   anchor `m = open`. `prior_skill` then ranks models by error against the *close*, i.e. by
   movement skill, automatically.
@@ -137,14 +137,14 @@ was active (the whole-history version was a tenure test that excluded the best f
 
 ## 5. Methods and findings
 
-### 5.1 The composite cannot out-forecast the close — and the reason given was wrong
+### 5.1 The model consensus cannot out-forecast the close — and the reason given was wrong
 
 The handoff argued a threshold rule cannot work because 89% of games sit within a point of the
 close. True of E4, whose γ ≈ 0.07 makes it the close plus 7% of a deviation. Not true of the
-panel. The raw composite (≈39 models per season) disagrees with the close by a **median of 2.0
+panel. The raw model median (≈39 models per season) disagrees with the close by a **median of 2.0
 points**, 99th percentile 8.9, and:
 
-| \|composite − close\| | n | ATS vs close | SE, 25 seasons |
+| \|raw model median − close\| | n | ATS vs close | SE, 25 seasons |
 |---|---|---|---|
 | [0,1) | 4,051 | 50.0% | 0.9% |
 | [1,2) | 4,160 | 49.4% | 0.8% |
@@ -174,7 +174,7 @@ week-2 games by Wednesday, so that waits for the Monday backfills.
 Monday snapshot (44 games): line already moved ≥1 from PT's opener on 61%; E4 within a point of
 Monday's line on every game. Tuesday: four games ≥1, max 1.39. PT typo: UCLA–Cal `lineopen = −55`.
 
-### 5.3 Book-line composite and line shopping (pre-registered `prereg-line-shopping.md`)
+### 5.3 Book fair and line shopping (pre-registered `prereg-line-shopping.md`)
 
 Design: fair = median of real books; every game contributes **both sides**; each side graded at
 its best available number and at fair; pushes 0.5; season×week clusters (29); t(G−1) CI.
@@ -297,8 +297,8 @@ Key-number half-points: Wyoming +3.5 (Caesars), Florida State +3.5 (BetMGM), SMU
 
 | file | what |
 |---|---|
-| `review-2026-09-02-composite-spread.md` | handoff review, raw-composite tail test, §6 timing addendum |
-| `prereg-line-shopping.md` → `line-shopping-results.md` | book composite and shopping |
+| `review-2026-09-02-composite-spread.md` | handoff review, raw-model-median tail test, §6 timing addendum |
+| `prereg-line-shopping.md` → `line-shopping-results.md` | book fair and shopping |
 | `combining-predictions.md` | four defects of the fair value; how model and book numbers combine; bet rule |
 | `prereg-line-movement.md` → `line-movement-results.md` | movement retarget, versions A and B |
 | `prediction-tracker-findings.md` | the prior sweep's consolidated record (unchanged) |
@@ -348,7 +348,7 @@ opener, 15 the consensus) — running in another session.
 
 ## 9. What is established, what is not, what to do
 
-**Established.** The model composite cannot beat the closing spread as a forecast of the game
+**Established.** The model consensus cannot beat the closing spread as a forecast of the game
 (tight null, three independent angles). Taking the best book number is worth +1.26 win-rate
 points per bet, +4.65 across 3 and 7, and the outlier book's direction carries no information.
 The panel predicts line movement from the opener with γ ≈ 0.30, stable across 20 seasons, and a
@@ -387,7 +387,9 @@ said Monday had none of the move left; in-season weeks are unmeasured.
   from the market, so zero correction is the market.
 - **γ (gamma)** — the scalar weight on the screened consensus deviation; 0.07 against the close
   as margin benchmark, 0.30 against the close as movement target.
-- **Fair** — median closing home spread across real books.
+- **Book fair** — median closing home spread across real books.
+- **Model consensus** — screened, equal-weighted average of Prediction Tracker model spreads; the
+  input to E4. "Composite" is retired: it was used for both of these and confused the reader.
 - **Gain** — points by which a side's best available number beats fair.
 - **Key numbers** — 3 and 7, the most common CFB margins; a half-point across them is worth
   ~2.5× a half-point elsewhere.
