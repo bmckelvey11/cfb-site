@@ -11,11 +11,12 @@ Prior decisions cited, not restated: [ADR 0002](adr/0002-graphql-stg-tables-in-s
 
 ## Recommendation in one line
 
-**Stop generating the `__` tables, keep `stg_gql`, and make `core` the clean-name surface —
-but ship a rename guard before any of it.**
+**Stop generating the `__` tables, collapse `stg_gql` into `stg` with a source suffix on the
+2–3 colliding names only, and make `core` the clean-name surface — behind a rename guard.**
 
-That is not the full ask. `stg_gql` I am recommending against removing *now*, for a reason worth
-your judgement, laid out in §3. Everything else is a yes.
+**Revised 2026-09-02** after the question "why does `gql` have to be in the group name?" It
+doesn't, and the first draft of §3 overstated the constraint that said it did. The measurement
+and the correction are in §3.
 
 ---
 
@@ -89,64 +90,93 @@ never pass through `GQL_ENTITY_TO_RAW` / `GQL_ENTITY_TO_STG` and get neither the
 prefix nor `stg_gql` placement.
 
 **Recommendation:** route them through the same mapping as every other GraphQL entity —
-`raw.gql_game_media` / `stg_gql.game_media`, `raw.gql_game_player_stat` /
-`stg_gql.game_player_stat`. This is a consistency hole in the existing scheme, not a new scheme.
+`raw.gql_game_media` and `raw.gql_game_player_stat` on the `raw` side, `stg.game_media` and
+`stg.game_player_stat` in staging. Neither name collides. This is a consistency hole in the
+existing scheme, not a new scheme.
 
 Note `stg.gamePlayerStat` is the table carrying the 998 season-less rows from a stale
 whole-corpus source file (audit S6) — worth doing both at once.
 
-## 3. `stg_gql` — I recommend keeping it, and here is the constraint you are choosing against
+**Under §3's single-schema recommendation this shrinks further:** with one `stg` there is nowhere
+to misfile them, so all they need is snake_casing to `game_media` / `game_player_stat`.
 
-You asked to remove it. The reason not to is a correctness constraint that has not changed since
-ADR 0002, so I would rather put it in front of you than quietly satisfy the request.
+## 3. `stg_gql` — collapse it; the constraint is 2 table names, not 38
 
-**Bare names in one staging schema collide.** Three GraphQL entities collide *exactly* with a
-REST table once snake_cased:
+**My first draft recommended keeping it. That was wrong, and the correction is worth showing.**
+
+I wrote that bare names collide on "3 exactly, 7 more by a trailing `s`". I took that from ADR
+0002 and did not measure it. Measured against the live warehouse:
+
+| | |
+|---|---|
+| `stg` tables | 134 |
+| `stg_gql` tables | 38 |
+| **Exact collisions if merged into one schema** | **2** — `draft_picks`, `predicted_points` |
+| `stg_gql` tables with **no `stg` counterpart at all** | **29 of 38** |
+
+The "7 near-misses" — `game`/`games`, `coach_season`/`coach_seasons`, `conference`/`conferences`,
+`recruit`/`recruits`, `draft_team`/`draft_teams`, `draft_position`/`draft_positions`,
+`recruiting_team`/`recruiting_teams` — **are not collisions.** They are distinct table names.
+ADR 0002 raised them as a readability complaint and I repeated it as if it were part of the
+correctness constraint. It never was.
+
+`calendar` becomes a third collision once audit S3 is fixed and the REST calendar is finally
+staged. So: **3 colliding names out of 172.**
+
+### The schema tags 38 tables to disambiguate 2
+
+29 of the 38 carry `gql` in their qualified name for a collision that does not exist for them.
+`athlete`, `athlete_team`, `game_lines`, `game_team`, `current_teams`, `adjusted_team_metrics`
+and 23 others have no REST counterpart of any spelling.
+
+And ADR 0002's own argument cuts against its own conclusion. It rejected the `gql_` prefix
+because provenance would be "encoded in a string a reader has to know to interpret", and because
+the prefix would end up "permanently named after which API produced it rather than what it is."
+Both criticisms apply verbatim to a *schema* named `stg_gql` — at coarser granularity, so it
+tags all 38 instead of only the 3 that need it.
+
+### The bug ADR 0002 actually fixed was load-order dependence, not the prefix
+
+The real defect was `_stg_dest_name` resolving clashes against a `taken` set populated as loads
+proceeded, so which source won the unsuffixed name depended on load order. That is fixed by an
+**explicit static mapping**, which already exists and already ships: `GQL_ENTITY_TO_STG`. A
+separate schema was one way to make collisions structurally impossible; an explicit three-entry
+mapping is another, and it does not tax the 29 non-colliding tables.
+
+### Recommendation
+
+**One `stg`. Source suffix on the colliding names only, from the existing explicit mapping.**
 
 ```
-draftPicks       → draft_picks        (REST: draft_picks)
-predictedPoints  → predicted_points   (REST: predicted_points)
-calendar         → calendar           (REST: calendar)
+stg.athlete            stg.game_lines        stg.current_teams      # 29 tables, no tag needed
+stg.game               stg.games                                    # distinct already, no tag
+stg.draft_picks_gql    stg.draft_picks                              # 1 of 3 that need one
+stg.calendar_gql       stg.calendar                                 # after S3 stages REST calendar
 ```
 
-Seven more differ only by a trailing `s` — `game`/`games`, `coach`/`coaches`,
-`conference`/`conferences`, `recruit`/`recruits`, and so on. Those are not duplicates to
-deduplicate: the [source rationalization](superpowers/specs/2026-09-01-warehouse-source-rationalization.md)
-measured all 13 pairs and found **7 genuinely complementary** — `game`/`games` carry Elo under
-different names *and different coverage* (GraphQL `awayEndElo` 0.59 filled vs REST
-`awayPostgameElo` 0.43); neither dominates.
+`predicted_points` needs no suffix at all — source rationalization Bucket A drops the REST side
+outright, so the GraphQL table simply becomes `stg.predicted_points`.
 
-The pre-ADR scheme resolved this with a `taken` set populated as loads proceeded, so **which
-source won the unsuffixed name depended on load order** — a live provenance-swapping bug. Any
-single-schema staging layer has to re-solve that. A separate schema makes the collision
-structurally impossible instead of prevented by convention.
+The suffix is temporary by construction. All three colliders are exactly the tables that stop
+existing in duplicate: `predicted_points` drops REST (Bucket A), `draft_picks` and `calendar`
+merge into `core` (Bucket C). When source rationalization lands, the suffix count goes to zero
+and nothing in the schema is named after a transport.
 
-**What I would do instead:** treat `core` as the clean-name surface and leave staging as
-plumbing. `core` is already exactly what you are asking for —
+Two things this also buys: §2's misfiled `gameMedia` / `gamePlayerStat` stop being misfiled —
+with one staging schema there is nowhere to misfile them, they just need snake_casing — and
+`stg` stops silently meaning "REST", which §3 of the first draft flagged and then proposed to fix
+with documentation.
 
-```
-core.dim_week   core.dim_team    core.dim_venue   core.dim_conference   core.dim_lines_provider
-core.fact_game  core.fact_game_line   core.fact_game_team
-```
+**Cost, stated plainly.** This renames the qualified name of all 38 `stg_gql` tables, and code
+references them 30+ times (`stg_gql.game` 13, `stg_gql.game_lines` 12, `stg_gql.lines_provider`
+6, `stg_gql.calendar` 4). That is precisely the operation that silently broke two consumers in
+§0. It is safe **only behind the catalog-resolution test**, which is why that is step 1 and this
+is step 3.
 
-snake_case, singular dims, `dim_`/`fact_` prefixes, no source in any name, no `__`. Consumers
-should read `core`; `stg`/`stg_gql` should be an implementation detail nobody types.
-
-**The honest path to actually deleting `stg_gql`** — if you want it gone, this is the sequence,
-and it is the source-rationalization plan, not a rename:
-
-1. Land the 6 droppable pairs (3 where GraphQL is the superset, 3 where REST is) — those
-   concepts stop existing twice.
-2. Merge the 7 complementary pairs into `core` facts/dims, which is where they were always going.
-3. `stg_gql` then holds only entities with no REST counterpart, and the collision set is empty.
-   *Then* one staging schema is safe, and the merge — not a rename — is what made it safe.
-
-Doing step 3 first is the thing ADR 0002 rejected, and the reason still holds.
-
-**One asymmetry worth naming even if you keep the split:** `stg` silently means "REST". The
-symmetric spelling is `stg_rest` + `stg_gql`. I am *not* recommending it — it renames the
-qualified name of 134 tables to fix a documentation problem, and §0 says renames are the
-expensive thing here. Fix it in `cfb_system_maker/CLAUDE.md` instead.
+**ADR 0002 needs superseding, not deleting.** Write ADR 0003 recording the measurement (2 real
+collisions, 29 of 38 tagged for nothing) and the explicit-mapping alternative that was available
+to the load-order bug. ADR 0002's diagnosis of that bug was right; only its remedy was
+disproportionate.
 
 ## 4. `raw` — leave it alone
 
@@ -178,13 +208,14 @@ violate rather than being a surprise.
 |---|---|---|---|
 | 1 | Catalog-resolution test (§0) | — | none; pure addition |
 | 2 | List explosion opt-in (§1) | 1 | removes 53 unread tables |
-| 3 | Route `gameMedia` / `gamePlayerStat` through the GQL mapping (§2) | 1 | renames 4 tables; 1 consumer (`stg.gamePlayerStat`) |
-| 4 | `source_file` → `_source_file` in `raw` (§4) | 1 | column rename, 120 tables |
-| 5 | Write down the casing boundary + the `stg`-means-REST note (§3, §5) | — | docs only |
-| 6 | Source rationalization → then reconsider `stg_gql` (§3) | 2, 3 | the real project |
+| 3 | Collapse `stg_gql` into `stg`, suffix the colliders (§3) | 1 | 38 tables renamed, 30+ code refs — the gate exists for this |
+| 4 | snake_case `gameMedia` / `gamePlayerStat` (§2) | 3 | 4 tables; trivial once there is one schema |
+| 5 | `source_file` → `_source_file` in `raw` (§4) | 1 | column rename, 120 tables |
+| 6 | ADR 0003 superseding 0002 + write down the casing boundary (§3, §5) | 3 | docs only |
+| 7 | Source rationalization → suffix count goes to zero (§3) | 3 | the real project |
 
-1–5 are small and land in the next rebuild. 6 is the one that actually earns the schema you
-asked for, and it is a data-merge project, not a naming pass.
+1–6 land in the next rebuild. 7 is what removes the last transport-named thing from the schema,
+and it is a data-merge project, not a naming pass.
 
 ## What I am not recommending
 
