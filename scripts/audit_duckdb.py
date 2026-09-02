@@ -351,8 +351,9 @@ def main():
     p.add_argument("--max-rows", type=int, default=200_000,
                    help="dead-column scan skips tables above this row count")
     p.add_argument("--coverage-tables",
-                   default="stg.games,stg.game,stg.lines,stg_gql.game_lines,stg.calendar,"
-                           "stg.plays,stg.drives,stg.actionnetwork_scoreboard")
+                   default="stg.games,stg_gql.game,stg.lines,stg_gql.game_lines,"
+                           "stg_gql.calendar,stg.plays,stg.drives,"
+                           "stg.actionnetwork_scoreboard")
     a = p.parse_args()
     a.coverage_tables = [t.strip() for t in a.coverage_tables.split(",") if t.strip()]
     names = list(CHECKS) if a.checks == "all" else [c.strip() for c in a.checks.split(",")]

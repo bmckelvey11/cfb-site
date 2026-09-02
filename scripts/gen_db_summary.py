@@ -131,7 +131,7 @@ th {{ background:color-mix(in srgb, var(--fg) 7%, transparent); }}
 <h1>cfb.duckdb</h1>
 <p class="sub">{ntab} tables · {ncol} columns · source <code>{db}</code>. Each table shows its
 columns and up to 3 sample rows (cell values truncated).</p>
-<input id="q" type="search" placeholder="filter tables… (e.g. games, stg.betting)">
+<input id="q" type="search" placeholder="filter tables… (e.g. games, stg.lines)">
 {body}
 <script>
 const q = document.getElementById('q');
