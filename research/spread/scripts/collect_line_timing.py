@@ -180,13 +180,15 @@ def main() -> int:
     if args.mode in ("snapshot", "both"):
         written = snapshot()
         if written is not None:
-            # Log E4/E14 against the line at capture time. Predictions are recomputable from
-            # the snapshot, but the forward test is only as good as what is written per week.
-            subprocess.run(
-                [sys.executable, str(Path(__file__).with_name("predict_upcoming.py")),
-                 "--snapshot", str(written)],
-                check=False,
-            )
+            # Log E4/E14 against the line at capture time, then every movement model plus the
+            # live book fair (weekly_slate.py -> movement_forward_log.csv). Both are recomputable
+            # from the snapshot, but the forward test is only as good as what is written per week.
+            for script in ("predict_upcoming.py", "weekly_slate.py"):
+                subprocess.run(
+                    [sys.executable, str(Path(__file__).with_name(script)),
+                     "--snapshot", str(written)],
+                    check=False,
+                )
     if args.mode in ("history", "both"):
         history(args.season, weeks, force=args.force)
     return 0
