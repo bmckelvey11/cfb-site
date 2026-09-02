@@ -14,6 +14,7 @@ Findings below are empirical, from the live database, and cross-checked against
 [`duckdb-warehouse-plan.md`](duckdb-warehouse-plan.md), [`duckdb-core-ddl.md`](duckdb-core-ddl.md),
 [`duckdb-rebuild-spec.md`](duckdb-rebuild-spec.md), [`schema-audit.md`](schema-audit.md) and
 [`graphql-schema-draft.md`](graphql-schema-draft.md). The generated sections 1–10 follow.
+Remediation is planned in [`duckdb-audit-remediation-plan.md`](duckdb-audit-remediation-plan.md).
 
 **Scope note.** No index or normalization recommendations are given. DuckDB is columnar with
 automatic zone maps, and `raw`/`stg` are deliberate 1:1 JSON mirrors with no relational contract —
@@ -84,10 +85,15 @@ JSON payload has exactly `season` / `seasonType` / `week` / `startDate` / `endDa
 `raw.teams`. Then change the test fixture to build whatever the loader actually produces, so the
 gate can fail for real.
 
-**Separately, the 2026-09-02 05:00 refresh never reached `build_core`.** The log records that run
-starting and nothing after it, and `data/cfb.duckdb.building` was left at 2.2 GB holding 53 of
-120 `raw` tables with a 30 MB uncheckpointed WAL, stamped 05:07 (S8). That is a second,
-independent failure inside the raw rebuild — investigate it separately from the `dim_week` break.
+**Separately, the 2026-09-02 05:00 refresh never reached `build_core` — but it was interrupted,
+not buggy.** The log records that run starting and nothing after it, and
+`data/cfb.duckdb.building` was left at 2.2 GB holding 53 of 120 `raw` tables with a 30 MB
+uncheckpointed WAL, stamped 05:07 (S8). No Python process is running, and the `.cmd` wrapper
+always writes `---- exited N ----` on a non-zero exit — so this is a killed process (sleep or
+shutdown), not a raw-load crash. The traceback is missing because Python block-buffers stdout
+when redirected; see the remediation plan's step 2. The orphan `.building` is harmless:
+`build_duckdb` unlinks it on entry, and a stale `.wal` beside a fresh file was tested to connect
+clean with no replay.
 
 ### S2 — High: `season_type` is 100% NULL on `stg.games` and 24 other tables
 
@@ -197,8 +203,12 @@ rebuild that stalled mid-transaction this morning. **Not deleted; that is your c
 
 Separately, `meta.load_report` is internally clean — 120/120 tables present, 0 row-count
 mismatches, 0 recorded errors (§2) — but it is stamped `2026-09-01 09:11:55` while `cfb.duckdb`
-was last written `2026-09-02 07:10`. Something modified the database after the load without
-updating the report, so the report is not a reliable freshness signal.
+was last written `2026-09-02 07:10`. The writer is
+[`scripts/promote_to_motherduck.py:67`](../scripts/promote_to_motherduck.py:67), which runs
+`ATTACH '{src_path}' AS src` with no `READ_ONLY` and so opens the local warehouse read-write on
+every promote (`mirror_duckdb_to_sqlite.py:27` gets the same attach right). Provenance is
+accounted for, but `load_report` still is not a reliable freshness signal, and the attach should
+be read-only — see the remediation plan's step 4.
 
 ## Prior-doc status
 
