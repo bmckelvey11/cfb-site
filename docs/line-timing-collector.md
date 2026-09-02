@@ -25,11 +25,11 @@ the only failure mode here that cannot be repaired after the fact.
 | Task | Command | Schedule | Repairable if missed? |
 |---|---|---|---|
 | `CFB-PT-Snapshot` | `collect_line_timing.cmd snapshot` | every 6 hours, from 00:30 | **No** |
+| `CFB-AN-History` | `collect_line_timing.cmd history --weeks 1-16` | Mondays 09:00 | Yes — just run it |
 
 When a snapshot is actually new, the snapshot run also executes `predict_upcoming.py` and
 `weekly_slate.py` on it, so `pt_upcoming_predictions.csv`, `weekly_slate_<stamp>.csv` and
 `movement_forward_log.csv` fill without a hand run. Their output lands in the same log.
-| `CFB-AN-History` | `collect_line_timing.cmd history --weeks 1-16` | Mondays 09:00 | Yes — just run it |
 
 Both run as `mckel`, unelevated, **only while that user is logged on** (see Limitations).
 
