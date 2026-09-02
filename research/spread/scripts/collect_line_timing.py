@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 import sys
 import time
 import urllib.error
@@ -177,7 +178,15 @@ def main() -> int:
     weeks = range(int(lo), int(hi or lo) + 1)
 
     if args.mode in ("snapshot", "both"):
-        snapshot()
+        written = snapshot()
+        if written is not None:
+            # Log E4/E14 against the line at capture time. Predictions are recomputable from
+            # the snapshot, but the forward test is only as good as what is written per week.
+            subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("predict_upcoming.py")),
+                 "--snapshot", str(written)],
+                check=False,
+            )
     if args.mode in ("history", "both"):
         history(args.season, weeks, force=args.force)
     return 0
