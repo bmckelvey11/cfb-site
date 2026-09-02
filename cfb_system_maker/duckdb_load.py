@@ -463,8 +463,8 @@ def build_duckdb(
             reports.extend(explode_payloads(con, progress=progress))
         con.close()
         con = None
-        if db_path.exists():
-            db_path.unlink()
+        # No unlink first: Path.replace overwrites on Windows, and unlinking opens
+        # a window where a crash leaves no warehouse at all.
         tmp_path.replace(db_path)
     except Exception:
         if con is not None:
@@ -530,6 +530,9 @@ def explode_payloads(
             reports.append(report)
         con.execute("CHECKPOINT")
         for report in promote_timestamp_columns(con, progress=progress):
+            reports.append(report)
+        con.execute("CHECKPOINT")
+        for report in drop_dead_spine_columns(con, progress=progress):
             reports.append(report)
         con.execute("CHECKPOINT")
     finally:
@@ -836,6 +839,62 @@ def promote_timestamp_columns(
                 )
             else:
                 report = TableLoad(schema, label, 1, int(parsed))
+            reports.append(report)
+            if progress is not None:
+                progress(report)
+    finally:
+        if owns_connection:
+            con.close()
+    return reports
+
+
+def drop_dead_spine_columns(
+    db: str | Path | duckdb.DuckDBPyConnection,
+    *,
+    progress: Callable[[TableLoad], None] | None = None,
+) -> list[TableLoad]:
+    """Drop ``stg.*`` spine columns that are 100% NULL.
+
+    ``season``/``week``/``season_type`` are derived from the source *filename*.
+    A dataset scraped as one whole-corpus file has no season in its name, so the
+    column lands entirely NULL while the API payload's own ``year``/``seasonType``
+    carries the value. Leaving the empty column in place is the worst outcome:
+    ``WHERE season_type = 'postseason'`` on ``stg.games`` returns zero rows with
+    no error. Dropping it makes that same query fail loudly on a missing column.
+
+    ``raw`` is left alone -- there the spine columns are load provenance, not a
+    query surface. Idempotent: a dropped column no longer matches.
+    """
+    owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
+    con = duckdb.connect(str(db)) if owns_connection else db
+    reports: list[TableLoad] = []
+    try:
+        candidates = con.execute(
+            f"""
+            SELECT table_schema, table_name, column_name
+            FROM information_schema.columns
+            WHERE table_schema IN ('stg', 'stg_gql')
+              AND column_name IN ({", ".join("'%s'" % c for c in _RAW_SPINE)})
+            ORDER BY table_schema, table_name, column_name
+            """
+        ).fetchall()
+        for schema, table, column in candidates:
+            target = _qualify(schema, table)
+            label = f"{table}.{column}"
+            try:
+                (populated,) = con.execute(
+                    f"SELECT count({_ident(column)}) FROM {target}"
+                ).fetchone()
+                if populated:
+                    continue
+                con.execute(f"ALTER TABLE {target} DROP COLUMN {_ident(column)}")
+            except Exception as exc:
+                detail = str(exc).splitlines()[0] if str(exc) else ""
+                report = TableLoad(
+                    schema, label, 0, 0, error=f"{type(exc).__name__}: {detail}"
+                )
+            else:
+                report = TableLoad(schema, label, 1, 0)
             reports.append(report)
             if progress is not None:
                 progress(report)

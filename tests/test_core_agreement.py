@@ -82,21 +82,35 @@ def _seed_phase_1a_warehouse(db: Path) -> None:
         "INSERT INTO stg.venues VALUES (100, 'Stadium', 'Town', 'TX', false, true, 50000, '100.5')"
     )
 
+    # The week spine comes from raw.calendar's JSON payload, matching what the
+    # loader produces -- the REST calendar is never exploded into stg. A fixture
+    # that invents stg.calendar hides exactly the break this suite exists to catch.
     con.execute(
         """
-        CREATE TABLE stg.calendar (
-          season INTEGER, week INTEGER, seasonType VARCHAR,
-          startDate VARCHAR, endDate VARCHAR
+        CREATE TABLE raw.calendar (
+          season INTEGER, week INTEGER, season_type VARCHAR, payload JSON
         )
         """
     )
-    con.execute(
-        """
-        INSERT INTO stg.calendar VALUES
-          (2023, 1, 'regular', '2023-08-26', '2023-09-01'),
-          (2023, 1, 'postseason', '2023-12-15', '2023-12-22')
-        """
-    )
+    for week in (
+        {
+            "season": 2023,
+            "week": 1,
+            "seasonType": "regular",
+            "startDate": "2023-08-26",
+            "endDate": "2023-09-01",
+        },
+        {
+            "season": 2023,
+            "week": 1,
+            "seasonType": "postseason",
+            "startDate": "2023-12-15",
+            "endDate": "2023-12-22",
+        },
+    ):
+        con.execute(
+            "INSERT INTO raw.calendar (payload) VALUES (?::JSON)", [json.dumps(week)]
+        )
 
     line_struct = (
         "STRUCT(awayMoneyline HUGEINT, formattedSpread VARCHAR, homeMoneyline HUGEINT, "
@@ -812,3 +826,47 @@ def test_live_warehouse_agreement_4_5_6():
             game_id,
             team,
         )
+
+
+def test_core_is_bounded_to_the_calendar_first_season(tmp_path: Path):
+    """`core` is an explicit 2012+ layer: no fact row without a dim_week partner.
+
+    stg.games reaches back to 1992; raw.calendar only starts at 2012. A game
+    outside the calendar's range must be excluded from fact_game outright, not
+    admitted and then silently dropped by a downstream join.
+    """
+    db = tmp_path / "cfb.duckdb"
+    _seed_phase_1a_warehouse(db)
+    con = duckdb.connect(str(db))
+    con.execute(
+        """
+        INSERT INTO stg.games VALUES
+          (99, 1995, 1, 'regular', '1995-09-02T19:00:00.000Z', true, 100,
+           1, 2, 'Alpha', 'Beta', 'SEC', 'SEC', 20, 17)
+        """
+    )
+    con.close()
+
+    build_core(db, provider="consensus")
+
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        assert con.execute("SELECT min(season) FROM core.dim_week").fetchone()[0] == 2023
+        assert con.execute(
+            "SELECT count(*) FROM core.fact_game WHERE game_id = 99"
+        ).fetchone()[0] == 0
+        # The bound holds for every row, not just the one we planted.
+        assert con.execute(
+            "SELECT count(*) FROM core.fact_game f"
+            " WHERE f.season < (SELECT min(season) FROM core.dim_week)"
+        ).fetchone()[0] == 0
+        # ...and it is a SEASON bound, not per-week joinability. The CFBD calendar
+        # carries one `postseason` row per season while games carry real postseason
+        # week numbers (11-20), so 154 of 34,645 live 2012+ games have no exact
+        # (season, week, season_type) partner. fact_game keeps them; anything
+        # joining dim_week must LEFT JOIN or match on season + season_type only.
+        assert con.execute(
+            "SELECT count(*) FROM core.fact_game WHERE season_type = 'postseason'"
+        ).fetchone()[0] > 0
+    finally:
+        con.close()

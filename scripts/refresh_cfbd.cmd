@@ -20,7 +20,9 @@ set "LOG=%LOGDIR%\cfbd_refresh.log"
 
 echo.>> "%LOG%"
 echo ==== %DATE% %TIME% :: %* ====>> "%LOG%"
-"%PYTHON%" "%REPO%\scripts\refresh_cfbd.py" %*>> "%LOG%" 2>&1
+REM -u: Python block-buffers stdout when redirected, so a killed run (sleep,
+REM shutdown) loses everything it had printed. Unbuffered keeps the partial trail.
+"%PYTHON%" -u "%REPO%\scripts\refresh_cfbd.py" %*>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- exited %RC% ---->> "%LOG%"
 exit /b %RC%

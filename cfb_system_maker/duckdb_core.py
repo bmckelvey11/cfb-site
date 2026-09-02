@@ -64,6 +64,16 @@ def build_core(
 
 
 def _build_dim_week(con: duckdb.DuckDBPyConnection) -> None:
+    """Week spine, sourced from ``raw.calendar``'s JSON payload.
+
+    Not ``stg.calendar``: the REST calendar is never exploded into ``stg``, and
+    the only staged calendar (``stg_gql.calendar``) keeps its season in ``year``
+    with the ``season`` column entirely NULL. ``raw.calendar``'s payload carries
+    ``season``/``seasonType``/``week``/``startDate``/``endDate`` outright, so read
+    it with ``json_extract`` the way ``_build_dim_team`` reads ``raw.teams``.
+
+    This is what bounds ``core`` to 2012+ (see ``CORE_MIN_SEASON``).
+    """
     season_in = ", ".join(repr(s) for s in _SEASON_TYPES)
     con.execute("DROP TABLE IF EXISTS core.dim_week")
     con.execute(
@@ -72,23 +82,26 @@ def _build_dim_week(con: duckdb.DuckDBPyConnection) -> None:
         SELECT season, week, season_type, start_date, end_date
         FROM (
           SELECT
-            CAST(season AS INTEGER) AS season,
-            CAST(week AS INTEGER) AS week,
-            CAST(seasonType AS VARCHAR) AS season_type,
-            TRY_CAST(startDate AS TIMESTAMPTZ) AS start_date,
-            TRY_CAST(endDate AS TIMESTAMPTZ) AS end_date,
+            CAST(json_extract(payload, '$.season') AS INTEGER) AS season,
+            CAST(json_extract(payload, '$.week') AS INTEGER) AS week,
+            json_extract_string(payload, '$.seasonType') AS season_type,
+            TRY_CAST(json_extract_string(payload, '$.startDate') AS TIMESTAMPTZ)
+              AS start_date,
+            TRY_CAST(json_extract_string(payload, '$.endDate') AS TIMESTAMPTZ)
+              AS end_date,
             ROW_NUMBER() OVER (
               PARTITION BY
-                CAST(season AS INTEGER),
-                CAST(week AS INTEGER),
-                CAST(seasonType AS VARCHAR)
-              ORDER BY TRY_CAST(startDate AS TIMESTAMPTZ) NULLS LAST
+                CAST(json_extract(payload, '$.season') AS INTEGER),
+                CAST(json_extract(payload, '$.week') AS INTEGER),
+                json_extract_string(payload, '$.seasonType')
+              ORDER BY TRY_CAST(
+                json_extract_string(payload, '$.startDate') AS TIMESTAMPTZ
+              ) NULLS LAST
             ) AS rn
-          FROM stg.calendar
-          WHERE season IS NOT NULL
-            AND week IS NOT NULL
-            AND seasonType IS NOT NULL
-            AND seasonType IN ({season_in})
+          FROM raw.calendar
+          WHERE json_extract(payload, '$.season') IS NOT NULL
+            AND json_extract(payload, '$.week') IS NOT NULL
+            AND json_extract_string(payload, '$.seasonType') IN ({season_in})
         )
         WHERE rn = 1
         """
@@ -256,6 +269,10 @@ def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
     ).fetchall()
     conf_by_name = {str(name): int(cid) for cid, name in conf_rows if name is not None}
 
+    # `core` is an explicit 2012+ layer: the REST calendar that feeds dim_week only
+    # goes back to 2012, while stg.games reaches 1992. Bounding here keeps every
+    # fact row joinable to a week; the alternative (letting 1992-2011 games in with
+    # no dim_week partner) makes an inner join silently drop them instead.
     games = con.execute(
         """
         SELECT
@@ -263,6 +280,7 @@ def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
           homeTeamId, awayTeamId, homeTeam, awayTeam, homeConference, awayConference,
           homePoints, awayPoints
         FROM stg.games
+        WHERE season >= (SELECT min(season) FROM core.dim_week)
         """
     ).fetchall()
 
@@ -382,7 +400,12 @@ def _build_fact_game_line(con: duckdb.DuckDBPyConnection) -> None:
     """
     batch: list[list[Any]] = []
     seen: set[tuple[int, str]] = set()
-    for game_id, lines_val in con.execute("SELECT gameId, lines FROM stg.lines").fetchall():
+    # Same 2012+ bound as fact_game, inherited rather than restated: a line row for
+    # a game the spine excluded would be an orphan.
+    for game_id, lines_val in con.execute(
+        "SELECT gameId, lines FROM stg.lines"
+        " WHERE gameId IN (SELECT game_id FROM core.fact_game)"
+    ).fetchall():
         if game_id is None:
             continue
         gid = int(game_id)
