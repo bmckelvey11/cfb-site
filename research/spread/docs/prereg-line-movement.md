@@ -89,3 +89,25 @@ PT compiles them.
 
 One run of A. B is evaluated once at 300 games and once at season end; no interim looks.
 No re-thresholding, no switching anchors, no adding models to the screen after seeing A.
+
+## Amendment A2 — the rest of the library, same target (committed before running)
+
+Version A registered E4, E6, E7, E14. The user's instruction on 2026-09-02: prior nulls targeted
+a different question and must not gate methods here. A2 therefore runs, once, on the same
+target (close), anchor (open), support and inference:
+
+- **E8** Stock–Watson shrinkage, **E9** residual PCs, **E10** market-anchored peLASSO,
+  **E11** trimmed consensus, **E12** elastic net, **E13** Hedge — registered grids from the
+  addendum, unchanged.
+- **E6 ridge with a wider grid** λ ∈ {10, 10², 10³, 10⁴, 10⁵, 10⁶}. Version A hit 10⁴ in 19 of
+  20 seasons; this asks whether the rule wanted more shrinkage or was clipped. Reported as its
+  own row (E6w) beside the registered E6.
+
+Holm across the seven new rows. Same outputs as A1/A2 plus the opener-CLV table (pred move ≥ 1
+and ≥ 2) for every method that produces a distinct forecast.
+
+**Expectations.** E8 and E12 will not collapse to zero this time (ψ > 0, nonzero coefficients)
+because the signal is estimable; E9 with 1–2 components will land near E4 (R² 0.15–0.20); E10
+and E11 near E4; E13 below E4; E6w R² within 0.02 of E6 — the wider grid changes little either
+way. No method beats E6 by more than 0.03 R². Stopping rule: one run; anything further is a new
+amendment.

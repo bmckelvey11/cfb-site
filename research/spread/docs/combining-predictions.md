@@ -72,8 +72,10 @@ tie-breaking at the margin, not generating bets. The reason to keep it in the fo
 the forward test: if a Monday γ comes back near 0.3 or higher, the term matters; if it comes
 back near 0.07, drop it and the pipeline is line shopping alone.
 
-Do **not** combine E4 and E14 into a mean, do not add a "raw median" term, and do not fit a new
-weight vector — each has a recorded null or a recorded failure.
+Against the *margin-vs-close* target, averaging E4 and E14, adding a raw-median term, or fitting a
+new weight vector each has a recorded null or failure. Those nulls do not carry to the movement
+target (`line-movement-results.md`), where ridge was the best method; the weight vector that
+fails at forecasting the game may be the right one for forecasting the line.
 
 ## 3. The bet decision
 

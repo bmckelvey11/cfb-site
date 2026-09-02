@@ -123,5 +123,7 @@ posted in spring. The panel's edge lives in the first quarter of the move.
    movement forecasters (rank by E6 loadings or prior movement skill) can be pulled Sunday
    night when in-season openers post. That is the version of this that could pay, and it is a
    scraping task, not a modelling one.
-3. **Do not re-tune on the archive.** E6's λ grid is mis-scaled and a wider grid would probably
-   improve R²; that is a pre-registered amendment for a later run, not a reason to look again.
+3. **Run the rest of the library on this target.** Only E4/E6/E7/E14 were registered for version
+   A. E8–E13 and a wider ridge grid are pre-registered as amendment A2 in
+   `prereg-line-movement.md` and run once; the margin-target nulls of those methods are not a
+   reason to skip them here.

@@ -96,8 +96,10 @@ The word *composite* is right; the inputs are wrong. Compose **book lines**, not
 3. **Totals are where the user's own money says the edge is** (58.0% on 231 bets, CLV +0.45,
    results grade with CLV). Out of scope for this tree, but it should absorb the modelling
    effort the spread work no longer deserves.
-4. **Do not build**: another combiner, a recency scheme, a cohort correction, or a spread GBM.
-   Each has a recorded null.
+4. **Scope the nulls correctly.** Another combiner, a recency scheme, a cohort correction or a
+   spread GBM each has a recorded null *as a margin forecast against the close*. That is not a
+   reason to skip them against the line-movement target (§6, `prereg-line-movement.md`), where
+   the same estimators succeed.
 
 If a midweek fair-value number is wanted for reference, serve E4 from the latest snapshot,
 not the raw median: the raw median disagrees with the close by 2 points on a typical game and

@@ -367,8 +367,10 @@ said Monday had none of the move left; in-season weeks are unmeasured.
    openers post is a scraping task and the version of this that could pay.
 3. **Shopping script**: add the outlier guard and price-adjusted value as a pre-registered
    amendment; verify snapshot = close on 2026 histories after ~4 weeks.
-4. **Do not**: build another combiner against the close, a spread GBM, recency or cohort
-   schemes, or average E4 and E14. Each has a recorded null.
+4. **Scope of the nulls.** Every "closed" verdict in this tree is about forecasting the *margin*
+   against the *closing* line. It is not a gate against trying a method on the movement target
+   (§5.5), where the same estimators worked. Pre-register generously and run them; the user's
+   instruction on 2026-09-02 was explicit that prior conclusions targeted a different question.
 5. **Totals** remain where the user's own bet history shows edge (58% on 231 bets, CLV +0.45);
    the spread tree should not absorb that effort.
 
