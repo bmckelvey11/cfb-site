@@ -127,3 +127,67 @@ posted in spring. The panel's edge lives in the first quarter of the move.
    A. E8–E13 and a wider ridge grid are pre-registered as amendment A2 in
    `prereg-line-movement.md` and run once; the margin-target nulls of those methods are not a
    reason to skip them here.
+
+---
+
+## Amendment A2 — the rest of the library (run 2026-09-02, registered in `prereg-line-movement.md`)
+
+Same target, anchor, support (n = 14,068) and inference. E6 here uses the **wide** ridge grid
+λ ∈ {10 … 10⁶}; the version-A E6 (λ ≤ 10⁴) is the registered one and stands.
+
+| method | R² of move | ΔMSE vs R0 | p | Holm | seasons beating R0 | direction right | chosen parameter |
+|---|---|---|---|---|---|---|---|
+| E4 screened consensus | 0.170 | −1.04 | 0.006 | — | 74% | 70.6% | γ median 0.30 |
+| E6 ridge, **version A grid** | **0.248** | **−1.52** | <0.001 | <0.001 | 84% | 77.2% | λ = 10⁴ (edge) 19/20 |
+| E6w ridge, wide grid | 0.193 | −1.19 | <0.001 | <0.001 | 89% | 77.5% | λ = 10⁶ 12/20, 10⁵ 7/20 |
+| E7 k by rule | 0.147 | −0.90 | 0.011 | 0.044 | 74% | 69.3% | k = all 14/20 |
+| E8 Stock–Watson | 0.112 | −0.69 | <0.001 | <0.001 | 89% | **81.6%** | ψ 0.2–0.6, **not** 0 |
+| E9 residual PCs | 0.118 | −0.72 | 0.069 | 0.069 | 58% | 67.1% | 1 component 14/20 |
+| **E10 peLASSO** | **0.197** | −1.21 | 0.002 | 0.010 | 84% | 73.6% | λ = 1.0 (edge) 19/20 |
+| E11 trimmed | 0.148 | −0.91 | 0.015 | 0.045 | 74% | 69.7% | τ = 0.4 (edge) 19/20 |
+| E12 elastic net | 0.133 | −0.82 | <0.001 | <0.001 | 79% | 78.6% | (10, 0.1) 12/20, **nonzero** |
+| E13 Hedge | 0.085 | −0.52 | 0.032 | 0.063 | 63% | 63.3% | η = 0.001 (floor) |
+| E14 screened CSR | 0.136 | −0.83 | <0.001 | <0.001 | **95%** | 78.2% | k = 1 17/20 |
+
+Every method beats the recalibrated opener; all but E9 and E13 survive Holm. Against the margin
+target, E8 and E12 collapsed to exactly zero correction; here E8 keeps ψ ≈ 0.2–0.6 and E12 keeps
+nonzero coefficients in every season. That is the cleanest statement of what retargeting did.
+
+**The wide ridge grid hurt.** The 1-SE rule ran to 10⁶ and gave up 0.055 R². It is too
+conservative for this target; the registered λ ≤ 10⁴ ridge remains the best method, and a
+future amendment should use a *finer* grid below 10⁴, not a wider one above it.
+
+### Closing line value at the opener, every method (intervals are season-cluster bootstrap, absolute)
+
+| method | pred move ≥ 1: bets / CLV / beat close / ATS at open | pred move ≥ 2: bets / CLV / beat close / ATS at open |
+|---|---|---|
+| E4 | 2,914 / +1.32 [+0.86, +1.79] / 62% / 52.5% | 356 / +3.89 [+2.08, +5.64] / 76% / 64.4% [54.7, 74.1] |
+| E6w (wide) | 3,175 / +1.59 [+1.23, +1.97] / 69% / 53.0% | 541 / +3.57 [+2.38, +4.75] / 81% / 59.6% [50.8, 68.5] |
+| E6 version A (λ ≤ 10⁴) | — | **1,567 / +2.33 [+1.77, +2.94] / 77% / 57.8% [54.7, 60.6]** |
+| E7 | 2,624 / +1.29 / 61% / 51.2% | 273 / +4.21 / 73% / 58.8% |
+| E8 | 1,042 / +1.97 [+1.23, +2.67] / 73% / 54.7% [49.9, 59.5] | 96 / +4.48 / 76% / 65.2% |
+| E9 | 4,073 / +1.01 / 59% / 50.9% | 755 / +2.19 / 66% / 53.7% |
+| E10 | 3,710 / +1.35 [+1.01, +1.69] / 65% / 52.4% | 605 / +3.12 [+1.89, +4.37] / 77% / 57.0% [49.8, 64.3] |
+| E11 | 2,476 / +1.30 / 62% / 52.7% | 237 / +4.56 / 75% / 59.2% |
+| E12 | 2,320 / +1.62 [+1.17, +2.09] / 70% / 54.0% [50.6, 57.2] | 258 / +3.53 [+1.97, +5.06] / 80% / 60.6% [50.8, 70.4] |
+| E13 | 1,348 / +1.29 [+0.26, +2.28] / 56% / 52.7% | 144 / +4.48 [−2.27, +11.26] / 57% / 58.0% |
+| E14 | 853 / +2.42 [+1.50, +3.33] / 70% / 56.6% [51.1, 61.6] | 47 / +16.3 [−3.4, +36.3] / 94% / 85% — too few to read |
+
+Every method shows the same shape: the bets it makes at the opener are followed by the market,
+with 1–2 points of CLV at the ≥ 1 threshold and 3–4.5 at ≥ 2, and the ATS record at the opener
+runs 52–65%. The differences between methods are second-order next to the timing question.
+
+### A2 scorecard
+
+| expectation | outcome |
+|---|---|
+| E8, E12 do not collapse to zero | ✓ |
+| E9 near E4 (R² 0.15–0.20) | ✗ lower, 0.12, and only marginally significant |
+| E10, E11 near E4 | ✓ E10 above (0.197), E11 at (0.148) |
+| E13 below E4 | ✓ |
+| E6w within 0.02 of E6 | ✗ 0.055 worse — the 1-SE rule over-shrank |
+| no method beats E6 by > 0.03 R² | ✓ nothing beats the registered E6 |
+
+*Reporting note.* The script's first printout of the per-method CLV intervals added the mean to
+bounds that were already absolute; the table above is recomputed from the saved predictions
+with the correct intervals, and the script is fixed. Means and all other columns were unaffected.

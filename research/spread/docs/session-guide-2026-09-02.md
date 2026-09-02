@@ -40,6 +40,9 @@ serves that.
 | `0d3da6c` | Review of the book fair; how predictions should combine; juice measured. |
 | `c9bbab5` | Pre-registration: retarget the panel at line movement. |
 | `313e3cd` | Line-movement sweep (version A) and results. |
+| `63f26dc` | Prior nulls rescoped to the margin target; amendment A2 pre-registered. |
+| `95622ec` | "Composite" retired: model consensus vs book fair, defined in `CONTEXT.md`. |
+| (this) | Amendment A2: E8–E13 and a wide ridge grid on the movement target. |
 
 Uncommitted by design: data outputs under `data/processed/`, the weekly slate, memory notes.
 Left untouched: `models/over_zero/docs/figs/bias_bins.png`, dirty before the session began.

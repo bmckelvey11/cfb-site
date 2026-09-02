@@ -14,6 +14,7 @@ two thirds of games, so leaving it in would be leakage of the target into the re
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -26,7 +27,9 @@ import eval_prediction_tracker_models as base  # noqa: E402
 import eval_combination_sweep as sweep  # noqa: E402
 
 MARKET_LINES = {"lineca", "linemidweek"}
-METHODS = ["E6", "E7", "E14"]          # M3 ridge, M2 k-by-rule, M4 screened CSR
+METHODS = ["E6", "E7", "E14"]          # M3 ridge, M2 k-by-rule, M4 screened CSR (version A)
+METHODS_A2 = ["E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14"]  # amendment A2
+WIDE_LAMBDA = [10.0, 100.0, 1000.0, 1e4, 1e5, 1e6]
 BREAKEVEN = 0.5238
 FRACS = (0.0, 0.25, 0.5, 0.75, 1.0)
 THRESH = (1.0, 2.0)
@@ -42,6 +45,16 @@ def cluster_rate(win, season):
 
 
 def main() -> int:
+    global METHODS
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--amend", action="store_true", help="amendment A2: all methods, wide ridge grid")
+    args = ap.parse_args()
+    suffix = "_a2" if args.amend else ""
+    grids = None
+    if args.amend:
+        METHODS = METHODS_A2
+        grids = {k: list(v) for k, v in sweep.GRIDS.items()}
+        grids["E6"] = WIDE_LAMBDA
     df, models = base.load()
     models = [m for m in models if m not in MARKET_LINES]
     df = df[df["line"].notna() & df["lineopen"].notna()].reset_index(drop=True)
@@ -50,7 +63,7 @@ def main() -> int:
     print(f"{len(df)} games with open and close, {len(models)} models, "
           f"seasons {df.season.min()}-{df.season.max()}, bootstrap draws {base.N_BOOT}")
 
-    preds, chosen, coefs, seasons = sweep.sweep(df, models, "lineopen", only=METHODS)
+    preds, chosen, coefs, seasons = sweep.sweep(df, models, "lineopen", only=METHODS, grids=grids)
 
     y = df["y"].to_numpy()                    # close (margin space)
     open_m = -df["lineopen"].to_numpy(float)  # opener (margin space)
@@ -115,10 +128,34 @@ def main() -> int:
                   f"[{r['lo']:.3f}, {r['hi']:.3f}]  p={r['p_vs_breakeven']:.3f}  ROI@-110 {r['roi_110']:+.3f}")
     out["decay"] = decay
 
+    # CLV at the opener for every method: back its side when it predicts a move >= thr
+    print("\nCLV at the OPENER by method (side = method vs open; CLV = points the close moved toward the bet)")
+    clv_rows = []
+    for k in ["E4"] + METHODS:
+        for thr in THRESH:
+            pm = preds[k] - open_m
+            m = sup & (np.abs(pm) >= thr) & np.isfinite(margin)
+            if m.sum() < 30:
+                continue
+            side = np.sign(pm[m])
+            clv = side * move[m]
+            cm, cci, _ = base.wild_cluster_boot(clv, season[m])
+            res = side * (margin[m] - open_m[m])
+            keep = res != 0
+            r = cluster_rate((res[keep] > 0).astype(float), season[m][keep])
+            clv_rows.append({"method": k, "thr": thr, "bets": int(m.sum()), "clv": float(clv.mean()),
+                             "clv_lo": float(cci[0]), "clv_hi": float(cci[1]),   # boot CI is absolute
+                             "beat_close": float((clv > 0).mean()), "ats_open": r["rate"],
+                             "ats_lo": r["lo"], "ats_hi": r["hi"]})
+            print(f"  {k:4s} pred>={thr:.0f}  bets {m.sum():5d}  CLV {clv.mean():+.2f} "
+                  f"[{cci[0]:+.2f},{cci[1]:+.2f}]  beat close {(clv>0).mean():.1%}  "
+                  f"ATS@open {r['rate']:.4f} [{r['lo']:.3f},{r['hi']:.3f}]")
+    out["clv_open"] = clv_rows
+
     pd.DataFrame({"game_id": df["game_id"], "season": season, "open": open_m, "close": y,
                   "margin": margin, **{k: preds[k] for k in ["R0", "E4"] + METHODS}})[sup].to_csv(
-        OUT / "pt_movement_preds.csv", index=False)
-    (OUT / "pt_movement.json").write_text(json.dumps(out, indent=2, default=float))
+        OUT / f"pt_movement_preds{suffix}.csv", index=False)
+    (OUT / f"pt_movement{suffix}.json").write_text(json.dumps(out, indent=2, default=float))
     print(f"\nwrote {OUT / 'pt_movement_preds.csv'} and {OUT / 'pt_movement.json'}")
     return 0
 
