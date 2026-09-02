@@ -3,8 +3,11 @@
 Plan for the findings in [`duckdb-audit-2026-09-02.md`](duckdb-audit-2026-09-02.md).
 Ordered by **what breaks next**, not by audit severity.
 
-**Status 2026-09-02: steps 1-4 implemented and committed (`e169ed7`).** Sign-off was
-*explicit 2012+* and *drop the column*. Backlog below is untouched by design.
+**Status 2026-09-02: steps 1–5 done and verified against the live warehouse.** Sign-off was
+*explicit 2012+*, *drop the column*, and *(a) conditional re-infer*. `core` is built (8 tables,
+`fact_game` 34,645 rows), 715 unit tests pass, and **both live agreement tests pass** — they had
+never run before, because they `pytest.skip` when `core` is missing. That is what surfaced S9.
+Backlog below is untouched by design.
 
 **Architecture is not in scope.** Single-node DuckDB, atomic full-refresh, one nightly
 Windows Task Scheduler job, three in-repo consumers. No orchestrator, no streaming layer, no
@@ -73,7 +76,7 @@ wrong, not the code.
 
 **Check (done):** the `stg.calendar` fixture in `tests/test_core_agreement.py` now seeds
 `raw.calendar` as the loader does, plus `test_core_is_bounded_to_the_calendar_first_season`.
-709 tests pass (was 703).
+715 tests pass (was 703).
 
 ## Step 2 — Stop losing the traceback (root cause of the silence) — DONE 2026-09-02
 
@@ -140,8 +143,10 @@ union query fails, so a pathological table degrades to today's behavior instead 
 load.
 
 **Check (done):** `tests/test_structure_inference.py`, 6 cases — the load-bearing one asserts a
-value past the sample window survives the explode. On the live warehouse a re-explode recovered
-8,413 opening spreads, 6,917 opening totals and 7,899 moneylines, all previously zero.
+value past the sample window survives the explode. On the live warehouse a re-explode plus a
+`core` rebuild recovered 8,413 opening spreads, 6,917 opening totals and 7,908 moneylines in
+`core.fact_game_line`, all previously zero, and **`test_live_warehouse_agreement_4_5_6` now
+passes** — the SQL warehouse and `enrich._build_line_move_index` agree on all 13,515 games.
 
 ## Backlog — real, not urgent
 
