@@ -12,7 +12,9 @@ Prior decisions cited, not restated: [ADR 0002](adr/0002-graphql-stg-tables-in-s
 ## Recommendation in one line
 
 **Stop generating the `__` tables, collapse `stg_gql` into `stg` with a source suffix on the
-2–3 colliding names only, and make `core` the clean-name surface — behind a rename guard.**
+2–3 colliding names only, shorten Action Network to `an_` and strip its repeated column
+prefixes, evict the leaked PFF and snapshot tables, and make `core` the clean-name surface —
+behind a rename guard.**
 
 **Revised 2026-09-02** after the question "why does `gql` have to be in the group name?" It
 doesn't, and the first draft of §3 overstated the constraint that said it did. The measurement
@@ -212,10 +214,126 @@ violate rather than being a surprise.
 | 4 | snake_case `gameMedia` / `gamePlayerStat` (§2) | 3 | 4 tables; trivial once there is one schema |
 | 5 | `source_file` → `_source_file` in `raw` (§4) | 1 | column rename, 120 tables |
 | 6 | ADR 0003 superseding 0002 + write down the casing boundary (§3, §5) | 3 | docs only |
-| 7 | Source rationalization → suffix count goes to zero (§3) | 3 | the real project |
+| 7 | Evict PFF + move ad-hoc snapshots out of the loader glob (§7) | — | drops 15 tables; needs your say-so on the files |
+| 8 | Action Network `an_` rename + strip child column prefixes (§8) | 1, 2 | 8 tables, ~60 columns; 1 consumer |
+| 9 | Decide the Massey 72 MB question (§7) | — | in or out, but not neither |
+| 10 | Source rationalization → suffix count goes to zero (§3) | 3 | the real project |
 
-1–6 land in the next rebuild. 7 is what removes the last transport-named thing from the schema,
+1–9 land in the next rebuild. 10 is what removes the last transport-named thing from the schema,
 and it is a data-merge project, not a naming pass.
+
+## 7. Foreign data that leaked into the warehouse
+
+Checked every `raw`/`stg` table for provenance. Three things do not belong.
+
+### PFF — 4 tables, no consumer, and a `__restricted` payload
+
+```
+raw.pff_facet_offense_summary_21580                     1 row
+stg.pff_facet_offense_summary_21580                     1 row
+stg.pff_facet_offense_summary_21580__offense_summary   43 rows
+stg.pff_facet_offense_summary_21580__restricted        15 rows
+```
+
+Source is a single hand-saved `data/raw/pff_facet_offense_summary_21580.json` (8.1 KB,
+2026-08-26). The loader globs `data/raw/*.json`, so it got picked up and exploded like an
+endpoint. **Nothing in the repo references it** — zero hits for `pff` across
+`cfb_system_maker/`, `models/`, `research/`, `scripts/`.
+
+The content is a 43-player roster block (`player`, `player_id`, `position`, `status`,
+`franchise_id`) with a sibling key literally named `restricted`. It is one team's availability
+list from a paid third-party product, not CFBD data, not referenced, and not something the
+pipeline should be silently ingesting and re-exploding on every rebuild.
+
+**Recommendation:** move it out of `data/raw/` and let the next rebuild drop all four tables.
+**Your call — it is a file in your data root and I have not touched it.** If the data is wanted,
+`data/vendor/` puts it beyond the loader's glob while keeping it on disk.
+
+### Ad-hoc line snapshots — 11 tables named after a capture date
+
+```
+raw.lines_2026_week1            stg.lines_2026_week1            stg.lines_2026_week1__lines
+raw.lines_2026_week1_20260826   stg.lines_2026_week1_20260826   stg.lines_2026_week1_20260826__lines
+raw.lines_2026_week1_20260831   stg.lines_2026_week1_20260831   stg.lines_2026_week1_20260831__lines
+raw.lines_2026_week2            stg.lines_2026_week2            stg.lines_2026_week2__lines
+raw.lines_2026_week2_20260826   stg.lines_2026_week2_20260826   stg.lines_2026_week2_20260826__lines
+```
+
+Manual snapshots dropped into `data/raw/`, each becoming a permanent table whose name encodes a
+date. No consumer: the one apparent hit, `models/over_zero/v1/predict_week.py:5`, references the
+**file** in a usage example (`--raw data/raw/lines_2026_week1.json`), not the table.
+
+Same defect as PFF — any file that lands in `data/raw/` becomes schema.
+
+**Recommendation:** move point-in-time captures to `data/snapshots/` and glob only
+endpoint-named files. The snapshots stay readable by path for the scripts that want them; they
+stop minting tables.
+
+### The inverse problem: Massey is scraped but never loaded
+
+`data/raw/massey/` holds **497 files, 72 MB** of Massey rating editions, and there is no
+`massey` table anywhere in the warehouse. Real data sitting outside the schema while an 8 KB PFF
+file sits inside it. Not a naming issue, but it is the other half of "is the right data in here"
+and deserves a decision in the same pass.
+
+## 8. Action Network — `an_`, and drop the repeated path prefixes
+
+Two problems. The table names are long; the **column** names are worse.
+
+### Tables: `actionnetwork_` → `an_`
+
+`actionnetwork_` is 14 characters of prefix on every table and it pushes the market children past
+75 characters. Shortening, and naming the markets for what they are:
+
+| Today | Proposed |
+|---|---|
+| `actionnetwork_scoreboard` | `an_scoreboard` |
+| `actionnetwork_history` | `an_history` |
+| `actionnetwork_scoreboard__markets__markets_event_spread` | `an_market_spread` |
+| `actionnetwork_scoreboard__markets__markets_event_total` | `an_market_total` |
+| `actionnetwork_scoreboard__markets__markets_event_moneyline` | `an_market_moneyline` |
+| `actionnetwork_scoreboard__markets__markets_event_core_bet_type_6_team_score` | `an_market_team_total` |
+| `actionnetwork_scoreboard__teams` | `an_team` |
+| `actionnetwork_scoreboard__linescore` | `an_linescore` |
+
+`core_bet_type_6_team_score` is a raw Action Network internal key. Its rows are
+`side in ('over','under')` grouped by team — it is a **team total**, and the table should say so.
+75 characters becomes 20.
+
+These are children of `actionnetwork_scoreboard`, so §1's opt-in list is what keeps the four
+market tables alive; the rest stop being generated.
+
+### Columns: the explode repeats the path the table name already carries
+
+`stg.actionnetwork_scoreboard__markets__markets_event_spread` has 62 columns, and every column
+actually about the spread is prefixed `markets_event_spread_`:
+
+```
+markets_event_spread_bet_info_money_percent                      ->  money_pct
+markets_event_spread_bet_info_tickets_percent                    ->  tickets_pct
+markets_event_spread_odds_coefficient_score                      ->  odds_coefficient_score
+markets_event_spread_is_alt_market                               ->  is_alt_market
+markets_event_spread_value                                       ->  line
+markets_event_core_bet_type_6_team_score_odds_coefficient_score  ->  odds_coefficient_score
+```
+
+That last one is **62 characters** for a single scalar. `__teams` has the same shape —
+`teams_standings_overtime_losses` inside a table already named for teams.
+
+**Recommendation: strip the parent path prefix from child columns.** The table name carries it;
+repeating it per column is noise. `explode_stg_lists` should prefix a child column only when
+stripping would collide with an inherited parent column — rare, and detectable at build time.
+
+Two supporting notes:
+
+- **`stg.actionnetwork_history` needs none of this.** Its 19 columns are already clean:
+  `event_id`, `book_id`, `market_type`, `side`, `line`, `odds`, `money_pct`, `tickets_pct`. It is
+  the model for what the scoreboard children should look like — and it is the one AN table built
+  by a hand-written exploder rather than the generic path.
+- **Children also inherit all 36 parent scalars** (`clock`, `broadcast_network`, `attendance`,
+  `home_timeouts`…), so `an_market_spread` carries 62 columns to describe one price. Whether
+  children should inherit only the join key plus the spine is a bigger change than renaming and
+  belongs with §1's opt-in work.
 
 ## What I am not recommending
 
