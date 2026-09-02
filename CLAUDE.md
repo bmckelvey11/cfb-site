@@ -5,10 +5,16 @@ unit-specific commands and conventions. `AGENTS.md` points here; `.claude/CLAUDE
 owns only GSD workflow; `CONTEXT.md` owns current terminology; `PRODUCT.md` owns
 human-facing product intent. None should duplicate another file's rules.
 
+## Standing Rules
+
+- After finishing tasks/findings tracked in a doc (review docs, plans, TODO lists), update that doc marking each  item done + the completion date — don't leave it stale once the work lands.
+
+- Any modelling, backtesting, or analysis that might be reproduced gets a reusable script, not a one-off. Write the script as part of the task.
+
 ## Units
 
 | Unit | Home | Instructions |
-|---|---|---|
+| --- | --- | --- |
 | System maker, Flask app, scrapers, warehouse | `cfb_system_maker/` | `cfb_system_maker/CLAUDE.md` |
 | Totals model | `models/totals/` | `models/totals/CLAUDE.md` |
 | Over-zero models and floor-bias research | `models/over_zero/` | `models/over_zero/CLAUDE.md` |

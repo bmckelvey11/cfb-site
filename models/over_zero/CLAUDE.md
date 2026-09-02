@@ -3,9 +3,6 @@
 Scope: Arscott, saturation, floor-bias, and monitoring work under this tree. Shared data,
 archive, and no-lookahead rules live in root `CLAUDE.md`.
 
-- Run commands from repository root unless a script documents a narrower working directory.
-- Resolve raw and processed data through root `cfb_paths.py` and required `CFB_DATA_ROOT`.
-  Never recreate an in-repository `data/` directory.
 - Historical model copies may use local sibling imports; preserve numerical behavior when
   changing paths.
 - First-half builders live in this unit's `scripts/` directory. Their inputs come from

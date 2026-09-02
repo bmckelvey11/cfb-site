@@ -54,8 +54,7 @@ Data flows acquire → build → enrich → consume. Each CLI command persists t
 
 `web.py` (`create_app`) skips fetch/build — it loads already-built `games.csv` (+ `features.json` if present). Missing data → `error="missing_data"`. Routes: `/` dashboard, `/system` editor, `/compare`, `/betlog`, `/filter-detail`, `/api/backtest`. Vanilla JS/CSS, no frontend framework. Waitress unless `--debug`.
 
-Canonical data dir is required `CFB_DATA_ROOT`, resolved by root `cfb_paths.py`. Explicit
-`--data-dir` still wins where a command supports it; no repository-relative fallback exists.
+Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 
 `scrapers.py` is a parallel REST sweep: registry `ENDPOINTS` (82 entries = unique vendored-client methods plus 9 `*_ngt` garbage-time variants). Unique live spec paths: 74; 73 methods registered, `/info/usage` is account metering (deliberately unregistered). `*_ngt` is a **second source** — `excludeGarbageTime` changes aggregates and cannot be derived from the unfiltered dump. (Vendored client bumped `034cd17` → `52f2bbf` on 2026-08-28 for CFP, core ratings, expanded SRS, coach profile/seasons/tenures, conference affiliations/changes.) Re-check with `python scripts/audit_coverage.py` (registry vs disk) and `python scripts/audit_endpoints.py` (live spec vs registry); `docs/data-coverage.md` records why absent endpoints are absent and why empty `[]` files are data floors, not failures. Writes `data/raw/` only — does not feed `build`/`backtest`.
 
@@ -120,7 +119,6 @@ Canonical data dir is required `CFB_DATA_ROOT`, resolved by root `cfb_paths.py`.
   `games.csv` columns or tables. Compute from `stg.drives` or `stg.plays`.
 - **Spread sign convention:** `GameRecord.spread` is always the **home** spread. `_side_spread` negates it for away. A bet covers when `team_points + side_spread - opponent_points > 0`. Preserve this when touching grading.
 - **Two bet types share one path:** `SystemFilter.bet_type` is `"spread"` (uses `side` home/away) or `"total"` (uses `total_side` over/under). `matches_system` and `grade_bet` branch on it; `_grade_total_bet` handles totals separately. CLI and web both expose spread and total (`--bet-type` / form). `fade` flips the graded side only.
-- **No lookahead:** new registry features must be computable pre-game (entering-game state) or tagged `result_lookahead` and quarantined in the UI. Do not fold a game's own result into its features.
 - **CFBD field names are inconsistent** (camelCase vs snake_case across API versions). `normalize._first(row, *keys, fallback=...)` tries multiple key spellings — extend the key list rather than assuming one casing.
 - **All domain types are frozen dataclasses** (`models.py`). `GameRecord` field order is the CSV schema — changing it changes `storage` read/write. New game-level data goes in `features.json`, not new CSV columns. `storage._row_to_game` parses CSV strings back, treating `""` as `None`. `SavedSystem` JSON: new fields must default for old saves.
 - **API token resolution** (`cfbd_client.find_cfbd_token`): env vars `CFBD_API_KEY`, `CFBD-API`, `BEARER_TOKEN`, then `env.env` file. `env.env` holds the real key (gitignored-style secret) — never commit or echo its value.
