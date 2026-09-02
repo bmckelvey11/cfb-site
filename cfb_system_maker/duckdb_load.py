@@ -539,9 +539,15 @@ def explode_payloads(
 
 
 # Action Network book_id → CFBD linesProvider.id when the book already exists.
-_AN_BOOK_PROVIDER = {15: 888888, 71: 38}  # DraftKings, Caesars
+# 15 is AN's consensus line (median 0.00 from the real books), not DraftKings; it
+# stays under its own id. 30 is the consensus opener, not a book: it lands as
+# spreadOpen/overUnderOpen on the book-15 row. See
+# research/spread/docs/prereg-line-shopping.md (Data).
+_AN_BOOK_PROVIDER = {71: 38}  # Caesars
+_AN_CONSENSUS_BOOK = 15
+_AN_OPENER_BOOK = 30
 _AN_PROVIDER_NAMES = {
-    30: "Circa",
+    15: "Action Network consensus",
     49: "Pinnacle",
     68: "FanDuel",
     69: "BetMGM",
@@ -565,6 +571,8 @@ def backfill_gamelines_from_actionnetwork(
     CFBD ``gameLines`` is full-game only. AN history is 1H/1Q; scoreboard
     ``markets`` is full-game per book. Existing CFBD numbers win; AN fills
     nulls and inserts missing ``(gameId, linesProviderId, period)`` rows.
+    AN book 30 (consensus opener) fills ``spreadOpen``/``overUnderOpen`` on
+    the book-15 (consensus) row instead of becoming a provider.
     """
     owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
     con = duckdb.connect(str(db)) if owns_connection else db
@@ -688,19 +696,31 @@ def _backfill_gamelines(
           SELECT
             CAST(m.game_id AS {gid_type}) AS gameId,
             CAST(
-              (CASE book_id {book_sql} ELSE book_id END) AS {prov_type}
+              (CASE book_id
+                 WHEN {_AN_OPENER_BOOK} THEN {_AN_CONSENSUS_BOOK}
+                 {book_sql} ELSE book_id END) AS {prov_type}
             ) AS linesProviderId,
             CASE
               WHEN period IN ('event', 'game') THEN 'game'
               ELSE period
             END AS period,
-            MAX(CASE WHEN market_type = 'spread' AND side = 'home'
+            MAX(CASE WHEN book_id <> {_AN_OPENER_BOOK}
+                      AND market_type = 'spread' AND side = 'home'
                      THEN line END) AS spread,
-            MAX(CASE WHEN market_type = 'total' AND side IN ('over', 'under')
+            MAX(CASE WHEN book_id = {_AN_OPENER_BOOK}
+                      AND market_type = 'spread' AND side = 'home'
+                     THEN line END) AS spreadOpen,
+            MAX(CASE WHEN book_id <> {_AN_OPENER_BOOK}
+                      AND market_type = 'total' AND side IN ('over', 'under')
                      THEN line END) AS overUnder,
-            MAX(CASE WHEN market_type = 'moneyline' AND side = 'home'
+            MAX(CASE WHEN book_id = {_AN_OPENER_BOOK}
+                      AND market_type = 'total' AND side IN ('over', 'under')
+                     THEN line END) AS overUnderOpen,
+            MAX(CASE WHEN book_id <> {_AN_OPENER_BOOK}
+                      AND market_type = 'moneyline' AND side = 'home'
                      THEN odds END) AS moneylineHome,
-            MAX(CASE WHEN market_type = 'moneyline' AND side = 'away'
+            MAX(CASE WHEN book_id <> {_AN_OPENER_BOOK}
+                      AND market_type = 'moneyline' AND side = 'away'
                      THEN odds END) AS moneylineAway,
             ANY_VALUE(an_long._source_file) AS _source_file
           FROM an_long
@@ -726,9 +746,9 @@ def _backfill_gamelines(
           COALESCE(c.linesProviderId, a.linesProviderId) AS linesProviderId,
           COALESCE(c.period, a.period) AS period,
           COALESCE(c.spread, a.spread) AS spread,
-          c.spreadOpen,
+          COALESCE(c.spreadOpen, a.spreadOpen) AS spreadOpen,
           COALESCE(c.overUnder, a.overUnder) AS overUnder,
-          c.overUnderOpen,
+          COALESCE(c.overUnderOpen, a.overUnderOpen) AS overUnderOpen,
           COALESCE(c.moneylineHome, a.moneylineHome) AS moneylineHome,
           COALESCE(c.moneylineAway, a.moneylineAway) AS moneylineAway,
           CASE

@@ -952,7 +952,29 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
                         },
                     ],
                 }
-            }
+            },
+            "30": {
+                "event": {
+                    "spread": [
+                        {
+                            "period": "event",
+                            "type": "spread",
+                            "side": "home",
+                            "value": -2.5,
+                            "odds": -110,
+                        }
+                    ],
+                    "total": [
+                        {
+                            "period": "event",
+                            "type": "total",
+                            "side": "over",
+                            "value": 47.5,
+                            "odds": -110,
+                        }
+                    ],
+                }
+            },
         }
     )
     con.execute(
@@ -975,7 +997,8 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
         """
         INSERT INTO stg.actionnetwork_history VALUES
           (100, 15, 'firsthalf', 'spread', 'home', 1, -3.5, -110, 'history.json'),
-          (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, 'history.json')
+          (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, 'history.json'),
+          (100, 30, 'firsthalf', 'spread', 'home', 1, -1.5, -110, 'history.json')
         """
     )
     con.close()
@@ -986,24 +1009,42 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     con = duckdb.connect(str(db_path), read_only=True)
     cols = {row[0] for row in con.execute("DESCRIBE stg_gql.game_lines").fetchall()}
     assert "period" in cols and "line_source" in cols
-    fg = con.execute(
+    # CFBD DraftKings row untouched: AN book 15 is the consensus, not DraftKings.
+    dk = con.execute(
         """
-        SELECT spread, spreadOpen, overUnder, moneylineHome, moneylineAway, period
+        SELECT spread, spreadOpen, overUnder, moneylineHome, moneylineAway, line_source
         FROM stg_gql.game_lines
         WHERE gameId = 99 AND linesProviderId = 888888 AND period = 'game'
         """
     ).fetchone()
-    assert fg == (-7.0, -6.5, 45.5, -155, 135, "game")
+    assert dk == (-7.0, -6.5, 45.5, None, None, "cfbd")
+    # AN consensus keeps id 15; book 30 (opener) lands as the *Open columns.
+    consensus = con.execute(
+        """
+        SELECT spread, spreadOpen, overUnder, overUnderOpen,
+               moneylineHome, moneylineAway, line_source
+        FROM stg_gql.game_lines
+        WHERE gameId = 99 AND linesProviderId = 15 AND period = 'game'
+        """
+    ).fetchone()
+    assert consensus == (-3.5, -2.5, 48.5, 47.5, -155, 135, "actionnetwork")
+    assert (
+        con.execute(
+            "SELECT count(*) FROM stg_gql.game_lines WHERE linesProviderId = 30"
+        ).fetchone()[0]
+        == 0
+    )
     half = con.execute(
         """
-        SELECT spread, overUnder, period, line_source
+        SELECT spread, spreadOpen, overUnder, period, line_source
         FROM stg_gql.game_lines
         WHERE gameId = 99 AND period = 'firsthalf'
         """
-    ).fetchone()
-    assert half[0] == -3.5 and half[1] == 24.5 and half[3] == "actionnetwork"
+    ).fetchall()
+    assert half == [(-3.5, -1.5, 24.5, "firsthalf", "actionnetwork")]
     names = {
         row[0]
         for row in con.execute("SELECT name FROM stg_gql.lines_provider").fetchall()
     }
-    assert "DraftKings" in names and "FanDuel" in names
+    assert {"DraftKings", "FanDuel", "Action Network consensus"} <= names
+    assert "Circa" not in names
