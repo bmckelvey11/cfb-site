@@ -2,7 +2,7 @@
 
 Source: $CFB_DATA_ROOT/raw/prediction_tracker/ncaa*.csv (seasons come from files present, so a
         new ncaa{year}.csv is picked up without a code change)
-CFBD:   stg.game in data/cfb.duckdb -- the GraphQL-fed table. data/raw/games_*.json holds
+CFBD:   stg_gql.game in data/cfb.duckdb -- the GraphQL-fed table. data/raw/games_*.json holds
         regular-season rows only, which would drop every bowl (~35/season); games.csv is
         additionally 2013+ only.
 Out:    data/raw/prediction_tracker_lines.csv
@@ -136,12 +136,12 @@ def load_cfbd(db_path, seasons):
 
     con = duckdb.connect(str(db_path), read_only=True)
     # the GraphQL re-pull has renamed this column before (id -> gameId); tolerate either
-    cols = {c[0] for c in con.execute("describe stg.game").fetchall()}
+    cols = {c[0] for c in con.execute("describe stg_gql.game").fetchall()}
     id_col = "gameId" if "gameId" in cols else "id"
     rows = con.execute(
         f"""
         select season, {id_col}, homeTeam, awayTeam, week, seasonType, homePoints, awayPoints
-        from stg.game
+        from stg_gql.game
         where season between ? and ?
         """,
         [min(seasons), max(seasons)],
