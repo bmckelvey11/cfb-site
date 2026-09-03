@@ -55,12 +55,12 @@ def history_payloads(connection, season=2025):
         """
         WITH season_events AS (
             SELECT DISTINCT CAST(json_extract_string(game.value, '$.id') AS BIGINT) event_id
-            FROM raw.actionnetwork_scoreboard scoreboard,
+            FROM raw.an_scoreboard scoreboard,
                  json_each(scoreboard.payload, '$.games') game
             WHERE scoreboard.season = ?
         )
         SELECT history.payload, history.source_file
-        FROM raw.actionnetwork_history history
+        FROM raw.an_history history
         JOIN season_events
           ON TRY_CAST(
               regexp_extract(history.source_file, 'history_([0-9]+)[.]json', 1)

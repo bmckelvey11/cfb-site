@@ -69,7 +69,7 @@ def scoreboard_payloads(connection, season=2025):
     return connection.execute(
         """
         SELECT payload, source_file
-        FROM raw.actionnetwork_scoreboard
+        FROM raw.an_scoreboard
         WHERE season = ?
         ORDER BY source_file
         """,

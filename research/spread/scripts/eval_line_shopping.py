@@ -26,7 +26,7 @@ REPO = next(p for p in Path(__file__).resolve().parents if (p / "cfb_paths.py").
 sys.path.insert(0, str(REPO))
 import cfb_paths  # noqa: E402
 
-TABLE = "stg.actionnetwork_scoreboard__markets__markets_event_spread"
+TABLE = "stg.an_market"
 SEASONS = (2024, 2025)
 # 15 is the consensus, 30 the consensus opener; neither is a book. See prereg.
 REAL_BOOKS = (49, 68, 69, 71, 75)
@@ -40,17 +40,21 @@ OUT = cfb_paths.PROCESSED
 
 def load() -> pd.DataFrame:
     con = duckdb.connect(str(cfb_paths.DB_PATH), read_only=True)
+    # an_market holds only the offering; the game's score and status stay on
+    # the scoreboard row, one per event_id, so the join cannot fan out.
     q = f"""
-        select event_id, season, week,
-               markets_event_spread_book_id as book,
-               markets_event_spread_value as s,
-               markets_event_spread_odds as odds,
-               markets_event_spread_line_status as line_status,
-               markets_event_spread_is_live as is_live,
-               home_points as hp, away_points as ap
-        from {TABLE}
-        where side_ok and season in {SEASONS} and status = 'complete'
-    """.replace("side_ok", "markets_event_spread_side = 'home'")
+        select m.event_id, m.season, m.week,
+               m.book_id as book,
+               m.line as s,
+               m.odds,
+               m.line_status,
+               m.is_live,
+               sb.home_points as hp, sb.away_points as ap
+        from {TABLE} m
+        join stg.an_scoreboard sb using (event_id)
+        where m.market_type = 'spread' and m.period = 'event' and m.side = 'home'
+          and m.season in {SEASONS} and sb.status = 'complete'
+    """
     return con.sql(q).df()
 
 

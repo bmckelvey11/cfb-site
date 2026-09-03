@@ -80,7 +80,7 @@ def collect_teams(files: list) -> dict:
     """massey_id -> dict(name, first_date, last_date, n_editions)."""
     teams = {}
     for path in files:
-        date = Path(path).stem[6:]
+        date = edition_date(path)
         for row in json.load(open(path, encoding="utf-8"))["DI"]:
             m = _ID_RE.search(row[C_TEAM][2] or "")
             if not m:
@@ -118,6 +118,16 @@ def build_map(teams: dict, cfbd: dict) -> dict:
     return out
 
 
+def edition_date(path) -> str:
+    """``ranks_19960916.json`` -> ``1996-09-16``.
+
+    ISO so read_csv_auto types the column DATE rather than an 8-digit integer.
+    Still sorts and compares as a string, which the min/max bookkeeping relies on.
+    """
+    d = Path(path).stem[6:]
+    return f"{d[:4]}-{d[4:6]}-{d[6:]}"
+
+
 def _split_wl(cell) -> tuple:
     m = _WL_RE.match((cell[0] or "").strip()) if cell else None
     if not m:
@@ -141,7 +151,7 @@ def flatten(files: list, tmap: dict) -> int:
     w_rk.writerow(["date", "season", "massey_id", "cfbd_team", "system", "rank"])
 
     for path in files:
-        date = Path(path).stem[6:]
+        date = edition_date(path)
         payload = json.load(open(path, encoding="utf-8"))
         season = int(str(payload.get("seas", "")).replace("cf", "") or 0)
 

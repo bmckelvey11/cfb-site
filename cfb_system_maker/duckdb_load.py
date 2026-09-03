@@ -452,6 +452,7 @@ def build_duckdb(
         con.execute("SET preserve_insertion_order = false")
         con.execute("SET threads = 1")
         con.execute("CREATE SCHEMA IF NOT EXISTS raw")
+        con.execute("CREATE SCHEMA IF NOT EXISTS stg")
         con.execute("CREATE SCHEMA IF NOT EXISTS meta")
         for job in jobs:
             report = _load_job(con, job)
@@ -520,6 +521,8 @@ def explode_payloads(
             if progress is not None:
                 progress(report)
             con.execute("CHECKPOINT")
+        for report in explode_an_children(con, progress=progress):
+            reports.append(report)
         extra = backfill_gamelines_from_actionnetwork(con)
         if extra is not None:
             reports.append(extra)
@@ -587,7 +590,7 @@ def backfill_gamelines_from_actionnetwork(
         if not (
             "game_lines" in gql_tables
             and "games" in stg_tables
-            and "actionnetwork_scoreboard" in stg_tables
+            and "an_market" in stg_tables
         ):
             return None
         return _backfill_gamelines(con, stg_tables, gql_tables)
@@ -611,7 +614,7 @@ def _backfill_gamelines(
     }
     gid_type = gl_types.get("gameId", "BIGINT")
     prov_type = gl_types.get("linesProviderId", "BIGINT")
-    has_history = "actionnetwork_history" in stg_tables
+    has_history = "an_history" in stg_tables
     has_provider = "lines_provider" in gql_tables
     alias_sql = " ".join(
         f"WHEN '{src.replace(chr(39), chr(39) + chr(39))}' THEN '{dst.replace(chr(39), chr(39) + chr(39))}'"
@@ -630,7 +633,7 @@ def _backfill_gamelines(
     history_sql = (
         """
         SELECT event_id, book_id, period, market_type, side, line, odds, _source_file
-        FROM stg.actionnetwork_history
+        FROM stg.an_history
         WHERE market_type IN ('spread', 'total', 'moneyline')
         """
         if has_history
@@ -652,7 +655,7 @@ def _backfill_gamelines(
             sb.event_id,
             g.{_ident(game_id)} AS game_id,
             sb._source_file
-          FROM stg.actionnetwork_scoreboard sb
+          FROM stg.an_scoreboard sb
           JOIN stg.games g
             ON g.season = sb.season
            AND g.week = sb.week
@@ -660,26 +663,11 @@ def _backfill_gamelines(
            AND g.awayTeam = CASE {away_loc} {alias_sql} ELSE {away_loc} END
         ),
         sb_long AS (
-          SELECT
-            t.event_id,
-            TRY_CAST(b.key AS INTEGER) AS book_id,
-            COALESCE(json_extract_string(offering.value, '$.period'), 'event') AS period,
-            COALESCE(
-              json_extract_string(offering.value, '$.type'),
-              mkt.key
-            ) AS market_type,
-            json_extract_string(offering.value, '$.side') AS side,
-            TRY_CAST(json_extract(offering.value, '$.value') AS DOUBLE) AS line,
-            TRY_CAST(json_extract(offering.value, '$.odds') AS BIGINT) AS odds,
-            t._source_file
-          FROM stg.actionnetwork_scoreboard t,
-            json_each(t.markets) AS b,
-            json_each(b.value) AS slot,
-            json_each(slot.value) AS mkt,
-            json_each(mkt.value) AS offering
-          WHERE t.markets IS NOT NULL
-            AND json_type(t.markets) = 'OBJECT'
-            AND json_array_length(json_keys(t.markets)) > 0
+          -- stg.an_market already is this unnest; reading it keeps one
+          -- definition of "an Action Network offering" instead of two.
+          SELECT event_id, book_id, period, market_type, side, line, odds,
+                 _source_file
+          FROM stg.an_market
         ),
         an_long AS (
           SELECT * FROM sb_long
@@ -996,6 +984,9 @@ def explode_stg_lists(
             for name in roots:
                 if only is not None and name not in only:
                     continue
+                # explode_an_children already built this one by hand.
+                if name == "an_scoreboard" or name in _AN_CHILDREN:
+                    continue
                 _explode_nested_columns(con, schema, name, 0, reports, progress)
     finally:
         if owns_connection:
@@ -1301,15 +1292,64 @@ def _spine_select(con: duckdb.DuckDBPyConnection, source: str, structure: str) -
     return ",\n              ".join(pieces)
 
 
-def _explode_actionnetwork_history(
+# An Action Network offering is one price for one (book, period, market, side).
+# The object is byte-identical in a history file and in the scoreboard's
+# ``markets`` map, so both exploders emit these columns from ``o.value``.
+_AN_OFFERING_COLS = """
+              TRY_CAST(b.key AS INTEGER) AS book_id,
+              {period} AS period,
+              CASE {market}
+                WHEN 'core_bet_type_6_team_score' THEN 'team_total'
+                ELSE {market}
+              END AS market_type,
+              json_extract_string(o.value, '$.side') AS side,
+              TRY_CAST(json_extract(o.value, '$.team_id') AS BIGINT) AS team_id,
+              TRY_CAST(json_extract(o.value, '$.value') AS DOUBLE) AS line,
+              TRY_CAST(json_extract(o.value, '$.odds') AS BIGINT) AS odds,
+              json_extract_string(o.value, '$.market_id') AS market_id,
+              json_extract_string(o.value, '$.outcome_id') AS outcome_id,
+              TRY_CAST(json_extract(o.value, '$.is_live') AS BOOLEAN) AS is_live,
+              json_extract_string(o.value, '$.line_status') AS line_status,
+              TRY_CAST(
+                json_extract(o.value, '$.odds_coefficient_score') AS DOUBLE
+              ) AS odds_coefficient_score,
+              TRY_CAST(
+                json_extract(o.value, '$.option_type_id') AS INTEGER
+              ) AS option_type_id,
+              TRY_CAST(
+                json_extract(o.value, '$.bet_info.money.percent') AS INTEGER
+              ) AS money_pct,
+              TRY_CAST(json_extract(o.value, '$.bet_info.money.value') AS BIGINT) AS money,
+              TRY_CAST(
+                json_extract(o.value, '$.bet_info.tickets.percent') AS INTEGER
+              ) AS tickets_pct,
+              TRY_CAST(
+                json_extract(o.value, '$.bet_info.tickets.value') AS BIGINT
+              ) AS tickets,
+"""
+
+_AN_OFFERING_JOIN = """
+              json_each({src}) AS b,
+              json_each(b.value) AS p,
+              json_each(p.value) AS m,
+              json_each(m.value) AS o
+"""
+
+
+def _explode_an_history(
     con: duckdb.DuckDBPyConnection, source: str, target: str, dest: str
 ) -> TableLoad:
-    """Unpivot book→period→market maps into one row per offering.
+    """Unpivot book->period->market maps into one row per offering.
 
     Generic explode turns dynamic book ids into sparse LIST columns
     (``15_firsthalf_spread``). History files are one event each; empty ``{}``
-    payloads produce no rows.
+    payloads produce no rows -- which is most of them, since the scraper writes
+    an empty file for an event with no history and resumes past it.
     """
+    cols = _AN_OFFERING_COLS.format(
+        period="p.key",
+        market="COALESCE(json_extract_string(o.value, '$.type'), m.key)",
+    )
     try:
         con.execute(f"DROP TABLE IF EXISTS {target}")
         con.execute(
@@ -1317,47 +1357,13 @@ def _explode_actionnetwork_history(
             CREATE TABLE {target} AS
             SELECT
               COALESCE(
-                TRY_CAST(json_extract(offering.value, '$.event_id') AS BIGINT),
+                TRY_CAST(json_extract(o.value, '$.event_id') AS BIGINT),
                 TRY_CAST(regexp_extract(t.source_file, 'history_(\\d+)', 1) AS BIGINT)
               ) AS event_id,
-              TRY_CAST(b.key AS INTEGER) AS book_id,
-              p.key AS period,
-              COALESCE(
-                json_extract_string(offering.value, '$.type'),
-                m.key
-              ) AS market_type,
-              json_extract_string(offering.value, '$.side') AS side,
-              TRY_CAST(json_extract(offering.value, '$.team_id') AS BIGINT) AS team_id,
-              TRY_CAST(json_extract(offering.value, '$.value') AS DOUBLE) AS line,
-              TRY_CAST(json_extract(offering.value, '$.odds') AS BIGINT) AS odds,
-              json_extract_string(offering.value, '$.market_id') AS market_id,
-              json_extract_string(offering.value, '$.outcome_id') AS outcome_id,
-              TRY_CAST(json_extract(offering.value, '$.is_live') AS BOOLEAN) AS is_live,
-              json_extract_string(offering.value, '$.line_status') AS line_status,
-              TRY_CAST(
-                json_extract(offering.value, '$.odds_coefficient_score') AS DOUBLE
-              ) AS odds_coefficient_score,
-              TRY_CAST(
-                json_extract(offering.value, '$.option_type_id') AS INTEGER
-              ) AS option_type_id,
-              TRY_CAST(
-                json_extract(offering.value, '$.bet_info.money.percent') AS INTEGER
-              ) AS money_pct,
-              TRY_CAST(
-                json_extract(offering.value, '$.bet_info.money.value') AS BIGINT
-              ) AS money,
-              TRY_CAST(
-                json_extract(offering.value, '$.bet_info.tickets.percent') AS INTEGER
-              ) AS tickets_pct,
-              TRY_CAST(
-                json_extract(offering.value, '$.bet_info.tickets.value') AS BIGINT
-              ) AS tickets,
+              {cols}
               t.source_file AS _source_file
             FROM {source} AS t,
-              json_each(t.payload) AS b,
-              json_each(b.value) AS p,
-              json_each(p.value) AS m,
-              json_each(m.value) AS offering
+              {_AN_OFFERING_JOIN.format(src="t.payload")}
             WHERE json_type(t.payload) = 'OBJECT'
               AND json_array_length(json_keys(t.payload)) > 0
             """
@@ -1367,7 +1373,7 @@ def _explode_actionnetwork_history(
         return _explode_failed(con, "stg", target, dest, exc)
 
 
-def _explode_actionnetwork_scoreboard(
+def _explode_an_scoreboard(
     con: duckdb.DuckDBPyConnection, source: str, target: str, dest: str
 ) -> TableLoad:
     """Unnest ``games[]`` to one row per event; drop league-calendar noise.
@@ -1475,6 +1481,119 @@ def _explode_actionnetwork_scoreboard(
         return _explode_failed(con, "stg", target, dest, exc)
 
 
+# The scoreboard's nested columns, hand-written like ``an_history`` rather than
+# left to the generic recursion. The generic path names a child for the whole
+# path it walked (``actionnetwork_scoreboard__markets__markets_event_spread``)
+# and repeats that path on every column, so one spread price arrived as a
+# 62-character column inside a 62-column table. See
+# ``docs/warehouse-schema-recommendation.md`` §8.
+_AN_CHILDREN = ("an_market", "an_team", "an_linescore")
+
+
+def explode_an_children(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    progress: Callable[[TableLoad], None] | None = None,
+) -> list[TableLoad]:
+    """Build ``stg.an_market`` / ``an_team`` / ``an_linescore``.
+
+    ``latest_odds``, ``ranks`` and ``last_play`` stay unexploded JSON on
+    ``stg.an_scoreboard``: the first duplicates ``an_market``, the second
+    duplicates CFBD rankings, and the third is live in-game state.
+    """
+    have = {
+        row[0]
+        for row in con.execute(
+            "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
+        ).fetchall()
+    }
+    if "an_scoreboard" not in have:
+        return []
+    reports = []
+    for dest, sql in (
+        ("an_market", _AN_MARKET_SQL),
+        ("an_team", _AN_TEAM_SQL),
+        ("an_linescore", _AN_LINESCORE_SQL),
+    ):
+        target = _qualify("stg", dest)
+        try:
+            con.execute(f"DROP TABLE IF EXISTS {target}")
+            con.execute(f"CREATE TABLE {target} AS {sql}")
+            rows = con.execute(f"SELECT COUNT(*) FROM {target}").fetchone()[0]
+            report = TableLoad("stg", dest, 1, int(rows))
+        except Exception as exc:
+            report = _explode_failed(con, "stg", target, dest, exc)
+        reports.append(report)
+        if progress is not None:
+            progress(report)
+        con.execute("CHECKPOINT")
+    return reports
+
+
+_AN_MARKET_SQL = f"""
+            SELECT
+              t.event_id,
+              t.season,
+              t.week,
+              {_AN_OFFERING_COLS.format(
+                  period="COALESCE(json_extract_string(o.value, '$.period'), p.key)",
+                  market="COALESCE(json_extract_string(o.value, '$.type'), m.key)",
+              )}
+              t._source_file
+            FROM stg.an_scoreboard AS t,
+              {_AN_OFFERING_JOIN.format(src="t.markets")}
+            WHERE t.markets IS NOT NULL
+              AND json_type(t.markets) = 'OBJECT'
+              AND json_array_length(json_keys(t.markets)) > 0
+"""
+
+# Logo and colour columns are dropped: presentation assets, not data.
+_AN_TEAM_SQL = """
+            SELECT
+              t.event_id,
+              t.season,
+              t.week,
+              TRY_CAST(json_extract(x, '$.id') AS BIGINT) AS team_id,
+              TRY_CAST(json_extract(x, '$.core_id') AS BIGINT) AS core_id,
+              json_extract_string(x, '$.abbr') AS abbr,
+              json_extract_string(x, '$.location') AS location,
+              json_extract_string(x, '$.display_name') AS display_name,
+              json_extract_string(x, '$.full_name') AS full_name,
+              json_extract_string(x, '$.short_name') AS short_name,
+              json_extract_string(x, '$.url_slug') AS url_slug,
+              json_extract_string(x, '$.conference_type') AS conference_type,
+              json_extract_string(x, '$.division_type') AS division_type,
+              TRY_CAST(json_extract(x, '$.standings.win') AS INTEGER) AS wins,
+              TRY_CAST(json_extract(x, '$.standings.loss') AS INTEGER) AS losses,
+              TRY_CAST(json_extract(x, '$.standings.ties') AS INTEGER) AS ties,
+              TRY_CAST(json_extract(x, '$.standings.draw') AS INTEGER) AS draws,
+              TRY_CAST(
+                json_extract(x, '$.standings.overtime_losses') AS INTEGER
+              ) AS overtime_losses,
+              t._source_file
+            FROM stg.an_scoreboard AS t,
+              UNNEST(json_transform(t.teams, '["JSON"]')) AS u(x)
+            WHERE t.teams IS NOT NULL
+"""
+
+_AN_LINESCORE_SQL = """
+            SELECT
+              t.event_id,
+              t.season,
+              t.week,
+              TRY_CAST(json_extract(x, '$.id') AS INTEGER) AS period_id,
+              json_extract_string(x, '$.abbr') AS abbr,
+              json_extract_string(x, '$.display_name') AS display_name,
+              json_extract_string(x, '$.full_name') AS full_name,
+              TRY_CAST(json_extract(x, '$.home_points') AS INTEGER) AS home_points,
+              TRY_CAST(json_extract(x, '$.away_points') AS INTEGER) AS away_points,
+              t._source_file
+            FROM stg.an_scoreboard AS t,
+              UNNEST(json_transform(t.linescore, '["JSON"]')) AS u(x)
+            WHERE t.linescore IS NOT NULL
+"""
+
+
 def _finish_stg_table(
     con: duckdb.DuckDBPyConnection, schema: str, dest: str, target: str
 ) -> TableLoad:
@@ -1502,10 +1621,10 @@ def _explode_table(
 ) -> TableLoad:
     source = _qualify(schema, name)
     target = _qualify(dest_schema, dest)
-    if name == "actionnetwork_history":
-        return _explode_actionnetwork_history(con, source, target, dest)
-    if name == "actionnetwork_scoreboard":
-        return _explode_actionnetwork_scoreboard(con, source, target, dest)
+    if name == "an_history":
+        return _explode_an_history(con, source, target, dest)
+    if name == "an_scoreboard":
+        return _explode_an_scoreboard(con, source, target, dest)
     try:
         structure = _payload_structure(con, source)
         if structure is None:
@@ -1625,6 +1744,11 @@ def _is_struct_type(dtype: object) -> bool:
     return upper.startswith("STRUCT") and not upper.endswith("[]")
 
 
+# Written by scripts/massey_flatten.py. Ordered small-to-large so a failure
+# shows up on a 137-row table before a 5M-row one.
+_MASSEY_TABLES = ("massey_teams", "massey_systems", "massey_editions", "massey_ranks")
+
+
 def _plan_loads(
     data_dir: Path,
     *,
@@ -1648,15 +1772,28 @@ def _plan_loads(
             )
 
         csv_path = raw_dir / "actionnetwork_odds.csv"
-        if csv_path.exists() and (only is None or "actionnetwork_odds" in only):
+        if csv_path.exists() and (only is None or "an_odds" in only):
             jobs.append(
                 {
                     "schema": "raw",
-                    "name": "actionnetwork_odds",
+                    "name": "an_odds",
                     "paths": [csv_path],
                     "format": "csv",
                 }
             )
+
+    # Massey lands already flat: `massey_flatten` maps its ids to CFBD schools and
+    # writes long-format CSVs. There is no payload to explode, so these load
+    # straight into `stg` rather than passing through `raw`, which is the JSON
+    # mirror. `ingest/massey/` -- the scraped editions -- stays out of the glob.
+    massey_dir = data_dir / "processed" / "massey"
+    if massey_dir.is_dir():
+        for name in _MASSEY_TABLES:
+            path = massey_dir / f"{name}.csv"
+            if path.exists() and (only is None or name in only):
+                jobs.append(
+                    {"schema": "stg", "name": name, "paths": [path], "format": "csv"}
+                )
 
     gql_dir = data_dir / "graphql"
     if gql_dir.is_dir():
@@ -1676,21 +1813,21 @@ def _plan_loads(
         an_dir = data_dir / "raw" / "actionnetwork"
         if an_dir.is_dir():
             boards = sorted(an_dir.glob("scoreboard_*.json"))
-            if boards and (only is None or "actionnetwork_scoreboard" in only):
+            if boards and (only is None or "an_scoreboard" in only):
                 jobs.append(
                     {
                         "schema": "raw",
-                        "name": "actionnetwork_scoreboard",
+                        "name": "an_scoreboard",
                         "paths": boards,
                         "format": "object",
                     }
                 )
             histories = sorted(an_dir.glob("history_*.json"))
-            if histories and (only is None or "actionnetwork_history" in only):
+            if histories and (only is None or "an_history" in only):
                 jobs.append(
                     {
                         "schema": "raw",
-                        "name": "actionnetwork_history",
+                        "name": "an_history",
                         "paths": histories,
                         "format": "object",
                     }

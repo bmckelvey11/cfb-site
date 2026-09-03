@@ -4,6 +4,7 @@ from cfb_system_maker.cli import main
 from cfb_system_maker.duckdb_load import (
     backfill_gamelines_from_actionnetwork,
     build_duckdb,
+    explode_an_children,
     explode_payloads,
     explode_stg_lists,
     flatten_stg_nested,
@@ -814,24 +815,24 @@ def test_explode_actionnetwork_unpivots_history_and_unnests_scoreboard(tmp_path)
 
     db_path, _ = build_duckdb(tmp_path)
     reports = explode_payloads(
-        db_path, only={"actionnetwork_history", "actionnetwork_scoreboard"}
+        db_path, only={"an_history", "an_scoreboard"}
     )
     by_name = {r.name: r for r in reports}
-    assert by_name["actionnetwork_history"].error is None
-    assert by_name["actionnetwork_scoreboard"].error is None
+    assert by_name["an_history"].error is None
+    assert by_name["an_scoreboard"].error is None
 
     import duckdb
 
     con = duckdb.connect(str(db_path), read_only=True)
     hist_cols = [
-        row[0] for row in con.execute("DESCRIBE stg.actionnetwork_history").fetchall()
+        row[0] for row in con.execute("DESCRIBE stg.an_history").fetchall()
     ]
     assert "15_firsthalf_spread" not in hist_cols
     assert hist_cols[0] == "event_id"
     rows = con.execute(
         """
         SELECT event_id, book_id, period, market_type, side, line, odds
-        FROM stg.actionnetwork_history
+        FROM stg.an_history
         ORDER BY market_type
         """
     ).fetchall()
@@ -842,21 +843,21 @@ def test_explode_actionnetwork_unpivots_history_and_unnests_scoreboard(tmp_path)
 
     board_cols = [
         row[0]
-        for row in con.execute("DESCRIBE stg.actionnetwork_scoreboard").fetchall()
+        for row in con.execute("DESCRIBE stg.an_scoreboard").fetchall()
     ]
     assert "games" not in board_cols
     assert not any(c.startswith("league_calendar") for c in board_cols)
     games = con.execute(
         """
         SELECT event_id, season, week, home_team_id, away_team_id, home_points
-        FROM stg.actionnetwork_scoreboard
+        FROM stg.an_scoreboard
         ORDER BY event_id
         """
     ).fetchall()
     assert games == [(100, 2025, 1, 1, 2, 21), (200, 2025, 1, 3, 4, None)]
     total = con.execute(
         "SELECT TRY_CAST(json_extract(latest_odds, '$.game.total') AS DOUBLE) "
-        "FROM stg.actionnetwork_scoreboard WHERE event_id = 100"
+        "FROM stg.an_scoreboard WHERE event_id = 100"
     ).fetchone()[0]
     assert total == 45.5
 
@@ -905,7 +906,7 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     )
     con.execute(
         """
-        CREATE TABLE stg.actionnetwork_scoreboard (
+        CREATE TABLE stg.an_scoreboard (
           event_id BIGINT, season INTEGER, week INTEGER,
           home_team_id BIGINT, away_team_id BIGINT,
           teams JSON, markets JSON, _source_file VARCHAR
@@ -957,14 +958,14 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     )
     con.execute(
         """
-        INSERT INTO stg.actionnetwork_scoreboard
+        INSERT INTO stg.an_scoreboard
         VALUES (100, 2025, 1, 1, 2, ?::JSON, ?::JSON, 'scoreboard.json')
         """,
         [teams, markets],
     )
     con.execute(
         """
-        CREATE TABLE stg.actionnetwork_history (
+        CREATE TABLE stg.an_history (
           event_id BIGINT, book_id INTEGER, period VARCHAR,
           market_type VARCHAR, side VARCHAR, team_id BIGINT,
           line DOUBLE, odds BIGINT, _source_file VARCHAR
@@ -973,11 +974,12 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     )
     con.execute(
         """
-        INSERT INTO stg.actionnetwork_history VALUES
+        INSERT INTO stg.an_history VALUES
           (100, 15, 'firsthalf', 'spread', 'home', 1, -3.5, -110, 'history.json'),
           (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, 'history.json')
         """
     )
+    explode_an_children(con)
     con.close()
 
     report = backfill_gamelines_from_actionnetwork(db_path)
@@ -1007,3 +1009,128 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
         for row in con.execute("SELECT name FROM stg_gql.lines_provider").fetchall()
     }
     assert "DraftKings" in names and "FanDuel" in names
+
+
+def test_an_children_are_flat_and_the_generic_recursion_leaves_them_alone(tmp_path):
+    """§8: one price should not need a 62-character column name.
+
+    The generic path named a child for the whole path it walked and repeated
+    that path on every column. These are hand-written instead, on the shape
+    ``an_history`` already had.
+    """
+    import duckdb
+
+    an = tmp_path / "raw" / "actionnetwork"
+    an.mkdir(parents=True)
+    offering = {"odds": -110, "side": "home", "value": -3.5, "period": "event"}
+    (an / "scoreboard_2025_wk1.json").write_text(
+        json.dumps(
+            {
+                "games": [
+                    {
+                        "id": 100,
+                        "season": 2025,
+                        "week": 1,
+                        "home_team_id": 1,
+                        "away_team_id": 2,
+                        "boxscore": {
+                            "linescore": [
+                                {"id": 1, "abbr": "1", "home_points": 7,
+                                 "away_points": 3}
+                            ]
+                        },
+                        "teams": [
+                            {"id": 1, "abbr": "AAA", "location": "Alpha",
+                             "standings": {"win": 3, "loss": 1}},
+                            {"id": 2, "abbr": "BBB", "location": "Beta",
+                             "standings": {"win": 2, "loss": 2}},
+                        ],
+                        "markets": {
+                            "15": {
+                                "event": {
+                                    "spread": [offering],
+                                    "core_bet_type_6_team_score": [
+                                        {"odds": -115, "side": "over",
+                                         "value": 24.5, "period": "event"}
+                                    ],
+                                }
+                            }
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    db_path, _ = build_duckdb(tmp_path)
+    explode_payloads(db_path, only={"an_scoreboard"})
+    explode_stg_lists(db_path)
+
+    con = duckdb.connect(str(db_path), read_only=True)
+    tables = {
+        row[0]
+        for row in con.execute(
+            "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
+        ).fetchall()
+    }
+    assert {"an_scoreboard", "an_market", "an_team", "an_linescore"} <= tables
+    assert not [t for t in tables if t.startswith("an_scoreboard__")]
+
+    cols = [row[0] for row in con.execute("DESCRIBE stg.an_market").fetchall()]
+    assert not [c for c in cols if c.startswith("markets_")]
+    # The offering plus its keys, not the 36 parent scalars it used to inherit.
+    assert "home_timeouts" not in cols and "broadcast_network" not in cols
+    assert len(cols) < 25, cols
+
+    markets = con.execute(
+        "SELECT market_type, side, line, odds FROM stg.an_market ORDER BY market_type"
+    ).fetchall()
+    assert markets == [
+        ("spread", "home", -3.5, -110),
+        ("team_total", "over", 24.5, -115),
+    ]
+    assert con.execute(
+        "SELECT wins, losses FROM stg.an_team WHERE team_id = 1"
+    ).fetchone() == (3, 1)
+    assert con.execute(
+        "SELECT period_id, home_points, away_points FROM stg.an_linescore"
+    ).fetchone() == (1, 7, 3)
+
+
+def test_massey_csvs_load_into_stg_with_a_real_date(tmp_path):
+    """§7: 72 MB of scraped Massey editions sat outside the warehouse entirely.
+
+    The date must type as DATE, not an 8-digit integer -- a Massey number is
+    as-of its edition, and a season-level collapse would be lookahead.
+    """
+    import datetime
+
+    import duckdb
+
+    massey = tmp_path / "processed" / "massey"
+    massey.mkdir(parents=True)
+    (massey / "massey_teams.csv").write_text(
+        "massey_id,massey_team,cfbd_team\n55,Air Force,Air Force\n", encoding="utf-8"
+    )
+    (massey / "massey_ranks.csv").write_text(
+        "date,season,massey_id,cfbd_team,system,rank\n"
+        "1996-09-16,1996,55,Air Force,PAC,27\n"
+        "2024-11-02,2024,55,Air Force,PAC,88\n",
+        encoding="utf-8",
+    )
+    db_path, reports = build_duckdb(tmp_path, include_actionnetwork=False)
+    by_name = {r.name: r for r in reports}
+    assert by_name["massey_ranks"].error is None
+    assert by_name["massey_ranks"].schema == "stg"
+    # Only the CSVs that exist are planned; no empty tables for the rest.
+    assert "massey_systems" not in by_name
+
+    con = duckdb.connect(str(db_path), read_only=True)
+    types = {
+        row[0]: row[1] for row in con.execute("DESCRIBE stg.massey_ranks").fetchall()
+    }
+    assert types["date"] == "DATE"
+    assert con.execute("SELECT min(date), max(date) FROM stg.massey_ranks").fetchone() == (
+        datetime.date(1996, 9, 16),
+        datetime.date(2024, 11, 2),
+    )
