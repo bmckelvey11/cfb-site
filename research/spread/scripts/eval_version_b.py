@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import duckdb
 import numpy as np
 import pandas as pd
 from scipy.stats import t as tdist
@@ -75,27 +76,35 @@ def close_from_history(event_id: float, kick: datetime) -> float:
     return -max(ticks)[1] if ticks else np.nan          # AN sign -> PT sign
 
 
-def margins(games: pd.DataFrame) -> pd.Series:
-    """Home margin from CFBD via the archive build's name matching; NaN when unplayed/unmatched."""
-    seasons = sorted(set(pd.to_datetime(games.kick, utc=True).dt.year))
-    by_season = bpt.load_cfbd(base.cfb_paths.DB_PATH, seasons)
+def fetch_scores(con, seasons):
+    """{(season, {home, away}): (cfbd_home, home_points, away_points)} from core.fact_game.
+
+    core.fact_game is what CFB-CFBD-Daily rebuilds; stg_gql.game is refreshed only by the
+    GraphQL pull and lagged a full week of scores in 2026.
+    """
+    rows = con.execute(
+        "select season, home_team, away_team, home_points, away_points from core.fact_game "
+        "where season between ? and ? and home_points is not null",
+        [min(seasons), max(seasons)]).fetchall()
+    return {(int(s), frozenset((h, a))): (h, float(hp), float(ap)) for s, h, a, hp, ap in rows}
+
+
+def margins(games: pd.DataFrame, scores: dict) -> pd.Series:
+    """Home margin in PT orientation via the archive build's name matching; NaN when unplayed."""
     out = []
     for r in games.itertuples():
         season = pd.Timestamp(r.kick).year
-        pairs, _ = by_season.get(season, ({}, set()))
-        hit = None
+        hit = np.nan
         for h in bpt.candidates(r.home):
             for a in bpt.candidates(r.road):
-                hits = pairs.get(frozenset((h, a)))
-                if hits:
-                    g, flipped, _ = bpt.pick_game(hits, h, None, None, None)
-                    if g is not None and g["home_points"] is not None:
-                        m = float(g["home_points"]) - float(g["away_points"])
-                        hit = -m if flipped else m
+                rec = scores.get((season, frozenset((h, a))))
+                if rec:
+                    cfbd_home, hp, ap = rec
+                    hit = (hp - ap) if cfbd_home == h else (ap - hp)
                     break
-            if hit is not None:
+            if not np.isnan(hit):
                 break
-        out.append(np.nan if hit is None else hit)
+        out.append(hit)
     return pd.Series(out, index=games.index, dtype=float)
 
 
@@ -140,7 +149,12 @@ def main() -> int:
     g = monday_anchor(log)
     g["kick_utc"] = pd.to_datetime(g.kick, utc=True)
     g["close"] = [close_from_history(e, k) for e, k in zip(g.event_id, g.kick_utc)]
-    g["margin"] = margins(g)
+    con = duckdb.connect(str(base.cfb_paths.DB_PATH), read_only=True)
+    g["margin"] = margins(g, fetch_scores(con, sorted(set(g.kick_utc.dt.year))))
+    unmatched = g[g.margin.isna() & (g.kick_utc < datetime.now(timezone.utc))]
+    if len(unmatched):
+        print(f"no score for {len(unmatched)} played games: "
+              f"{unmatched[['road', 'home']].values.tolist()[:8]}")
     now = datetime.now(timezone.utc)
     graded = g[g.close.notna() & (g.kick_utc < now)].copy()
     print(f"forward log: {log.snapshot.nunique()} snapshots, {len(g)} games with a Monday anchor, "
