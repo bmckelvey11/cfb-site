@@ -226,6 +226,11 @@ This repo is FBS college football, and PFF's own examples are all NFL. What actu
   every other league, and any other value fails `502 upstream_error` (the failure happens
   downstream of this API, so the message is unhelpful). Divisions fan out in parallel, so a
   multi-division request is materially slower than one division.
+- **Always pin `--division` on an NCAA facet export.** Measured 2026-09-08 on
+  `passing --league ncaa --season 2025 --export true`: with `--division fbs` it returned in
+  **5.5 seconds**; with no `--division` it had produced nothing after **16 minutes** and was killed.
+  This is not "materially slower" — an unpinned NCAA export sweeps every division down to D3 and is
+  effectively unusable. If you genuinely want the lower divisions, ask for them one at a time.
 - **`team-report ncaa <slug> <report>`** works the same as NFL. A programme with no rows for a
   report section returns an empty table, not an error.
 - **Seasons turn over 1 March.** January and February belong to the *previous* year's season when
