@@ -192,6 +192,10 @@ lists all 70 commands grouped by family:
 | `auth` | `whoami`, `logout` | |
 | `meta` | `openapi-json`, `openapi-yaml` | |
 
+Every operation, its positionals, flags, wire names, enums and CSV flag is tabulated in
+[`docs/pff-endpoint-reference.md`](pff-endpoint-reference.md), generated from the OpenAPI
+document by [`scripts/gen_pff_endpoint_reference.py`](../scripts/gen_pff_endpoint_reference.py).
+
 Ten commands have short aliases: `passing` = `facet-passing-summary`, `players` = `ref-players`,
 `games` = `ref-games`, `leagues` = `ref-leagues`, and so on. Same command either way.
 
@@ -401,6 +405,7 @@ NCAA seasons the API reports: 2008, then 2010–2026 — no 2009.
 
 ## Links
 
+- Endpoint reference generated from the spec: [`docs/pff-endpoint-reference.md`](pff-endpoint-reference.md)
 - Guide: <https://developer.pff.com/guide/>
 - API reference: <https://developer.pff.com/reference/>
 - Troubleshooting: <https://developer.pff.com/guide/troubleshooting/>
