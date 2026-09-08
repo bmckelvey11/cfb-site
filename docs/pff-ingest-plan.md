@@ -5,7 +5,9 @@ to `done` with a date, and the worklog at the bottom gets an entry saying what w
 actually found. Nothing is deleted — a step that turns out to be wrong is struck with the
 reason, so the next pass does not re-open it.
 
-**Status 2026-09-08: S1 done. 2025 is audited and clean; nothing is loaded yet.**
+**Status 2026-09-08: S1 and S2 done, S6 held. 2025 is audited and clean; nothing is loaded
+yet.** 2025 is the reference season — the process gets proven and trimmed against it before
+a single backfill call is made, because a backfill pays every inefficiency eleven times.
 
 **Scope: `data/raw/pff/` only.** The other scrapers (CFBD, Action Network, Massey) already
 land in the warehouse through `refresh_cfbd.py` and are not in this plan. Widen it only if
@@ -25,8 +27,8 @@ wins on what is finished.
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | open | — |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` (~35 by hand) | S5 | open | — |
 | S5 | `_PFF_TABLES` loader entries → `stg` | S6 | open | — |
-| S6 | Backfill 2014–2024, finish 2026 | — | open | — |
-| S7 | Trim the pull plan — the two calls that buy nothing | — | open | — |
+| S6 | Backfill 2014–2024, finish 2026 | — | **held** — gated on S3/S5/S7 | — |
+| S7 | Trim the pull plan using 2025 as the reference season | S6 | in progress | 2026-09-08 |
 | S8 | Decide the player tier: finish it or delete the smoke test | — | open | — |
 
 ## S1 — Audit the pull ✅ 2026-09-08
@@ -126,25 +128,79 @@ pinned (f0c729b) — that is what finding 4 above buys.
 **Done when:** a rebuild lands the PFF tables, `scripts/check_an_tick_pin.py`'s sibling
 check passes for PFF, and row counts match the processed CSVs.
 
-## S6 — Backfill and 2026
+## S6 — Backfill and 2026 ⏸ held 2026-09-08
 
-2014–2024 has not been pulled. 2026 is mid-season: 207 files, one zero-byte, 780 open
-cells that fill in as weeks are played. Backfill is cheap in reads but not in exports —
-size it against the measured rate limits in [`pff-cli.md`](pff-cli.md) before starting.
+**Held deliberately. Nothing is pulled for 2014–2024 until the process is proven on 2025.**
+A backfill is 14.5 hours of metered calls at today's plan, and every unfixed inefficiency
+or schema mistake is paid eleven times over. 2025 is complete and audited, so it is the
+reference season: prove the shape, trim the plan, then scale.
+
+**Gate — all three before a backfill starts:**
+
+1. S3 and S5 land: 2025 flattens and loads end to end, so the schema is known-good before
+   it is applied to eleven more seasons.
+2. S7 lands: the pull plan is trimmed against the 2025 measurements below.
+3. The payload question below is answered: which of the 19 team reports a backfill needs.
+
+2026 is a separate case and is *not* held — it is mid-season (207 files, one zero-byte,
+780 cells that fill as weeks are played) and its weekly pull should keep running. It just
+should not gain a new tier until S7 says which ones are worth pulling.
 
 **Done when:** `audit_pff_pull.py` reports every backfilled season clean, and the 2026
 weekly pull is on the same schedule as the Action Network history job.
 
-## S7 — Trim the pull plan
+## S7 — Trim the pull plan, measured on 2025
 
-Two calls that buy nothing, both found by the audit:
+2025 is the only complete season, so it is where the cost of a pull gets measured and cut.
+All numbers below are from files on disk against the puller's own pacing constants
+(`READ_PACING_SECONDS = 0.65`, `EXPORT_PACING_SECONDS = 3.5`) — no API calls were made to
+produce them.
 
-- `team-rushing-direction` is pulled twice per team (`table=rows`, `table=totals`) for one
-  distinct body. Drop one, or find the parameter that actually splits the views.
-- `facet-passing-detail` is already in `SKIP_FACETS` — it is the union of the other four
-  passing facets and it hangs. Confirm nothing re-adds it.
+**What a season costs today:** 3,998 reads + 613 exports ≈ **79 min**. The per-team report
+tier is 3,808 of those reads — roughly half the wall clock, and the whole difference
+between a 14.5-hour and a 7-hour backfill.
 
-**Done when:** a season pull makes 136 fewer calls and the audit still reports it clean.
+### Three cuts, largest first
+
+**1. Eleven of the nineteen team reports are a re-cut of leaderboard data.**
+`python scripts/pff_tier_overlap.py --season 2025` compares each report's columns against
+its matching league-wide leaderboard, in snake_case, ignoring biographical columns (the
+roster pull has them) and two recoverable ones (`games_played` is `player_game_count` on
+the leaderboard; `team_abbreviation` is in the directory). Result:
+
+| | Reports | Reads/season |
+|---|---|---|
+| Fully covered by the leaderboard — droppable | 11 | 1,496 |
+| Carry columns the leaderboard lacks — keep | 8 | 1,088 |
+
+Droppable: `blocking`, `coverage`, `defense`, `field-goals`, `kick-returns`, `kickoffs`,
+`passing-depth`, `punting`, `receiving-depth`, `run-defense`, `rushing`. Where the two
+overlap, values agree exactly (checked on `grades_pass`, Alabama passing).
+
+Worth keeping, and why: `pass-rush` has 30 unique columns (the `lhs_*`/`rhs_*` directional
+splits), `offense` 19, `passing-pressure` 12 (`blitz_*` / `no_blitz_*` blocking grades),
+`pass-blocking` 10 and `run-blocking` 6 (`snap_counts_*` by line position), `passing` 4
+(`npa_epa`, `no_screen_epa` and their positive-EPA rates), `receiving` 1
+(`team_targets_percent`), `special-teams` 1 (`total_snaps`). Whether those are worth 1,088
+reads a season is a modelling question, not a plumbing one — but they are genuinely absent
+from the leaderboards, so dropping them is a data decision, not a free win.
+
+Saving: **16 min a season, 3.0 h over an 11-season backfill.**
+
+**2. `team-rushing-direction` is pulled twice for one answer.** PFF ignores the `table`
+parameter: `_rows.json` and `_totals.json` are byte-identical for all 136 franchises. Drop
+one call, or find the parameter that actually splits the views. Saving: 136 reads a season
+(~1.5 min), and 1,632 junk files across a backfill.
+
+**3. `facet-passing-detail` stays out.** Already in `SKIP_FACETS` — the union of the other
+four passing facets, and it hangs. Confirm nothing re-adds it.
+
+**Together:** 79 → **62 min a season**, and a backfill from 14.5 h to ~11.4 h. Dropping the
+eight report types that carry unique columns as well would reach 38 min and 6.9 h — that is
+the payload question S6's gate 3 asks, and it needs a modelling answer, not a timing one.
+
+**Done when:** a 2025 re-pull makes ≥1,632 fewer calls, `audit_pff_pull.py` still reports
+the season clean, and the tier decision is recorded here.
 
 ## S8 — The player tier
 
@@ -180,3 +236,23 @@ ops have no season file at all so the union is the only available schema source,
 disk are legacy `pull_pff_facet.py` output. Net effect: no puller change, S3's schema rule
 becomes "union of that season's weekly headers" instead of "the season file", and the
 flattener skips any leaderboard file without `_wk` in its name. Schema doc §6 amended.
+
+### 2026-09-08 — S6 held, S7 measured on 2025
+
+Backfill is on hold until 2025 proves the process. Wrote `scripts/pff_tier_overlap.py` to
+answer the payload question with evidence rather than a guess: eleven of the nineteen team
+reports are fully covered by their league-wide leaderboard once naming convention is
+normalized (values agree exactly where they overlap), and eight carry columns that are
+genuinely absent — the `lhs_*`/`rhs_*` pass-rush splits, the `blitz_*` blocking grades, the
+`snap_counts_*` line positions, and the `npa_epa`/`no_screen_epa` family. So "drop the
+per-team tier" was the wrong instinct; the right cut is eleven reports, not nineteen.
+
+Sizing a season from file counts and the puller's pacing constants: 79 min today, 62 min
+trimmed, 38 min if the eight unique-column reports also go. A backfill is 14.5 h / 11.4 h /
+6.9 h respectively — which is why S6 waits.
+
+The overlap work also surfaced a latent hole in the audit: a team report's envelope holds
+`report`, `section`, `team`, `week`, `weekGroup` and `weekTo` beyond the five keys
+`ENVELOPE` knew about, and `team` is a 4-key dict — so a report with `rows: []` would have
+counted 4 and read as usable. All 2,584 `team_report` files sat behind that hole. `rows` is
+decisive now where present, and the envelope set is complete. 2025 still audits clean.

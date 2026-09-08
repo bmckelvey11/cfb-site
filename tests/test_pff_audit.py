@@ -61,10 +61,13 @@ def test_inspect_separates_column_keys_from_declared_types(tmp_path):
 
 
 def test_a_full_header_over_no_rows_is_still_a_defect(tmp_path):
-    """`columns` is a list, so counting it would call an empty report full."""
+    """A team report's `columns` list and 4-key `team` dict are envelope, not payload."""
     report = tmp_path / "e.json"
-    report.write_text(json.dumps({"columns": [{"key": "a", "type": "integer"}], "rows": [],
-                                  "league": "ncaa", "season": 2025}), encoding="utf-8")
+    report.write_text(json.dumps({
+        "columns": [{"key": "a", "type": "integer"}], "rows": [], "league": "ncaa",
+        "season": 2025, "report": "passing", "section": "offense", "weekGroup": "regular",
+        "team": {"abbreviation": "BAMA", "franchiseId": 103, "name": "Alabama",
+                 "slug": "alabama-crimson-tide"}}), encoding="utf-8")
     rows, _, defect, _ = inspect(report)
     assert (rows, defect) == (0, "no rows")
 

@@ -37,7 +37,10 @@ from pull_pff_modeling import (  # noqa: E402
 
 PFF_ROOT = DATA_ROOT / "raw" / "pff"
 REFERENCE = REPO_ROOT / "docs" / "pff-endpoint-reference.md"
-ENVELOPE = {"columns", "category", "league", "scope", "season"}  # metadata, not rows
+# Metadata, not rows. `team` is a 4-key dict and `columns` a list, so both would be
+# counted as payload by a naive max() over the body.
+ENVELOPE = {"columns", "category", "league", "scope", "season",
+            "report", "section", "team", "week", "weekGroup", "weekTo"}
 # `<op>_ncaa_<season>[_<division>][_wk<n>].csv`; signature exports carry no division (c406dcb).
 LEADERBOARD = re.compile(r"^(?P<op>.+?)_ncaa_(?P<season>\d{4})(?:_(?P<division>fbs|fcs))?"
                          r"(?:_wk(?P<week>\d+))?\.(?P<ext>csv|json)$")
@@ -67,10 +70,12 @@ def inspect(path: Path) -> tuple[int | None, list[str] | None, str | None, dict]
             return None, None, "JSON is not an object", {}
         # One key holds the payload: a list (rows, games, leagues) for a leaderboard or
         # a season report, a dict for the player reports, which return one object. The
-        # envelope's own keys are not payload -- `columns` is a list, and counting it
-        # would make a report with a full header and no rows look full.
-        n = max((len(v) for k, v in body.items()
-                 if k not in ENVELOPE and isinstance(v, (list, dict))), default=0)
+        # envelope's own keys are not payload -- a team report's `columns` is a list and
+        # its `team` a 4-key dict, so either would make an empty report look full.
+        # `rows`, where present, is decisive; nothing else in an envelope is named that.
+        n = (len(body["rows"]) if isinstance(body.get("rows"), list) else
+             max((len(v) for k, v in body.items()
+                  if k not in ENVELOPE and isinstance(v, (list, dict))), default=0))
         cols = body.get("columns") if isinstance(body.get("columns"), list) else []
         # A team report declares columns as {key,label,type}; the type is inferred from
         # that response, so it is tracked apart from the column set (see type_drift).
