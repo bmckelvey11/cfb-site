@@ -263,6 +263,42 @@ CREATE TABLE stg.pff_passing (
    row and let `pff_franchise.kind`/`cfbd_team_id` do the filtering downstream. The second is
    less code and loses nothing.
 
+## 5b. What the 2025 audit found (2026-09-08)
+
+`python scripts/audit_pff_pull.py --season 2025` walks every file for a season and
+re-checks it. 2025 holds 4,657 files — 639 leaderboards, 3,998 team-tier, 20 player —
+with **zero unusable files**: none empty, none carrying PFF's error envelope, none
+header-only, no missing (op, week) cell, and no FBS franchise short a report. Four
+things the loader has to handle:
+
+1. **Three facets exist only as JSON.** `facet-offense-summary` and
+   `facet-rushing-direction` (22 files each) and `facet-passing-detail` (1) came back
+   through the puller's JSON fallback (73e8ea6), so a loader globbing `facet_*.csv`
+   drops them silently. The flattener's filename regex in §5.1 already accepts `json`;
+   the glob has to as well.
+2. **Weekly column sets are not nested — pin to the season file.** `facet-passing-concept`,
+   `facet-passing-pressure` and `signature-passing-time-in-pocket` carry a wide pivot
+   whose columns exist only when that split had snaps, and the sets are *disjoint*, not
+   subsets: passing-concept wk11 and wk18 are both 183 columns wide and each holds four
+   the other does not (`*_grades_coverage_defense` vs `*_grades_pass_rush_defense`). The
+   union across 2025 is 199 columns, which is exactly the width of the season-to-date
+   file — so take the season file's header as the schema and union weeks by name. Never
+   stack positionally, and never pin to week 1.
+3. **`team-rushing-direction` ignores its `table` parameter.** `..._rows.json` and
+   `..._totals.json` are byte-identical for all 136 FBS franchises — 136 duplicate files,
+   and the `totals` view was never actually obtained. Load one; drop the second pull from
+   the plan or find the parameter that does split the views.
+4. **320 team-report columns declare two types across responses.** PFF infers a JSON
+   column's type from the rows in *that* response, so `draftSeason` is `integer` for one
+   team and `string` for the next (empty draft year rendered `""`), and every percentage
+   column swings `integer`/`number`/`string` on whole values, nulls and blanks. Same
+   failure class as `stg.an_history_tick` (f0c729b): pin the type at load rather than
+   taking the first file's schema. Numeric columns → `DOUBLE`, ids and years → `VARCHAR`
+   unless the flattener normalizes the blanks to NULL first.
+
+Column *order* also varies between teams for 17 of the 19 team reports, with identical
+membership — harmless if the reader goes by name, fatal if it goes by position.
+
 ## 6. Open decisions
 
 - **Point-in-time.** A facet season file is season-to-date at pull time and a re-pull

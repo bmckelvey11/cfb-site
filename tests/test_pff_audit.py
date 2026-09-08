@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from audit_pff_pull import column_drift, duplicate_bodies, inspect, team_op, type_drift  # noqa: E402
+from audit_pff_pull import (  # noqa: E402
+    column_drift, duplicate_bodies, inspect, json_only, team_op, type_drift,
+)
 
 SLUGS = frozenset({"akron-zips", "air-force-falcons"})
 
@@ -58,6 +60,15 @@ def test_inspect_separates_column_keys_from_declared_types(tmp_path):
     assert cols == ["patPercent"] and types == {"patPercent": "integer"}
 
 
+def test_a_full_header_over_no_rows_is_still_a_defect(tmp_path):
+    """`columns` is a list, so counting it would call an empty report full."""
+    report = tmp_path / "e.json"
+    report.write_text(json.dumps({"columns": [{"key": "a", "type": "integer"}], "rows": [],
+                                  "league": "ncaa", "season": 2025}), encoding="utf-8")
+    rows, _, defect, _ = inspect(report)
+    assert (rows, defect) == (0, "no rows")
+
+
 def test_drift_checks_separate_membership_order_and_type():
     found = {
         "wk1.json": {"op": "r", "week": 1, "cols": ["a", "b"], "types": {"a": "integer"},
@@ -69,3 +80,24 @@ def test_drift_checks_separate_membership_order_and_type():
     assert members == [] and reordered == ["r"]
     assert type_drift(found) == [("r", "a", ["integer", "number"])]
     assert duplicate_bodies(found) == [("r", ["wk1.json", "wk2.json"])]
+
+
+def test_duplicate_bodies_compares_across_an_ops_qualifiers():
+    """`table=rows` and `table=totals` are two questions; one answer means a param was ignored."""
+    found = {
+        "rows.json": {"op": "d.rows", "week": None, "cols": None, "types": {},
+                      "defect": None, "sha": "same", "tier": "team"},
+        "totals.json": {"op": "d.totals", "week": None, "cols": None, "types": {},
+                        "defect": None, "sha": "same", "tier": "team"},
+    }
+    assert duplicate_bodies(found) == [("d", ["rows.json", "totals.json"])]
+
+
+def test_json_only_names_facets_a_csv_glob_would_drop():
+    found = {
+        "facet_a_ncaa_2025_fbs.json": {"op": "facet-a", "tier": "leaderboard", "week": None,
+                                       "cols": None, "types": {}, "defect": None, "sha": "1"},
+        "facet_b_ncaa_2025_fbs.csv": {"op": "facet-b", "tier": "leaderboard", "week": None,
+                                      "cols": None, "types": {}, "defect": None, "sha": "2"},
+    }
+    assert json_only(found) == ["facet-a"]

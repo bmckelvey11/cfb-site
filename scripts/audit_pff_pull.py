@@ -37,6 +37,7 @@ from pull_pff_modeling import (  # noqa: E402
 
 PFF_ROOT = DATA_ROOT / "raw" / "pff"
 REFERENCE = REPO_ROOT / "docs" / "pff-endpoint-reference.md"
+ENVELOPE = {"columns", "category", "league", "scope", "season"}  # metadata, not rows
 # `<op>_ncaa_<season>[_<division>][_wk<n>].csv`; signature exports carry no division (c406dcb).
 LEADERBOARD = re.compile(r"^(?P<op>.+?)_ncaa_(?P<season>\d{4})(?:_(?P<division>fbs|fcs))?"
                          r"(?:_wk(?P<week>\d+))?\.(?P<ext>csv|json)$")
@@ -65,8 +66,11 @@ def inspect(path: Path) -> tuple[int | None, list[str] | None, str | None, dict]
         if not isinstance(body, dict):
             return None, None, "JSON is not an object", {}
         # One key holds the payload: a list (rows, games, leagues) for a leaderboard or
-        # a season report, a dict for the player reports, which return one object.
-        n = max((len(v) for v in body.values() if isinstance(v, (list, dict))), default=0)
+        # a season report, a dict for the player reports, which return one object. The
+        # envelope's own keys are not payload -- `columns` is a list, and counting it
+        # would make a report with a full header and no rows look full.
+        n = max((len(v) for k, v in body.items()
+                 if k not in ENVELOPE and isinstance(v, (list, dict))), default=0)
         cols = body.get("columns") if isinstance(body.get("columns"), list) else []
         # A team report declares columns as {key,label,type}; the type is inferred from
         # that response, so it is tracked apart from the column set (see type_drift).
@@ -134,12 +138,15 @@ def scan(season: int) -> dict[str, dict]:
 
 
 def duplicate_bodies(found: dict) -> list[tuple[str, list[str]]]:
-    """Identical bytes returned for two different week parameters of one op."""
+    """Identical bytes for two files of one op that asked different questions.
+
+    Covers the per-team tier as well as the weekly one: a parameter the API ignores
+    shows up as the same body under two file names, and nothing else flags it."""
     by_op = collections.defaultdict(lambda: collections.defaultdict(list))
     for rel, f in found.items():
-        if f["defect"] or f["week"] is None:
+        if f["defect"]:
             continue
-        by_op[f["op"]][f["sha"]].append(rel)
+        by_op[f["op"].split(".")[0]][f["sha"]].append(rel)  # the qualifier is the question
     return sorted((op, sorted(files)) for op, shas in by_op.items()
                   for files in shas.values() if len(files) > 1)
 
@@ -176,6 +183,18 @@ def type_drift(found: dict) -> list[tuple[str, str, list[str]]]:
                   for key, kinds in keys.items() if len(kinds) > 1)
 
 
+def json_only(found: dict) -> list[str]:
+    """Leaderboards that landed as JSON and never as CSV.
+
+    The puller falls back to JSON when an export comes back empty (73e8ea6), so the
+    data is there -- but a loader globbing `facet_*.csv` drops the facet silently."""
+    ext = collections.defaultdict(set)
+    for rel, f in found.items():
+        if f["tier"] == "leaderboard":
+            ext[f["op"]].add(Path(rel).suffix)
+    return sorted(op for op, seen in ext.items() if ".csv" not in seen)
+
+
 def missing_cells(found: dict, weeks: list[int]) -> list[str]:
     """(tier, op, week) cells the pull plan calls for that disk does not have."""
     have = {(f["tier"], f["op"].split(".")[0], f["week"]) for f in found.values()}
@@ -198,7 +217,7 @@ def team_coverage(season: int) -> dict[str, list[str]]:
     """Per-franchise team-tier coverage: which FBS teams are missing which report."""
     directory = PFF_ROOT / "team" / f"team_directory_{season}.json"
     if not directory.exists():
-        return {}
+        return {"": ["no team_directory on disk -- coverage unchecked"]}
     rows = fbs_rows(json.loads(directory.read_text(encoding="utf-8")))
     on_disk = {p.name for p in (PFF_ROOT / "team").glob("*.json")}
     gaps = {}
@@ -228,6 +247,7 @@ def main() -> None:
     found = scan(args.season)
     bad = {rel: f for rel, f in found.items() if f["defect"]}
     dupes, types = duplicate_bodies(found), type_drift(found)
+    csvless = json_only(found)
     drift, reordered = column_drift(found)
     missing = missing_cells(found, weeks) + stats_categories(args.season, weeks)
     teams = team_coverage(args.season)
@@ -243,7 +263,7 @@ def main() -> None:
         for rel, f in sorted(bad.items()):
             print(f"         {rel}  -- {f['defect']}")
 
-    print(f"\n[duplicate bodies] {len(dupes)} ops returned identical bytes for different weeks")
+    print(f"\n[duplicate bodies] {len(dupes)} ops answered two questions with the same bytes")
     for op, files in dupes[:cut]:
         print(f"  {op}: {', '.join(Path(f).name for f in files)}")
 
@@ -257,6 +277,8 @@ def main() -> None:
     print(f"\n[declared-type drift] {len(types)} columns come back with two types across an op")
     for op, key, kinds in types[:cut]:
         print(f"  {op}.{key}: {'/'.join(kinds)}")
+
+    print(f"\n[json only] {len(csvless)} leaderboards never landed as CSV: {', '.join(csvless)}")
 
     print(f"\n[missing cells] {len(missing)}")
     for cell in missing[:cut]:
@@ -272,7 +294,7 @@ def main() -> None:
              "defects": {rel: f["defect"] for rel, f in sorted(bad.items())},
              "duplicate_bodies": dupes,
              "column_drift": [(op, [list(c) for c in shapes]) for op, shapes in drift],
-             "type_drift": types, "column_order_drift": reordered,
+             "type_drift": types, "column_order_drift": reordered, "json_only": csvless,
              "missing_cells": missing, "team_gaps": teams}, indent=2), encoding="utf-8")
         print(f"\nwrote {args.json}")
 
