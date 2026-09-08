@@ -10,8 +10,9 @@ PFF ships no binary of its own. It publishes an OpenAPI document at
 Upstream guide: <https://developer.pff.com/guide/>.
 
 Everything past `--help` needs **a paid PFF Pro subscription**. PFF+, free, and Pro-*trial*
-accounts can sign in but every data command answers 403. As of this writing that step is not
-done — see [Status](#status) at the bottom.
+accounts can sign in but every data command answers 403. This machine is authenticated by API key
+through the `ci` profile and returns live data; the interactive browser sign-in is still unused.
+See [Status](#status) at the bottom.
 
 ---
 
@@ -123,18 +124,45 @@ before any request is sent. `--rsh-no-browser` doesn't help; it still wants to r
 from stdin. Sign in once from a real terminal, or use an API-key profile.
 
 **API key (scripts, CI, notebooks, curl).** Create at <https://www.pff.com/account/api-keys>.
-Shown once, starts with `ak_live_`. Put it in the environment — never on a command line, never in
-this repo:
+Shown once. PFF documents the prefix as `ak_live_`, but the working key here does not match that —
+don't validate a key on its prefix, call `whoami` instead. Put it in the environment — never on a
+command line, never in a tracked file:
 
 ```powershell
 restish api set pff 'profiles.ci.credentials.pffApiKey.auth.type: bearer'
-restish api set pff 'profiles.ci.credentials.pffApiKey.auth.params.token: env:PFF_API_KEY'
+restish api set pff 'profiles.ci.credentials.pffApiKey.auth.params.token: env:PFF_API'
 restish pff whoami -p ci        # credential: api_key
 ```
 
-`env:PFF_API_KEY` is resolved at request time, so the key never lands in `restish.json` or shell
+`env:PFF_API` is resolved at request time, so the key never lands in `restish.json` or shell
 history. The default (browser) profile keeps working alongside it — pick the key with `-p ci` per
 command.
+
+### The `ci` profile on this machine
+
+**Set up 2026-09-08 and verified** — `whoami -p ci` returns `tier: pro`, `entitled: true`,
+`credential: api_key`. Data commands work through it.
+
+The key lives in `env.env` at the repo root as **`PFF_API`** (not `PFF_API_KEY` — PFF's docs use
+that name, this repo doesn't). `env.env` is gitignored. Nothing but the literal string
+`env:PFF_API` is stored in `restish.json`.
+
+Nothing loads `env.env` into your shell automatically, so export it before running `-p ci`:
+
+```powershell
+$env:PFF_API = ((Select-String -Path env.env -Pattern '^PFF_API=').Line -split '=',2)[1].Trim()
+restish pff leagues -p ci
+```
+
+```bash
+export PFF_API=$(grep -E '^PFF_API=' env.env | cut -d= -f2- | tr -d '\r')
+restish pff leagues -p ci
+```
+
+Making it permanent (a user env var) would put the key in the registry for every process on the
+box — a deliberate tradeoff, not a default. Left per-shell.
+
+An API key reports `installations.max: null` — the device cap applies to browser sign-ins, not keys.
 
 Revocation from the same page takes up to ~60s to bite (the API caches a successful key check).
 
@@ -330,12 +358,12 @@ restish pff openapi-json -o json > pff-openapi.json
 The credential and paths are plain HTTP, so any client works:
 
 ```bash
-export PFF_API_KEY=ak_live_...
-curl -s https://api.pff.com/v1/auth/whoami -H "Authorization: Bearer $PFF_API_KEY"
+export PFF_API=$(grep -E '^PFF_API=' env.env | cut -d= -f2- | tr -d '\r')
+curl -s https://api.pff.com/v1/auth/whoami -H "Authorization: Bearer $PFF_API"
 curl -s 'https://api.pff.com/v1/facet/passing/summary?league=ncaa&season=2025&division=fbs' \
-  -H "Authorization: Bearer $PFF_API_KEY"
+  -H "Authorization: Bearer $PFF_API"
 curl -s 'https://api.pff.com/v2/ncaa/teams/alabama-crimson-tide/reports/passing?season=2025&weekGroup=REG' \
-  -H "Authorization: Bearer $PFF_API_KEY"
+  -H "Authorization: Bearer $PFF_API"
 ```
 
 **Restish flag names are not wire names.** `--franchise` → `franchise_id`, `--game` → `game_id`,
@@ -347,25 +375,29 @@ the flags. CSV is `export=true` on `/v1` and `format=csv` on `/v2`.
 
 ## Status
 
-**What is verified here vs. transcribed.** Everything about the install — paths, versions,
-checksums, the `api connect` output, the command list, and every argument/flag description — was
-read off this machine from `restish doctor`, `restish api list` and `--help` (which needs no
-credential). Everything that only a signed-in account can observe is transcribed from
-developer.pff.com and **unverified**: the `whoami` fields and `entitlement_reason` values, the
-`installations.max` limit, the 100-read/20-export budget, the `ref-leagues` league list, the error
-`details.reason` table, and the ~60s key-revocation cache. Treat those as PFF's claims until the
-first real call.
+**What is verified here vs. transcribed.** The install, the paths, the command surface and every
+argument/flag description were read off this machine (`restish doctor`, `restish api list`,
+`--help` — none of which need a credential). Authentication and one live read are now verified too:
+`whoami -p ci` returns `tier: pro`, `entitled: true`, `credential: api_key`, and `ref-leagues`
+returns `nfl`, `ncaa`, `aaf`, `ufl` — exactly the four PFF documents.
+
+Still **unverified**, transcribed from developer.pff.com: the failure-side `entitlement_reason`
+values (`subscription_required`, `trial`, `unlinked_account`), the 100-read/20-export budget, the
+error `details.reason` table, and the ~60s key-revocation cache. One contradiction found already —
+PFF says API keys start with `ak_live_` and the working key here does not — so treat the rest as
+claims, not facts.
 
 | Step | State |
 | --- | --- |
 | Restish 2.3.0 downloaded, checksum verified, extracted | done (2026-09-08) |
 | `restish api connect pff` — 70 operations discovered | done (2026-09-08) |
 | `restish.exe` on PATH | done (2026-09-08) — user PATH, old value backed up |
-| Browser sign-in / PFF Pro entitlement confirmed | **not done** — run `restish pff whoami` from an interactive terminal (an agent shell is refused, see above) |
-| Any data pulled | not started |
+| `ci` API-key profile created and verified | done (2026-09-08) — `whoami -p ci`: pro, entitled |
+| Browser sign-in (`default` profile) | **not done** — needs an interactive terminal; the `ci` profile covers scripted use |
+| Live data read | done (2026-09-08) — `ref-leagues` only, as a smoke test |
+| Any CFB data pulled into `data/` | not started |
 
-Nothing past `--help` has been exercised, because every data command requires a signed-in PFF Pro
-account.
+NCAA seasons the API reports: 2008, then 2010–2026 — no 2009.
 
 ## Links
 
