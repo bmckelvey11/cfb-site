@@ -259,6 +259,9 @@ Every counted response carries `x-ratelimit-limit`, `x-ratelimit-remaining` and
 restish pff passing --league ncaa --season 2025 --rsh-headers | Select-String -Pattern ratelimit
 ```
 
+`--rsh-headers` is shorthand for `-f headers` — it swaps the body out of the output, it does not
+skip the request, so checking your budget this way still spends a read.
+
 Download once, work from the file. Don't loop an export. Seasons and weeks take comma-separated
 lists (`--season 2023,2024,2025`, `--week 1,2,3`) — often that replaces a loop entirely. An export
 spanning too many weeks or seasons is refused with `422`.
@@ -332,6 +335,15 @@ the flags. CSV is `export=true` on `/v1` and `format=csv` on `/v2`.
 ---
 
 ## Status
+
+**What is verified here vs. transcribed.** Everything about the install — paths, versions,
+checksums, the `api connect` output, the command list, and every argument/flag description — was
+read off this machine from `restish doctor`, `restish api list` and `--help` (which needs no
+credential). Everything that only a signed-in account can observe is transcribed from
+developer.pff.com and **unverified**: the `whoami` fields and `entitlement_reason` values, the
+`installations.max` limit, the 100-read/20-export budget, the `ref-leagues` league list, the error
+`details.reason` table, and the ~60s key-revocation cache. Treat those as PFF's claims until the
+first real call.
 
 | Step | State |
 | --- | --- |
