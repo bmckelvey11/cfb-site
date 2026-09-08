@@ -619,7 +619,22 @@ tbody tr:hover{background:var(--ink-50)}
 .filter-modal__chart {
   display: block;
   width: 100%;
-  height: 190px;
+  /* Square viewBox drives the height, so the value axis and the ROI axis stay the
+     same length at every container width. */
+  height: auto;
+  max-width: 520px;
+  margin-inline: auto;
+}
+
+.filter-modal__chart .filter-modal__trendline {
+  stroke: var(--ink-500);
+  stroke-width: 1.5;
+}
+
+.filter-modal__chart .filter-modal__fit-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--ink-600);
 }
 
 .filter-modal__chart .zero-line {

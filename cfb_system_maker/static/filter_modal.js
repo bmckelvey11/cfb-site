@@ -1235,6 +1235,53 @@
     return Number.isInteger(num) ? String(num) : num.toFixed(1);
   }
 
+  function leastSquaresFit(xs, ys) {
+    /* Unweighted OLS of ROI on value. Every dot is one value bucket, so a bucket
+       holding 4 bets pulls exactly as hard as one holding 400 -- this describes the
+       shape of the dots it is drawn over, not a bet-weighted relationship. Null when
+       there is nothing to fit. */
+    if (xs.length < 2) {
+      return null;
+    }
+    const n = xs.length;
+    const meanX = xs.reduce((a, b) => a + b, 0) / n;
+    const meanY = ys.reduce((a, b) => a + b, 0) / n;
+    let sxy = 0;
+    let sxx = 0;
+    let syy = 0;
+    for (let i = 0; i < n; i += 1) {
+      const dx = xs[i] - meanX;
+      const dy = ys[i] - meanY;
+      sxy += dx * dy;
+      sxx += dx * dx;
+      syy += dy * dy;
+    }
+    // No spread on either axis -> no line to draw and no variance for R2 to explain.
+    if (sxx <= 0 || syy <= 0) {
+      return null;
+    }
+    const slope = sxy / sxx;
+    return {
+      slope,
+      intercept: meanY - slope * meanX,
+      r2: (sxy * sxy) / (sxx * syy),
+    };
+  }
+
+  function clipToRange(x0, y0, x1, y1, yLo, yHi) {
+    const pull = (px, py, qx, qy) => {
+      if (py >= yLo && py <= yHi) {
+        return [px, py];
+      }
+      const bound = py < yLo ? yLo : yHi;
+      const t = (bound - py) / (qy - py);
+      return [px + t * (qx - px), bound];
+    };
+    const [ax, ay] = pull(x0, y0, x1, y1);
+    const [bx, by] = pull(x1, y1, ax, ay);
+    return { x0: ax, y0: ay, x1: bx, y1: by };
+  }
+
   function renderMoneyChart() {
     if (!exploreEl || !state) {
       return;
@@ -1248,11 +1295,14 @@
       exploreEl.appendChild(empty);
       return;
     }
-    // Plot area is the original 520x150/28,18-padded box the server laid points out in;
-    // it's translated into a larger canvas here to make room for axis ticks/labels.
-    const plotW = 520;
-    const plotH = 150;
-    const marginLeft = 54;
+    // Square plot box so the two axes are the same length on screen. The server also
+    // ships x/y on each point, but laid out in its own 520x170 box -- ignored here and
+    // recomputed from value/roi, so the dots, the zero line and the fit all share one
+    // scale instead of three.
+    const plotW = 360;
+    const plotH = 360;
+    // Wide enough that a full '-100.00%' tick clears the rotated ROI axis title.
+    const marginLeft = 74;
     const marginBottom = 34;
     const marginTop = 6;
     const marginRight = 10;
@@ -1275,7 +1325,13 @@
     const minRoi = Math.min(0, ...rois);
     const maxRoi = Math.max(0, ...rois);
     const roiSpan = maxRoi - minRoi || 1;
-    const zeroY = plotH - 18 - ((0 - minRoi) / roiSpan) * (plotH - 36);
+    const valueSpan = maxValue - minValue || 1;
+    const plotX = (value) =>
+      28 + ((plotW - 28 * 2) * (value - minValue)) / valueSpan;
+    const plotY = (roi) =>
+      plotH - 18 - ((roi - minRoi) / roiSpan) * (plotH - 36);
+    const zeroY = plotY(0);
+    const fit = leastSquaresFit(values, rois);
 
     // Axis lines
     svg.appendChild(
@@ -1296,8 +1352,7 @@
     svg.appendChild(xTitle);
 
     [minRoi, (minRoi + maxRoi) / 2, maxRoi].forEach((roiValue) => {
-      const y =
-        marginTop + plotH - 18 - ((roiValue - minRoi) / roiSpan) * (plotH - 36);
+      const y = marginTop + plotY(roiValue);
       const tick = svgText(
         marginLeft - 6,
         y + 3,
@@ -1309,11 +1364,7 @@
     });
 
     [minValue, (minValue + maxValue) / 2, maxValue].forEach((tickValue) => {
-      const valueSpan = maxValue - minValue || 1;
-      const x =
-        marginLeft +
-        28 +
-        ((plotW - 28 * 2) * (tickValue - minValue)) / valueSpan;
+      const x = marginLeft + plotX(tickValue);
       const tick = svgText(
         x,
         marginTop + plotH + 14,
@@ -1338,13 +1389,45 @@
     zero.setAttribute("class", "zero-line");
     plot.appendChild(zero);
 
+    if (fit) {
+      const line = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "line",
+      );
+      // Clipped to the ROI range: the fitted value at an x extreme can sit outside the
+      // observed ROI span, and letting it draw there would put the line off the plot.
+      const ends = clipToRange(
+        minValue,
+        fit.slope * minValue + fit.intercept,
+        maxValue,
+        fit.slope * maxValue + fit.intercept,
+        minRoi,
+        maxRoi,
+      );
+      line.setAttribute("x1", String(plotX(ends.x0)));
+      line.setAttribute("y1", String(plotY(ends.y0)));
+      line.setAttribute("x2", String(plotX(ends.x1)));
+      line.setAttribute("y2", String(plotY(ends.y1)));
+      line.setAttribute("class", "filter-modal__trendline");
+      plot.appendChild(line);
+
+      const label = svgText(
+        plotW - 28,
+        16,
+        "R² = " + fit.r2.toFixed(3) + "  ·  n = " + points.length,
+        "filter-modal__fit-label",
+      );
+      label.setAttribute("text-anchor", "end");
+      plot.appendChild(label);
+    }
+
     points.forEach((point) => {
       const circle = document.createElementNS(
         "http://www.w3.org/2000/svg",
         "circle",
       );
-      const x = point.x != null ? point.x : 28;
-      const y = point.y != null ? point.y : zeroY;
+      const x = plotX(Number(point.value));
+      const y = plotY(Number(point.roi));
       circle.setAttribute("cx", String(x));
       circle.setAttribute("cy", String(y));
       circle.setAttribute("r", "3.5");
