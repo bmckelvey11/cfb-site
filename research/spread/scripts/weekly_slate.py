@@ -79,7 +79,15 @@ ALIASES = {"ga tech": "georgia tech", "s carolina": "south carolina", "s florida
            # both-teams join drops the game outright when the road name does not
            "e carolina": "east carolina", "w kentucky": "western kentucky",
            "umass": "massachusetts", "kent": "kent state", "fiu": "florida intl",
-           "sam houston": "sam houston state"}
+           "sam houston": "sam houston state",
+           # 2026 week 3: 13 of 49 games unmatched on these AN spellings alone
+           "nd state": "north dakota state", "ga southern": "georgia southern",
+           "uconn": "connecticut", "app state": "appalachian state",
+           "sac state": "sacramento state", "n mexico state": "new mexico state",
+           "k state": "kansas state", "jax state": "jacksonville state",
+           "ucf": "central florida", "utsa": "texas-san antonio",
+           "s alabama": "south alabama", "louisiana": "louisiana-lafayette",
+           "va tech": "virginia tech"}
 
 
 # ------------------------------------------------------------------------------ models
@@ -328,6 +336,11 @@ def _check() -> None:
     assert norm("Kent") == norm("Kent State")
     assert norm("Florida Intl.") == norm("FIU")
     assert norm("Sam Houston St.") == norm("Sam Houston")
+    for pt_name, an_name in [("North Dakota St.", "ND State"), ("Connecticut", "UConn"),
+                             ("New Mexico St.", "N. Mexico St"), ("Kansas St.", "K State"),
+                             ("Central Florida", "UCF"), ("Texas-San Antonio", "UTSA"),
+                             ("Louisiana-Lafayette", "Louisiana"), ("Virginia Tech", "VA Tech")]:
+        assert norm(pt_name) == norm(an_name), (pt_name, an_name, norm(pt_name), norm(an_name))
     q = {"68": (-7.5, -110), "69": (-7.0, -110), "71": (18.0, -110)}
     s = shop(q)
     assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # Caesars' 18 was guarded out
