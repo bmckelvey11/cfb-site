@@ -3,12 +3,20 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from pull_pff_modeling import fbs_franchises, flatten_team_games, ncaa_weeks, parse_seasons  # noqa: E402
+from pull_pff_modeling import (  # noqa: E402
+    all_ops, command, fbs_franchises, flatten_team_games, ncaa_weeks, parse_ids, parse_seasons,
+)
 
 
 def test_parse_seasons_ranges_and_lists():
     assert parse_seasons("2025") == [2025]
     assert parse_seasons("2019,2021-2023") == [2019, 2021, 2022, 2023]
+
+
+def test_parse_ids_reads_at_files(tmp_path):
+    f = tmp_path / "ids.txt"
+    f.write_text("7\n3\n\n7\n")
+    assert parse_ids(f"9,@{f}") == [3, 7, 9]
 
 
 def test_ncaa_weeks_drops_all_star_weeks():
@@ -20,6 +28,20 @@ def test_ncaa_weeks_drops_all_star_weeks():
 def test_fbs_franchises_reads_group_11():
     directory = {"rows": [{"franchiseId": 5, "groupIds": "11;24"}, {"franchiseId": 9, "groupIds": "12;209"}]}
     assert fbs_franchises(directory) == [5]
+
+
+def test_command_positionals_follow_spec_order_and_flags_use_cli_names():
+    spec = {"paths": {"/v2/{league}/teams/stats": {"get": {"operationId": "team-stats", "parameters": [
+        {"name": "league", "in": "path", "required": True},
+        {"name": "season", "in": "query"},
+        {"name": "weekIds", "in": "query"},
+        {"name": "franchise_id", "in": "query", "x-cli-name": "franchise"},
+    ]}}}}
+    ops = all_ops(spec)
+    assert command(ops, "team-stats", {"league": "ncaa", "weekIds": 3, "season": 2025}) == \
+        ["team-stats", "ncaa", "--season", "2025", "--week-ids", "3"]
+    assert command(ops, "team-stats", {"league": "ncaa", "franchise_id": 103}) == \
+        ["team-stats", "ncaa", "--franchise", "103"]
 
 
 def test_flatten_pairs_opponent_grades(tmp_path):

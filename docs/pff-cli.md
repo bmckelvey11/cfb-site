@@ -456,7 +456,7 @@ claims, not facts.
 | `ci` API-key profile created and verified | done (2026-09-08) — `whoami -p ci`: pro, entitled |
 | Browser sign-in (`default` profile) | **not done** — needs an interactive terminal; the `ci` profile covers scripted use |
 | Live data read | done (2026-09-08) — `ref-leagues` only, as a smoke test |
-| Any CFB data pulled into `data/` | not started |
+| Any CFB data pulled into `data/` | done (2026-09-08) — `scripts/pull_pff_modeling.py` covers every operation by tier; `scripts/pull_pff_facet.py` the leaderboard exports. Schema: `docs/pff-warehouse-schema.md` |
 
 NCAA seasons the API reports: 2008, then 2010–2026 — no 2009.
 
