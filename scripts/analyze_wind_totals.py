@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import glob
 import json
 from pathlib import Path
 
@@ -19,11 +20,49 @@ import numpy as np
 # Pre-registered wind-speed buckets (mph), plan section 2.
 BUCKETS = ((0.0, 7.0), (7.0, 12.0), (12.0, 18.0), (18.0, 1e9))
 
+# teamrankings and numberfire are model projection sites, not sportsbooks. A total
+# sourced from them is not a market price, so "beyond what the market priced" does
+# not hold for those games. --books-only drops them.
+NON_BOOK_PROVIDERS = {"teamrankings", "numberfire"}
 
-def load_rows(data_dir: Path) -> list[dict]:
+
+def total_providers(data_dir: Path) -> dict[str, str]:
+    """Which provider supplied each game's total, replicating normalize's selection."""
+
+    def first(d: dict, *keys: str):
+        for k in keys:
+            if d.get(k) is not None:
+                return d[k]
+        return None
+
+    out: dict[str, str] = {}
+    for path in sorted(glob.glob(str(data_dir / "raw" / "lines_*.json"))):
+        for game in json.loads(Path(path).read_text(encoding="utf-8")):
+            gid = first(game, "id", "gameId", "game_id")
+            lines = game.get("lines") or []
+            usable = [
+                ln for ln in lines
+                if ln.get("spread") is not None or first(ln, "overUnder", "over_under") is not None
+            ]
+            if gid is None or not usable:
+                continue
+            line = next(
+                (ln for ln in usable if str(ln.get("provider", "")).lower() == "consensus"),
+                usable[0],
+            )
+            if first(line, "overUnder", "over_under") is None:
+                line = next(
+                    (ln for ln in lines if first(ln, "overUnder", "over_under") is not None), line
+                )
+            out[str(gid)] = str(line.get("provider") or "")
+    return out
+
+
+def load_rows(data_dir: Path, *, books_only: bool = False) -> list[dict]:
     """Outdoor games with a closing total, a final score and a gated field azimuth."""
     features = json.loads((data_dir / "processed" / "features.json").read_text(encoding="utf-8"))
     feature_map = features["games"]
+    providers = total_providers(data_dir) if books_only else {}
     rows: list[dict] = []
     with (data_dir / "processed" / "games.csv").open(newline="", encoding="utf-8") as fh:
         for game in csv.DictReader(fh):
@@ -33,6 +72,8 @@ def load_rows(data_dir: Path) -> list[dict]:
             if not (game["home_points"] and game["away_points"] and game["total"]):
                 continue
             if f.get("weather_temperature") is None or f.get("weather_precipitation") is None:
+                continue
+            if books_only and providers.get(game["game_id"], "").lower() in NON_BOOK_PROVIDERS:
                 continue
             total = float(game["total"])
             rows.append(
@@ -155,9 +196,14 @@ def holm(pairs: dict[str, tuple[float, float]]) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--data-dir", default="data", type=Path)
+    ap.add_argument(
+        "--books-only",
+        action="store_true",
+        help="drop games whose total came from a projection site rather than a book",
+    )
     args = ap.parse_args()
 
-    rows = load_rows(args.data_dir)
+    rows = load_rows(args.data_dir, books_only=args.books_only)
     if not rows:
         print("No usable rows. Run `python -m cfb_system_maker enrich` first.")
         return 1

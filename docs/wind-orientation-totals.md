@@ -175,6 +175,10 @@ The pipeline is **not** blind: precipitation lands hard and well clear of zero o
 the same outcome, same clusters. So the wind nulls are real nulls-in-the-noise,
 not a broken join.
 
+> **Superseded.** That precipitation coefficient is an artifact of the mixed
+> provider pool — see "Correction" below. On book-sourced totals it is
+> -6.84 [-20.88, +7.20] and this paragraph's argument does not hold.
+
 Two readings follow. First, **the market prices raw wind speed** — `wind_speed`
 alone is ~0 against the closing total. Second, that is why the orientation split
 is the only place a residual edge could hide: if the market conditions on speed
@@ -209,6 +213,58 @@ Note the linear primary spec already lets the effect grow with speed: the
 regressors are `speed * cos(angle)` and `speed * sin(angle)`. The buckets test
 whether it grows *faster than linearly*, and nothing here says it does.
 
+### Correction — the benchmark is not uniformly a market
+
+Added after the first run, in response to "how are you testing it against the
+closing total?". `games.csv` `total` is CFBD's `overUnder` from
+`normalize._select_line` / `_select_total`: prefer the `consensus` provider, else
+the first usable line, and if that row has no total, the first sibling row that
+does. `overUnder` really is a late number rather than the opener — it differs from
+`overUnderOpen` in 79.4% of rows that carry both, mean absolute move 1.56 points.
+
+But the provider pool is not all sportsbooks. In the 9,927-game sample:
+
+| provider | n | share |
+|---|---:|---:|
+| consensus | 3,963 | 39.9% |
+| teamrankings | 2,420 | 24.4% |
+| ESPN Bet | 1,312 | 13.2% |
+| DraftKings | 1,101 | 11.1% |
+| Bovada | 681 | 6.9% |
+| William Hill (New Jersey) | 369 | 3.7% |
+| Caesars (Colorado) | 38 | 0.4% |
+| numberfire | 25 | 0.3% |
+| Draft Kings | 18 | 0.2% |
+
+**`teamrankings` and `numberfire` are model projection sites, not books.** 24.7% of
+the benchmark is a projected total, so for a quarter of the sample "beyond what
+the market priced" was not what was being measured.
+
+Re-run with `--books-only` (drops those two, n = 7,482, 209 venues):
+
+| coefficient | estimate (pts/mph) | 95% CI | Holm p |
+|---|---:|---|---:|
+| `beta_cross` | -0.0470 | [-0.1336, +0.0395] | 0.574 |
+| `beta_along` | +0.0241 | [-0.0611, +0.1093] | 0.580 |
+| difference | -0.0711 | [-0.2073, +0.0652] | — |
+
+The wind conclusion is unchanged and slightly weaker: same signs, same ordering,
+CIs still span zero, and MDE rises to about 0.131 pts/mph on the smaller n.
+
+**The precipitation finding does not survive.** On book-sourced totals it falls
+from -18.50 [-29.09, -7.91] to **-6.84 [-20.88, +7.20]** — a CI straddling zero.
+The original number was largely an artifact of the projection-site games:
+teamrankings and numberfire generate a total from team form and do not price
+weather, so games benchmarked against them leave a large weather residual by
+construction. Real books price rain. Withdraw the precipitation lead from the
+first version of this document.
+
+That also removes the "the pipeline is not blind" argument. On the clean
+subsample this design finds **no** weather effect distinguishable from zero —
+wind, temperature or precipitation. That is consistent with books pricing weather
+well and equally consistent with the design being underpowered, and this analysis
+cannot separate the two.
+
 ### Verdict
 
 Crosswind is the right place to look and the sign is right, but at this sample
@@ -230,7 +286,5 @@ What would settle it, in rough order of cost:
 3. **Second-half / late-game splits**, where wind has had time to matter and the
    market's pregame number is staler.
 
-Out of scope but worth its own look: **precipitation at -18.5 points per unit
-against the closing total** is a much larger and cleaner signal than anything
-wind-related here. That is a real finding this analysis was not designed to test
-and did not correct for — treat it as a lead, not a result.
+Run `--books-only` for any follow-up. The mixed-provider benchmark inflates
+weather residuals and already produced one withdrawn finding.
