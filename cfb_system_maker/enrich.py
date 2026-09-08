@@ -13,6 +13,8 @@ from cfb_system_maker.normalize import _first, _select_line, _select_total
 from cfb_system_maker.running_stats import compute_running_stats
 from cfb_system_maker.storage import load_processed_games
 from cfb_system_maker.v1_model import load_v1_fit, score_v1
+from cfb_system_maker.wind import derive as derive_wind
+from cfb_system_maker.wind import orientation_is_usable
 
 
 def enrich_games(data_dir: str | Path, games: list[GameRecord] | None = None) -> dict[str, dict[str, Any]]:
@@ -141,8 +143,47 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
     indexes["computed_running"] = _build_running_index(data_dir, seasons, games, indexes["raw_game"])
     indexes["computed_v1"] = _build_v1_index(data_dir, games)
     indexes["computed_line_move"] = _build_line_move_index(data_dir, seasons, games)
+    indexes["computed_wind"] = _build_wind_index(
+        data_dir, games, indexes["raw_game"], indexes["raw_weather"]
+    )
 
     return indexes
+
+
+def _build_wind_index(
+    data_dir: Path,
+    games: list[GameRecord],
+    raw_games: dict[int, dict[str, Any]],
+    raw_weather: dict[int, dict[str, Any]],
+) -> dict[int, dict[str, Any]]:
+    """Wind relative to the field axis, keyed by game_id.
+
+    Orientation comes from ``raw/venue_orientation.json``; rows whose OSM match is
+    not a nearby football pitch are dropped rather than trusted (see
+    ``wind.orientation_is_usable``), so a game with a bad match reads as null, not
+    as a confidently wrong crosswind.
+    """
+    path = data_dir / "raw" / "venue_orientation.json"
+    orientation: dict[int, dict[str, Any]] = {}
+    if path.exists():
+        for row in json.loads(path.read_text(encoding="utf-8")):
+            venue_id = row.get("venue_id")
+            if venue_id is not None and orientation_is_usable(row):
+                orientation[int(venue_id)] = row
+
+    index: dict[int, dict[str, Any]] = {}
+    for game in games:
+        weather = raw_weather.get(game.game_id) or {}
+        game_row = raw_games.get(game.game_id) or {}
+        venue_id = weather.get("venueId") if weather.get("venueId") is not None else game_row.get("venueId")
+        venue = orientation.get(int(venue_id)) if venue_id is not None else None
+        index[game.game_id] = derive_wind(
+            wind_direction_deg=weather.get("windDirection"),
+            wind_speed_mph=weather.get("windSpeed"),
+            azimuth_deg=venue.get("azimuth_deg") if venue else None,
+            indoors=bool(weather.get("gameIndoors") or (venue or {}).get("dome")),
+        )
+    return index
 
 
 def _build_running_index(
@@ -368,6 +409,9 @@ def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> A
 
     if feature.source_kind == "computed_line_move":
         return indexes["computed_line_move"].get(game.game_id, {}).get(feature.field)
+
+    if feature.source_kind == "computed_wind":
+        return indexes["computed_wind"].get(game.game_id, {}).get(feature.field)
 
     if feature.source_kind == "graphql_game":
         record = indexes["graphql_game"].get(game.game_id)

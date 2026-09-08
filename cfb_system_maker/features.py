@@ -35,6 +35,7 @@ SourceKind = Literal[
     "computed_running",
     "computed_v1",
     "computed_line_move",
+    "computed_wind",
     "graphql_game",
     "graphql_weather",
     "graphql_lines",
@@ -225,6 +226,54 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
     FeatureDef(
         "weather_windDirection", "Wind Direction (deg)", "weather", "raw_weather", "windDirection", "game_id", "numeric",
         description="Wind direction in degrees. Pregame weather compass heading.",
+    ),
+    FeatureDef(
+        "wind_relative_cardinal", "Wind vs Field + Direction", "weather", "computed_wind",
+        "wind_relative_cardinal", "game_id", "categorical",
+        description=(
+            "Wind relative to the field's long axis, split by the compass point the wind "
+            "blows from: for example Crosswind (NW) or Headwind (S). Headwind means the wind "
+            "runs goalpost to goalpost -- a headwind one direction and a tailwind the other, "
+            "since teams swap ends. Calm below 3 mph, where direction is noise. Null indoors "
+            "and at venues with no trustworthy field orientation (about 56% of games have one)."
+        ),
+    ),
+    FeatureDef(
+        "wind_relative", "Wind vs Field", "weather", "computed_wind", "wind_relative",
+        "game_id", "categorical",
+        description=(
+            "Wind relative to the field's long axis, ignoring compass direction: Headwind "
+            "(within 30 degrees of the goalpost axis), Crosswind (within 30 degrees of "
+            "sideline to sideline), Quartering in between, or Calm below 3 mph. Null indoors "
+            "and where field orientation is unknown."
+        ),
+    ),
+    FeatureDef(
+        "wind_cross_mph", "Crosswind Speed (mph)", "weather", "computed_wind", "wind_cross_mph",
+        "game_id", "numeric",
+        description=(
+            "Component of wind speed blowing sideline to sideline (mph). Higher means more "
+            "of the wind pushes kicks and passes sideways. Null indoors and where field "
+            "orientation is unknown."
+        ),
+    ),
+    FeatureDef(
+        "wind_along_mph", "Headwind Speed (mph)", "weather", "computed_wind", "wind_along_mph",
+        "game_id", "numeric",
+        description=(
+            "Component of wind speed blowing goalpost to goalpost (mph). Higher means more "
+            "of the wind runs up and down the field, helping one direction of play and "
+            "hurting the other. Null indoors and where field orientation is unknown."
+        ),
+    ),
+    FeatureDef(
+        "wind_axis_angle", "Wind Angle Off Field Axis (deg)", "weather", "computed_wind",
+        "wind_axis_angle", "game_id", "numeric",
+        description=(
+            "Angle between the wind line and the field's long axis, 0 to 90 degrees. 0 is "
+            "straight up the field, 90 is straight across it. Null indoors and where field "
+            "orientation is unknown."
+        ),
     ),
     # --- team preseason ---
     FeatureDef(
