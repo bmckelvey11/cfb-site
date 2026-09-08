@@ -31,15 +31,20 @@ paths, which do not apply here. Windows cannot check config file permissions (`p
 unsupported on this platform`); the token cache is fine, but treat `restish.json` as sensitive
 anyway.
 
-### `restish` is not on PATH yet
+### PATH
 
-Only the absolute path works today. To fix it, in PowerShell (run once, then reopen the terminal):
+`C:\Users\mckel\restish` was appended to the **user** PATH on 2026-09-08, so `restish` resolves in
+any new terminal. Terminals open before that still need the absolute path.
+
+To redo it on another machine, in PowerShell:
 
 ```powershell
-[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ';' + "$HOME\restish", 'User')
+[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User').TrimEnd(';') + ";$HOME\restish", 'User')
 ```
 
-Do **not** use `setx PATH` — it truncates at ~1024 characters and can eat the existing PATH.
+Do **not** use `setx PATH` — it truncates at ~1024 characters. The user PATH here was already 1901
+characters across 32 entries, so `setx` would have silently destroyed most of it. The pre-change
+value is backed up at `C:\Users\mckel\path-backup-2026-09-08.txt`.
 
 ### How it was installed (reproduce on another machine)
 
@@ -349,7 +354,7 @@ first real call.
 | --- | --- |
 | Restish 2.3.0 downloaded, checksum verified, extracted | done (2026-09-08) |
 | `restish api connect pff` — 70 operations discovered | done (2026-09-08) |
-| `restish.exe` on PATH | **not done** — one-line command above |
+| `restish.exe` on PATH | done (2026-09-08) — user PATH, old value backed up |
 | Browser sign-in / PFF Pro entitlement confirmed | **not done** — needs a PFF Pro account; run `restish pff whoami` |
 | Any data pulled | not started |
 
