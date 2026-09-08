@@ -143,9 +143,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
     indexes["computed_running"] = _build_running_index(data_dir, seasons, games, indexes["raw_game"])
     indexes["computed_v1"] = _build_v1_index(data_dir, games)
     indexes["computed_line_move"] = _build_line_move_index(data_dir, seasons, games)
-    indexes["computed_wind"] = _build_wind_index(
-        data_dir, games, indexes["raw_game"], indexes["raw_weather"]
-    )
+    indexes["computed_wind"] = _build_wind_index(data_dir, games, indexes["raw_weather"])
 
     return indexes
 
@@ -153,7 +151,6 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
 def _build_wind_index(
     data_dir: Path,
     games: list[GameRecord],
-    raw_games: dict[int, dict[str, Any]],
     raw_weather: dict[int, dict[str, Any]],
 ) -> dict[int, dict[str, Any]]:
     """Wind relative to the field axis, keyed by game_id.
@@ -174,8 +171,7 @@ def _build_wind_index(
     index: dict[int, dict[str, Any]] = {}
     for game in games:
         weather = raw_weather.get(game.game_id) or {}
-        game_row = raw_games.get(game.game_id) or {}
-        venue_id = weather.get("venueId") if weather.get("venueId") is not None else game_row.get("venueId")
+        venue_id = weather.get("venueId")
         venue = orientation.get(int(venue_id)) if venue_id is not None else None
         index[game.game_id] = derive_wind(
             wind_direction_deg=weather.get("windDirection"),
