@@ -1748,6 +1748,14 @@ def _is_struct_type(dtype: object) -> bool:
 # shows up on a 137-row table before a 5M-row one.
 _MASSEY_TABLES = ("massey_teams", "massey_systems", "massey_editions", "massey_ranks")
 
+# Action Network line movement. `raw.an_history` keeps one row per offering -- its
+# closing price -- because that is all the offer's own columns carry. The tick
+# series lives in a nested `history[]` the exploder cannot reach without changing
+# an_history's grain, so `scripts/actionnetwork_flatten.py` walks it into a flat
+# CSV instead. Already flat and already using this module's market vocabulary, so
+# it loads straight to `stg` like massey, no raw twin.
+_AN_TICK_TABLE = "an_history_tick"
+
 
 def _plan_loads(
     data_dir: Path,
@@ -1794,6 +1802,20 @@ def _plan_loads(
                 jobs.append(
                     {"schema": "stg", "name": name, "paths": [path], "format": "csv"}
                 )
+
+    # Same deal for the tick CSV, but gated on --skip-actionnetwork with the rest
+    # of Action Network rather than loading when the AN JSON is excluded.
+    if include_actionnetwork:
+        tick_path = data_dir / "processed" / "actionnetwork" / f"{_AN_TICK_TABLE}.csv"
+        if tick_path.exists() and (only is None or _AN_TICK_TABLE in only):
+            jobs.append(
+                {
+                    "schema": "stg",
+                    "name": _AN_TICK_TABLE,
+                    "paths": [tick_path],
+                    "format": "csv",
+                }
+            )
 
     gql_dir = data_dir / "graphql"
     if gql_dir.is_dir():

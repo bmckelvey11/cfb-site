@@ -93,6 +93,7 @@ denylist, and writes one DuckDB file:
 | `data/raw/actionnetwork_odds.csv` | `raw.an_odds` | A CSV source; loaded via `read_csv_auto`, not the JSON path. |
 | `data/raw/actionnetwork/scoreboard_*.json`, `history_*.json` | `raw.an_scoreboard`, `raw.an_history` | Object-rooted JSON (`format='unstructured'`), off by default toggle is `--skip-actionnetwork` to exclude them. |
 | `data/processed/massey/*.csv` | `stg.massey_*` | Written by `scripts/massey_flatten.py`, already flat and CFBD-mapped, so they load straight to `stg`. Their source (`data/ingest/massey/`) is deliberately outside the glob. |
+| `data/processed/actionnetwork/an_history_tick.csv` | `stg.an_history_tick` | Written by `scripts/actionnetwork_flatten.py` — the timestamped `history[]` nested under each offering, which `_explode_an_history` cannot reach without changing `an_history`'s grain. Flat already, so it loads straight to `stg`; gated on `--skip-actionnetwork` with the other AN sources. |
 | `data/graphql/*.json` | `graphql` | GraphQL table dumps from `graphql_client.py`. Same stem-parsing as `raw`. |
 
 **Skipped stems** (`_SKIP_STEMS` in `duckdb_load.py`, plus anything starting with `_`):

@@ -1155,3 +1155,59 @@ def test_massey_csvs_load_into_stg_with_a_real_date(tmp_path):
         ).fetchall()
         if row[0].startswith("massey_") and "__" in row[0]
     ]
+
+
+def _write_tick_csv(tmp_path):
+    tick_dir = tmp_path / "processed" / "actionnetwork"
+    tick_dir.mkdir(parents=True)
+    (tick_dir / "an_history_tick.csv").write_text(
+        """event_id,book_id,period,market_type,side,team_id,market_id,outcome_id,is_alt_market,is_live,updated_at,line,odds,line_status,_source_file
+500,15,event,spread,home,256,164,284,False,False,2026-04-29T19:10:10.254657Z,-6.5,-110,opener,history_event_500.json
+500,15,event,spread,home,256,164,284,False,False,2026-08-29T20:31:23.788398Z,-7.5,-108,normal,history_event_500.json
+""",
+        encoding="utf-8",
+    )
+    return tick_dir
+
+
+def test_tick_csv_loads_into_stg_with_a_real_timestamp(tmp_path):
+    """The movement series the exploder cannot reach: a nested history[] under
+    each offering. `actionnetwork_flatten.py` walks it to a flat CSV, which loads
+    straight to stg like massey. updated_at is the whole point -- as VARCHAR it
+    would sort lexically and every "line at time T" query would be string math.
+    """
+    import duckdb
+
+    _write_tick_csv(tmp_path)
+    db_path, reports = build_duckdb(tmp_path, explode=True)
+    by_name = {r.name: r for r in reports}
+    assert by_name["an_history_tick"].error is None
+    assert by_name["an_history_tick"].schema == "stg"
+    assert by_name["an_history_tick"].rows == 2
+
+    con = duckdb.connect(str(db_path), read_only=True)
+    types = {
+        row[0]: row[1]
+        for row in con.execute("DESCRIBE stg.an_history_tick").fetchall()
+    }
+    assert types["updated_at"] == "TIMESTAMP WITH TIME ZONE"
+    assert types["line"] == "DOUBLE"
+    # Ordering by the timestamp is the query this table exists to serve.
+    assert con.execute(
+        "SELECT line FROM stg.an_history_tick ORDER BY updated_at"
+    ).fetchall() == [(-6.5,), (-7.5,)]
+    # Flat already: nothing to explode, so no child tables invented.
+    assert not [
+        row[0]
+        for row in con.execute(
+            "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
+        ).fetchall()
+        if row[0].startswith("an_history_tick") and "__" in row[0]
+    ]
+
+
+def test_tick_csv_is_skipped_with_the_rest_of_actionnetwork(tmp_path):
+    """--skip-actionnetwork excludes every AN source, the flattened one included."""
+    _write_tick_csv(tmp_path)
+    _, reports = build_duckdb(tmp_path, include_actionnetwork=False)
+    assert "an_history_tick" not in {r.name for r in reports}

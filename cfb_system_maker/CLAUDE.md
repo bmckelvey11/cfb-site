@@ -119,6 +119,12 @@ Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
   `stg.an_linescore` are its other children. Generic explode is wrong for all of them: it
   repeats the walked path on every column and carries down 36 parent scalars, so each is
   hand-written. Nothing under `an_scoreboard` goes through `explode_stg_lists`.
+- **Action Network movement:** every table above is a **snapshot** — one closing price per
+  offering. The movement is a nested `history[]` under each offering that no exploder reads;
+  `scripts/actionnetwork_flatten.py` walks it into
+  `data/processed/actionnetwork/an_history_tick.csv`, which loads straight to
+  `stg.an_history_tick` (one row per offering per `updated_at`, `line_status='opener'` on the
+  first). Re-run the flatten after any scrape — the loader takes the CSV as it finds it.
 - **New statistics:** tempo and similar values belong in `FEATURE_REGISTRY`, not new
   `games.csv` columns or tables. Compute from `stg.drives` or `stg.plays`.
 - **Spread sign convention:** `GameRecord.spread` is always the **home** spread. `_side_spread` negates it for away. A bet covers when `team_points + side_spread - opponent_points > 0`. Preserve this when touching grading.
