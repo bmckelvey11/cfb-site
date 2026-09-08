@@ -4,7 +4,9 @@
 > `raw/` moved to `ingest/` (`e2e9e5d`, except `raw/actionnetwork/`); the margin-era documents
 > it cites moved to `archive/spread-margin-era/`; the §5.5 numbers predate decontamination
 > (`line-movement-results.md` § A3), where the ridge's R² 0.25 falls to 0.16 and E4's 0.17 to
-> 0.15; the scheduled tasks' health claims in §7 are superseded by `docs/line-timing-collector.md`.
+> 0.15; the scheduled tasks' health claims in §7 are superseded by `docs/line-timing-collector.md`;
+> the book names in §3.3 are wrong (49 is Caesars, 68 DraftKings, 69 FanDuel, 71 BetRivers,
+> 75 BetMGM, per AN's own book list) — the ids and numbers stand.
 > Read `README.md` for the current state.
 
 A complete account of one working session: what was asked, what was built, which models and
@@ -105,11 +107,6 @@ publication timestamp the archive lacks.
 The handoff's earlier "book 30 is stale" was this: the opener mistaken for a slow book. A
 background task to fix the loader mapping was spawned and is running in a separate session.
 Book 71 (Caesars) mis-posts: numbers 10–25 points from every other book at normal odds.
-
-> **Correction 2026-09-08.** The real-book names in the table above were guesses and are
-> wrong. Action Network's `/web/v1/books` says 49 = Caesars, 68 = DraftKings, 69 = FanDuel,
-> 71 = BetRivers, 75 = BetMGM. The mis-posting book 71 is BetRivers. The loader and
-> `weekly_slate.py` were corrected the same day.
 
 ### 3.4 Warehouse
 `cfb.duckdb` is source of truth; `CFB_DATA_ROOT=C:\Users\mckel\dev\cfb\data`. Scores for

@@ -77,6 +77,39 @@ def schema_faults(live: dict[str, str]) -> list[str]:
     return faults
 
 
+def check(con: duckdb.DuckDBPyConnection) -> tuple[bool, list[str]]:
+    """``(ok, lines to print)``. Shared by this script and `refresh_cfbd.py`."""
+    live = live_types(con)
+    if not live:
+        return False, [f"{TABLE} does not exist"]
+
+    faults = schema_faults(live)
+    lines = [f"  {fault}" for fault in faults]
+    verdict = "DRIFTED -- see scripts/migrate_an_history_tick.py" if faults else "ok"
+    lines.append(f"schema : {verdict} ({len(_AN_TICK_COLUMNS)} columns)")
+
+    have_history = con.execute(
+        "SELECT COUNT(*) FROM duckdb_tables()"
+        " WHERE schema_name = 'stg' AND table_name = 'an_history'"
+    ).fetchone()[0]
+    if not have_history:
+        lines.append("join   : skipped -- no stg.an_history to join")
+        return not faults, lines
+
+    rows = con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]
+    joined = con.execute(_JOIN_SQL).fetchone()[0]
+    orphans = rows - joined
+    lines.append(
+        f"join   : {joined:,}/{rows:,} tick rows reach stg.an_history without a cast"
+    )
+    if orphans:
+        lines.append(
+            f"  {orphans:,} orphan(s) -- most likely a stale CSV, not a type fault."
+            " Re-run scripts/actionnetwork_flatten.py, reload, check again."
+        )
+    return not (faults or orphans), lines
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--db", default=str(cfb_paths.DB_PATH))
@@ -84,39 +117,11 @@ def main() -> int:
 
     con = duckdb.connect(a.db, read_only=True)
     try:
-        live = live_types(con)
-        if not live:
-            print(f"{TABLE} does not exist")
-            return 1
-
-        faults = schema_faults(live)
-        for fault in faults:
-            print(f"  {fault}")
-        print(
-            f"schema : {'DRIFTED -- see scripts/migrate_an_history_tick.py' if faults else 'ok'}"
-            f" ({len(_AN_TICK_COLUMNS)} columns)"
-        )
-
-        rows = con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]
-        have_history = con.execute(
-            "SELECT COUNT(*) FROM duckdb_tables()"
-            " WHERE schema_name = 'stg' AND table_name = 'an_history'"
-        ).fetchone()[0]
-        if not have_history:
-            print("join   : skipped -- no stg.an_history to join")
-            return 1 if faults else 0
-
-        joined = con.execute(_JOIN_SQL).fetchone()[0]
-        orphans = rows - joined
-        print(f"join   : {joined:,}/{rows:,} tick rows reach stg.an_history without a cast")
-        if orphans:
-            print(
-                f"  {orphans:,} orphan(s) -- most likely a stale CSV, not a type fault."
-                " Re-run scripts/actionnetwork_flatten.py, reload, check again."
-            )
+        ok, lines = check(con)
     finally:
         con.close()
-    return 1 if (faults or orphans) else 0
+    print("\n".join(lines))
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

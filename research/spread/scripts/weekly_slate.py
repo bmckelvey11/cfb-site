@@ -5,8 +5,9 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
 
   open_pt      PT's recorded opener (often a months-old look-ahead number for early weeks)
   line_pt      the market line at the moment PT compiled the snapshot
-  book_fair    median home spread across real books RIGHT NOW (DraftKings, FanDuel,
-               BetRivers, BetMGM, Caesars), after the outlier guard
+  book_fair    median home spread across real books RIGHT NOW (DraftKings, FanDuel, BetMGM,
+               BetRivers, Caesars), after the outlier guard
+  <Book>_home / <Book>_odds   each book's posted home spread (PT sign) and its odds
   consensus    the model consensus: mean of the top-20 models by prior MOVEMENT skill
   E4 .. E14    each movement model's predicted CLOSE, fit on the whole archive with the
                opener as anchor (research/spread/docs/line-movement-results.md)
@@ -19,9 +20,14 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
   side_line    the number to take for that side, from that side's perspective (+3.5 = getting
                3.5), at the best book; PT's line when no book matched
   side_book    where that number is posted
+  side_odds    the price at that book
   edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1
 
-Every run writes weekly_slate_<stamp>.csv and overwrites weekly_slate_latest.csv.
+Every run writes weekly_slate_<stamp>.csv and overwrites weekly_slate_latest.csv. With
+`--book DraftKings` the side columns use that one book's number and price instead of the best
+across books, the files get a `_draftkings` suffix, and the forward log is left alone.
+
+    python research/spread/scripts/weekly_slate.py --book DraftKings
 
 Everything here is anchored on the OPENER because that is what the archive could validate.
 The archive says the move from the opener is predictable (gamma 0.30, R^2 up to 0.25) and
@@ -63,7 +69,8 @@ PARAMS = {"E6": 10000.0, "E7": "all", "E8": 0.3, "E9": 1, "E10": 1.0, "E11": 0.4
           "E12": (10.0, 0.1), "E14": 1}
 MODEL_COLS = ["E4", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E14"]
 
-# Action Network book ids per its /web/v1/books endpoint (2026-09-08).
+# Action Network book ids, names from AN's own /web/v1/books (2026-09-08). Until then this map
+# said Pinnacle/FanDuel/BetMGM/Caesars/Bet365 -- every label was wrong; the ids were right.
 REAL_BOOKS = {"49": "Caesars", "68": "DraftKings", "69": "FanDuel", "71": "BetRivers", "75": "BetMGM"}
 OUTLIER_PTS = 2.5          # a book > this far from the median of all books is ignored (n >= 3)
 ODDS_WINDOW = (-135, 125)
@@ -210,7 +217,7 @@ def crosses_key(a: float, b: float) -> bool:
 # --------------------------------------------------------------------------------- main
 
 
-def build(snapshot: Path, with_books: bool) -> pd.DataFrame:
+def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataFrame:
     hist, models = base.load()
     hist = hist[hist["line"].notna() & hist[BENCH].notna()].reset_index(drop=True)
     live_raw = pd.read_csv(snapshot).drop_duplicates(["road", "home"], keep="last").reset_index(drop=True)
@@ -247,8 +254,12 @@ def build(snapshot: Path, with_books: bool) -> pd.DataFrame:
         t["key"] = t.home.map(norm)
         t["rkey"] = t.road.map(norm)
         t = t.merge(books, on=["key", "rkey"], how="left")
-        s = pd.DataFrame([shop(q) if isinstance(q, dict) else {} for q in t.quotes])
+        qs = [q if isinstance(q, dict) else {} for q in t.quotes]
+        s = pd.DataFrame([shop(q) for q in qs])
         t = pd.concat([t.drop(columns=["quotes"]), s], axis=1)
+        for bid, name in REAL_BOOKS.items():           # every book's own number, PT sign
+            t[f"{name}_home"] = [-q[bid][0] if bid in q else np.nan for q in qs]
+            t[f"{name}_odds"] = [q[bid][1] if bid in q else np.nan for q in qs]
         # AN sign -> PT sign. When nothing matched, shop() yields no columns at all, so these
         # must still exist as float NaN or every downstream arithmetic turns object-dtype.
         for c in ("fair_an", "best_home_an", "best_away_an"):
@@ -273,36 +284,44 @@ def build(snapshot: Path, with_books: bool) -> pd.DataFrame:
         if len(unmatched) == len(t):
             print("  ALL games unmatched -- the snapshot is almost certainly a different week "
                   "than the books. book_fair/move_vs_fair are unavailable, not zero.")
-    t = add_side(t)
+    t = add_side(t, book)
     t.insert(0, "snapshot", snapshot.name)
     t.insert(1, "captured_utc", snapshot.stem.split("_")[-1])
     return t
 
 
-def add_side(t: pd.DataFrame) -> pd.DataFrame:
-    """Which side E4 says to take, the number to take it at, and the edge in points.
+def add_side(t: pd.DataFrame, book: str | None = None) -> pd.DataFrame:
+    """Which side E4 says to take, the number to take it at, its price, and the edge.
 
     PT sign: E4 above fair means the models favour the home team by more than the market,
     so take the home side; below, take the road side. The line is expressed from the chosen
-    side's perspective (+3.5 = getting 3.5) so it reads like a slip.
+    side's perspective (+3.5 = getting 3.5) so it reads like a slip. The side is always decided
+    against the book fair; `book` only changes which number and price are shown -- that
+    book's own, NaN where it has not posted -- instead of the best across books.
     """
     have_books = "fair_pt" in t and t.fair_pt.notna().any()
-    fair = t.fair_pt if have_books else t.line_pt
-    fair = fair.fillna(t.line_pt)
+    fair = (t.fair_pt if have_books else t.line_pt).fillna(t.line_pt)
     gap = t.E4 - fair
     home = gap > 0
-    if have_books:
+    if book:
+        home_num = away_num = t[f"{book}_home"]
+        home_odds = away_odds = t[f"{book}_odds"]
+        home_book = away_book = pd.Series(book, index=t.index).where(home_num.notna(), "")
+    elif have_books:
         home_num = t.best_home_pt.fillna(t.line_pt)
         away_num = t.best_away_pt.fillna(t.line_pt)
+        home_odds, away_odds = t.best_home_odds, t.best_away_odds
         home_book = t.best_home_book.where(t.best_home_pt.notna(), "PT")
         away_book = t.best_away_book.where(t.best_away_pt.notna(), "PT")
     else:
         home_num = away_num = t.line_pt
+        home_odds = away_odds = pd.Series(np.nan, index=t.index)
         home_book = away_book = pd.Series("PT", index=t.index)
     t["side"] = np.where(gap.isna() | (gap == 0), "", np.where(home, t.home, t.road))
     t["side_line"] = np.where(home, -home_num, away_num).round(1)
     t["side_book"] = np.where(home, home_book, away_book)
-    t.loc[t.side == "", ["side_line", "side_book"]] = [np.nan, ""]
+    t["side_odds"] = np.where(home, home_odds, away_odds)
+    t.loc[t.side == "", ["side_line", "side_book", "side_odds"]] = [np.nan, "", np.nan]
     t["edge"] = gap.abs().round(2)
     return t
 
@@ -328,6 +347,13 @@ def report(t: pd.DataFrame, with_books: bool) -> None:
         if len(rg):
             print(f"\n  range across real books: median {rg.median():.2f}; "
                   f"{int((rg >= 1).sum())} of {len(rg)} games with >= 1 point of dispersion")
+    if "side" in t:
+        print("\n=== SIDE: E4's side vs book fair, edge >= 1 (the forward test's bet set) ===")
+        s = t[(t.side != "") & (t.edge >= 1)].sort_values("edge", ascending=False)
+        for _, r in s.iterrows():
+            odds = f" ({r.side_odds:+.0f})" if pd.notna(r.side_odds) else ""
+            line = f"{r.side_line:+.1f}" if pd.notna(r.side_line) else "not posted"
+            print(f"  {r.side:20s} {line:>11s} @ {r.side_book or '-':10s}{odds:8s} edge {r.edge:.1f}")
 
 
 def append_forward_log(t: pd.DataFrame) -> int:
@@ -348,19 +374,28 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--snapshot", type=Path, default=None)
     ap.add_argument("--no-books", action="store_true", help="skip the live Action Network fetch")
+    ap.add_argument("--book", default=None,
+                    help="show the side's number and price at this one book: " + ", ".join(REAL_BOOKS.values()))
     args = ap.parse_args()
+    book = None
+    if args.book:
+        book = next((n for n in REAL_BOOKS.values() if n.lower() == args.book.lower()), None)
+        if book is None or args.no_books:
+            raise SystemExit(f"--book must be one of {', '.join(REAL_BOOKS.values())}, with the live fetch on")
     snap = args.snapshot or pu.latest_snapshot()
-    t = build(snap, with_books=not args.no_books)
+    t = build(snap, with_books=not args.no_books, book=book)
     report(t, with_books=not args.no_books)
+    suffix = f"_{book.lower()}" if book else ""
     stamp = snap.stem.split("_")[-1]
-    path = OUT / f"weekly_slate_{stamp}.csv"
+    path = OUT / f"weekly_slate_{stamp}{suffix}.csv"
     out = t.drop(columns=[c for c in ("quotes", "key", "rkey") if c in t])
     out.to_csv(path, index=False)
-    out.to_csv(OUT / "weekly_slate_latest.csv", index=False)
+    out.to_csv(OUT / f"weekly_slate_latest{suffix}.csv", index=False)
     # A snapshot with no book match is a stale slate (PT still serving last week's games after
-    # they kicked off); logging it would add ungradable rows to version B's dataset.
+    # they kicked off); logging it would add ungradable rows to version B's dataset. A --book
+    # run is a view, not new data.
     stale = (not args.no_books) and "event_id" in t and t.event_id.isna().all()
-    n = 0 if stale else append_forward_log(t)
+    n = 0 if (stale or book) else append_forward_log(t)
     print(f"\nwrote {path}; appended {n} rows to {FORWARD_LOG.name}")
     return 0
 
@@ -383,12 +418,19 @@ def _check() -> None:
         assert norm(pt_name) == norm(an_name), (pt_name, an_name, norm(pt_name), norm(an_name))
     # side: E4 above fair -> home at the best home number (shown as a home line);
     # below -> road at the best road number (shown as points received)
-    s = add_side(pd.DataFrame({"home": ["Auburn", "LSU"], "road": ["S Miss", "La Tech"], "line_pt": [33.5, 35.5],
-                               "E4": [28.5, 36.5], "fair_pt": [33.5, 35.5], "best_home_pt": [32.5, 36.0],
-                               "best_away_pt": [34.0, 35.5], "best_home_book": ["FanDuel", "BetRivers"],
-                               "best_away_book": ["BetMGM", "Caesars"]}))
+    frame = pd.DataFrame({"home": ["Auburn", "LSU"], "road": ["S Miss", "La Tech"], "line_pt": [33.5, 35.5],
+                          "E4": [28.5, 36.5], "fair_pt": [33.5, 35.5], "best_home_pt": [32.5, 36.0],
+                          "best_away_pt": [34.0, 35.5], "best_home_book": ["FanDuel", "BetRivers"],
+                          "best_away_book": ["BetMGM", "Caesars"], "best_home_odds": [-106, -110],
+                          "best_away_odds": [100, -112], "DraftKings_home": [33.5, np.nan],
+                          "DraftKings_odds": [-115, np.nan]})
+    s = add_side(frame.copy())
     assert s.side.tolist() == ["S Miss", "LSU"] and s.side_line.tolist() == [34.0, -36.0], s
     assert s.side_book.tolist() == ["BetMGM", "BetRivers"] and s.edge.tolist() == [5.0, 1.0], s
+    assert s.side_odds.tolist() == [100, -110], s
+    d = add_side(frame.copy(), book="DraftKings")        # same side; that book's number, NaN if unposted
+    assert d.side.tolist() == ["S Miss", "LSU"] and d.side_line.iloc[0] == 33.5 and np.isnan(d.side_line.iloc[1]), d
+    assert d.side_book.tolist() == ["DraftKings", ""] and d.side_odds.iloc[0] == -115, d
     q = {"68": (-7.5, -110), "69": (-7.0, -110), "71": (18.0, -110)}
     s = shop(q)
     assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # BetRivers' 18 was guarded out

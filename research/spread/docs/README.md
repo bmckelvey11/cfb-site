@@ -86,6 +86,11 @@ Never committed. `CFB_DATA_ROOT` is `C:\Users\mckel\dev\cfb\data`.
 `processed/pt_*` files not listed (leaderboards, sweeps, recency, neff, ats tail, season
 stability) are margin-era outputs; their scripts are archived and they are not regenerated.
 
+**Action Network book ids**, from AN's own `/web/v1/books` (checked 2026-09-08): 15 consensus,
+30 opener, **49 Caesars, 68 DraftKings, 69 FanDuel, 71 BetRivers, 75 BetMGM**. Every document
+dated before 2026-09-08 that names these books (Pinnacle, Bet365, "Caesars mis-posts") used a
+wrong label; the ids and every number were right. Book 71, the one that mis-posts, is BetRivers.
+
 `ingest/snapshots/` (Action Network book lines) and `ingest/vendor/` (PFF) are **not** PT.
 There is no Prediction Tracker table in `cfb.duckdb`; this work is file-based end to end. The
 warehouse contributes `stg_gql.game` (the `game_id` join and version B's scores) and

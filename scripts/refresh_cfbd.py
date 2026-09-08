@@ -6,7 +6,10 @@ Phase 1 tables need), reflattens the Action Network tick CSV so the movement
 scraped since the last run is visible, then does a full rebuild of `cfb.duckdb`
 from data/raw + data/graphql + data/processed (that rebuild is a cheap, atomic
 full-reload -- see `duckdb_load.build_duckdb` -- so there is no incremental-load
-state to get wrong).
+state to get wrong), then checks that the rebuild reproduced the pinned
+`stg.an_history_tick` schema. A rebuild is the only thing that can undo that pin,
+so this is the run that has to notice; a failure exits non-zero into the
+scheduler's log without implying the warehouse itself is unusable.
 
     python scripts/refresh_cfbd.py
     python scripts/refresh_cfbd.py --season 2026
@@ -22,6 +25,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import duckdb
+
 REPO = next(
     parent for parent in Path(__file__).resolve().parents
     if (parent / "cfb_paths.py").is_file()
@@ -32,6 +37,7 @@ import cfb_paths  # noqa: E402
 from actionnetwork_flatten import IN_DIR as AN_HISTORY_DIR  # noqa: E402
 from actionnetwork_flatten import collect as an_collect  # noqa: E402
 from actionnetwork_flatten import write as an_write  # noqa: E402
+from check_an_tick_pin import check as an_tick_check  # noqa: E402
 from cfb_system_maker.cfbd_client import find_cfbd_token  # noqa: E402
 from cfb_system_maker.duckdb_core import build_core  # noqa: E402
 from cfb_system_maker.duckdb_load import build_duckdb  # noqa: E402
@@ -96,7 +102,38 @@ def main() -> int:
     db_path, _ = build_duckdb(cfb_paths.DATA_ROOT, explode=True)
     built = build_core(db_path)
     print(f"Rebuilt {db_path} (core: {', '.join(built)})")
-    return 0
+
+    return 0 if _check_an_tick_pin(db_path) else 1
+
+
+def _check_an_tick_pin(db_path: Path) -> bool:
+    """Verify the rebuild reproduced the pinned `stg.an_history_tick` schema.
+
+    A rebuild is the only thing that can undo the pin, so this is the run that
+    has to notice. Both halves of the check mean something different here than
+    they do from the command line: `_flatten_actionnetwork` ran first, so the
+    tick CSV and the AN JSON went in together and the stale-CSV explanation for
+    orphans is off the table -- a shortfall means the payloads themselves
+    disagree. A schema drift means the loader stopped honouring
+    `_AN_TICK_COLUMNS`.
+
+    Non-fatal to the warehouse, which is already written and usable; the
+    non-zero exit is what puts it in the scheduler's log.
+    """
+    print("=== check an_history_tick pin ===")
+    con = duckdb.connect(str(db_path), read_only=True)
+    try:
+        ok, lines = an_tick_check(con)
+    finally:
+        con.close()
+    for line in lines:
+        print(f"  {line}")
+    if not ok:
+        # check() writes for a command-line reader, who most often got here with a
+        # stale CSV. This run reflattened first, so that hint does not apply.
+        print("  (the CSV was reflattened this run -- staleness is not the cause)")
+        print("  warehouse is rebuilt and usable; the pin check is what failed")
+    return ok
 
 
 if __name__ == "__main__":
