@@ -10,13 +10,23 @@ _spec.loader.exec_module(rc)
 
 
 def test_current_season_keeps_bowls_with_the_prior_year():
-    """Jan-Jun belongs to the season that started the previous July."""
+    """Jan-Jun belongs to the season that started the previous July.
+
+    Lives in `cfb_paths` so every script defaulting a `--season` agrees on the
+    boundary; asserted from here because this refresh was where the rule started.
+    """
     import datetime
 
+    import cfb_paths
+
     jan = datetime.datetime(2027, 1, 12, tzinfo=datetime.timezone.utc)
+    jun = datetime.datetime(2026, 6, 30, tzinfo=datetime.timezone.utc)
+    jul = datetime.datetime(2026, 7, 1, tzinfo=datetime.timezone.utc)
     sep = datetime.datetime(2026, 9, 8, tzinfo=datetime.timezone.utc)
-    assert rc._current_season(jan) == 2026
-    assert rc._current_season(sep) == 2026
+    assert cfb_paths.current_season(jan) == 2026
+    assert cfb_paths.current_season(jun) == 2025
+    assert cfb_paths.current_season(jul) == 2026
+    assert cfb_paths.current_season(sep) == 2026
 
 
 def test_flatten_failure_does_not_cost_the_rebuild(tmp_path, monkeypatch, capsys):

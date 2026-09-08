@@ -133,3 +133,22 @@ def test_event_ids_marks_settled_from_game_status(monkeypatch):
     monkeypatch.setattr(ct, "_get", lambda *a, **k: payload)
     monkeypatch.setattr(ct.time, "sleep", lambda s: None)
     assert ct.event_ids(2026, range(1, 2)) == [(1, True), (2, False)]
+
+
+def test_season_default_follows_the_shared_cfb_boundary(monkeypatch):
+    """January still belongs to the prior season -- a bare calendar year would ask
+    Action Network for a season that has not started while bowls are being priced."""
+    import datetime
+
+    import cfb_paths
+
+    seen = {}
+    monkeypatch.setattr(ct.sys, "argv", ["collect_line_timing.py", "history"])
+    monkeypatch.setattr(
+        ct, "history", lambda season, weeks, force=False: seen.setdefault("season", season)
+    )
+    ct.main()
+    assert seen["season"] == cfb_paths.current_season()
+    assert cfb_paths.current_season(
+        datetime.datetime(2027, 1, 12, tzinfo=datetime.timezone.utc)
+    ) == 2026

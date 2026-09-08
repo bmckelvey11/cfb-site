@@ -181,7 +181,7 @@ def history(season: int, weeks: range, *, force: bool = False) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("mode", choices=("snapshot", "history", "both"), nargs="?", default="snapshot")
-    ap.add_argument("--season", type=int, default=datetime.now(timezone.utc).year)
+    ap.add_argument("--season", type=int, default=cfb_paths.current_season())
     ap.add_argument("--weeks", default="1-16", help="inclusive week range, e.g. 1-16")
     ap.add_argument("--force", action="store_true", help="re-pull history already on disk")
     args = ap.parse_args()

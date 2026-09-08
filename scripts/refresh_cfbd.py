@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = next(
@@ -39,11 +38,6 @@ from cfb_system_maker.duckdb_load import build_duckdb  # noqa: E402
 from cfb_system_maker.scrapers import scrape  # noqa: E402
 
 DEFAULT_ONLY = {"games", "lines", "calendar", "conferences", "venues"}
-
-
-def _current_season(now: datetime | None = None) -> int:
-    now = now or datetime.now(timezone.utc)
-    return now.year if now.month >= 7 else now.year - 1
 
 
 def _flatten_actionnetwork() -> None:
@@ -74,7 +68,7 @@ def _flatten_actionnetwork() -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--season", type=int, default=_current_season())
+    ap.add_argument("--season", type=int, default=cfb_paths.current_season())
     ap.add_argument("--only", nargs="+", default=sorted(DEFAULT_ONLY))
     args = ap.parse_args()
 
