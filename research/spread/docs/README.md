@@ -24,7 +24,8 @@ includes zero, and no verdict is due before the MDE reaches 0.2.
 1. `prereg-line-movement.md` — the question, the estimators, the amendments. Binding.
 2. `line-movement-results.md` — the result, decontaminated, with the target and version B reads.
 3. `combining-predictions.md` — how the model numbers and the book numbers combine into one bet.
-4. `review-2026-09-08-tree-audit.md` — the last full review; §5 is the order of work.
+4. `review-2026-09-08-tree-audit.md` — the last full review, every finding resolved in-file.
+   The plan that follows it: `docs/superpowers/plans/2026-09-08-spread-next-steps.md`.
 5. `prediction-tracker.md` — the dataset: 179 columns, 17,755 games, 2001–2025.
 
 ## Documents
