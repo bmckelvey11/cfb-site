@@ -1235,6 +1235,15 @@
     return Number.isInteger(num) ? String(num) : num.toFixed(1);
   }
 
+  function withinBounds(value, lo, hi) {
+    /* An empty bound input parses to NaN, which means "unbounded on that side" --
+       comparing against it directly would be false and drop every point. */
+    return (
+      (!Number.isFinite(lo) || value >= lo) &&
+      (!Number.isFinite(hi) || value <= hi)
+    );
+  }
+
   function leastSquaresFit(xs, ys) {
     /* Unweighted OLS of ROI on value. Every dot is one value bucket, so a bucket
        holding 4 bets pulls exactly as hard as one holding 400 -- this describes the
@@ -1331,7 +1340,15 @@
     const plotY = (roi) =>
       plotH - 18 - ((roi - minRoi) / roiSpan) * (plotH - 36);
     const zeroY = plotY(0);
-    const fit = leastSquaresFit(values, rois);
+    // Axes stay pinned to the full domain while the fit follows the selected window:
+    // rescaling the plot on every drag would leave nothing fixed to aim the range at.
+    const selected = points.filter((point) =>
+      withinBounds(Number(point.value), state.min, state.max),
+    );
+    const fit = leastSquaresFit(
+      selected.map((point) => Number(point.value)),
+      selected.map((point) => Number(point.roi)),
+    );
 
     // Axis lines
     svg.appendChild(
@@ -1396,11 +1413,13 @@
       );
       // Clipped to the ROI range: the fitted value at an x extreme can sit outside the
       // observed ROI span, and letting it draw there would put the line off the plot.
+      const fitLo = Math.min(...selected.map((point) => Number(point.value)));
+      const fitHi = Math.max(...selected.map((point) => Number(point.value)));
       const ends = clipToRange(
-        minValue,
-        fit.slope * minValue + fit.intercept,
-        maxValue,
-        fit.slope * maxValue + fit.intercept,
+        fitLo,
+        fit.slope * fitLo + fit.intercept,
+        fitHi,
+        fit.slope * fitHi + fit.intercept,
         minRoi,
         maxRoi,
       );
@@ -1414,7 +1433,7 @@
       const label = svgText(
         plotW - 28,
         16,
-        "R² = " + fit.r2.toFixed(3) + "  ·  n = " + points.length,
+        "R² = " + fit.r2.toFixed(3) + "  ·  n = " + selected.length,
         "filter-modal__fit-label",
       );
       label.setAttribute("text-anchor", "end");
@@ -1431,9 +1450,11 @@
       circle.setAttribute("cx", String(x));
       circle.setAttribute("cy", String(y));
       circle.setAttribute("r", "3.5");
+      const inWindow = withinBounds(Number(point.value), state.min, state.max);
       circle.setAttribute(
         "class",
-        Number(point.roi) >= 0 ? "positive" : "negative",
+        (Number(point.roi) >= 0 ? "positive" : "negative") +
+          (inWindow ? "" : " is-muted"),
       );
       const title = document.createElementNS(
         "http://www.w3.org/2000/svg",
@@ -1545,6 +1566,15 @@
     exploreEl.appendChild(wrap);
   }
 
+  function redrawExploreForBounds() {
+    // Mid-edit ("7" on the way to "78") can leave min > max. refreshLive already bails
+    // there; redrawing would empty the window and drop the fit, so hold the last good
+    // one on screen instead.
+    if (boundsAreValid()) {
+      renderNumericExplore();
+    }
+  }
+
   function renderNumericExplore() {
     if (!state || state.kind !== "numeric") {
       return;
@@ -1625,11 +1655,13 @@
       state.min = Number(minRange.value);
       syncBoundInputs("minRange");
       refreshLive();
+      redrawExploreForBounds();
     });
     maxRange.addEventListener("input", () => {
       state.max = Number(maxRange.value);
       syncBoundInputs("maxRange");
       refreshLive();
+      redrawExploreForBounds();
     });
 
     dual.appendChild(track);
@@ -1661,6 +1693,7 @@
       state.min = parsed;
       syncBoundInputs("minNumber");
       refreshLive();
+      redrawExploreForBounds();
     });
     maxNumber.addEventListener("input", () => {
       const parsed =
@@ -1668,6 +1701,7 @@
       state.max = parsed;
       syncBoundInputs("maxNumber");
       refreshLive();
+      redrawExploreForBounds();
     });
     between.appendChild(betweenLabel);
     between.appendChild(minNumber);

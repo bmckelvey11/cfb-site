@@ -14,6 +14,7 @@ const grab = (name) => {
 };
 eval(grab("leastSquaresFit").replace(/^\s*function/, "var leastSquaresFit = function"));
 eval(grab("clipToRange").replace(/^\s*function/, "var clipToRange = function"));
+eval(grab("withinBounds").replace(/^\s*function/, "var withinBounds = function"));
 
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 let fails = 0;
@@ -57,5 +58,25 @@ check("inside range unchanged", near(c.x0, 0) && near(c.y0, 1) && near(c.x1, 2) 
 c = clipToRange(0, -5, 10, 15, 0, 10);
 check("both ends clipped", near(c.y0, 0) && near(c.y1, 10) && near(c.x0, 2.5) && near(c.x1, 7.5));
 
+
+// An empty bound input parses to NaN and must mean "unbounded", not "match nothing".
+check("NaN bounds admit everything",
+  withinBounds(5, NaN, NaN) && withinBounds(-999, NaN, NaN) && withinBounds(0, NaN, 3));
+check("one-sided bounds", withinBounds(5, 4, NaN) && !withinBounds(3, 4, NaN));
+check("bounds are inclusive", withinBounds(4, 4, 8) && withinBounds(8, 4, 8));
+check("outside the window", !withinBounds(3.99, 4, 8) && !withinBounds(8.01, 4, 8));
+
+// Narrowing to a single bucket leaves nothing to fit: no line, no R2.
+const w1 = [[1, 5], [2, 9], [3, 4]].filter(([x]) => withinBounds(x, 2, 2));
+check("single-bucket window -> no fit",
+  w1.length === 1 &&
+  leastSquaresFit(w1.map((r) => r[0]), w1.map((r) => r[1])) === null);
+
+// Refitting on a sub-window gives that window's slope, not the whole domain's.
+const dom = [[1, 0], [2, 0], [3, 0], [4, 6], [5, 12]];
+const sub = dom.filter(([x]) => withinBounds(x, 3, 5));
+check("window refit uses only its own points",
+  near(leastSquaresFit(sub.map((r) => r[0]), sub.map((r) => r[1])).slope, 6) &&
+  !near(leastSquaresFit(dom.map((r) => r[0]), dom.map((r) => r[1])).slope, 6));
 console.log(fails ? "\n" + fails + " FAILED" : "\nall passed");
 process.exit(fails ? 1 : 0);

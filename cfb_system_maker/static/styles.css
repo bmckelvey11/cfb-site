@@ -666,6 +666,12 @@ tbody tr:hover{background:var(--ink-50)}
   fill: var(--error-500);
 }
 
+/* Outside the selected range: kept on the plot for context, faded so the window
+   the filter actually covers reads as the foreground. */
+.filter-modal__chart circle.is-muted {
+  opacity: 0.18;
+}
+
 /* filter_modal.js sets left/width on the fill inline as the thumbs move. */
 .filter-modal__dual-range {
   position: relative;
