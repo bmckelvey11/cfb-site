@@ -24,7 +24,7 @@ wins on what is finished.
 |---|---|---|---|---|
 | S1 | Audit the pull — every file verified, gaps named | everything | **done** | 2026-09-08 |
 | S2 | Settle point-in-time: per-week pulls vs dated snapshots | S3 | **done** — per week | 2026-09-08 |
-| S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | open | — |
+| S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` (~35 by hand) | S5 | open | — |
 | S5 | `_PFF_TABLES` loader entries → `stg` | S6 | open | — |
 | S6 | Backfill 2014–2024, finish 2026 | — | **held** — gated on S3/S5/S7 | — |
@@ -78,7 +78,7 @@ sources; the flattener must skip any leaderboard file without a `_wk` in its nam
 **Done when:** the choice is recorded here with its date, and §6 of the schema doc is
 amended to match. ✅
 
-## S3 — `scripts/pff_flatten.py`
+## S3 — `scripts/pff_flatten.py` ✅ 2026-09-08
 
 Reads `data/raw/pff/`, writes one CSV per target table to `data/processed/pff/`. The split
 unpivot regex and filename regex are given in
@@ -113,7 +113,15 @@ which S2 invalidated.
 
 **Done when:** `data/processed/pff/` holds every table in §3 of the schema doc for 2025,
 a test asserts each of the five above on a fixture, and `audit_pff_pull.py` still reports
-2025 clean afterwards (the flattener must not write into `data/raw/`).
+2025 clean afterwards (the flattener must not write into `data/raw/`). ✅
+
+    python scripts/pff_flatten.py --seasons 2025 --validate
+
+29 weekly sources fold into 21 tables, 1.09 M rows for 2025. `--validate` reads every CSV
+back with the pinned types and inserts the six the sample DDL defines into it, so a
+duplicated split label fails on the primary key and an undeclared direction fails on the
+CHECK. All 21 pass; 25 tests in `tests/test_pff_flatten.py`, one of which round-trips a
+real 2025 value.
 
 ## S4 — `pff_franchise` map
 
@@ -289,3 +297,31 @@ Grounding it in real 2025 columns rather than the §3 prose turned up three thin
 The signature line report was also mis-described from memory: it is franchise-grain (216
 rows, 216 distinct franchises — all-division, per c406dcb) and carries `pbe`, `pass_snaps`
 and `attempts`, not the `grades_pass_block` and `snap_counts_pass_block` first drafted.
+
+### 2026-09-08 — S3 done: the flattener, and a split regex that was wrong twice over
+
+`scripts/pff_flatten.py`. 29 weekly sources → 21 tables, 1.09 M rows for 2025, all of them
+loading back under the pinned types and the six with DDL passing their keys and CHECKs.
+
+The schema doc's §5.1 split regex does not survive contact with the headers, in both
+directions. It **misses** eight split families (`man`, `zone`, `slot`, `true_pass_set`,
+`gap`, `lhs`, `rhs`, and the time-in-pocket pair), and it **false-matches**: applied to
+`facet_passing_summary`, which has no splits at all, it reads `pressure_to_sack_rate` as
+split `pressure` with metric `to_sack_rate`. Splits are an enumerated set per source now,
+matched longest-first, and a declared split that matches no column fails the run.
+
+Two things only the data could have said:
+
+- **An unsplit column is that report's own total, not the `all` row's.** The concept
+  report's `dropbacks` is charted dropbacks and the time-in-pocket report's is timed
+  dropbacks; neither equals `facet_passing_summary`'s. Merging them onto `all` produced
+  10.9 K silent disagreements before they were given their own labels (`concept`,
+  `ttt_all`, `outside`).
+- **The signature outside-pass-rush report is a different population.** Its unprefixed
+  `pressures` equals `lhs + rhs` on 370 of 400 rows, and its `pass_rush_snaps` disagrees
+  with the facet's on 616 — so it is `outside`, not `all`.
+
+`ttt_le_2_5`/`ttt_gt_2_5` in §3 do not exist either; PFF names them `less_*`/`more_*`, kept
+relabelled so the split column says what it means. That is the fifth correction the files
+have made to the prose, which is why the registry declares sources and the columns come
+from the headers.
