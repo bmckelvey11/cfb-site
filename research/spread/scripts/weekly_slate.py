@@ -72,7 +72,12 @@ ALIASES = {"ga tech": "georgia tech", "s carolina": "south carolina", "s florida
            # Prediction Tracker's own abbreviations
            "eastern mich": "eastern michigan", "western mich": "western michigan",
            "central mich": "central michigan", "northern ill": "northern illinois",
-           "miami (ohio)": "miami (oh)", "southern miss": "southern mississippi"}
+           "miami (ohio)": "miami (oh)", "southern miss": "southern mississippi",
+           # road-side gaps: harmless while only the home name had to resolve, but the
+           # both-teams join drops the game outright when the road name does not
+           "e carolina": "east carolina", "w kentucky": "western kentucky",
+           "umass": "massachusetts", "kent": "kent state", "fiu": "florida intl",
+           "sam houston": "sam houston state"}
 
 
 # ------------------------------------------------------------------------------ models
@@ -311,6 +316,13 @@ def _check() -> None:
     assert crosses_key(-2.5, -3.5) and crosses_key(6.5, 7.5) and not crosses_key(-10, -12)
     assert norm("Troy St.") == "troy state" and norm("Troy") == "troy state"
     assert norm("Eastern Mich.") == norm("E. Michigan") == "eastern michigan"
+    # road-side names, which the both-teams join now depends on (PT spelling == AN spelling)
+    assert norm("East Carolina") == norm("E. Carolina")
+    assert norm("Western Kentucky") == norm("W. Kentucky")
+    assert norm("Massachusetts") == norm("UMass")
+    assert norm("Kent") == norm("Kent State")
+    assert norm("Florida Intl.") == norm("FIU")
+    assert norm("Sam Houston St.") == norm("Sam Houston")
     q = {"68": (-7.5, -110), "69": (-7.0, -110), "71": (18.0, -110)}
     s = shop(q)
     assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # Caesars' 18 was guarded out
