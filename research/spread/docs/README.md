@@ -38,6 +38,7 @@ margin forecast is still a candidate against line movement — that is `prereg-l
 | `combining-predictions.md` | review | How E4 / E14 / raw consensus and the book fair combine into one fair spread. |
 | `review-2026-09-02-composite-spread.md` | review | Reviewer pass on the goal; §5 sets the direction. Status marked in-file. |
 | `session-guide-2026-09-02.md` | guide | Full account of the session: what was built, what the numbers say, where it lives. |
+| `review-2026-09-08-tree-audit.md` | review | Full-tree audit. Movement headline is undecontaminated (blocker); version B unpowered at 300 games; collector outage; code and doc hygiene. §5 is the order of work. |
 
 ### Margin era — beat the close as a margin forecast (2026-08-29, closed null)
 
