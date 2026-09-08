@@ -301,15 +301,16 @@ membership — harmless if the reader goes by name, fatal if it goes by position
 
 ## 6. Open decisions
 
-- **Point-in-time.** A facet season file is season-to-date at pull time and a re-pull
-  overwrites it, so the 2026 files are "through week 2" and will silently become "through
-  week 3". For the no-lookahead rule that is a problem: a pre-game feature built from
-  `pff_passing` `week = 0` rows leaks the rest of the season. Two fixes, pick one:
-  (a) pull facets weekly with `--week N` (every facet takes it) so every row is a
-  per-week row like the signature stats and season-to-date is a windowed `SUM`; or
-  (b) keep season pulls but name the file with the pull date and keep every snapshot.
-  (a) is the same shape as the signature data and the cleaner warehouse; it costs 26
-  exports per week, well inside the 20/minute budget.
+- ~~**Point-in-time.**~~ **Settled 2026-09-08: (a), the weekly file is the grain.** A facet
+  season file is season-to-date at pull time and a re-pull overwrites it, so a pre-game
+  feature built from one leaks the rest of the season backwards. Every PFF fact is keyed
+  `(season, week, entity)` and season-to-date is a windowed `SUM` over weeks `< N`, never
+  a stored row. Cheaper than it looked: `pull_pff_modeling.py --player-facets` already
+  pulls week-only, so no puller change is needed, and the union of a season's weekly
+  headers reproduces the season header exactly (`facet-passing-concept` 199,
+  `facet-passing-pressure` 197) — nothing is lost by dropping the season file as a row
+  source. The season files on disk are legacy snapshots kept as a cross-check. Sequencing
+  in [`pff-ingest-plan.md`](pff-ingest-plan.md) S2.
 - **2-bucket tables.** `pff_pass_blocking`, `pff_run_blocking` and `pff_defense_pass_rush`
   could stay wide (`true_pass_set_*`, `gap_*`, `zone_*`) at under 35 columns each. They
   are long above only so that every split in the warehouse reads the same way. Wide is

@@ -21,7 +21,7 @@ wins on what is finished.
 | # | Step | Blocks | State | Date |
 |---|---|---|---|---|
 | S1 | Audit the pull — every file verified, gaps named | everything | **done** | 2026-09-08 |
-| S2 | Settle point-in-time: per-week pulls vs dated snapshots | S3 | open | — |
+| S2 | Settle point-in-time: per-week pulls vs dated snapshots | S3 | **done** — per week | 2026-09-08 |
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | open | — |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` (~35 by hand) | S5 | open | — |
 | S5 | `_PFF_TABLES` loader entries → `stg` | S6 | open | — |
@@ -47,19 +47,34 @@ flattener are carried as S3's acceptance criteria below.
 
 **Done when:** the script exists, is tested, and reports 2025 clean. ✅
 
-## S2 — Settle point-in-time
+## S2 — Point-in-time: per week ✅ 2026-09-08
 
-The one decision that changes the flattener's grain, so it comes first. A facet *season*
-file is season-to-date at pull time and a re-pull overwrites it — build a pre-game feature
-from it and the whole season leaks backwards. Two options, stated in
-[`pff-warehouse-schema.md` §6](pff-warehouse-schema.md): (a) pull per week and treat
-season-to-date as a windowed `SUM`, (b) keep season pulls and date the filename.
+**Decided: (a) the weekly file is the grain.** A facet *season* file is season-to-date at
+pull time and a re-pull overwrites it, so a pre-game feature built from one leaks the rest
+of the season backwards. Every PFF fact is therefore keyed `(season, week, entity)`, and
+season-to-date is a windowed `SUM` over weeks `< N` — never a stored row.
 
-2025 already holds every week 0–20 for every op, so (a) is available today with no
-re-pull. That is the recommendation; it needs a yes before S3 starts.
+Three things checked while recording this, all of which make the decision cheaper than it
+looked:
+
+- **The puller already does it.** `pull_pff_modeling.py --player-facets` pulls per week
+  only; it never asks for a season-level facet. The season files sitting in
+  `data/raw/pff/` are legacy snapshots from the earlier `pull_pff_facet.py` run. No puller
+  change is needed — the change is entirely downstream.
+- **The weekly files reconstruct the season file exactly.** Union of the 21 weekly headers
+  equals the season header, column for column: `facet-passing-concept` 199, and
+  `facet-passing-pressure` 197. Nothing is lost by dropping the season file as a row
+  source.
+- **So the schema source is the union of weeks, not the season file.** That rule also
+  covers the four signature ops, which have no season file at all (their union across 22
+  weekly files is 105 columns). S3 criterion 2 is amended to match.
+
+The legacy season files stay on disk — they are a free cross-check that the union is
+complete, and `audit_pff_pull.py` expects them for the facet ops. They are not row
+sources; the flattener must skip any leaderboard file without a `_wk` in its name.
 
 **Done when:** the choice is recorded here with its date, and §6 of the schema doc is
-amended to match.
+amended to match. ✅
 
 ## S3 — `scripts/pff_flatten.py`
 
@@ -71,10 +86,12 @@ acceptance criteria — a flattener that does not handle all five is not done:
 1. **Glob `.csv` *and* `.json`.** `facet-offense-summary`, `facet-rushing-direction` and
    `facet-passing-detail` exist for 2025 only as JSON (the puller's fallback). A
    `facet_*.csv` glob drops two facets silently.
-2. **Pin the schema to the season-to-date file, union weeks by name.** Weekly column sets
-   are *disjoint*, not nested: passing-concept wk11 and wk18 are both 183 wide and each
-   holds four the other lacks. The union across 2025 is 199 — exactly the season file's
-   width. Never stack positionally; never pin to week 1.
+2. **Schema is the union of that season's weekly headers; union by name.** Weekly column
+   sets are *disjoint*, not nested: passing-concept wk11 and wk18 are both 183 wide and
+   each holds four the other lacks. Never stack positionally, never pin to one week. Per
+   S2 the union is the rule rather than the season file, because the signature ops have no
+   season file; where a season file does exist it is asserted equal to the union as a
+   cross-check (holds for 2025: 199 and 197).
 3. **Load one rushing-direction view, not two.** PFF ignores `team-rushing-direction`'s
    `table` parameter: `_rows.json` and `_totals.json` are byte-identical for all 136
    franchises.
@@ -83,6 +100,9 @@ acceptance criteria — a flattener that does not handle all five is not done:
    Normalize blanks to NULL first, then numerics → `DOUBLE`, ids and years → `VARCHAR`.
    Same failure class as `stg.an_history_tick` (f0c729b).
 5. **Read columns by name.** Order varies between teams on 7 ops with identical membership.
+
+6. **Weekly files only.** Per S2 the grain is `(season, week, entity)`; a leaderboard file
+   with no `_wk` in its name is a legacy season-to-date snapshot and is not a row source.
 
 **Done when:** `data/processed/pff/` holds every table in §3 of the schema doc for 2025,
 a test asserts each of the five above on a fixture, and `audit_pff_pull.py` still reports
@@ -150,3 +170,13 @@ tier, which is where the 136 `team-rushing-direction` duplicates were hiding), a
 leaderboard that only ever landed as JSON was not named. Findings written to
 `pff-warehouse-schema.md` §5b. Commits `f522775` (script) and `c5122a8` (widened checks,
 findings doc).
+
+### 2026-09-08 — S2 done: per-week grain
+
+Signed off on (a). Verified rather than assumed: the union of a season's weekly headers
+equals the season header exactly for both drifting facets (199, 197), the four signature
+ops have no season file at all so the union is the only available schema source, and
+`pull_pff_modeling.py --player-facets` was already pulling week-only — the season files on
+disk are legacy `pull_pff_facet.py` output. Net effect: no puller change, S3's schema rule
+becomes "union of that season's weekly headers" instead of "the season file", and the
+flattener skips any leaderboard file without `_wk` in its name. Schema doc §6 amended.
