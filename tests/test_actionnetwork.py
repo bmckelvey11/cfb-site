@@ -3,6 +3,11 @@ import json
 from cfb_system_maker.actionnetwork_client import actionnetwork_scrape
 
 
+def done(event_id):
+    """A settled game — resume may skip its cached files."""
+    return {"id": event_id, "status": "complete"}
+
+
 def make_fetch(games_by_week, captured=None):
     """Fake Action Network API. Scoreboard returns games for a (season, week);
     history returns a per-book payload keyed by the requested event id."""
@@ -17,7 +22,7 @@ def make_fetch(games_by_week, captured=None):
 
 
 def test_scoreboard_and_history_files(tmp_path):
-    games = {1: [{"id": 100}, {"id": 101}], 2: [{"id": 200}]}
+    games = {1: [done(100), done(101)], 2: [done(200)]}
     reports = actionnetwork_scrape(
         [2025], data_dir=tmp_path, weeks=range(1, 3), delay=0, fetch_fn=make_fetch(games)
     )
@@ -34,7 +39,7 @@ def test_scoreboard_and_history_files(tmp_path):
 
 def test_periods_passed_to_history(tmp_path):
     captured = []
-    games = {1: [{"id": 100}]}
+    games = {1: [done(100)]}
     actionnetwork_scrape(
         [2025], data_dir=tmp_path, weeks=range(1, 2), delay=0,
         periods=("firsthalf", "firstquarter"), fetch_fn=make_fetch(games, captured),
@@ -45,7 +50,7 @@ def test_periods_passed_to_history(tmp_path):
 
 
 def test_empty_week_writes_no_file(tmp_path):
-    games = {1: [{"id": 100}], 2: []}  # week 2 has no games
+    games = {1: [done(100)], 2: []}  # week 2 has no games
     reports = actionnetwork_scrape(
         [2025], data_dir=tmp_path, weeks=range(1, 3), delay=0, fetch_fn=make_fetch(games)
     )
@@ -57,7 +62,7 @@ def test_empty_week_writes_no_file(tmp_path):
 
 
 def test_resume_skips_existing(tmp_path):
-    games = {1: [{"id": 100}]}
+    games = {1: [done(100)]}
     actionnetwork_scrape([2025], data_dir=tmp_path, weeks=range(1, 2), delay=0, fetch_fn=make_fetch(games))
     reports = actionnetwork_scrape([2025], data_dir=tmp_path, weeks=range(1, 2), delay=0, fetch_fn=make_fetch(games))
 
@@ -67,7 +72,7 @@ def test_resume_skips_existing(tmp_path):
 
 
 def test_only_history_reads_ids_from_disk(tmp_path):
-    games = {1: [{"id": 100}, {"id": 101}]}
+    games = {1: [done(100), done(101)]}
     actionnetwork_scrape([2025], data_dir=tmp_path, weeks=range(1, 2), delay=0,
                          only={"scoreboard"}, fetch_fn=make_fetch(games))
     reports = actionnetwork_scrape([2025], data_dir=tmp_path, weeks=range(1, 2), delay=0,
@@ -76,3 +81,23 @@ def test_only_history_reads_ids_from_disk(tmp_path):
     raw = tmp_path / "raw" / "actionnetwork"
     assert (raw / "history_100.json").exists() and (raw / "history_101.json").exists()
     assert {r.name: r for r in reports}["history_2025"].files == 2
+
+
+def test_resume_refetches_week_with_a_scheduled_game(tmp_path):
+    """A snapshot of an unplayed game is stale the moment it lands, so resume
+    must re-pull the week and that game's history rather than skip both."""
+    games = {1: [done(100), {"id": 101, "status": "scheduled"}]}
+    actionnetwork_scrape([2025], data_dir=tmp_path, weeks=range(1, 2), delay=0,
+                         fetch_fn=make_fetch(games))
+    captured = []
+    reports = actionnetwork_scrape([2025], data_dir=tmp_path, weeks=range(1, 2), delay=0,
+                                   fetch_fn=make_fetch(games, captured))
+
+    by = {r.name: r for r in reports}
+    assert by["scoreboard_2025"].skipped == 0 and by["scoreboard_2025"].files == 1
+    # only the scheduled game's history is re-pulled; the completed one stays cached
+    assert by["history_2025"].skipped == 1 and by["history_2025"].files == 1
+    assert [p for url, p in captured if "history" in url] == [
+        {"periods": "firsthalf,firstquarter"}
+    ]
+    assert "/event/101/" in [url for url, _ in captured if "history" in url][0]

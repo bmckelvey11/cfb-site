@@ -9,6 +9,11 @@ Two stages, mirroring the CFBD scrapers' resume-by-file pattern:
 
 Output lands in ``data/raw/actionnetwork/`` (kept separate from CFBD ``data/raw/``
 because the row shapes differ). ``fetch_fn`` is injectable so tests run network-free.
+
+Resume is status-aware, not file-existence-aware: a cached week is only skipped once
+every game in it has reached a terminal status (``_TERMINAL_STATUSES``). Both payloads
+are live snapshots, so a plain file check would freeze pre-game prices in the warehouse
+for the whole season. ``--force`` still re-scrapes everything.
 """
 
 from __future__ import annotations
@@ -35,6 +40,15 @@ HISTORY_URL = "https://api.actionnetwork.com/web/v2/markets/event/{event_id}/his
 # this module writes. See research/spread/docs/prediction-tracker-model-eval.md section 8.
 DEFAULT_PERIODS: tuple[str, ...] = ("firsthalf", "firstquarter")
 FULL_GAME_PERIOD = "event"
+
+# Resume is only safe once a week can no longer change. Both payloads are live
+# SNAPSHOTS -- the scoreboard's embedded markets and the history file's top-level
+# prices -- so skipping a week that still holds a scheduled game freezes pre-game
+# prices in the warehouse and leaves the game's status at "scheduled" after it has
+# been played. Terminal statuses are re-read from disk; everything else re-fetches.
+# ponytail: "postponed" counts as terminal so back-season runs stay quiet. A
+# postponed game that gets rescheduled needs --force to pick the new date up.
+_TERMINAL_STATUSES = frozenset({"complete", "cancelled", "postponed"})
 
 # Cloudflare 403s urllib's default User-Agent; a browser UA is required.
 _USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -69,16 +83,19 @@ def actionnetwork_scrape(
     reports: list[AnReport] = []
     for season in seasons:
         event_ids: list[int] = []
+        stale_ids: list[int] = []
         if only is None or "scoreboard" in only:
-            report, event_ids = _scrape_scoreboard(
+            report, event_ids, stale_ids = _scrape_scoreboard(
                 fetch, season, season_type, weeks, data_dir, delay, resume
             )
             reports.append(report)
         else:
-            event_ids = _event_ids_from_disk(data_dir, season)
+            event_ids, stale_ids = _event_ids_from_disk(data_dir, season)
         if only is None or "history" in only:
             reports.append(
-                _scrape_history(fetch, season, event_ids, periods, data_dir, delay, resume)
+                _scrape_history(
+                    fetch, season, event_ids, set(stale_ids), periods, data_dir, delay, resume
+                )
             )
     return reports
 
@@ -91,19 +108,22 @@ def _scrape_scoreboard(
     data_dir: str | Path,
     delay: float,
     resume: bool,
-) -> tuple[AnReport, list[int]]:
+) -> tuple[AnReport, list[int], list[int]]:
     files = 0
     skipped = 0
     games = 0
     errors = 0
     last_error: str | None = None
     event_ids: list[int] = []
+    stale_ids: list[int] = []
     for week in weeks:
         filename = f"scoreboard_{season}_wk{week}.json"
         if resume and _exists(data_dir, filename):
-            skipped += 1
-            event_ids.extend(_event_ids(_read(data_dir, filename)))
-            continue
+            cached = _read(data_dir, filename)
+            if not _unsettled_ids(cached):
+                skipped += 1
+                event_ids.extend(_event_ids(cached))
+                continue
         try:  # one failing week must not abort the rest of the season
             payload = _call(fetch, SCOREBOARD_URL, {"season": season, "week": week, "seasonType": season_type}, delay)
         except Exception as exc:
@@ -117,13 +137,16 @@ def _scrape_scoreboard(
         files += 1
         games += len(week_games)
         event_ids.extend(_event_ids(payload))
-    return AnReport(f"scoreboard_{season}", files, games, skipped, errors, last_error), event_ids
+        stale_ids.extend(_unsettled_ids(payload))
+    report = AnReport(f"scoreboard_{season}", files, games, skipped, errors, last_error)
+    return report, event_ids, stale_ids
 
 
 def _scrape_history(
     fetch: Fetcher,
     season: int,
     event_ids: list[int],
+    stale_ids: set[int],
     periods: tuple[str, ...],
     data_dir: str | Path,
     delay: float,
@@ -136,7 +159,7 @@ def _scrape_history(
     period_param = ",".join(periods)
     for event_id in event_ids:
         filename = f"history_{event_id}.json"
-        if resume and _exists(data_dir, filename):
+        if resume and event_id not in stale_ids and _exists(data_dir, filename):
             skipped += 1
             continue
         try:  # one failing event must not abort the rest
@@ -155,13 +178,25 @@ def _event_ids(payload: dict[str, Any]) -> list[int]:
     return [int(g["id"]) for g in payload.get("games", []) if g.get("id") is not None]
 
 
-def _event_ids_from_disk(data_dir: str | Path, season: int) -> list[int]:
-    """Collect event ids from already-scraped scoreboard files (history-only runs)."""
+def _unsettled_ids(payload: dict[str, Any]) -> list[int]:
+    """Event ids whose game has not reached a terminal status (missing = unsettled)."""
+    return [
+        int(g["id"])
+        for g in payload.get("games", [])
+        if g.get("id") is not None and g.get("status") not in _TERMINAL_STATUSES
+    ]
+
+
+def _event_ids_from_disk(data_dir: str | Path, season: int) -> tuple[list[int], list[int]]:
+    """Event ids + unsettled ids from already-scraped scoreboards (history-only runs)."""
     folder = Path(data_dir) / "raw" / "actionnetwork"
     ids: list[int] = []
+    stale: list[int] = []
     for path in sorted(folder.glob(f"scoreboard_{season}_wk*.json")):
-        ids.extend(_event_ids(json.loads(path.read_text(encoding="utf-8"))))
-    return ids
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        ids.extend(_event_ids(payload))
+        stale.extend(_unsettled_ids(payload))
+    return ids, stale
 
 
 def _call(fetch: Fetcher, url: str, params: dict[str, Any], delay: float) -> dict[str, Any]:
