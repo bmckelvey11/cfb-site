@@ -112,9 +112,13 @@ Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 - **Staging IDs:** primary `id` columns take the foreign-key name they join on (`gameId`,
   `playId`, `driveId`, `teamId`, `athleteId`, `conferenceId`, `venueId`, etc.). Explode and
   `--rename-ids` reapply this.
-- **Action Network staging:** `stg.actionnetwork_history` is one offering per event, book,
-  period, market, and side; `stg.actionnetwork_scoreboard` is one row per game. Generic
-  explode is wrong for both. Use history for 1H/1Q prices and scoreboard for matchups/scores.
+- **Action Network staging:** all `an_*`. `stg.an_history` (1H/1Q) and `stg.an_market`
+  (full game, from the scoreboard's `markets`) are the same 19-column grain — one offering per
+  event, book, period, market and side. `stg.an_scoreboard` is one row per game and carries
+  the score, status and matchup those two join back to on `event_id`. `stg.an_team` and
+  `stg.an_linescore` are its other children. Generic explode is wrong for all of them: it
+  repeats the walked path on every column and carries down 36 parent scalars, so each is
+  hand-written. Nothing under `an_scoreboard` goes through `explode_stg_lists`.
 - **New statistics:** tempo and similar values belong in `FEATURE_REGISTRY`, not new
   `games.csv` columns or tables. Compute from `stg.drives` or `stg.plays`.
 - **Spread sign convention:** `GameRecord.spread` is always the **home** spread. `_side_spread` negates it for away. A bet covers when `team_points + side_spread - opponent_points > 0`. Preserve this when touching grading.

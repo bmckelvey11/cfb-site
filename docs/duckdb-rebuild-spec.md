@@ -90,8 +90,9 @@ denylist, and writes one DuckDB file:
 | Source | Schema | Notes |
 |---|---|---|
 | `data/raw/*.json` | `raw` | REST dumps from `scrapers.py`. One table per stem (season/week suffix stripped — see `## Schema`). |
-| `data/raw/actionnetwork_odds.csv` | `raw.actionnetwork_odds` | The one CSV source; loaded via `read_csv_auto`, not the JSON path. |
-| `data/raw/actionnetwork/scoreboard_*.json`, `history_*.json` | `raw.actionnetwork_scoreboard`, `raw.actionnetwork_history` | Object-rooted JSON (`format='unstructured'`), off by default toggle is `--skip-actionnetwork` to exclude them. |
+| `data/raw/actionnetwork_odds.csv` | `raw.an_odds` | A CSV source; loaded via `read_csv_auto`, not the JSON path. |
+| `data/raw/actionnetwork/scoreboard_*.json`, `history_*.json` | `raw.an_scoreboard`, `raw.an_history` | Object-rooted JSON (`format='unstructured'`), off by default toggle is `--skip-actionnetwork` to exclude them. |
+| `data/processed/massey/*.csv` | `stg.massey_*` | Written by `scripts/massey_flatten.py`, already flat and CFBD-mapped, so they load straight to `stg`. Their source (`data/ingest/massey/`) is deliberately outside the glob. |
 | `data/graphql/*.json` | `graphql` | GraphQL table dumps from `graphql_client.py`. Same stem-parsing as `raw`. |
 
 **Skipped stems** (`_SKIP_STEMS` in `duckdb_load.py`, plus anything starting with `_`):

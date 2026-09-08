@@ -1118,7 +1118,13 @@ def test_massey_csvs_load_into_stg_with_a_real_date(tmp_path):
         "2024-11-02,2024,55,Air Force,PAC,88\n",
         encoding="utf-8",
     )
-    db_path, reports = build_duckdb(tmp_path, include_actionnetwork=False)
+    # explode=True on purpose: massey_* are the first stg tables that never came
+    # from a raw payload, so promote_timestamp_columns / explode_stg_lists /
+    # drop_dead_spine_columns meet a shape they have not seen before. massey_teams
+    # has no season/week at all, and date is already DATE.
+    db_path, reports = build_duckdb(
+        tmp_path, include_actionnetwork=False, explode=True
+    )
     by_name = {r.name: r for r in reports}
     assert by_name["massey_ranks"].error is None
     assert by_name["massey_ranks"].schema == "stg"
@@ -1134,3 +1140,18 @@ def test_massey_csvs_load_into_stg_with_a_real_date(tmp_path):
         datetime.date(1996, 9, 16),
         datetime.date(2024, 11, 2),
     )
+    assert set(types) == {"date", "season", "massey_id", "cfbd_team", "system", "rank"}
+    assert con.execute("SELECT count(*) FROM stg.massey_ranks").fetchone()[0] == 2
+    assert {row[0] for row in con.execute("DESCRIBE stg.massey_teams").fetchall()} == {
+        "massey_id",
+        "massey_team",
+        "cfbd_team",
+    }
+    # No child tables invented from a table that has no nested column.
+    assert not [
+        row[0]
+        for row in con.execute(
+            "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
+        ).fetchall()
+        if row[0].startswith("massey_") and "__" in row[0]
+    ]
