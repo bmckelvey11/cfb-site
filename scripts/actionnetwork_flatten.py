@@ -48,6 +48,11 @@ COLUMNS = [
 
 _EVENT_ID_RE = re.compile(r"history_(?:event_)?(\d+)")
 
+# Action Network's bet-type 6 is the per-team total ("will this team score over
+# N"), not the game total. `duckdb_load._AN_OFFERING_COLS` renames it the same way,
+# so stg.an_history / stg.an_market and this CSV share one market vocabulary.
+_MARKET_TYPE = {"core_bet_type_6_team_score": "team_total"}
+
 
 def _event_id(offer: dict, path: Path) -> int | None:
     """Offer's own id, else the one in the filename."""
@@ -76,7 +81,9 @@ def ticks(path: Path) -> tuple[list[dict], int]:
                         "event_id": _event_id(offer, path),
                         "book_id": offer.get("book_id"),
                         "period": offer.get("period") or period,
-                        "market_type": offer.get("type") or market,
+                        "market_type": _MARKET_TYPE.get(
+                            offer.get("type") or market, offer.get("type") or market
+                        ),
                         "side": offer.get("side"),
                         "team_id": offer.get("team_id"),
                         "market_id": offer.get("market_id"),
