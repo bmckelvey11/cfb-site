@@ -285,8 +285,10 @@ the interval is optimistic.
 | E6 | +0.43 | [+0.17, +0.70] | 1.07 | 0.36 |
 | model median | +0.18 | [−0.03, +0.39] | 1.16 | 0.29 |
 
-sd(close − Monday) = 0.81, mean +0.25. E4's side at |x| ≥ 1: 20 bets, CLV +0.47, beat the close
-on 55%; no scores yet. The dispersion of E4 against Monday's line (1.17) is far larger than the
+sd(close − Monday) = 0.81, mean +0.25. E4's side at |x| ≥ 1: 20 bets, CLV +0.47 [+0.09, +0.86],
+beat the close on 55%; graded 2026-09-08 once `core.fact_game` carried the scores: **11–9 ATS
+at Monday's number (55.0% [31, 79])**, an interval that says nothing yet. The dispersion of E4
+against Monday's line (1.17) is far larger than the
 0.45 assumed in amendment B1, so the n at which the MDE reaches 0.2 is about **80–140 games
 before week clustering**, not a thousand. Reported here because B1 says every read is reported;
 the verdict waits for that n.

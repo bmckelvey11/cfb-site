@@ -94,7 +94,7 @@ git commit -m "docs(spread): record the AN backfill after the collector outage"
 
 ---
 
-### Task 2: Version B reads scores from `core.fact_game`
+### Task 2: Version B reads scores from `core.fact_game` — **done 2026-09-08** (42 of 42 week-2 games scored; 11–9 ATS on the 20 |x| ≥ 1 bets)
 
 `stg_gql.game` is refreshed only by the GraphQL pull and is stale for 2026; `core.fact_game`
 is rebuilt by `CFB-CFBD-Daily` and carries 454 scored week-1 (CFBD numbering) games. PT's
