@@ -6,17 +6,21 @@
     python scripts/pull_pff_modeling.py --seasons 2025 --dry-run
 
 Four cheap reads give a complete team-game history without touching the export
-budget:
+budget, and none of them loops over teams:
 
     ref-leagues      seasons and week ids (postseason weeks are 17-20, not 15-18)
     team-directory   every franchise with its group ids; group 11 is FBS
     ref-games        one call per (season, week): game_id, home/away, score, kickoff
-    team-summary     one call per (season, franchise): PFF's 14 team grades per game
+    team-overview    one call per (season, week) with --week: PFF's 14 team grades
+                     for every team that played that week, all divisions
+
+That is 42 reads a season. (`team-summary` gives the same grades one franchise at a
+time -- 138 reads a season and only the teams you list -- so it is not used.)
 
 Everything lands as JSON under data/raw/pff/team/ (outside the warehouse glob, which
 is not recursive), then `team_game.csv` is rebuilt under data/processed/pff/: one row
 per (game_id, franchise_id) with that team's grades, the opponent's grades from the
-same game, home/away, points, and kickoff. A game's grades are a *result* of that
+same game, home/away, points, kickoff, and whether each side is FBS. A game's grades are a *result* of that
 game -- a pre-game feature has to roll them from earlier weeks. That is the model's
 job; this script only lands the facts.
 
@@ -102,33 +106,36 @@ def fbs_franchises(directory: dict) -> list[int]:
     return sorted(r["franchiseId"] for r in directory["rows"] if FBS_GROUP_ID in r["groupIds"].split(";"))
 
 
-def flatten_team_games(team_dir: Path, seasons: list[int]) -> list[dict]:
-    """One row per (game, franchise): own grades, opponent grades, points, kickoff."""
-    games = {}
-    for path in team_dir.glob("games_*_wk*.json"):
-        for g in json.loads(path.read_text(encoding="utf-8"))["games"]:
-            games[g["id"]] = g
-    by_game: dict[int, dict[int, dict]] = {}
-    for season in seasons:
-        for path in team_dir.glob(f"team_summary_{season}_*.json"):
-            for row in json.loads(path.read_text(encoding="utf-8"))["team_summary"]:
-                by_game.setdefault(row["game_id"], {})[row["franchise_id"]] = row
+def flatten_team_games(team_dir: Path, seasons: list[int], fbs: set[int] = frozenset()) -> list[dict]:
+    """One row per (game, franchise): own grades, opponent grades, points, kickoff.
+
+    A week's overview row has no game id, so it is matched to that week's games by
+    franchise -- sound because a team plays at most one game per PFF week id.
+    """
     rows = []
-    for game_id, sides in sorted(by_game.items()):
-        g = games.get(game_id, {})
-        for fid, own in sides.items():
-            opp = sides.get(own.get("opponent_franchise_id"), {})
-            rows.append({
-                "season": g.get("season"), "week": own.get("week"), "game_id": game_id,
-                "start": g.get("start"), "lock_status": own.get("lock_status"),
-                "franchise_id": fid, "home": int(bool(own.get("home"))),
-                "opponent_franchise_id": own.get("opponent_franchise_id"),
-                "points_scored": own.get("points_scored"), "points_allowed": own.get("points_allowed"),
-                # ponytail: both sides' grades on one row so a model never joins
-                "opp_in_pull": int(bool(opp)),
-                **{c: own.get(c) for c in GRADE_COLS},
-                **{f"opp_{c}": opp.get(c) for c in GRADE_COLS},
-            })
+    for season in seasons:
+        for path in sorted(team_dir.glob(f"team_overview_{season}_wk*.json")):
+            week = int(path.stem.rsplit("wk", 1)[1])
+            games_path = team_dir / f"games_{season}_wk{week}.json"
+            if not games_path.exists():
+                continue
+            grades = {r["franchise_id"]: r
+                      for r in json.loads(path.read_text(encoding="utf-8"))["team_overview"]}
+            for g in json.loads(games_path.read_text(encoding="utf-8"))["games"]:
+                for side, opp_side in (("home", "away"), ("away", "home")):
+                    fid, opp_fid = g[f"{side}_franchise_id"], g[f"{opp_side}_franchise_id"]
+                    own, opp = grades.get(fid, {}), grades.get(opp_fid, {})
+                    rows.append({
+                        "season": season, "week": week, "game_id": g["id"], "start": g.get("start"),
+                        "lock_status": g.get("lock_status"), "franchise_id": fid, "home": int(side == "home"),
+                        "fbs": int(fid in fbs), "opponent_franchise_id": opp_fid, "opp_fbs": int(opp_fid in fbs),
+                        "points_scored": (g.get("score") or {}).get(f"{side}_team"),
+                        "points_allowed": (g.get("score") or {}).get(f"{opp_side}_team"),
+                        # ponytail: both sides' grades on one row so a model never joins
+                        "graded": int(bool(own)),
+                        **{c: own.get(c) for c in GRADE_COLS},
+                        **{f"opp_{c}": opp.get(c) for c in GRADE_COLS},
+                    })
     return rows
 
 
@@ -136,7 +143,6 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seasons", default=str(current_season()),
                     help="e.g. 2025, 2014-2026, 2019,2021-2023 (default: current season)")
-    ap.add_argument("--franchises", help="comma-separated franchise ids (default: every FBS team)")
     ap.add_argument("--player-facets", action="store_true",
                     help="also export every weekly facet/signature leaderboard (slow: ~2 min/week)")
     ap.add_argument("--force", action="store_true", help="re-pull files that already exist")
@@ -177,21 +183,18 @@ def main() -> None:
         print("dry run needs leagues.json and team_directory.json on disk once; run without --dry-run first")
         return
     weeks = ncaa_weeks(json.loads(leagues_path.read_text(encoding="utf-8")))
-    franchises = ([int(x) for x in args.franchises.split(",")] if args.franchises
-                  else fbs_franchises(json.loads(directory_path.read_text(encoding="utf-8"))))
-    print(f"{len(seasons)} seasons x {len(weeks)} weeks, {len(franchises)} franchises")
+    fbs = set(fbs_franchises(json.loads(directory_path.read_text(encoding="utf-8"))))
+    print(f"{len(seasons)} seasons x {len(weeks)} weeks, {len(fbs)} FBS franchises")
 
-    # 2. games per week, team grades per franchise-season, one overview per season
+    # 2. per (season, week): the games played, and every team's grades for that week
     failures = 0
     for season in seasons:
         for week in weeks:
             failures += not pull(f"games {season} wk{week}", ["games", "ncaa", str(season), str(week)],
                                  team_dir / f"games_{season}_wk{week}.json", season)
-        for fid in franchises:
-            failures += not pull(f"team-summary {season} {fid}", ["team-summary", "ncaa", str(season), str(fid)],
-                                 team_dir / f"team_summary_{season}_{fid}.json", season)
-        failures += not pull(f"team-overview {season}", ["team-overview", "ncaa", str(season)],
-                             team_dir / f"team_overview_{season}.json", season)
+            failures += not pull(f"team-overview {season} wk{week}",
+                                 ["team-overview", "ncaa", str(season), "--week", str(week)],
+                                 team_dir / f"team_overview_{season}_wk{week}.json", season)
 
     # 3. optional: the weekly player leaderboards, through the facet puller
     if args.player_facets:
@@ -213,7 +216,7 @@ def main() -> None:
 
     # 4. flatten to the modeling table
     if not args.dry_run:
-        rows = flatten_team_games(team_dir, seasons)
+        rows = flatten_team_games(team_dir, seasons, fbs)
         out = DATA_ROOT / "processed" / "pff" / "team_game.csv"
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("w", newline="", encoding="utf-8") as fh:
