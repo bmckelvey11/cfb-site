@@ -328,11 +328,32 @@ rule, anything reproducible gets a script, not a one-off command in shell histor
 
 ## Rate limits
 
-**100 reads and 20 exports per minute, per account** — shared across every credential the account
-holds, so a CI key and your laptop draw on the same budget. `whoami` and `logout` are never counted.
+**Measured 2026-09-08 against this account** — the OpenAPI document deliberately refuses to name the
+numbers ("so many reads a minute, so many exports a minute"), so read them off the headers rather
+than trusting any doc, this one included.
 
-Every counted response carries `x-ratelimit-limit`, `x-ratelimit-remaining` and
-`x-ratelimit-reset`; going over answers `429` with `Retry-After`.
+| Budget | Limit | Spent by |
+| --- | --- | --- |
+| read (`scope: api`) | **100 / minute** | every operation, including a refused one |
+| export (`scope: export`) | **20 / minute** | `--export true` on `/v1`, `--format csv` on `/v2` |
+
+Both are **per account**, shared across every credential it holds — a CI key and your laptop draw
+on the same budget. `whoami` is genuinely free: it comes back with no `x-ratelimit-*` headers at all.
+
+The window is **fixed, aligned to the wall-clock minute** — `x-ratelimit-reset` is always an epoch
+second divisible by 60, and both budgets reset on the same tick. So a burst straddling a boundary
+gets 40 exports in a few seconds, and a run that starts at `:59` stalls almost immediately.
+
+An export **spends its quota whether or not it succeeds**, and restish retries twice by default —
+so one failing export can burn three credits. `--rsh-retry 0` (or `RSH_RETRY=0`) turns that off when
+you would rather see the failure than pay for it three times.
+
+Over budget is `429` with `error.code: rate_limited`, `error.details.scope` naming which budget, and
+a `Retry-After`. A `429` with `error.details.upstream_status: 429` is a different thing — PFF's own
+data source metering you, not this API.
+
+Every counted response carries `x-ratelimit-limit`, `x-ratelimit-remaining` and `x-ratelimit-reset`
+(epoch seconds), so a client can slow down before it is told to.
 
 ```powershell
 restish pff passing --league ncaa --season 2025 --rsh-headers | Select-String -Pattern ratelimit
@@ -422,7 +443,7 @@ argument/flag description were read off this machine (`restish doctor`, `restish
 returns `nfl`, `ncaa`, `aaf`, `ufl` — exactly the four PFF documents.
 
 Still **unverified**, transcribed from developer.pff.com: the failure-side `entitlement_reason`
-values (`subscription_required`, `trial`, `unlinked_account`), the 100-read/20-export budget, the
+values (`subscription_required`, `trial`, `unlinked_account`), the
 error `details.reason` table, and the ~60s key-revocation cache. One contradiction found already —
 PFF says API keys start with `ak_live_` and the working key here does not — so treat the rest as
 claims, not facts.
