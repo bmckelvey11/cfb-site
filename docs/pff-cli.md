@@ -116,6 +116,12 @@ account). Worth knowing before installing this on a second box.
 
 No browser (SSH, headless): add `--rsh-no-browser` and paste the code from another device.
 
+**The browser flow needs a real terminal.** Restish checks whether stdout is a TTY and refuses
+otherwise — from an agent shell, a script or CI you get
+`has no cached access token; rerun from an interactive terminal to complete OAuth authorization`
+before any request is sent. `--rsh-no-browser` doesn't help; it still wants to read a pasted code
+from stdin. Sign in once from a real terminal, or use an API-key profile.
+
 **API key (scripts, CI, notebooks, curl).** Create at <https://www.pff.com/account/api-keys>.
 Shown once, starts with `ak_live_`. Put it in the environment — never on a command line, never in
 this repo:
@@ -355,7 +361,7 @@ first real call.
 | Restish 2.3.0 downloaded, checksum verified, extracted | done (2026-09-08) |
 | `restish api connect pff` — 70 operations discovered | done (2026-09-08) |
 | `restish.exe` on PATH | done (2026-09-08) — user PATH, old value backed up |
-| Browser sign-in / PFF Pro entitlement confirmed | **not done** — needs a PFF Pro account; run `restish pff whoami` |
+| Browser sign-in / PFF Pro entitlement confirmed | **not done** — run `restish pff whoami` from an interactive terminal (an agent shell is refused, see above) |
 | Any data pulled | not started |
 
 Nothing past `--help` has been exercised, because every data command requires a signed-in PFF Pro
