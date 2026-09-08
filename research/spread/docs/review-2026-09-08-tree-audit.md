@@ -13,12 +13,14 @@ saved outputs and the code.
 |---|---|---|
 | Margin era (`archive/spread-margin-era/prediction-tracker-findings.md`) | **sound** | Tight null, defects recorded, corrections applied. Cite freely. |
 | Line shopping (`line-shopping-results.md`) | **sound with caveats** | The caveats are already in the file (snapshot = close unverified, juice unpriced). |
-| Movement era (`line-movement-results.md`) | **do not cite as "the panel leads the market"** | The headline is the one estimator already shown to be 73% market proxying, and no decontamination has been run on this target. Cite as an *undecontaminated upper bound at an unreachable price* until §1.1 is done. |
-| Version B (forward test) | **not yet an analysis** | No grading script exists, and the registered 300-game read cannot deliver the decision the prereg assigns to it (§1.3). |
+| Movement era (`line-movement-results.md`) | **sound with caveats** (resolved 2026-09-08) | Decontaminated (amendment A3): E4 keeps 90% of its R², the ridge falls to E4's level. Cite the decontaminated E4 as an upper bound at the opener; PT's `line` is 0.7 pts short of the true close. |
+| Version B (forward test) | **grader in place** (2026-09-08) | `eval_version_b.py` written before in-season closes; amendment B1 replaces the 300-game rule with an MDE gate. First read: slope 0.20 on 42 games, no verdict. |
 
 ## 1. Theory
 
-### [BLOCKER] The movement headline has not been decontaminated
+### [BLOCKER → resolved 2026-09-08] The movement headline has not been decontaminated
+
+> **Resolution.** Amendment A3 run: E4 R² 0.170 → 0.153 (90%), γ 0.29, CLV unchanged; E6 0.248 → 0.163; E14 0.136 → 0.107. `line-movement-results.md` § A3. Summary sentences rewritten.
 
 - **What.** `line-movement-results.md` leads with E6 ridge: R² 0.248, +2.33 pts CLV, 57.8% ATS
   at the opener; E4 γ = 0.30. `CLAUDE.md` and `README.md` restate this as "the panel works" /
@@ -58,7 +60,9 @@ saved outputs and the code.
   sentences (`CLAUDE.md`, `README.md` "current position", `line-movement-results.md` "one-line
   result") to say *upper bound, undecontaminated*.
 
-### [CAVEAT] Version B cannot answer its own stopping rule at 300 games
+### [CAVEAT → resolved 2026-09-08] Version B cannot answer its own stopping rule at 300 games
+
+> **Resolution.** Amendment B1: no verdict before the MDE reaches 0.2; the grader prints the MDE and the n it needs. First read shows sd(x) = 1.17, so that n is ~80–140 before clustering, not 1,000.
 
 - **What.** `prereg-line-movement.md` B4: first read at ~300 graded games; close the tree if the
   slope is under 0.1 *with a CI excluding 0.2*.
@@ -73,7 +77,9 @@ saved outputs and the code.
   observed σ_resid and σ_x, and amend B4 to a rule the data can decide: either a wider closing
   threshold, or a season-end read with the CI reported and no verdict at 300.
 
-### [CAVEAT] Version B has no grading script, and the log is not yet gradable
+### [CAVEAT → resolved 2026-09-08] Version B has no grading script, and the log is not yet gradable
+
+> **Resolution.** `eval_version_b.py` (anchor rule, AN book-15 close, CFBD scores, cluster/HC1 SE). `weekly_slate.py` no longer logs a stale slate.
 
 - `movement_forward_log.csv` holds 43 games × 7 snapshots, no close, no result, no
   season-week key. Nothing in `scripts/` joins it to Action Network closes or to scores. The
@@ -84,7 +90,9 @@ saved outputs and the code.
   book 15), the slope estimator and its season-week cluster SE, and the CLV/ATS tables of B5.
   Designing the join after seeing the numbers is the defect-8 pattern.
 
-### [CAVEAT] PT's `line` is taken as the close on assumption
+### [CAVEAT → measured 2026-09-08] PT's `line` is taken as the close on assumption
+
+> **Resolution.** `check_pt_line_is_close.py`: 1,219 matched games, mean |Δ| 0.69, exact 31%, within 0.5 on 67%. It is a late line, not the close; recorded in `line-movement-results.md` § target.
 
 - `prediction-tracker.md` calls `line` "the market spread"; every movement number treats it as
   the close. For a season file PT froze months later that is plausible, not shown.
@@ -94,7 +102,9 @@ saved outputs and the code.
 - Resolves with: join 2024–25 PT `line` to the AN scoreboard close (book 15) on matched games;
   report mean |Δ| and share within 0.5. Twenty lines.
 
-### [CAVEAT] The CLV → break-even conversion reuses one in-sample constant
+### [CAVEAT → fixed 2026-09-08] The CLV → break-even conversion reuses one in-sample constant
+
+> **Resolution.** The "3–5× the bar" paragraph is replaced; ATS at the opener is the stated measurement.
 
 - "3.2 win-rate points per point of spread" comes from line-shopping P2 (2024–25, 3,574 sides,
   dominated by 3/7 crossings on small spreads). `line-movement-results.md` turns it into "break-
@@ -118,7 +128,9 @@ saved outputs and the code.
   not building it for spreads. Either fit it once or move it to `archive/` so the "not yet run"
   row stops looking like a queue.
 
-## 2. Operations — the collector has been failing since Thursday
+## 2. Operations — the collector has been failing since Thursday (fixed 2026-09-08)
+
+> **Resolution.** All three CFB tasks now allow battery starts, are not stopped on battery, and catch up missed starts; a forced run returned 0. Wrapper exits 3 without `CFB_DATA_ROOT`. Runbook updated.
 
 - `CFB-PT-Snapshot`, `CFB-AN-History`, `CFB-CFBD-Daily` all show last result
   **0x800710E0 (request refused)** at 01:04 on 09-08. The task is `Interactive` logon with
@@ -134,7 +146,7 @@ saved outputs and the code.
   instead of writing into a ghost path. `diag_weight_concentration.py:46` carries the same stale
   hardcoded fallback.
 
-## 3. Code
+## 3. Code (addressed 2026-09-08: tests added, `MARKET_LINES`/`SNAP_DIR` single-sourced, stale-slate guard, `compare_lines.py` moved to `models/totals/`)
 
 Live path: `collect_line_timing.py snapshot` → `predict_upcoming.py` + `weekly_slate.py`, both
 importing the estimator core from `eval_prediction_tracker_models.py` / `eval_combination_sweep.py`.
@@ -161,7 +173,7 @@ No lookahead found in the live path; `lineca` / `linemidweek` are excluded every
 - **`compare_lines.py`** is a totals script (imports `models.totals.*`, grades `ou_open` vs
   `total`). It belongs in `models/totals/` and the README row describing it is wrong.
 
-## 4. Organisation
+## 4. Organisation (addressed 2026-09-08: margin era archived, README and CLAUDE.md rewritten, session guide bannered, paths fixed)
 
 - `README.md` is the tree's best asset: complete index, era tags, script → doc → output map.
   Keep it as the single entry point.
@@ -182,7 +194,7 @@ No lookahead found in the live path; `lineca` / `linemidweek` are excluded every
 - Leftovers: `processed/weekly_slate_2026w2.csv` (hand-named, superseded by the stamped files);
   `pt_model_season_stability.csv` (orphan, already flagged in README).
 
-## 5. Order of work
+## 5. Order of work — all done 2026-09-08
 
 1. Decontaminated rerun of `eval_line_movement.py` (§1.1). Ten minutes; decides how the tree
    describes itself.

@@ -11,11 +11,14 @@ walk-forward support 14,068 games, 2006–2025. sd(close − open) = 2.48 points
 
 ## The one-line result
 
-**The panel predicts where the line goes.** Against the game margin it predicted nothing;
-against the close every estimator is significant, gamma is stable, and the direction is right
-seven times in ten. Betting the panel's side at the opener earns 1.3 to 3.9 points of closing
-line value depending on how much movement is predicted. **The opener is the only price at which
-that is true**, and week 1 of 2026 showed the opener is months gone by Monday.
+**The screened consensus anticipates about 15% of the open→close move, and that survives
+removing the most market-anchored columns** (amendment A3, below): E4 keeps 90% of its R²
+(0.170 → 0.153), γ stays at 0.29, direction is right seven times in ten, and a bet on its side
+at the opener earns 1.2 to 3.8 points of closing line value. The ridge's extra (R² 0.248) was
+the mid-week line read back: decontaminated it falls to E4's level (0.163). **The opener is
+the only price at which any of this is measured**, the archive's "close" is PT's last recorded
+line (0.7 points from the consensus close on average, § target), and week 1 of 2026 showed the
+opener is months gone by Monday. Whether anything is left at Monday's price is version B.
 
 ## A1 — how much of the move is predictable
 
@@ -63,10 +66,11 @@ threshold. CLV = points the close moved in the bet's favour.
 | E4, pred move ≥ 2 | 356 | **+3.89** | [+2.10, +5.76] | 75.8% | 18.0% | 64.4% [54.6, 74.3] |
 | E6, pred move ≥ 2 | 1,567 | **+2.33** | [+1.77, +2.94] | 77.0% | — | **57.8% [54.7, 60.6]** |
 
-Scale: this feed's line-shopping study put one point of spread at ~3.2 win-rate points, and
-break-even at −110 needs ~2.4. A rule that averages 2.3 to 3.9 points of CLV is far past the
-bar **if the opener is the price you get.** The ATS column confirms the CLV cashes: 57.8% on
-1,567 bets is +10% ROI at −110.
+Scale: the ATS-at-the-opener column is the measurement that matters; the CLV points are the
+mechanism. (The line-shopping study's 3.2 win-rate points per point is an average dominated by
+3/7 crossings on small spreads and does not transfer to these bets, which sit on larger
+spreads; do not convert CLV to ROI with it.) 57.8% on 1,567 bets is +10% ROI at −110 **if the
+opener is the price you get.**
 
 Per-season, E4 ≥ 2 is above 50% in 13 of 19 seasons; 2012 (16/30) and 2023 (12/31) were bad.
 Small cells; the E6 rule is the one with volume.
@@ -191,3 +195,98 @@ runs 52–65%. The differences between methods are second-order next to the timi
 *Reporting note.* The script's first printout of the per-method CLV intervals added the mean to
 bounds that were already absolute; the table above is recomputed from the saved predictions
 with the correct intervals, and the script is fixed. Means and all other columns were unaffected.
+
+---
+
+## Amendment A3 — decontamination (run 2026-09-08, registered in `prereg-line-movement.md`)
+
+The review of 2026-09-08 (`review-2026-09-08-tree-audit.md` §1.1) objected that the panel's
+values are recorded mid-week, so a column that reprints the mid-week line predicts the move
+mechanically, and that E6 — the headline — was already known to be 73% market-proxying on the
+margin target. `eval_line_movement.py --decontaminate` drops the top decile of models by
+`ρ_i = corr(f_i − open, close − open)` before anything is fitted, then reruns A and A2. Same
+support (n = 14,068), inference and grids. Outputs `pt_movement_decon.json`,
+`pt_movement_a2_decon.json` and the matching `_preds` files.
+
+Dropped, ρ ≥ 0.365 (15 of 152): `linesprs3` 0.76, `linethocal` 0.74, `linethoats` 0.60,
+`linethoavg` 0.53, `linegrinder` 0.49, `linethompson` 0.46, `lineteamrank` 0.41, `linecrunch`
+0.41, `lineespn` 0.40, `linelabr` 0.40, `lineaustin` 0.39, `linekeep` 0.38, `linebemiss` 0.38,
+`linebythen` 0.37, `linedokter` 0.37. Note that three of the margin era's "best forecasters"
+(`lineespn`, `lineteamrank`, `linedokter`) are on this list: the columns that looked best against
+the close were the ones that had seen it.
+
+| method | R² full panel | R² decontaminated | retained | ΔMSE vs R0 | p | Holm | direction |
+|---|---|---|---|---|---|---|---|
+| **E4** screened consensus | 0.170 | **0.153** | **90%** | −0.94 [−1.68, −0.19] | 0.010 | — | 68.9% |
+| E6 ridge, version-A grid | 0.248 | 0.163 | 66% | −1.00 [−1.78, −0.22] | 0.009 | 0.018 | 72.7% |
+| E6w ridge, wide grid | 0.193 | 0.147 | 76% | −0.90 | <0.001 | 0.005 | 74.1% |
+| E7 k by rule | 0.147 | 0.133 | 90% | −0.81 | 0.018 | 0.072 | 68.0% |
+| E8 Stock–Watson | 0.112 | 0.047 | 42% | −0.29 | <0.001 | 0.005 | 72.0% |
+| E9 residual PCs | 0.118 | 0.098 | 83% | −0.60 | 0.11 | 0.13 | 65.6% |
+| E10 peLASSO | 0.197 | 0.160 | 81% | −0.99 | 0.005 | 0.030 | 71.6% |
+| E11 trimmed | 0.148 | 0.128 | 86% | −0.78 | 0.028 | 0.083 | 67.5% |
+| E12 elastic net | 0.133 | 0.090 | 68% | −0.55 | 0.006 | 0.030 | 73.5% |
+| E13 Hedge | 0.085 | 0.052 | 61% | −0.32 | 0.064 | 0.13 | 61.1% |
+| E14 screened CSR | 0.136 | 0.107 | 79% | −0.66 | <0.001 | 0.005 | 75.6% |
+
+E4's γ on movement after decontamination: median **0.291**, range 0.19–0.32, positive in 20 of
+20 seasons (was 0.30). E6 chose λ = 10⁴ in 19 of 20 seasons, as before.
+
+Closing line value at the opener, decontaminated:
+
+| rule | bets | mean CLV | 95% CI | beat close | ATS at the opener |
+|---|---|---|---|---|---|
+| E4, pred move ≥ 1 | 3,021 | +1.21 | [+0.77, +1.62] | 60.6% | 52.2% [49.4, 55.2] |
+| E4, pred move ≥ 2 | 349 | +3.83 | [+2.07, +5.55] | 74.8% | 62.9% [54.3, 71.3] |
+| E6, pred move ≥ 2 | 1,224 | +2.19 | [+1.55, +2.84] | 71.8% | 58.0% [53.5, 62.7] |
+| E14, pred move ≥ 1 | 674 | +2.45 | [+1.41, +3.51] | 67.7% | 58.8% [52.9, 64.9] |
+
+**Reading.** The consensus's share of the move is not the mid-week line read back: removing the
+fifteen most market-anchored columns costs E4 a tenth of its R² and nothing of its γ or its CLV.
+The ridge's advantage over E4 was exactly that contamination — it loaded on the anchored
+columns, and without them it is E4 with more parameters. The registered E6 row stands as the
+full-panel number; the decontaminated E4 is the number to quote for "what the panel knows
+before the line moves", with the residual caveat that the remaining models are still recorded
+mid-week and only version B can time-stamp them.
+
+### A3 scorecard
+
+| expectation | outcome |
+|---|---|
+| E4 retains ≥ 60% | ✓ 90% |
+| E6 falls to E4's level or below | ✓ 0.163 vs 0.153 |
+| E14 retains less than E4 | ✓ 79% vs 90% |
+
+## The target — what PT's `line` is (checked 2026-09-08)
+
+`check_pt_line_is_close.py` joins the 2024–25 archive rows to Action Network's consensus close
+(book 15) on season and both team names, rematches dropped: **1,219 games matched**.
+
+| | mean \|Δ\| | median | exact | within 0.5 | within 1 |
+|---|---|---|---|---|---|
+| PT `line` vs AN close | **0.69** | 0.50 | 31.4% | 66.7% | 83.6% |
+| PT `lineopen` vs AN close | 1.58 | — | — | 33.3% | — |
+
+PT's `line` is a late line, not the close: it sits 0.7 points from the consensus close on a
+typical game, against 1.6 for the opener. Every "close" in this file is that number. The
+movement it measures is therefore open → PT's last capture, roughly the first half to two
+thirds of the full move; the R² and CLV above are on that shorter path. Version B grades
+against the real close and is not affected.
+
+## Version B — first read (2026-09-08, reported, not decided; amendment B1)
+
+`eval_version_b.py` on the 2026 week-2 slate: 42 games with a Monday anchor (2026-08-31
+19:05Z), graded against the AN consensus close. One week, so the SE is HC1, not clustered, and
+the interval is optimistic.
+
+| predictor | slope of close − Monday on pred − Monday | 95% | sd(x) | MDE (80%) |
+|---|---|---|---|---|
+| E4 (registered) | **+0.20** | [0.00, +0.40] | 1.17 | 0.28 |
+| E6 | +0.43 | [+0.17, +0.70] | 1.07 | 0.36 |
+| model median | +0.18 | [−0.03, +0.39] | 1.16 | 0.29 |
+
+sd(close − Monday) = 0.81, mean +0.25. E4's side at |x| ≥ 1: 20 bets, CLV +0.47, beat the close
+on 55%; no scores yet. The dispersion of E4 against Monday's line (1.17) is far larger than the
+0.45 assumed in amendment B1, so the n at which the MDE reaches 0.2 is about **80–140 games
+before week clustering**, not a thousand. Reported here because B1 says every read is reported;
+the verdict waits for that n.

@@ -1,5 +1,12 @@
 # Spread research — session guide, 2026-09-02
 
+> **Dated record.** Written on 2026-09-02 and left as written. Since then: data paths under
+> `raw/` moved to `ingest/` (`e2e9e5d`, except `raw/actionnetwork/`); the margin-era documents
+> it cites moved to `archive/spread-margin-era/`; the §5.5 numbers predate decontamination
+> (`line-movement-results.md` § A3), where the ridge's R² 0.25 falls to 0.16 and E4's 0.17 to
+> 0.15; the scheduled tasks' health claims in §7 are superseded by `docs/line-timing-collector.md`.
+> Read `README.md` for the current state.
+
 A complete account of one working session: what was asked, what was built, which models and
 methods were used, what the numbers say, where every artifact lives, and how to pick it up.
 Written for someone who did not watch it happen. Every figure below is reproducible from a
