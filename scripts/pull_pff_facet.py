@@ -119,12 +119,18 @@ def run_to_file(cmd: list[str], dest: Path, env: dict, timeout: float) -> str | 
     """Run cmd with its body redirected to dest. Returns an error string, or None."""
     with dest.open("wb") as fh:
         try:
-            proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.PIPE, env=env, timeout=timeout)
+            # stdin closed: with a terminal attached, restish waits on it forever
+            # when run from a non-interactive shell (an agent, a scheduler).
+            proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                                  env=env, timeout=timeout)
         except subprocess.TimeoutExpired:
             # Some reports hang server-side rather than answering; one slow
             # command must not block the rest of a bulk run.
-            dest.unlink(missing_ok=True)
-            return f"timed out after {timeout:.0f}s"
+            proc = None
+    if proc is None:
+        # unlink after the `with` closes our handle -- Windows refuses while it is open
+        dest.unlink(missing_ok=True)
+        return f"timed out after {timeout:.0f}s"
     if proc.returncode != 0:
         # PFF's error envelope goes to stdout (the file); stderr only carries
         # restish's retry chatter, so prefer the body when it says something.

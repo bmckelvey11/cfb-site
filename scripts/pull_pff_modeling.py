@@ -3,6 +3,7 @@
     python scripts/pull_pff_modeling.py --seasons 2025                 # one season
     python scripts/pull_pff_modeling.py --seasons 2014-2026            # backfill
     python scripts/pull_pff_modeling.py --seasons 2026 --player-facets # + weekly leaderboards
+    python scripts/pull_pff_modeling.py --seasons 2026 --weeks 1 --player-facets --rosters
     python scripts/pull_pff_modeling.py --seasons 2025 --dry-run
 
 Four cheap reads give a complete team-game history without touching the export
@@ -16,6 +17,18 @@ budget, and none of them loops over teams:
 
 That is 42 reads a season. (`team-summary` gives the same grades one franchise at a
 time -- 138 reads a season and only the teams you list -- so it is not used.)
+
+Three more, all `/v2` and all pinned to PFF's *current* season (they take no season
+parameter, so history is not reachable through them):
+
+    team-list        one read: the whole schedule 2004-now, future games included
+    team-stats       7 categories x week: EPA/play, success rate, explosive rate,
+                     points per drive, third down, red zone, turnovers, pass/rush
+                     splits, opponent tendencies -- every team, ranked
+    team-roster      --rosters: one read per FBS team, depth chart with grade,
+                     status and snap share (availability signal for the live week)
+
+Files that exist are skipped except in the live season; use --weeks to scope a run.
 
 Everything lands as JSON under data/raw/pff/team/ (outside the warehouse glob, which
 is not recursive), then `team_game.csv` is rebuilt under data/processed/pff/: one row
@@ -52,6 +65,9 @@ from pull_pff_facet import (  # noqa: E402
 
 READ_PACING_SECONDS = 0.7  # 100 reads/minute, with headroom
 FBS_GROUP_ID = "11"
+TEAM_STATS_CATEGORIES = ("offense-overall-success", "offense-passing", "offense-rushing",
+                         "defense-overall-success", "defense-passing", "defense-rushing",
+                         "defense-opponent-tendencies")
 # passing_detail is the union of the other four passing facets and hangs;
 # the other two answer 500 for every NCAA pull. See docs/pff-warehouse-schema.md.
 SKIP_FACETS = {"facet-passing-detail", "facet-receiving-coverage", "facet-defense-coverage-matchup"}
@@ -102,8 +118,12 @@ def ncaa_weeks(leagues: dict) -> list[int]:
     return [w["id"] for w in lg["weeks"] if not w["all_star"]]
 
 
+def fbs_rows(directory: dict) -> list[dict]:
+    return [r for r in directory["rows"] if FBS_GROUP_ID in r["groupIds"].split(";")]
+
+
 def fbs_franchises(directory: dict) -> list[int]:
-    return sorted(r["franchiseId"] for r in directory["rows"] if FBS_GROUP_ID in r["groupIds"].split(";"))
+    return sorted(r["franchiseId"] for r in fbs_rows(directory))
 
 
 def flatten_team_games(team_dir: Path, seasons: list[int], fbs: set[int] = frozenset()) -> list[dict]:
@@ -143,8 +163,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seasons", default=str(current_season()),
                     help="e.g. 2025, 2014-2026, 2019,2021-2023 (default: current season)")
+    ap.add_argument("--weeks", help="week ids to pull, e.g. 1 or 0-3 (default: every non-all-star week)")
     ap.add_argument("--player-facets", action="store_true",
                     help="also export every weekly facet/signature leaderboard (slow: ~2 min/week)")
+    ap.add_argument("--rosters", action="store_true",
+                    help="also pull every FBS team's depth-chart roster (current season only, 138 reads)")
     ap.add_argument("--force", action="store_true", help="re-pull files that already exist")
     ap.add_argument("--timeout", type=float, default=120.0)
     ap.add_argument("--out-dir", type=Path, default=DATA_ROOT / "raw" / "pff")
@@ -183,8 +206,13 @@ def main() -> None:
         print("dry run needs leagues.json and team_directory.json on disk once; run without --dry-run first")
         return
     weeks = ncaa_weeks(json.loads(leagues_path.read_text(encoding="utf-8")))
-    fbs = set(fbs_franchises(json.loads(directory_path.read_text(encoding="utf-8"))))
+    if args.weeks:
+        weeks = [w for w in parse_seasons(args.weeks) if w in weeks]
+    directory = json.loads(directory_path.read_text(encoding="utf-8"))
+    fbs = set(fbs_franchises(directory))
     print(f"{len(seasons)} seasons x {len(weeks)} weeks, {len(fbs)} FBS franchises")
+    # the schedule: every game PFF knows about, past and future, in one read
+    pull("team-list", ["team-list", "ncaa"], team_dir / "schedule.json", season=live)
 
     # 2. per (season, week): the games played, and every team's grades for that week
     failures = 0
@@ -195,10 +223,23 @@ def main() -> None:
             failures += not pull(f"team-overview {season} wk{week}",
                                  ["team-overview", "ncaa", str(season), "--week", str(week)],
                                  team_dir / f"team_overview_{season}_wk{week}.json", season)
+            if season == live:  # /v2 has no season parameter; it only ever answers for `live`
+                for cat in TEAM_STATS_CATEGORIES:
+                    failures += not pull(f"team-stats {season} wk{week} {cat}",
+                                         ["team-stats", "ncaa", "--category", cat, "--week-ids", str(week)],
+                                         team_dir / f"team_stats_{season}_wk{week}_{cat}.json", season)
+        if args.rosters and season == live:
+            for r in fbs_rows(directory):
+                failures += not pull(f"team-roster {r['slug']}", ["team-roster", "ncaa", r["slug"]],
+                                     team_dir / f"roster_{season}_{r['slug']}.json", season)
+        elif args.rosters:
+            print(f"skip rosters {season}: team-roster only serves the current season ({live})")
 
     # 3. optional: the weekly player leaderboards, through the facet puller
     if args.player_facets:
-        ops = {e["id"]: e for e in exportable_ops(load_spec(None)).values() if e["id"] not in SKIP_FACETS}
+        ops = {e["id"]: e for e in exportable_ops(load_spec(None)).values()
+               if e["id"] not in SKIP_FACETS
+               and set(e["required"]) <= {"league", "season", "week", "division"}}
         for season in seasons:
             for week in weeks:
                 values = {"league": "ncaa", "season": str(season), "week": str(week), "division": "fbs"}
@@ -216,7 +257,9 @@ def main() -> None:
 
     # 4. flatten to the modeling table
     if not args.dry_run:
-        rows = flatten_team_games(team_dir, seasons, fbs)
+        # every season on disk, not just this run's -- the CSV is the whole history
+        on_disk = sorted({int(f.stem.split("_")[2]) for f in team_dir.glob("team_overview_*_wk*.json")})
+        rows = flatten_team_games(team_dir, on_disk, fbs)
         out = DATA_ROOT / "processed" / "pff" / "team_game.csv"
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("w", newline="", encoding="utf-8") as fh:
