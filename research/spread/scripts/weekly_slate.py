@@ -5,8 +5,8 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
 
   open_pt      PT's recorded opener (often a months-old look-ahead number for early weeks)
   line_pt      the market line at the moment PT compiled the snapshot
-  book_fair    median home spread across real books RIGHT NOW (FanDuel, BetMGM, Caesars,
-               Bet365, Pinnacle), after the outlier guard
+  book_fair    median home spread across real books RIGHT NOW (DraftKings, FanDuel,
+               BetRivers, BetMGM, Caesars), after the outlier guard
   consensus    the model consensus: mean of the top-20 models by prior MOVEMENT skill
   E4 .. E14    each movement model's predicted CLOSE, fit on the whole archive with the
                opener as anchor (research/spread/docs/line-movement-results.md)
@@ -63,7 +63,8 @@ PARAMS = {"E6": 10000.0, "E7": "all", "E8": 0.3, "E9": 1, "E10": 1.0, "E11": 0.4
           "E12": (10.0, 0.1), "E14": 1}
 MODEL_COLS = ["E4", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E14"]
 
-REAL_BOOKS = {"49": "Pinnacle", "68": "FanDuel", "69": "BetMGM", "71": "Caesars", "75": "Bet365"}
+# Action Network book ids per its /web/v1/books endpoint (2026-09-08).
+REAL_BOOKS = {"49": "Caesars", "68": "DraftKings", "69": "FanDuel", "71": "BetRivers", "75": "BetMGM"}
 OUTLIER_PTS = 2.5          # a book > this far from the median of all books is ignored (n >= 3)
 ODDS_WINDOW = (-135, 125)
 KEY_NUMBERS = (3, 7)
@@ -384,13 +385,13 @@ def _check() -> None:
     # below -> road at the best road number (shown as points received)
     s = add_side(pd.DataFrame({"home": ["Auburn", "LSU"], "road": ["S Miss", "La Tech"], "line_pt": [33.5, 35.5],
                                "E4": [28.5, 36.5], "fair_pt": [33.5, 35.5], "best_home_pt": [32.5, 36.0],
-                               "best_away_pt": [34.0, 35.5], "best_home_book": ["BetMGM", "Caesars"],
-                               "best_away_book": ["Bet365", "Pinnacle"]}))
+                               "best_away_pt": [34.0, 35.5], "best_home_book": ["FanDuel", "BetRivers"],
+                               "best_away_book": ["BetMGM", "Caesars"]}))
     assert s.side.tolist() == ["S Miss", "LSU"] and s.side_line.tolist() == [34.0, -36.0], s
-    assert s.side_book.tolist() == ["Bet365", "Caesars"] and s.edge.tolist() == [5.0, 1.0], s
+    assert s.side_book.tolist() == ["BetMGM", "BetRivers"] and s.edge.tolist() == [5.0, 1.0], s
     q = {"68": (-7.5, -110), "69": (-7.0, -110), "71": (18.0, -110)}
     s = shop(q)
-    assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # Caesars' 18 was guarded out
+    assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # BetRivers' 18 was guarded out
     # the cross-game guard: same home team, different opponent must NOT inherit book numbers
     pt = pd.DataFrame({"key": ["ole miss"], "rkey": ["louisville"]})
     an = pd.DataFrame({"key": ["ole miss"], "rkey": ["charlotte"], "event_id": [1]})

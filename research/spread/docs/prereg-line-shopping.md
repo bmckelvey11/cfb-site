@@ -21,7 +21,8 @@ events Action Network serves the final pre-kickoff market, so this is treated as
 Scores come from the same row (`home_points`, `away_points`). No join.
 
 **Book identities, established from data before this was written** (the loader's
-`_AN_PROVIDER_NAMES` disagrees and is not used):
+`_AN_PROVIDER_NAMES` disagreed at the time and is not used; corrected 2026-09-08 from
+Action Network's `/web/v1/books`: 49 Caesars, 68 DraftKings, 69 FanDuel, 71 BetRivers, 75 BetMGM):
 
 | book_id | what it is | evidence | used as |
 |---|---|---|---|

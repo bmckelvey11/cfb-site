@@ -106,6 +106,11 @@ The handoff's earlier "book 30 is stale" was this: the opener mistaken for a slo
 background task to fix the loader mapping was spawned and is running in a separate session.
 Book 71 (Caesars) mis-posts: numbers 10–25 points from every other book at normal odds.
 
+> **Correction 2026-09-08.** The real-book names in the table above were guesses and are
+> wrong. Action Network's `/web/v1/books` says 49 = Caesars, 68 = DraftKings, 69 = FanDuel,
+> 71 = BetRivers, 75 = BetMGM. The mis-posting book 71 is BetRivers. The loader and
+> `weekly_slate.py` were corrected the same day.
+
 ### 3.4 Warehouse
 `cfb.duckdb` is source of truth; `CFB_DATA_ROOT=C:\Users\mckel\dev\cfb\data`. Scores for
 Action Network games come from the same rows (no join needed). PT games carry CFBD `game_id`.

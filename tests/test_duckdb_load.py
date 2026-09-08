@@ -2,6 +2,8 @@ import json
 
 from cfb_system_maker.cli import main
 from cfb_system_maker.duckdb_load import (
+    _AN_BOOK_PROVIDER,
+    _AN_PROVIDER_NAMES,
     backfill_gamelines_from_actionnetwork,
     build_duckdb,
     explode_an_children,
@@ -916,7 +918,7 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     teams = json.dumps([{"id": 1, "location": "Alpha"}, {"id": 2, "location": "Beta"}])
     markets = json.dumps(
         {
-            "15": {
+            "68": {
                 "event": {
                     "spread": [
                         {
@@ -975,8 +977,8 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     con.execute(
         """
         INSERT INTO stg.an_history VALUES
-          (100, 15, 'firsthalf', 'spread', 'home', 1, -3.5, -110, 'history.json'),
-          (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, 'history.json')
+          (100, 68, 'firsthalf', 'spread', 'home', 1, -3.5, -110, 'history.json'),
+          (100, 68, 'firsthalf', 'total', 'over', NULL, 24.5, -105, 'history.json')
         """
     )
     explode_an_children(con)
@@ -1008,7 +1010,18 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
         row[0]
         for row in con.execute("SELECT name FROM stg_gql.lines_provider").fetchall()
     }
-    assert "DraftKings" in names and "FanDuel" in names
+    assert "DraftKings" in names and "FanDuel" in names and "BetRivers" in names
+    assert "Pinnacle" not in names and "Bet365" not in names and "Circa" not in names
+
+
+def test_an_book_ids_follow_action_networks_own_book_list():
+    """Ids per GET /web/v1/books (2026-09-08): 15 Consensus, 30 Open, 49 Caesars,
+    68 DraftKings, 69 FanDuel, 71 BetRivers, 75 BetMGM. The old map sent the
+    consensus to DraftKings and BetRivers to Caesars."""
+    assert _AN_BOOK_PROVIDER == {68: 888888, 49: 38, 15: 1004}
+    assert _AN_PROVIDER_NAMES == {30: "Open", 69: "FanDuel", 71: "BetRivers", 75: "BetMGM"}
+    assert not set(_AN_BOOK_PROVIDER) & set(_AN_PROVIDER_NAMES)
+
 
 
 def test_an_children_are_flat_and_the_generic_recursion_leaves_them_alone(tmp_path):

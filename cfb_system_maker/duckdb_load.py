@@ -545,13 +545,16 @@ def explode_payloads(
 
 
 # Action Network book_id → CFBD linesProvider.id when the book already exists.
-_AN_BOOK_PROVIDER = {15: 888888, 71: 38}  # DraftKings, Caesars
+# Ids per GET https://api.actionnetwork.com/web/v1/books (2026-09-08): 15 Consensus,
+# 30 Open (the consensus opener, not a sportsbook), 49 Caesars NV, 68 DraftKings NJ,
+# 69 FanDuel NJ, 71 BetRivers NJ, 75 BetMGM NJ.
+_AN_BOOK_PROVIDER = {68: 888888, 49: 38, 15: 1004}  # DraftKings, Caesars, consensus
+# Books CFBD has no provider for keep their AN id and get a name row.
 _AN_PROVIDER_NAMES = {
-    30: "Circa",
-    49: "Pinnacle",
-    68: "FanDuel",
-    69: "BetMGM",
-    75: "Bet365",
+    30: "Open",
+    69: "FanDuel",
+    71: "BetRivers",
+    75: "BetMGM",
 }
 _AN_SCHOOL_ALIAS = {
     "Miami (FL)": "Miami",
