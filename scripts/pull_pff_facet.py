@@ -188,7 +188,12 @@ def pull_one(binary: str, entry: dict, values: dict, out_dir: Path, profile: str
         json_dest.unlink(missing_ok=True)
         return f"FAIL {entry['id']}: blank CSV, and JSON was unparseable"
     listed = [(k, v) for k, v in payload.items() if isinstance(v, list)]
-    shape = ", ".join(f"{len(v)} {k}" for k, v in listed) or "no rows"
+    if not any(v for _, v in listed):
+        # Blank CSV *and* an empty JSON body: the report genuinely has no data
+        # for this query (a week that was never played, say). Keep no file.
+        json_dest.unlink(missing_ok=True)
+        return f"SKIP {entry['id']}: no data"
+    shape = ", ".join(f"{len(v)} {k}" for k, v in listed)
     return f"JSON {json_dest.name}  {shape}  (CSV export came back blank)"
 
 
