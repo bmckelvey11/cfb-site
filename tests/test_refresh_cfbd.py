@@ -99,3 +99,16 @@ def test_pin_check_fails_loudly_without_claiming_the_warehouse_is_broken(tmp_pat
     # check() writes its stale-CSV hint for a command-line reader; this path
     # reflattened first, so the log has to say the hint does not apply here.
     assert "staleness is not the cause" in out
+
+
+def test_load_errors_are_printed_not_swallowed(capsys):
+    from cfb_system_maker.duckdb_load import TableLoad
+
+    reports = [
+        TableLoad("stg", "games", 1, 10),
+        TableLoad("stg", "an_scoreboard", 0, 0, error="OutOfMemoryException: boom"),
+    ]
+    assert rc._print_load_errors(reports) == 1
+    out = capsys.readouterr().out
+    assert "LOAD ERROR stg.an_scoreboard: OutOfMemoryException: boom" in out
+    assert "games" not in out

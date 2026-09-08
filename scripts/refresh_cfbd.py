@@ -99,11 +99,21 @@ def main() -> int:
     _flatten_actionnetwork()
 
     print("=== rebuild cfb.duckdb ===")
-    db_path, _ = build_duckdb(cfb_paths.DATA_ROOT, explode=True)
+    db_path, reports = build_duckdb(cfb_paths.DATA_ROOT, explode=True)
+    _print_load_errors(reports)
     built = build_core(db_path)
     print(f"Rebuilt {db_path} (core: {', '.join(built)})")
 
     return 0 if _check_an_tick_pin(db_path) else 1
+
+
+def _print_load_errors(reports) -> int:
+    """A failed load or explode is recorded on its report, not raised, so the
+    rebuild finishes with the table missing and nothing in the log. Print them."""
+    failed = [r for r in reports if r.error]
+    for r in failed:
+        print(f"  LOAD ERROR {r.schema}.{r.name}: {r.error}")
+    return len(failed)
 
 
 def _check_an_tick_pin(db_path: Path) -> bool:
