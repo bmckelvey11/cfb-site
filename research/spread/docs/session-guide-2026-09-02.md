@@ -4,7 +4,9 @@
 > `raw/` moved to `ingest/` (`e2e9e5d`, except `raw/actionnetwork/`); the margin-era documents
 > it cites moved to `archive/spread-margin-era/`; the §5.5 numbers predate decontamination
 > (`line-movement-results.md` § A3), where the ridge's R² 0.25 falls to 0.16 and E4's 0.17 to
-> 0.15; the scheduled tasks' health claims in §7 are superseded by `docs/line-timing-collector.md`.
+> 0.15; the scheduled tasks' health claims in §7 are superseded by `docs/line-timing-collector.md`;
+> the book names in §3.3 are wrong (49 is Caesars, 68 DraftKings, 69 FanDuel, 71 BetRivers,
+> 75 BetMGM, per AN's own book list) — the ids and numbers stand.
 > Read `README.md` for the current state.
 
 A complete account of one working session: what was asked, what was built, which models and
