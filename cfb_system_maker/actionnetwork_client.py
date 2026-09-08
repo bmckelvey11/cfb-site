@@ -11,7 +11,7 @@ Output lands in ``data/raw/actionnetwork/`` (kept separate from CFBD ``data/raw/
 because the row shapes differ). ``fetch_fn`` is injectable so tests run network-free.
 
 Resume is status-aware, not file-existence-aware: a cached week is only skipped once
-every game in it has reached a terminal status (``_TERMINAL_STATUSES``). Both payloads
+every game in it has reached a terminal status (``TERMINAL_STATUSES``). Both payloads
 are live snapshots, so a plain file check would freeze pre-game prices in the warehouse
 for the whole season. ``--force`` still re-scrapes everything.
 """
@@ -48,7 +48,7 @@ FULL_GAME_PERIOD = "event"
 # been played. Terminal statuses are re-read from disk; everything else re-fetches.
 # ponytail: "postponed" counts as terminal so back-season runs stay quiet. A
 # postponed game that gets rescheduled needs --force to pick the new date up.
-_TERMINAL_STATUSES = frozenset({"complete", "cancelled", "postponed"})
+TERMINAL_STATUSES = frozenset({"complete", "cancelled", "postponed"})
 
 # Cloudflare 403s urllib's default User-Agent; a browser UA is required.
 _USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -183,7 +183,7 @@ def _unsettled_ids(payload: dict[str, Any]) -> list[int]:
     return [
         int(g["id"])
         for g in payload.get("games", [])
-        if g.get("id") is not None and g.get("status") not in _TERMINAL_STATUSES
+        if g.get("id") is not None and g.get("status") not in TERMINAL_STATUSES
     ]
 
 

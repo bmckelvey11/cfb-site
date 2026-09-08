@@ -43,6 +43,7 @@ REPO = next(
 )
 sys.path.insert(0, str(REPO))
 import cfb_paths  # noqa: E402
+from cfb_system_maker.actionnetwork_client import TERMINAL_STATUSES  # noqa: E402
 
 PT_URL = "http://www.thepredictiontracker.com/ncaapredictions.csv"
 AN_SCOREBOARD = "https://api.actionnetwork.com/web/v2/scoreboard/ncaaf"
@@ -118,8 +119,9 @@ def snapshot(now: datetime | None = None) -> Path | None:
 # -------------------------------------------------------------------------- history
 
 
-def event_ids(season: int, weeks: range) -> list[int]:
-    ids: list[int] = []
+def event_ids(season: int, weeks: range) -> list[tuple[int, bool]]:
+    """(event id, settled) per game. Settled means the game can no longer move."""
+    seen: dict[int, bool] = {}
     for week in weeks:
         try:
             payload = json.loads(
@@ -128,9 +130,12 @@ def event_ids(season: int, weeks: range) -> list[int]:
         except Exception as exc:  # one bad week must not abort the season
             print(f"  wk{week}: {type(exc).__name__}: {exc}", file=sys.stderr)
             continue
-        ids.extend(int(g["id"]) for g in payload.get("games", []) if g.get("id") is not None)
+        for game in payload.get("games", []):
+            if game.get("id") is None:
+                continue
+            seen[int(game["id"])] = game.get("status") in TERMINAL_STATUSES
         time.sleep(1.0)
-    return sorted(set(ids))
+    return sorted(seen.items())
 
 
 def history(season: int, weeks: range, *, force: bool = False) -> int:
@@ -138,14 +143,21 @@ def history(season: int, weeks: range, *, force: bool = False) -> int:
 
     Written as history_event_{id}.json so it never collides with the legacy
     history_{id}.json files, which hold firsthalf/firstquarter only.
+
+    A file on disk only ends the job once the game is settled. The endpoint replays
+    the whole path on every call, so re-pulling an unsettled event is lossless and
+    picks up every tick since the last run -- skipping on mere file existence froze
+    the series at whenever the event was first seen.
     """
     AN_DIR.mkdir(parents=True, exist_ok=True)
-    ids = event_ids(season, weeks)
-    print(f"{len(ids)} events in {season} weeks {weeks.start}-{weeks.stop - 1}")
+    events = event_ids(season, weeks)
+    unsettled = sum(1 for _, settled in events if not settled)
+    print(f"{len(events)} events in {season} weeks {weeks.start}-{weeks.stop - 1} "
+          f"({unsettled} still moving)")
     written = skipped = empty = errors = 0
-    for eid in ids:
+    for eid, settled in events:
         path = AN_DIR / f"history_event_{eid}.json"
-        if path.exists() and not force:
+        if path.exists() and settled and not force:
             skipped += 1
             continue
         try:
@@ -161,8 +173,8 @@ def history(season: int, weeks: range, *, force: bool = False) -> int:
             path.write_bytes(body)
             written += 1
         time.sleep(1.0)
-    print(f"history: {written} written, {skipped} already on disk, {empty} not yet posted, "
-          f"{errors} errors")
+    print(f"history: {written} written, {skipped} settled and on disk, "
+          f"{empty} not yet posted, {errors} errors")
     return written
 
 

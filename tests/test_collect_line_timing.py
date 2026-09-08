@@ -60,7 +60,7 @@ def test_snapshot_refuses_an_empty_body(snap_dir, monkeypatch):
 def test_history_asks_for_the_full_game_period(tmp_path, monkeypatch):
     """`event`, not `game` -- `game` returns an empty payload from Action Network."""
     monkeypatch.setattr(ct, "AN_DIR", tmp_path)
-    monkeypatch.setattr(ct, "event_ids", lambda season, weeks: [287967])
+    monkeypatch.setattr(ct, "event_ids", lambda season, weeks: [(287967, False)])
     seen = {}
 
     def fake_get(url, params=None, **k):
@@ -77,7 +77,7 @@ def test_history_asks_for_the_full_game_period(tmp_path, monkeypatch):
 def test_history_does_not_write_a_payload_with_no_ticks(tmp_path, monkeypatch):
     """An empty payload means AN hasn't posted history yet -- leave it to re-probe."""
     monkeypatch.setattr(ct, "AN_DIR", tmp_path)
-    monkeypatch.setattr(ct, "event_ids", lambda season, weeks: [1, 2])
+    monkeypatch.setattr(ct, "event_ids", lambda season, weeks: [(1, False), (2, False)])
     monkeypatch.setattr(ct, "_get", lambda *a, **k: b"[]")
     monkeypatch.setattr(ct.time, "sleep", lambda s: None)
     assert ct.history(2026, range(1, 2)) == 0
@@ -88,9 +88,48 @@ def test_history_filename_never_collides_with_the_legacy_1h_files(tmp_path, monk
     """Legacy history_{id}.json holds firsthalf/firstquarter only -- keep them apart."""
     monkeypatch.setattr(ct, "AN_DIR", tmp_path)
     (tmp_path / "history_99.json").write_bytes(b"[]")  # legacy file for the same event
-    monkeypatch.setattr(ct, "event_ids", lambda season, weeks: [99])
+    monkeypatch.setattr(ct, "event_ids", lambda season, weeks: [(99, False)])
     monkeypatch.setattr(ct, "_get", lambda *a, **k: b'{"15":{"event":{"updated_at":"x"}}}')
     monkeypatch.setattr(ct.time, "sleep", lambda s: None)
     ct.history(2026, range(1, 2))
     assert (tmp_path / "history_event_99.json").exists()
     assert (tmp_path / "history_99.json").read_bytes() == b"[]"  # untouched
+
+
+def test_history_repulls_an_unsettled_event_already_on_disk(tmp_path, monkeypatch):
+    """The endpoint replays the whole path, so a game that can still move is
+    re-pulled -- skipping on file existence alone froze the series at first sight."""
+    monkeypatch.setattr(ct, "AN_DIR", tmp_path)
+    stale = tmp_path / "history_event_500.json"
+    stale.write_bytes(b'{"15":{"event":{"spread":[{"history":[{"updated_at":"2026-08-29T00:00:00Z"}]}]}}}')
+    monkeypatch.setattr(ct, "event_ids", lambda season, weeks: [(500, False)])
+    fresh = b'{"15":{"event":{"spread":[{"history":[{"updated_at":"2026-09-08T00:00:00Z"}]}]}}}'
+    monkeypatch.setattr(ct, "_get", lambda *a, **k: fresh)
+    monkeypatch.setattr(ct.time, "sleep", lambda s: None)
+
+    assert ct.history(2026, range(1, 2)) == 1
+    assert stale.read_bytes() == fresh
+
+
+def test_history_skips_a_settled_event_already_on_disk(tmp_path, monkeypatch):
+    """Once the game is played its history cannot change -- don't spend the call."""
+    monkeypatch.setattr(ct, "AN_DIR", tmp_path)
+    done = tmp_path / "history_event_501.json"
+    done.write_bytes(b'{"cached": true}')
+    monkeypatch.setattr(ct, "event_ids", lambda season, weeks: [(501, True)])
+
+    def refuse(*a, **k):
+        raise AssertionError("settled event must not be re-fetched")
+
+    monkeypatch.setattr(ct, "_get", refuse)
+    monkeypatch.setattr(ct.time, "sleep", lambda s: None)
+
+    assert ct.history(2026, range(1, 2)) == 0
+    assert done.read_bytes() == b'{"cached": true}'
+
+
+def test_event_ids_marks_settled_from_game_status(monkeypatch):
+    payload = b'{"games":[{"id":1,"status":"complete"},{"id":2,"status":"scheduled"}]}'
+    monkeypatch.setattr(ct, "_get", lambda *a, **k: payload)
+    monkeypatch.setattr(ct.time, "sleep", lambda s: None)
+    assert ct.event_ids(2026, range(1, 2)) == [(1, True), (2, False)]
