@@ -470,6 +470,17 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         ),
     ),
     FeatureDef(
+        "running_rest_days", "Days of Rest", "season_to_date", "computed_running",
+        "rest_days", "game_id", "numeric", team_scoped=True,
+        description=(
+            "Calendar days (Eastern) between this game's kickoff and the team's previous "
+            "game this season. Schedule-derived and fully pregame. Team-scoped -- use "
+            "perspective to pick home, away, the bet side, or either. Null on a season "
+            "opener (the offseason is not rest), and null when either kickoff date is "
+            "missing rather than measuring rest from two games back."
+        ),
+    ),
+    FeatureDef(
         "running_win_pct", "Win % (to date)", "season_to_date", "computed_running",
         "win_pct", "game_id", "numeric", team_scoped=True,
         description=(

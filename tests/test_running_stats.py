@@ -1,3 +1,5 @@
+from datetime import date
+
 from cfb_system_maker.models import GameRecord
 from cfb_system_maker.running_stats import compute_running_stats
 
@@ -22,8 +24,8 @@ def _game(game_id, week, home="Alpha", away="Beta", home_points=None, away_point
 def test_first_game_of_season_has_zero_history():
     games = [_game(1, 1, home_points=21, away_points=14, spread=-3.5)]
     stats = compute_running_stats(games)
-    assert stats[(1, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
-    assert stats[(1, "Beta")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
+    assert stats[(1, "Alpha")] == {"games_played": 0, "rest_days": None, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
+    assert stats[(1, "Beta")] == {"games_played": 0, "rest_days": None, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
 
 
 def test_no_lookahead_stats_reflect_only_strictly_prior_games():
@@ -81,7 +83,7 @@ def test_seasons_reset():
         _game(2, 1, season=2023, home_points=0, away_points=0, spread=-1.0),
     ]
     stats = compute_running_stats(games)
-    assert stats[(2, "Alpha")] == {"games_played": 0, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
+    assert stats[(2, "Alpha")] == {"games_played": 0, "rest_days": None, "win_pct": None, "ats_pct": None, "streak": 0, "ats_streak": 0, "ppa_off": None, "ppa_def": None, "adv_success_off": None, "adv_success_def": None, "adv_explosiveness_off": None, "adv_explosiveness_def": None}
 
 
 def test_start_dates_override_week_order():
@@ -222,3 +224,50 @@ def test_streak_does_not_carry_across_seasons():
     ]
     stats = compute_running_stats(games)
     assert stats[(2, "Alpha")]["streak"] == 0
+
+
+def _dt(day):
+    return date(2023, 9, day)
+
+
+def test_rest_days_null_on_opener_then_measures_gap_to_prior_game():
+    games = [
+        _game(1, 1, home_points=21, away_points=14, spread=-3.5),
+        _game(2, 2, home_points=28, away_points=10, spread=-7.0),
+    ]
+    kick_dates = {1: _dt(2), 2: _dt(9)}
+    stats = compute_running_stats(games, kick_dates=kick_dates)
+    assert stats[(1, "Alpha")]["rest_days"] is None  # season opener: offseason is not rest
+    assert stats[(2, "Alpha")]["rest_days"] == 7
+    assert stats[(2, "Beta")]["rest_days"] == 7  # both sides, not just home
+
+
+def test_rest_days_ignores_missing_scores():
+    """The middle game has no result, so the result accumulators skip it -- rest must
+    still advance past it, or game 3 would read 14 days off game 1."""
+    games = [
+        _game(1, 1, home_points=21, away_points=14, spread=-3.5),
+        _game(2, 2, home_points=None, away_points=None),
+        _game(3, 3, home_points=35, away_points=0, spread=-10.0),
+    ]
+    kick_dates = {1: _dt(2), 2: _dt(9), 3: _dt(16)}
+    stats = compute_running_stats(games, kick_dates=kick_dates)
+    assert stats[(3, "Alpha")]["games_played"] == 1  # the scoreless game is not counted
+    assert stats[(3, "Alpha")]["rest_days"] == 7  # ...but it still resets the rest clock
+
+
+def test_rest_days_null_when_a_kickoff_date_is_missing():
+    games = [
+        _game(1, 1, home_points=21, away_points=14),
+        _game(2, 2, home_points=28, away_points=10),
+        _game(3, 3, home_points=35, away_points=0),
+    ]
+    stats = compute_running_stats(games, kick_dates={1: _dt(2), 3: _dt(16)})
+    assert stats[(2, "Alpha")]["rest_days"] is None  # game 2 has no date of its own
+    assert stats[(3, "Alpha")]["rest_days"] is None  # and the chain breaks, not spans 14
+
+
+def test_rest_days_null_on_non_positive_gap():
+    games = [_game(1, 1, home_points=21, away_points=14), _game(2, 2, home_points=28, away_points=10)]
+    stats = compute_running_stats(games, kick_dates={1: _dt(9), 2: _dt(9)})
+    assert stats[(2, "Alpha")]["rest_days"] is None

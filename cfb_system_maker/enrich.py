@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -185,12 +185,18 @@ def _build_running_index(
             }
 
     start_dates: dict[int, str] = {}
+    kick_dates: dict[int, date] = {}
     for game_id, row in raw_games.items():
         start = row.get("startDate") or row.get("start_date")
         if start:
             start_dates[game_id] = str(start)
+            kick_date = _et_date(start)
+            if kick_date is not None:
+                kick_dates[game_id] = kick_date
 
-    return compute_running_stats(games, ppa=ppa, adv=adv, start_dates=start_dates)
+    return compute_running_stats(
+        games, ppa=ppa, adv=adv, start_dates=start_dates, kick_dates=kick_dates
+    )
 
 
 def _build_v1_index(data_dir: Path, games: list[GameRecord]) -> dict[int, float]:
@@ -475,6 +481,30 @@ def _kickoff_hour_et(record: dict[str, Any] | None) -> int | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(_ET).hour
+
+
+def _et_date(raw: Any) -> date | None:
+    """Eastern calendar date from a games-row startDate.
+
+    Unlike _kickoff_hour_et this ignores startTimeTBD: a TBD clock time still has a
+    known date, which is all rest days needs. Eastern rather than UTC so a 10pm ET
+    west-coast kickoff stays on its own Saturday instead of rolling to Sunday and
+    shifting rest by a day.
+    """
+    if not raw:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(_ET).date()
 
 
 def _index_coach_seasons(

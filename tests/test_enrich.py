@@ -714,3 +714,16 @@ def test_enrich_ngt_defense_stats_none_when_file_absent(tmp_path):
     row = enrich_games(tmp_path, games)["1"]
     assert row["home_defense_ppa"] is None
     assert row["away_defense_successRate"] is None
+
+
+def test_et_date_keeps_late_kickoffs_on_their_own_day():
+    """A 10:30pm ET Saturday kickoff is 02:30 UTC Sunday. Reading it in UTC would
+    shift that game a day and skew both teams' rest by one."""
+    from datetime import date
+
+    from cfb_system_maker.enrich import _et_date
+
+    assert _et_date("2023-09-10T02:30:00.000Z") == date(2023, 9, 9)
+    assert _et_date("2023-09-09T16:00:00.000Z") == date(2023, 9, 9)
+    assert _et_date(None) is None
+    assert _et_date("not a date") is None

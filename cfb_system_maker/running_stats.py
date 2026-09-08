@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from cfb_system_maker.models import GameRecord
@@ -19,10 +20,12 @@ def compute_running_stats(
     ppa: dict[tuple[int, str], tuple[float | None, float | None]] | None = None,
     adv: dict[tuple[int, str], dict[str, float | None]] | None = None,
     start_dates: dict[int, str] | None = None,
+    kick_dates: dict[int, date] | None = None,
 ) -> dict[tuple[int, str], dict[str, Any]]:
     ppa = ppa or {}
     adv = adv or {}
     start_dates = start_dates or {}
+    kick_dates = kick_dates or {}
 
     by_team_season: dict[tuple[str, int], list[tuple[str, int, GameRecord, str]]] = {}
     for game in games:
@@ -42,12 +45,21 @@ def compute_running_stats(
         ppa_off_count = ppa_def_count = 0
         adv_sums: dict[str, float] = {out_key: 0.0 for out_key in _ADV_FIELDS}
         adv_counts: dict[str, int] = {out_key: 0 for out_key in _ADV_FIELDS}
+        prev_date: date | None = None
 
         for _sort_key, game_id, game, side in entries:
             decided = wins + losses
+            kick_date = kick_dates.get(game_id)
+            rest_days = (kick_date - prev_date).days if kick_date and prev_date else None
+            # Entries without a kickoff date sort to the tail of the season (the
+            # week fallback string sorts after every ISO date), so their neighbours'
+            # order is not trustworthy -- a non-positive gap means None, not 0.
+            if rest_days is not None and rest_days <= 0:
+                rest_days = None
             ats_decided = ats_wins + ats_losses
             stats[(game_id, team)] = {
                 "games_played": played,
+                "rest_days": rest_days,
                 "win_pct": round(wins / decided, 4) if decided else None,
                 "ats_pct": round(ats_wins / ats_decided, 4) if ats_decided else None,
                 "streak": streak,
@@ -59,6 +71,11 @@ def compute_running_stats(
                     for out_key in _ADV_FIELDS
                 },
             }
+
+            # Rest is schedule-derived, so it advances on every game -- including one
+            # with no score, which the result accumulators below skip. A missing date
+            # breaks the chain rather than measuring rest from two games back.
+            prev_date = kick_date
 
             team_points = game.home_points if side == "home" else game.away_points
             opponent_points = game.away_points if side == "home" else game.home_points
