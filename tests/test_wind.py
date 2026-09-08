@@ -22,10 +22,10 @@ def test_cardinal8_wraps():
     assert cardinal8(180.0) == "S"
 
 
-def test_headwind_on_axis():
+def test_along_axis_wind():
     out = derive(wind_direction_deg=180.0, wind_speed_mph=12.0, azimuth_deg=0.0)
-    assert out["wind_relative"] == "Headwind"
-    assert out["wind_relative_cardinal"] == "Headwind (S)"
+    assert out["wind_relative"] == "Head/Tail"
+    assert out["wind_relative_cardinal"] == "Head/Tail (S)"
     assert out["wind_axis_angle"] == 0.0
     assert out["wind_along_mph"] == 12.0
     assert out["wind_cross_mph"] == 0.0

@@ -232,7 +232,7 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "wind_relative_cardinal", "game_id", "categorical",
         description=(
             "Wind relative to the field's long axis, split by the compass point the wind "
-            "blows from: for example Crosswind (NW) or Headwind (S). Headwind means the wind "
+            "blows from: for example Crosswind (NW) or Head/Tail (S). Head/Tail means the wind "
             "runs goalpost to goalpost -- a headwind one direction and a tailwind the other, "
             "since teams swap ends. Calm below 3 mph, where direction is noise. Null indoors "
             "and at venues with no trustworthy field orientation (about 56% of games have one)."
@@ -242,7 +242,7 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         "wind_relative", "Wind vs Field", "weather", "computed_wind", "wind_relative",
         "game_id", "categorical",
         description=(
-            "Wind relative to the field's long axis, ignoring compass direction: Headwind "
+            "Wind relative to the field's long axis, ignoring compass direction: Head/Tail "
             "(within 30 degrees of the goalpost axis), Crosswind (within 30 degrees of "
             "sideline to sideline), Quartering in between, or Calm below 3 mph. Null indoors "
             "and where field orientation is unknown."
@@ -258,7 +258,7 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         ),
     ),
     FeatureDef(
-        "wind_along_mph", "Headwind Speed (mph)", "weather", "computed_wind", "wind_along_mph",
+        "wind_along_mph", "Head/Tail Speed (mph)", "weather", "computed_wind", "wind_along_mph",
         "game_id", "numeric",
         description=(
             "Component of wind speed blowing goalpost to goalpost (mph). Higher means more "

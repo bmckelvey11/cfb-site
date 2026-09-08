@@ -10,7 +10,7 @@ Conventions:
   *from* (CFBD's upstream weather provider, matching near-universal API practice).
 * ``azimuth_deg`` is the undirected field axis in [0, 180]. A football field is
   symmetric and teams swap ends each quarter, so an along-axis wind is a headwind
-  for one direction of play and a tailwind for the other. "Headwind" below names
+  for one direction of play and a tailwind for the other. "Head/Tail" below names
   that axis, not a specific offense.
 """
 
@@ -24,7 +24,7 @@ from typing import Any
 # metres away carry a real azimuth for the wrong polygon.
 MAX_PITCH_DIST_M = 50.0
 CALM_MPH = 3.0
-HEADWIND_MAX_ANGLE = 30.0
+ALONG_MAX_ANGLE = 30.0
 CROSSWIND_MIN_ANGLE = 60.0
 
 _CARDINALS = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")
@@ -92,8 +92,8 @@ def derive(
         result["wind_relative_cardinal"] = "Calm"
         return result
 
-    if angle <= HEADWIND_MAX_ANGLE:
-        relative = "Headwind"
+    if angle <= ALONG_MAX_ANGLE:
+        relative = "Head/Tail"
     elif angle >= CROSSWIND_MIN_ANGLE:
         relative = "Crosswind"
     else:
