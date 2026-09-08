@@ -3,6 +3,9 @@
 Scope: Prediction Tracker forecast evaluation, combination studies, preregistrations, and
 supporting scripts. Shared data, archive, and no-lookahead rules live in root `CLAUDE.md`.
 
+`docs/README.md` indexes every document, script, and data artifact in this tree, tagged to
+the margin era (closed) or the line-movement era (live). Start there.
+
 - Raw Prediction Tracker source belongs under `$CFB_DATA_ROOT/ingest/prediction_tracker/`.
 - Preserve preregistration order. Parent model-evaluation plan remains binding; addendum
   overrides only rules it names.

@@ -1,7 +1,15 @@
-# Prediction Tracker analysis — consolidated findings
+# Prediction Tracker analysis — consolidated findings, margin era
 
-Entry point for the whole line of work, 2026-08-29. Each section points at the document that
-carries the detail; nothing is restated here that those files already establish.
+> **Scope, added 2026-09-08.** This document consolidates the work through 2026-08-29, all of
+> which targets the **game margin against the closing line**. That target is closed: the null
+> below is tight, not underpowered. The work moved on 2026-09-02 to predicting **line
+> movement** — the close from an early line — where the same estimators succeed. A null
+> recorded here is not a gate against trying that method on the movement target.
+> `README.md` is the entry point for the whole line of work; `line-movement-results.md` is the
+> live result.
+
+Each section points at the document that carries the detail; nothing is restated here that
+those files already establish.
 
 | Document | What it holds |
 |---|---|

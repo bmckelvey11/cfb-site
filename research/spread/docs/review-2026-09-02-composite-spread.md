@@ -91,15 +91,23 @@ Average **book lines**, not model outputs: the book fair, not the model consensu
    season-clustered CI, both seasons. This is the edge the handoff's §3 hints at, measured
    properly. It is an edge over *a* book, never over the market, and that is the only kind the
    evidence supports. Done when: one script, one table, dispersion tail explained.
+   **Done 2026-09-02** — `prereg-line-shopping.md` → `eval_line_shopping.py` →
+   `line-shopping-results.md`.
 2. **Keep the forward timing test running; close the logging gap** (§2). It is the only asset
    that appreciates. Watch `corr(line move, edge_vs_open)`; it was +0.988 in week 1.
+   **Done 2026-09-02** — `collect_line_timing.py snapshot` now invokes `predict_upcoming.py`
+   and `weekly_slate.py` on every new snapshot, so the forward log fills itself. `pt_rollover.py`
+   (2026-09-08) detects the weekly slate flip so a wait loop can gate on it.
 3. **Totals are where the user's own money says the edge is** (58.0% on 231 bets, CLV +0.45,
    results grade with CLV). Out of scope for this tree, but it should absorb the modelling
    effort the spread work no longer deserves.
+   **Not done — out of scope for this tree, by design.** Belongs to `models/totals/`.
 4. **Scope the nulls correctly.** Another combiner, a recency scheme, a cohort correction or a
    spread GBM each has a recorded null *as a margin forecast against the close*. That is not a
    reason to skip them against the line-movement target (§6, `prereg-line-movement.md`), where
    the same estimators succeed.
+   **Done 2026-09-02** — scoped in `research/spread/CLAUDE.md` and bannered at the top of
+   `prediction-tracker-findings.md`.
 
 If a midweek fair-value number is wanted for reference, serve E4 from the latest snapshot,
 not the raw median: the raw median disagrees with the close by 2 points on a typical game and
