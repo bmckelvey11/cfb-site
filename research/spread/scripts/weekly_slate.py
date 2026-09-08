@@ -46,9 +46,11 @@ import predict_upcoming as pu  # noqa: E402
 import collect_line_timing as clt  # noqa: E402
 
 BENCH = "lineopen"
-# Modal hyperparameter choice across the 20 walk-forward seasons of the movement runs
-# (version A for E6; amendment A2 for the rest). E13 (Hedge) is omitted: weakest method and
-# it needs sequential state that does not apply to a one-shot live fit.
+# Modal hyperparameter choice across the 20 walk-forward seasons of the movement runs:
+# `chosen_params` in {CFB_DATA_ROOT}/processed/pt_movement.json (version A, E6) and
+# pt_movement_a2.json (the rest). E6's 1e4 is the grid edge; line-movement-results.md records
+# that a wider grid over-shrank and a finer one below 1e4 is untested, so it stays. E13 (Hedge)
+# is omitted: weakest method and it needs sequential state that a one-shot live fit lacks.
 PARAMS = {"E6": 10000.0, "E7": "all", "E8": 0.3, "E9": 1, "E10": 1.0, "E11": 0.4,
           "E12": (10.0, 0.1), "E14": 1}
 MODEL_COLS = ["E4", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E14"]
@@ -307,7 +309,10 @@ def main() -> int:
     stamp = snap.stem.split("_")[-1]
     path = OUT / f"weekly_slate_{stamp}.csv"
     t.drop(columns=[c for c in ("quotes", "key", "rkey") if c in t]).to_csv(path, index=False)
-    n = append_forward_log(t)
+    # A snapshot with no book match is a stale slate (PT still serving last week's games after
+    # they kicked off); logging it would add ungradable rows to version B's dataset.
+    stale = (not args.no_books) and "event_id" in t and t.event_id.isna().all()
+    n = 0 if stale else append_forward_log(t)
     print(f"\nwrote {path}; appended {n} rows to {FORWARD_LOG.name}")
     return 0
 

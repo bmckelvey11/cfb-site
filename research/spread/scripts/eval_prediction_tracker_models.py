@@ -1,6 +1,6 @@
 """Rank the Prediction Tracker models and build a walk-forward ensemble spread.
 
-Implements research/spread/docs/prediction-tracker-model-eval-plan.md. Read that first -- the estimand,
+Implements archive/spread-margin-era/prediction-tracker-model-eval-plan.md. Read that first -- the estimand,
 the dual open/close benchmark, the pre-registration of E4, the volatility definition and
 the multiplicity budget are all fixed there, before any of this was fit.
 
@@ -36,6 +36,11 @@ SRC = cfb_paths.INGEST / "prediction_tracker_lines.csv"
 OUT_DIR = cfb_paths.PROCESSED
 BURN_IN_THROUGH = 2005  # seasons <= this are fitting-only; evaluation starts 2006
 SCREEN_K = 20  # E3/E4 keep the top-K models by prior-season skill (fixed in the plan)
+# Not models: both reprint a market line under a model name (`lineca` IS the close on two
+# thirds of its games). Excluded from every screen and, when the close is the target, from the
+# regressors -- leaving them in would be leakage of the target. One definition, imported by
+# every live script.
+MARKET_LINES = {"lineca", "linemidweek"}
 CLEAN_COVERAGE = 0.95  # leaderboard restricts to model-seasons at/above this coverage
 RIDGE_ALPHA = 10.0
 N_BOOT = 2000

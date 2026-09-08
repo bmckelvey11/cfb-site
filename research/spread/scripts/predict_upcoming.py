@@ -4,7 +4,7 @@ READ THIS BEFORE USING THE OUTPUT.
 
   1. Against the CLOSING line there is no edge. Ten combination rules were tried; the best
      Holm-adjusted p is 0.4865. If the number you can actually bet is the close, this
-     predicts nothing. See research/spread/docs/prediction-tracker-findings.md.
+     predicts nothing. See archive/spread-margin-era/prediction-tracker-findings.md.
   2. Against the OPENING line the measured effect is real (-2.615 MSE, 20 of 20 seasons)
      but it is an UPPER BOUND, not a strategy: the historical archive carries no
      publication timestamp, so it cannot be shown the forecast existed before the open.
@@ -51,13 +51,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eval_prediction_tracker_models as base  # noqa: E402
 import eval_combination_sweep as sweep  # noqa: E402
 from build_prediction_tracker import UNSIGNED_LINES  # noqa: E402
+from collect_line_timing import SNAP_DIR  # noqa: E402
 
-SNAP_DIR = base.cfb_paths.INGEST / "pt_snapshots"
 LOG = base.OUT_DIR / "pt_upcoming_predictions.csv"
-
-# Not models. Both reproduce the market line under a model name, so they would top any
-# skill screen and consume slots in the K=20. See research/spread/docs/prediction-tracker-findings.md.
-MARKET_LINES = {"lineca", "linemidweek"}
+MARKET_LINES = base.MARKET_LINES
 
 
 def latest_snapshot():

@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eval_prediction_tracker_models as base  # noqa: E402
 import eval_combination_sweep as sweep  # noqa: E402
 
-MARKET_LINES = {"lineca", "linemidweek"}
+MARKET_LINES = base.MARKET_LINES
 METHODS = ["E6", "E7", "E14"]          # M3 ridge, M2 k-by-rule, M4 screened CSR (version A)
 METHODS_A2 = ["E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14"]  # amendment A2
 WIDE_LAMBDA = [10.0, 100.0, 1000.0, 1e4, 1e5, 1e6]
@@ -48,8 +48,10 @@ def main() -> int:
     global METHODS
     ap = argparse.ArgumentParser()
     ap.add_argument("--amend", action="store_true", help="amendment A2: all methods, wide ridge grid")
+    ap.add_argument("--decontaminate", action="store_true",
+                    help="drop the top decile of models by corr(f_i - open, close - open) first")
     args = ap.parse_args()
-    suffix = "_a2" if args.amend else ""
+    suffix = ("_a2" if args.amend else "") + ("_decon" if args.decontaminate else "")
     grids = None
     if args.amend:
         METHODS = METHODS_A2
@@ -58,6 +60,26 @@ def main() -> int:
     df, models = base.load()
     models = [m for m in models if m not in MARKET_LINES]
     df = df[df["line"].notna() & df["lineopen"].notna()].reset_index(drop=True)
+    dropped = []
+    if args.decontaminate:
+        # Decontamination (review 2026-09-08 §1.1). A column that reprints the mid-week line
+        # predicts close - open mechanically. rho_i = corr(f_i - open, close - open) on the
+        # model's own games; the top decile is removed BEFORE anything is fitted. Full-sample
+        # rho is a filter on the regressor set, not a target-informed selection, so it can only
+        # cost the methods accuracy -- there is no optimistic bias in using it.
+        open_m, close_m = -df["lineopen"].to_numpy(float), -df["line"].to_numpy(float)
+        move = close_m - open_m
+        rho = {}
+        for m in models:
+            f = -df[m].to_numpy(float)
+            ok = np.isfinite(f) & np.isfinite(move)
+            if ok.sum() >= 400 and (f[ok] - open_m[ok]).std() > 0:
+                rho[m] = float(np.corrcoef(f[ok] - open_m[ok], move[ok])[0, 1])
+        cut = float(np.quantile(list(rho.values()), 0.90))
+        dropped = sorted((m for m, r in rho.items() if r >= cut), key=rho.get, reverse=True)
+        models = [m for m in models if m not in set(dropped)]
+        print(f"decontaminate: dropped {len(dropped)} models at rho >= {cut:.3f}: "
+              + ", ".join(f"{m} ({rho[m]:.2f})" for m in dropped))
     df["margin"] = df["y"]                    # keep the real outcome for the decay curve
     df["y"] = -df["line"].to_numpy(float)     # TARGET: the close, in margin space
     print(f"{len(df)} games with open and close, {len(models)} models, "
@@ -79,7 +101,8 @@ def main() -> int:
     print(f"\n-- common support n={n}, seasons {seasons[0]}-{seasons[-1]} --")
     print(f"   sd(close - open) on support: {move[sup].std():.3f}")
 
-    out = {"n": n, "seasons": [int(s) for s in seasons], "sd_move": float(move[sup].std())}
+    out = {"n": n, "seasons": [int(s) for s in seasons], "sd_move": float(move[sup].std()),
+           "n_models": len(models), "dropped_models": dropped}
     rows = []
     r0 = preds["R0"]
     base_mse = float(((y - open_m) ** 2)[sup].mean())     # M0: no movement
