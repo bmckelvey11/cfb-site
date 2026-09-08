@@ -14,6 +14,14 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
   move_vs_fair pred_close - book_fair: where the models say the line still has to go.
                Positive = toward the home side being favored by more.
   best_home / best_away   the most favorable posted number for each side, and its book
+  side         which team E4 (the registered predictor, the one version B grades) says to
+               take: home when E4 sits above the book fair, road when below
+  side_line    the number to take for that side, from that side's perspective (+3.5 = getting
+               3.5), at the best book; PT's line when no book matched
+  side_book    where that number is posted
+  edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1
+
+Every run writes weekly_slate_<stamp>.csv and overwrites weekly_slate_latest.csv.
 
 Everything here is anchored on the OPENER because that is what the archive could validate.
 The archive says the move from the opener is predictable (gamma 0.30, R^2 up to 0.25) and
@@ -264,8 +272,37 @@ def build(snapshot: Path, with_books: bool) -> pd.DataFrame:
         if len(unmatched) == len(t):
             print("  ALL games unmatched -- the snapshot is almost certainly a different week "
                   "than the books. book_fair/move_vs_fair are unavailable, not zero.")
+    t = add_side(t)
     t.insert(0, "snapshot", snapshot.name)
     t.insert(1, "captured_utc", snapshot.stem.split("_")[-1])
+    return t
+
+
+def add_side(t: pd.DataFrame) -> pd.DataFrame:
+    """Which side E4 says to take, the number to take it at, and the edge in points.
+
+    PT sign: E4 above fair means the models favour the home team by more than the market,
+    so take the home side; below, take the road side. The line is expressed from the chosen
+    side's perspective (+3.5 = getting 3.5) so it reads like a slip.
+    """
+    have_books = "fair_pt" in t and t.fair_pt.notna().any()
+    fair = t.fair_pt if have_books else t.line_pt
+    fair = fair.fillna(t.line_pt)
+    gap = t.E4 - fair
+    home = gap > 0
+    if have_books:
+        home_num = t.best_home_pt.fillna(t.line_pt)
+        away_num = t.best_away_pt.fillna(t.line_pt)
+        home_book = t.best_home_book.where(t.best_home_pt.notna(), "PT")
+        away_book = t.best_away_book.where(t.best_away_pt.notna(), "PT")
+    else:
+        home_num = away_num = t.line_pt
+        home_book = away_book = pd.Series("PT", index=t.index)
+    t["side"] = np.where(gap.isna() | (gap == 0), "", np.where(home, t.home, t.road))
+    t["side_line"] = np.where(home, -home_num, away_num).round(1)
+    t["side_book"] = np.where(home, home_book, away_book)
+    t.loc[t.side == "", ["side_line", "side_book"]] = [np.nan, ""]
+    t["edge"] = gap.abs().round(2)
     return t
 
 
@@ -316,7 +353,9 @@ def main() -> int:
     report(t, with_books=not args.no_books)
     stamp = snap.stem.split("_")[-1]
     path = OUT / f"weekly_slate_{stamp}.csv"
-    t.drop(columns=[c for c in ("quotes", "key", "rkey") if c in t]).to_csv(path, index=False)
+    out = t.drop(columns=[c for c in ("quotes", "key", "rkey") if c in t])
+    out.to_csv(path, index=False)
+    out.to_csv(OUT / "weekly_slate_latest.csv", index=False)
     # A snapshot with no book match is a stale slate (PT still serving last week's games after
     # they kicked off); logging it would add ungradable rows to version B's dataset.
     stale = (not args.no_books) and "event_id" in t and t.event_id.isna().all()
@@ -341,6 +380,14 @@ def _check() -> None:
                              ("Central Florida", "UCF"), ("Texas-San Antonio", "UTSA"),
                              ("Louisiana-Lafayette", "Louisiana"), ("Virginia Tech", "VA Tech")]:
         assert norm(pt_name) == norm(an_name), (pt_name, an_name, norm(pt_name), norm(an_name))
+    # side: E4 above fair -> home at the best home number (shown as a home line);
+    # below -> road at the best road number (shown as points received)
+    s = add_side(pd.DataFrame({"home": ["Auburn", "LSU"], "road": ["S Miss", "La Tech"], "line_pt": [33.5, 35.5],
+                               "E4": [28.5, 36.5], "fair_pt": [33.5, 35.5], "best_home_pt": [32.5, 36.0],
+                               "best_away_pt": [34.0, 35.5], "best_home_book": ["BetMGM", "Caesars"],
+                               "best_away_book": ["Bet365", "Pinnacle"]}))
+    assert s.side.tolist() == ["S Miss", "LSU"] and s.side_line.tolist() == [34.0, -36.0], s
+    assert s.side_book.tolist() == ["Bet365", "Caesars"] and s.edge.tolist() == [5.0, 1.0], s
     q = {"68": (-7.5, -110), "69": (-7.0, -110), "71": (18.0, -110)}
     s = shop(q)
     assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # Caesars' 18 was guarded out
