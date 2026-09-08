@@ -40,3 +40,14 @@ human-facing product intent. None should duplicate another file's rules.
 `archive/` contains documents superseded by later answers. Retain them for audit history,
 but never cite them as current. Historical `.planning/` records remain in place and may
 contain old paths; do not rewrite them merely to modernize history.
+
+## Git: splitting a mixed unit
+
+Global `CLAUDE.md` §5 governs auto-commit and auto-push. When a finished unit holds more than one logical change (a feature tangled with a fix, a refactor mixed into new behavior, two unrelated fixes, or one file whose hunks serve different purposes):
+
+- Group by concern. Present the grouping and wait — that's the only pause.
+- Stage by path, never `git add .`. Use `git add -p` when one file holds two concerns.
+- Confirm with `git diff --staged` before each commit.
+- After the grouping is confirmed, commit and push per §5. Don't ask again.
+- Full test suite once before splitting, once after the last commit.
+- Conventional Commits, subject ≤72 chars. `revert` is not an accepted type here.
