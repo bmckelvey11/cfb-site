@@ -106,6 +106,11 @@ acceptance criteria — a flattener that does not handle all five is not done:
 6. **Weekly files only.** Per S2 the grain is `(season, week, entity)`; a leaderboard file
    with no `_wk` in its name is a legacy season-to-date snapshot and is not a row source.
 
+The target shape is [`pff-sample-schema.sql`](pff-sample-schema.sql) — runnable DuckDB DDL
+for one table per family, with these six criteria already expressed as column types, keys
+and constraints. It supersedes §3's `week = 0` and `player_game_count` conventions, both of
+which S2 invalidated.
+
 **Done when:** `data/processed/pff/` holds every table in §3 of the schema doc for 2025,
 a test asserts each of the five above on a fixture, and `audit_pff_pull.py` still reports
 2025 clean afterwards (the flattener must not write into `data/raw/`).
@@ -188,9 +193,11 @@ from the leaderboards, so dropping them is a data decision, not a free win.
 Saving: **16 min a season, 3.0 h over an 11-season backfill.**
 
 **2. `team-rushing-direction` is pulled twice for one answer.** PFF ignores the `table`
-parameter: `_rows.json` and `_totals.json` are byte-identical for all 136 franchises. Drop
-one call, or find the parameter that actually splits the views. Saving: 136 reads a season
-(~1.5 min), and 1,632 junk files across a backfill.
+parameter: `_rows.json` and `_totals.json` are byte-identical for all 136 franchises.
+**Nothing is lost by dropping one** — the body already holds both views, `rows`
+(player-grain) and `teamTotals` (franchise-grain), over the same direction vocabulary. Two
+tables from one file. Saving: 136 reads a season (~1.5 min), and 1,632 junk files across a
+backfill.
 
 **3. `facet-passing-detail` stays out.** Already in `SKIP_FACETS` — the union of the other
 four passing facets, and it hangs. Confirm nothing re-adds it.
@@ -256,3 +263,29 @@ The overlap work also surfaced a latent hole in the audit: a team report's envel
 `ENVELOPE` knew about, and `team` is a 4-key dict — so a report with `rows: []` would have
 counted 4 and read as usable. All 2,584 `team_report` files sat behind that hole. `rows` is
 decisive now where present, and the envelope set is complete. 2025 still audits clean.
+
+### 2026-09-08 — sample schema, and three corrections it forced
+
+Wrote [`pff-sample-schema.sql`](pff-sample-schema.sql): runnable DuckDB DDL for one table
+per family (dimension, long split fact, wide fact with an extra key part, team-grain fact),
+so S3 and S5 build against a shape rather than a paragraph. Verified by executing it — six
+tables create, the season-to-date window query parses and runs, the `direction` CHECK
+fires.
+
+Grounding it in real 2025 columns rather than the §3 prose turned up three things:
+
+- **`player_game_count` is 1 on every weekly row** (all 21 weeks of `facet_passing_summary`
+  checked). §3 carries it as a fact column on ten tables; under the S2 weekly grain it
+  holds nothing. Games played is `COUNT(DISTINCT week)`. Dropped from the sample.
+- **`week = 0` has nothing to mark.** §3 reserved it for season-aggregate rows; S2 removed
+  season files as a row source, so weeks are just 0–20 and the sentinel is gone.
+- **The `team-rushing-direction` duplicate is cheaper than it looked, and §3's direction
+  list is wrong.** The body holds both views — `rows` player-grain and `teamTotals`
+  franchise-grain — so dropping the second call loses nothing and yields two tables from
+  one file. And `direction` takes 19 values, not the 8 gaps §3 lists: end-around and
+  jet-sweep by side (`EA-L/R`, `JS-L/R`), designed QB runs and scrambles (`QBK`, `QBSc`,
+  `QBSn`, `QBT`, `QBF`), and `R-L`/`R-R`.
+
+The signature line report was also mis-described from memory: it is franchise-grain (216
+rows, 216 distinct franchises — all-division, per c406dcb) and carries `pbe`, `pass_snaps`
+and `attempts`, not the `grades_pass_block` and `snap_counts_pass_block` first drafted.
