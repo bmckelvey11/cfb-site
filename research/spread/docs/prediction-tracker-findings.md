@@ -11,6 +11,8 @@
 Each section points at the document that carries the detail; nothing is restated here that
 those files already establish.
 
+The margin-era documents only. `README.md` indexes both eras and the scripts.
+
 | Document | What it holds |
 |---|---|
 | `prediction-tracker.md` | The joined dataset: 154 model columns, 17,731 games, 2001–2025, column dictionary |
