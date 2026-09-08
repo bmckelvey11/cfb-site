@@ -108,13 +108,26 @@ def _fetch(args: argparse.Namespace) -> int:
 
 
 def _build(args: argparse.Namespace) -> int:
+    rebuilt_seasons = set(args.seasons)
     records = []
     for season in args.seasons:
         games = load_raw_json(args.data_dir, "games", season)
         lines = load_raw_json(args.data_dir, "lines", season)
         records.extend(normalize_games(games, lines, provider=args.provider))
-    save_processed_games(args.data_dir, records)
-    print(f"Built processed table with {len(records)} game(s).")
+
+    try:
+        existing = load_processed_games(args.data_dir)
+    except FileNotFoundError:
+        existing = []
+    kept = [g for g in existing if g.season not in rebuilt_seasons]
+
+    merged = kept + records
+    save_processed_games(args.data_dir, merged)
+    print(
+        f"Built {len(records)} game(s) for season(s) {sorted(rebuilt_seasons)}; "
+        f"kept {len(kept)} existing game(s) from other seasons "
+        f"(games.csv now has {len(merged)} total)."
+    )
     return 0
 
 
