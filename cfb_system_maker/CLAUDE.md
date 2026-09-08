@@ -124,7 +124,11 @@ Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
   `scripts/actionnetwork_flatten.py` walks it into
   `data/processed/actionnetwork/an_history_tick.csv`, which loads straight to
   `stg.an_history_tick` (one row per offering per `updated_at`, `line_status='opener'` on the
-  first). Re-run the flatten after any scrape — the loader takes the CSV as it finds it.
+  first). Re-run the flatten after any scrape — `refresh_cfbd.py` does it for you. The CSV
+  loads against `duckdb_load._AN_TICK_COLUMNS`, not `read_csv_auto`: the id columns must stay
+  VARCHAR/VARCHAR/INTEGER to match `an_history` and `an_market`, and `columns=` maps
+  positionally, so `actionnetwork_flatten.COLUMNS` and that dict have to stay in the same
+  order. `scripts/migrate_an_history_tick.py` retypes a warehouse loaded before the pin.
 - **New statistics:** tempo and similar values belong in `FEATURE_REGISTRY`, not new
   `games.csv` columns or tables. Compute from `stg.drives` or `stg.plays`.
 - **Spread sign convention:** `GameRecord.spread` is always the **home** spread. `_side_spread` negates it for away. A bet covers when `team_points + side_spread - opponent_points > 0`. Preserve this when touching grading.

@@ -10,17 +10,24 @@ a history file carries a nested `history[]` of timestamped `{value, odds,
 line_status}` entries; `duckdb_load._explode_an_history` reads only the offer's
 top-level snapshot, so `stg.an_history` holds closing prices and no movement.
 
-Only the full-game files `collect_line_timing.py` writes (`history_event_*.json`)
-actually carry ticks -- the 2026-08 bulk backfill of 1H/1Q periods came back with
-`history: []` on every offer, so it contributes offers and no rows. That is a
-property of the payloads on disk, not a bug here: `--report` prints the split.
+Nearly all the ticks come from the full-game files `collect_line_timing.py`
+writes (`history_event_*.json`); the 2026-08 bulk backfill of 1H/1Q periods came
+back with `history: []` on all but nine of its ~10.9k files, so it contributes a
+great many offers and almost no rows. Both globs are read -- those nine are where
+the `firsthalf`/`firstquarter` rows come from. That split is a property of the
+payloads on disk, not a bug here, and `--report` prints it.
+
+The same reason bounds coverage: only events AN still served a history for when
+the collector ran have ticks at all. Seasons before 2026 are closed out upstream,
+so their silence is permanent, not a gap left to backfill.
 
     python scripts/actionnetwork_flatten.py
     python scripts/actionnetwork_flatten.py --report     # counts only, write nothing
     python scripts/actionnetwork_flatten.py --validate   # re-read the written CSV
 
-Nothing loads this yet. `duckdb_load._plan_loads` would take it the way it takes
-`processed/massey/*.csv` -- straight to `stg`, no raw twin -- once the shape is agreed.
+`duckdb_load._plan_loads` loads the CSV the way it takes `processed/massey/*.csv`
+-- straight to `stg`, no raw twin -- against the schema pinned in
+`duckdb_load._AN_TICK_COLUMNS`. Change `COLUMNS` here and change that with it.
 """
 
 from __future__ import annotations

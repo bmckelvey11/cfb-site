@@ -1192,6 +1192,11 @@ def test_tick_csv_loads_into_stg_with_a_real_timestamp(tmp_path):
     }
     assert types["updated_at"] == "TIMESTAMP WITH TIME ZONE"
     assert types["line"] == "DOUBLE"
+    # Pinned, not sniffed: read_csv_auto would call these ids BIGINT, and
+    # stg.an_history / stg.an_market hold the same three as VARCHAR/VARCHAR/INTEGER.
+    assert types["market_id"] == "VARCHAR"
+    assert types["outcome_id"] == "VARCHAR"
+    assert types["book_id"] == "INTEGER"
     # Ordering by the timestamp is the query this table exists to serve.
     assert con.execute(
         "SELECT line FROM stg.an_history_tick ORDER BY updated_at"

@@ -1756,6 +1756,31 @@ _MASSEY_TABLES = ("massey_teams", "massey_systems", "massey_editions", "massey_r
 # it loads straight to `stg` like massey, no raw twin.
 _AN_TICK_TABLE = "an_history_tick"
 
+# Pinned rather than sniffed. `read_csv_auto` would type the id columns from
+# whatever happens to be in the file -- BIGINT while every id parses, VARCHAR the
+# first time one does not -- and the flatten regenerates this CSV on every
+# `refresh_cfbd.py` run. `stg.an_history` and `stg.an_market` come out of
+# `_AN_OFFERING_COLS`, where market_id/outcome_id are `json_extract_string` and
+# book_id is an INTEGER cast; matching them here is what lets the three AN tables
+# join without a cast on either side.
+_AN_TICK_COLUMNS = {
+    "event_id": "BIGINT",
+    "book_id": "INTEGER",
+    "period": "VARCHAR",
+    "market_type": "VARCHAR",
+    "side": "VARCHAR",
+    "team_id": "BIGINT",
+    "market_id": "VARCHAR",
+    "outcome_id": "VARCHAR",
+    "is_alt_market": "BOOLEAN",
+    "is_live": "BOOLEAN",
+    "updated_at": "TIMESTAMP WITH TIME ZONE",
+    "line": "DOUBLE",
+    "odds": "BIGINT",
+    "line_status": "VARCHAR",
+    "_source_file": "VARCHAR",
+}
+
 
 def _plan_loads(
     data_dir: Path,
@@ -1814,6 +1839,7 @@ def _plan_loads(
                     "name": _AN_TICK_TABLE,
                     "paths": [tick_path],
                     "format": "csv",
+                    "columns": _AN_TICK_COLUMNS,
                 }
             )
 
@@ -1865,7 +1891,7 @@ def _load_job(con: duckdb.DuckDBPyConnection, job: dict[str, Any]) -> TableLoad:
     try:
         if job["format"] == "csv":
             con.execute(
-                f"CREATE TABLE {table} AS SELECT * FROM read_csv_auto({_sql_path_list(paths)})"
+                f"CREATE TABLE {table} AS SELECT * FROM {_csv_source(job, paths)}"
             )
         else:
             con.execute(_JSON_TABLE_SQL.format(table=table))
@@ -1888,6 +1914,15 @@ def _load_job(con: duckdb.DuckDBPyConnection, job: dict[str, Any]) -> TableLoad:
             0,
             error=f"{type(exc).__name__}: {detail}",
         )
+
+
+def _csv_source(job: dict[str, Any], paths: list[Path]) -> str:
+    """`read_csv` with the job's pinned schema, else sniff it."""
+    columns = job.get("columns")
+    if not columns:
+        return f"read_csv_auto({_sql_path_list(paths)})"
+    spec = ", ".join(f"'{name}': '{dtype}'" for name, dtype in columns.items())
+    return f"read_csv({_sql_path_list(paths)}, header = true, columns = {{{spec}}})"
 
 
 def _insert_json_file(con: duckdb.DuckDBPyConnection, table: str, path: Path) -> None:
