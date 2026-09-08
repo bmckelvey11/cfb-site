@@ -287,6 +287,37 @@ An export with **no rows and no header line** means the account isn't entitled t
 report. Re-run without `--export` to see `restricted`. (An entitled export with no matching records
 still has its header line.)
 
+### Exports that lie — verified 2026-09-08, NCAA 2026
+
+That entitlement explanation is PFF's, and it is not the only cause of an empty export. Pulling all
+28 NCAA facet leaderboards turned up three separate failures, none of which set a non-zero exit
+status. **Restish exits 0 on all of them**, so a script that trusts the exit code writes garbage.
+
+**1. Blank CSV, working JSON.** `facet-offense-summary`, `facet-passing-detail` and
+`facet-rushing-direction` answer `--export true` with the *correct number of lines and nothing on
+any of them* — 7,624 bytes of bare CRLF for offense-summary, one blank line per JSON row. The same
+query without `--export` returns full data (3,811 × 25, 251 × 908, 898 × 11). Entitlement is fine;
+the CSV writer is broken. Take the JSON.
+
+**2. Upstream 500.** `facet-receiving-coverage` and `facet-defense-coverage-matchup` fail for NCAA
+2026 in every format, after two internal retries:
+
+```json
+{"error":{"code":"upstream_error","details":{"upstream_status":500},"message":"The upstream failed with status 500","request_id":"…"}}
+```
+
+The error envelope is written to **stdout**, so with `--rsh-print b > file.csv` it lands *in the CSV*
+and stderr carries only restish's retry chatter. Parse the body for `error.code`; don't read stderr.
+
+**3. Reports that never answer.** `facet-offense-summary` hung for 15 minutes at zero bytes and had
+to be killed — the same command that had returned (blank) five minutes earlier, with
+`x-ratelimit-remaining: 99`, so not throttling. Intermittent, server-side. Always set a timeout on a
+bulk run.
+
+What a caller has to check, in order: non-zero exit; then `error.code` in the body; then that the
+first non-blank line actually contains a comma. [`scripts/pull_pff_facet.py`](../scripts/pull_pff_facet.py)
+does all three, falls back to JSON on a blank CSV, and takes `--timeout` (default 180s).
+
 ### Where exports go in this repo
 
 `data/` is gitignored and `CFB_DATA_ROOT` resolves through root `cfb_paths.py`. Land PFF pulls
