@@ -41,8 +41,9 @@ data/processed/pff/team_game.csv is rebuilt from every season on disk: one row p
 (game, team) with own and opponent grades, home/away, points, kickoff, FBS flags.
 A game's grades are a *result* of that game -- pre-game features roll earlier weeks.
 
-Files already on disk are skipped, except in the current season, which grows weekly;
---force re-pulls. A 429 sleeps to the next wall-clock minute and retries once. stdin
+The run is planned before it starts, so the progress bar knows its total: elapsed,
+ETA and rate per tier (reads, then exports). Files already on disk are skipped,
+except in the current season, which grows weekly; --force re-pulls. A 429 sleeps to the next wall-clock minute and retries once. stdin
 is closed on every restish call: with a terminal attached it waits forever from a
 non-interactive shell.
 """
@@ -56,6 +57,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cfb_paths import DATA_ROOT, current_season  # noqa: E402
@@ -215,6 +218,13 @@ def flatten_team_games(team_dir: Path, seasons: list[int], fbs: set[int] = froze
 
 # ---------------------------------------------------------------- main
 
+def progress(items, unit: str):
+    """tqdm with a clock; on a log file (no TTY) it prints a line every 30 s instead."""
+    tty = sys.stderr.isatty()
+    return tqdm(items, unit=unit, desc=unit + "s", dynamic_ncols=True, file=sys.stderr,
+                mininterval=1 if tty else 30, disable=not items)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seasons", default=str(current_season()),
@@ -241,53 +251,55 @@ def main() -> None:
     binary = restish_bin()
     env = {**os.environ, "PFF_API": api_key()}
     live = current_season()
-    failures = 0
+    started = time.monotonic()
+    failures: list[str] = []
 
-    def pull(op_id: str, values: dict, dest: Path, season: int | None = None) -> bool:
-        nonlocal failures
-        if not args.force and dest.exists() and dest.stat().st_size and season != live:
-            return True
-        label = " ".join(command(ops, op_id, values))
-        if args.dry_run:
-            print(f"would pull {label} -> {dest.relative_to(args.out_dir)}")
-            return True
+    def wanted(dest: Path, season: int | None) -> bool:
+        return args.force or not dest.exists() or not dest.stat().st_size or season == live
+
+    def read_now(op_id: str, values: dict, dest: Path, season: int | None = None) -> None:
+        """Reference reads run before planning, because the plan depends on them."""
+        if not wanted(dest, season) or args.dry_run:
+            return
         err = read_json(binary, command(ops, op_id, values), dest, env, args.timeout)
-        print(f"{'FAIL' if err else 'ok  '} {label}" + (f": {err}" if err else ""), flush=True)
+        if err:
+            failures.append(f"{op_id}: {err}")
         time.sleep(READ_PACING_SECONDS)
-        failures += bool(err)
-        return err is None
 
     # 1. reference -------------------------------------------------------------
     leagues_path = team_dir / "leagues.json"
-    pull("ref-leagues", {}, leagues_path, live)
-    pull("team-list", {"league": "ncaa"}, team_dir / "schedule.json", live)
+    read_now("ref-leagues", {}, leagues_path, live)
+    read_now("team-list", {"league": "ncaa"}, team_dir / "schedule.json", live)
     directories = {}
     for season in seasons:
         dest = team_dir / f"team_directory_{season}.json"
-        pull("team-directory", {"league": "ncaa", "season": season}, dest, season)
+        read_now("team-directory", {"league": "ncaa", "season": season}, dest, season)
         if dest.exists():
             directories[season] = json.loads(dest.read_text(encoding="utf-8"))
-    if args.dry_run and not (leagues_path.exists() and directories):
-        print("dry run needs leagues.json and a team_directory on disk; run once without --dry-run")
-        return
+    if not (leagues_path.exists() and directories):
+        raise SystemExit("no leagues.json / team_directory on disk" + (" -- run once without --dry-run" if args.dry_run else ""))
     weeks = ncaa_weeks(json.loads(leagues_path.read_text(encoding="utf-8")))
     if args.weeks:
         weeks = [w for w in parse_seasons(args.weeks) if w in weeks]
-    print(f"{len(seasons)} seasons x {len(weeks)} weeks")
 
-    # 2. core: per (season, week), league-wide ---------------------------------
-    for season in seasons:
+    # 2. plan every read ------------------------------------------------------
+    reads: list[tuple[str, dict, Path, int | None]] = []
+
+    def plan(op_id: str, values: dict, dest: Path, season: int | None = None) -> None:
+        if wanted(dest, season):
+            reads.append((op_id, values, dest, season))
+
+    for season in seasons:  # core: league-wide, per (season, week)
         for week in weeks:
-            pull("ref-games", {"league": "ncaa", "season": season, "week": week},
+            plan("ref-games", {"league": "ncaa", "season": season, "week": week},
                  team_dir / f"games_{season}_wk{week}.json", season)
-            pull("team-overview", {"league": "ncaa", "season": season, "week": week},
+            plan("team-overview", {"league": "ncaa", "season": season, "week": week},
                  team_dir / f"team_overview_{season}_wk{week}.json", season)
             for cat in TEAM_STATS_CATEGORIES:
-                pull("team-stats", {"league": "ncaa", "season": season, "weekIds": week, "category": cat},
+                plan("team-stats", {"league": "ncaa", "season": season, "weekIds": week, "category": cat},
                      team_dir / f"team_stats_{season}_wk{week}_{cat}.json", season)
 
-    # 3. per team ---------------------------------------------------------------
-    if args.team_reports:
+    if args.team_reports:  # per team
         for season in seasons:
             teams = fbs_rows(directories.get(season, {"rows": []}))
             if args.teams:
@@ -296,33 +308,32 @@ def main() -> None:
             for t in teams:
                 slug, fid = t["slug"], t["franchiseId"]
                 base = {"league": "ncaa", "team": slug, "season": season}
-                pull("team-schedule", base, team_dir / f"team_schedule_{season}_{slug}.json", season)
-                pull("team-roster", base, team_dir / f"roster_{season}_{slug}.json", season)
+                plan("team-schedule", base, team_dir / f"team_schedule_{season}_{slug}.json", season)
+                plan("team-roster", base, team_dir / f"roster_{season}_{slug}.json", season)
                 for group in TEAM_LEADER_GROUPS:
-                    pull("team-leaders", {**base, "group": group},
+                    plan("team-leaders", {**base, "group": group},
                          team_dir / f"team_leaders_{season}_{slug}_{group}.json", season)
                 for table in ("rows", "totals"):
-                    pull("team-rushing-direction", {**base, "table": table},
+                    plan("team-rushing-direction", {**base, "table": table},
                          team_dir / f"team_rushing_direction_{season}_{slug}_{table}.json", season)
                 for report in TEAM_REPORTS:
-                    pull("team-report", {**base, "report": report},
+                    plan("team-report", {**base, "report": report},
                          team_dir / f"team_report_{season}_{slug}_{report}.json", season)
-                pull("team-summary", {"league": "ncaa", "season": season, "franchise_id": fid},
+                plan("team-summary", {"league": "ncaa", "season": season, "franchise_id": fid},
                      team_dir / f"team_summary_{season}_{fid}.json", season)
 
-    # 4. per player -------------------------------------------------------------
-    if args.player_ids:
+    if args.player_ids:  # per player
         player_dir.mkdir(exist_ok=True)
         for pid in parse_ids(args.player_ids):
-            pull("ref-players", {"league": "ncaa", "id": pid}, player_dir / f"player_{pid}_ref.json", live)
-            pull("player-seasons", {"league": "ncaa", "player_id": pid}, player_dir / f"player_{pid}_seasons.json", live)
+            plan("ref-players", {"league": "ncaa", "id": pid}, player_dir / f"player_{pid}_ref.json", live)
+            plan("player-seasons", {"league": "ncaa", "player_id": pid}, player_dir / f"player_{pid}_seasons.json", live)
             for season in seasons:
                 for report in PLAYER_REPORTS:
-                    pull(f"player-{report}", {"league": "ncaa", "season": season, "player_id": pid},
+                    plan(f"player-{report}", {"league": "ncaa", "season": season, "player_id": pid},
                          player_dir / f"player_{pid}_{season}_{report.replace('-', '_')}.json", season)
 
-    # 5. weekly leaderboards, as exports ----------------------------------------
-    if args.player_facets:
+    exports: list[tuple[dict, dict]] = []
+    if args.player_facets:  # weekly leaderboards, as exports
         facets = {e["id"]: e for e in exportable_ops(spec).values()
                   if e["id"] not in SKIP_FACETS
                   and set(e["required"]) <= {"league", "season", "week", "division"}}
@@ -331,32 +342,55 @@ def main() -> None:
                 values = {"league": "ncaa", "season": str(season), "week": str(week), "division": "fbs"}
                 for entry in sorted(facets.values(), key=lambda e: e["id"]):
                     stem = f"{entry['id'].replace('-', '_')}_ncaa_{season}_fbs_wk{week}"
-                    if not args.force and any((args.out_dir / f"{stem}{ext}").exists() for ext in (".csv", ".json")):
-                        continue
-                    if args.dry_run:
-                        print(f"would export {entry['id']} {season} wk{week}")
-                        continue
-                    line = pull_one(binary, entry, values, args.out_dir, "ci", env, args.timeout)
-                    print(line, flush=True)
-                    failures += not line.startswith(("ok", "JSON", "SKIP"))
-                    time.sleep(EXPORT_PACING_SECONDS)
+                    if args.force or not any((args.out_dir / f"{stem}{ext}").exists() for ext in (".csv", ".json")):
+                        exports.append((entry, values))
 
-    # 6. the modeling table, from every season on disk --------------------------
-    if not args.dry_run:
-        on_disk = sorted({int(f.stem.split("_")[2]) for f in team_dir.glob("team_overview_*_wk*.json")})
-        fbs = set()
-        for f in team_dir.glob("team_directory_*.json"):
-            fbs |= set(fbs_franchises(json.loads(f.read_text(encoding="utf-8"))))
-        rows = flatten_team_games(team_dir, on_disk, fbs)
-        out = DATA_ROOT / "processed" / "pff" / "team_game.csv"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with out.open("w", newline="", encoding="utf-8") as fh:
-            w = csv.DictWriter(fh, fieldnames=list(rows[0]) if rows else ["game_id"])
-            w.writeheader()
-            w.writerows(rows)
-        print(f"\n{len(rows)} team-game rows -> {out}")
+    est = len(reads) * READ_PACING_SECONDS + len(exports) * EXPORT_PACING_SECONDS
+    print(f"{len(seasons)} seasons x {len(weeks)} weeks: {len(reads)} reads, {len(exports)} exports, "
+          f"~{est / 60:.0f} min at the metered pace", flush=True)
+    if args.dry_run:
+        for op_id, values, dest, _ in reads:
+            print("would pull", " ".join(command(ops, op_id, values)), "->", dest.relative_to(args.out_dir))
+        for entry, values in exports:
+            print(f"would export {entry['id']} {values['season']} wk{values['week']}")
+        return
+
+    # 3. run it, with a clock ---------------------------------------------------
+    bar = progress(reads, "read")
+    for op_id, values, dest, _ in bar:
+        bar.set_postfix_str(" ".join(command(ops, op_id, values))[:60], refresh=False)
+        err = read_json(binary, command(ops, op_id, values), dest, env, args.timeout)
+        if err:
+            failures.append(f"{op_id} -> {dest.name}: {err}")
+            bar.write(f"FAIL {failures[-1]}")
+        time.sleep(READ_PACING_SECONDS)
+
+    bar = progress(exports, "export")
+    for entry, values in bar:
+        bar.set_postfix_str(f"{entry['id']} {values['season']} wk{values['week']}", refresh=False)
+        line = pull_one(binary, entry, values, args.out_dir, "ci", env, args.timeout)
+        if not line.startswith(("ok", "JSON", "SKIP")):
+            failures.append(line)
+            bar.write(line)
+        time.sleep(EXPORT_PACING_SECONDS)
+
+    # 4. the modeling table, from every season on disk --------------------------
+    on_disk = sorted({int(f.stem.split("_")[2]) for f in team_dir.glob("team_overview_*_wk*.json")})
+    fbs = set()
+    for f in team_dir.glob("team_directory_*.json"):
+        fbs |= set(fbs_franchises(json.loads(f.read_text(encoding="utf-8"))))
+    rows = flatten_team_games(team_dir, on_disk, fbs)
+    out = DATA_ROOT / "processed" / "pff" / "team_game.csv"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]) if rows else ["game_id"])
+        w.writeheader()
+        w.writerows(rows)
+    elapsed = time.monotonic() - started
+    print(f"\n{len(rows)} team-game rows -> {out}")
+    print(f"done in {elapsed / 60:.1f} min: {len(reads)} reads, {len(exports)} exports, {len(failures)} failed")
     if failures:
-        raise SystemExit(f"{failures} pulls failed")
+        raise SystemExit("failed:\n  " + "\n  ".join(failures))
 
 
 if __name__ == "__main__":
