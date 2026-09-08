@@ -142,6 +142,7 @@ def live_books(now: datetime) -> pd.DataFrame:
                 continue
             teams = {t["id"]: t for t in g.get("teams", [])}
             home = teams.get(g["home_team_id"], {})
+            road = teams.get(g["away_team_id"], {})
             quotes = {}
             for book, b in (g.get("markets") or {}).items():
                 if book not in REAL_BOOKS:
@@ -152,7 +153,9 @@ def live_books(now: datetime) -> pd.DataFrame:
                             and ODDS_WINDOW[0] <= s["odds"] <= ODDS_WINDOW[1]):
                         quotes[book] = (float(s["value"]), int(s["odds"]))
             rows.append({"event_id": g["id"], "kick": ko, "an_home": home.get("display_name"),
-                         "key": norm(home.get("display_name", "")), "quotes": quotes})
+                         "an_road": road.get("display_name"),
+                         "key": norm(home.get("display_name", "")),
+                         "rkey": norm(road.get("display_name", "")), "quotes": quotes})
         time.sleep(0.5)
     return pd.DataFrame(rows).drop_duplicates("event_id")
 
@@ -214,15 +217,22 @@ def build(snapshot: Path, with_books: bool) -> pd.DataFrame:
     if with_books:
         now = datetime.now(timezone.utc)
         books = live_books(now)
+        # Both teams must match. Home alone pairs a PT game with whatever AN game shares its
+        # home team -- on an off-week snapshot that silently fills book_fair from a different
+        # matchup (2026 wk1 snapshot drew wk2 numbers: Louisville-Ole Miss took Charlotte's -47.5).
         t["key"] = t.home.map(norm)
-        t = t.merge(books, on="key", how="left")
+        t["rkey"] = t.road.map(norm)
+        t = t.merge(books, on=["key", "rkey"], how="left")
         s = pd.DataFrame([shop(q) if isinstance(q, dict) else {} for q in t.quotes])
         t = pd.concat([t.drop(columns=["quotes"]), s], axis=1)
-        # AN sign -> PT sign
+        # AN sign -> PT sign. When nothing matched, shop() yields no columns at all, so these
+        # must still exist as float NaN or every downstream arithmetic turns object-dtype.
         for c in ("fair_an", "best_home_an", "best_away_an"):
-            if c in t:
-                t[c.replace("_an", "_pt")] = -t[c]
-        t["book_fair"] = t.get("fair_pt")
+            t[c.replace("_an", "_pt")] = -t[c] if c in t else np.nan
+        for c in ("range", "n_books", "event_id"):
+            if c not in t:
+                t[c] = np.nan
+        t["book_fair"] = t["fair_pt"]
         t["move_vs_fair"] = (t.pred_close - t.book_fair).round(1)
         # gain in points for each side vs fair, and key-number crossing
         t["home_gain"] = (t.fair_pt - t.best_home_pt).round(2)
@@ -234,7 +244,11 @@ def build(snapshot: Path, with_books: bool) -> pd.DataFrame:
         t["kick_et"] = pd.to_datetime(t.kick, utc=True).dt.tz_convert(ET).dt.strftime("%a %m-%d %I:%M%p")
         unmatched = t[t.event_id.isna()][["road", "home"]].values.tolist()
         if unmatched:
-            print(f"  no Action Network match for: {unmatched}")
+            print(f"  no Action Network match for {len(unmatched)}/{len(t)} games: "
+                  f"{unmatched[:8]}{' ...' if len(unmatched) > 8 else ''}")
+        if len(unmatched) == len(t):
+            print("  ALL games unmatched -- the snapshot is almost certainly a different week "
+                  "than the books. book_fair/move_vs_fair are unavailable, not zero.")
     t.insert(0, "snapshot", snapshot.name)
     t.insert(1, "captured_utc", snapshot.stem.split("_")[-1])
     return t
@@ -252,10 +266,10 @@ def report(t: pd.DataFrame, with_books: bool) -> None:
         print("\n=== SHOP: best posted number vs book fair (gain >= 0.5 pts; KEY = crosses 3 or 7) ===")
         for _, r in t.sort_values(["home_gain", "away_gain"], ascending=False).iterrows():
             if pd.notna(r.home_gain) and r.home_gain >= 0.5:
-                print(f"  {r.home:18s} {(-r.best_home_pt):+.1f} @ {r.best_home_book} ({r.best_home_odds:+d})"
+                print(f"  {r.home:18s} {(-r.best_home_pt):+.1f} @ {r.best_home_book} ({r.best_home_odds:+.0f})"
                       f"  fair {(-r.fair_pt):+.1f}  gain {r.home_gain:.2f}{'  KEY' if r.home_key else ''}")
             if pd.notna(r.away_gain) and r.away_gain >= 0.5:
-                print(f"  {r.road:18s} {r.best_away_pt:+.1f} @ {r.best_away_book} ({r.best_away_odds:+d})"
+                print(f"  {r.road:18s} {r.best_away_pt:+.1f} @ {r.best_away_book} ({r.best_away_odds:+.0f})"
                       f"  fair {r.fair_pt:+.1f}  gain {r.away_gain:.2f}{'  KEY' if r.away_key else ''}")
         rg = t.range.dropna()
         if len(rg):
@@ -265,7 +279,7 @@ def report(t: pd.DataFrame, with_books: bool) -> None:
 
 def append_forward_log(t: pd.DataFrame) -> int:
     """One row per game per snapshot, deduplicated on snapshot; this is version B's dataset."""
-    keep = [c for c in t.columns if c not in ("quotes", "key")]
+    keep = [c for c in t.columns if c not in ("quotes", "key", "rkey")]
     rec = t[keep].copy()
     rec["logged_utc"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     if FORWARD_LOG.exists():
@@ -287,7 +301,7 @@ def main() -> int:
     report(t, with_books=not args.no_books)
     stamp = snap.stem.split("_")[-1]
     path = OUT / f"weekly_slate_{stamp}.csv"
-    t.drop(columns=[c for c in ("quotes", "key") if c in t]).to_csv(path, index=False)
+    t.drop(columns=[c for c in ("quotes", "key", "rkey") if c in t]).to_csv(path, index=False)
     n = append_forward_log(t)
     print(f"\nwrote {path}; appended {n} rows to {FORWARD_LOG.name}")
     return 0
@@ -300,6 +314,11 @@ def _check() -> None:
     q = {"68": (-7.5, -110), "69": (-7.0, -110), "71": (18.0, -110)}
     s = shop(q)
     assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # Caesars' 18 was guarded out
+    # the cross-game guard: same home team, different opponent must NOT inherit book numbers
+    pt = pd.DataFrame({"key": ["ole miss"], "rkey": ["louisville"]})
+    an = pd.DataFrame({"key": ["ole miss"], "rkey": ["charlotte"], "event_id": [1]})
+    assert pt.merge(an, on=["key", "rkey"], how="left").event_id.isna().all()
+    assert pt.merge(an, on="key", how="left").event_id.notna().all()   # the old, silent behaviour
     print("checks pass\n")
 
 
