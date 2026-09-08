@@ -1,6 +1,6 @@
 """Collect the two things needed to answer the timing question, going forward.
 
-`research/spread/docs/prediction-tracker-model-eval.md` §8 could not run the timing test because the
+`archive/spread-margin-era/prediction-tracker-model-eval.md` §8 could not run the timing test because the
 archive is missing one field that no amount of scraping can recover retrospectively:
 **when each Prediction Tracker forecast was published**. This script captures it from now on.
 

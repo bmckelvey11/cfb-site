@@ -11,7 +11,7 @@ saved outputs and the code.
 
 | era | verdict | one line |
 |---|---|---|
-| Margin era (`prediction-tracker-findings.md`) | **sound** | Tight null, defects recorded, corrections applied. Cite freely. |
+| Margin era (`archive/spread-margin-era/prediction-tracker-findings.md`) | **sound** | Tight null, defects recorded, corrections applied. Cite freely. |
 | Line shopping (`line-shopping-results.md`) | **sound with caveats** | The caveats are already in the file (snapshot = close unverified, juice unpriced). |
 | Movement era (`line-movement-results.md`) | **do not cite as "the panel leads the market"** | The headline is the one estimator already shown to be 73% market proxying, and no decontamination has been run on this target. Cite as an *undecontaminated upper bound at an unreachable price* until §1.1 is done. |
 | Version B (forward test) | **not yet an analysis** | No grading script exists, and the registered 300-game read cannot deliver the decision the prereg assigns to it (§1.3). |
@@ -23,7 +23,7 @@ saved outputs and the code.
 - **What.** `line-movement-results.md` leads with E6 ridge: R² 0.248, +2.33 pts CLV, 57.8% ATS
   at the opener; E4 γ = 0.30. `CLAUDE.md` and `README.md` restate this as "the panel works" /
   "the panel does predict where the line goes". The regressors are model values PT recorded
-  **mid-week, at an unknown time between open and close**. `prediction-tracker-findings.md` §4
+  **mid-week, at an unknown time between open and close**. `archive/spread-margin-era/prediction-tracker-findings.md` §4
   already established, on the opening-line margin target, that E6 retains **27%** of its effect
   once the 15 most market-like columns are removed, and that the partially anchored columns
   carry movement correlations of 0.49–0.76. The movement target makes this worse, not better:
@@ -49,7 +49,7 @@ saved outputs and the code.
   by-season CLV means agree (3.04 ± 0.42 vs 2.95 ± 0.70). That removes one alternative
   explanation. It does not touch the contamination one, which is week-independent.
 - **Resolves with.** Rerun `eval_line_movement.py` (both `--amend` and not) with the top-decile
-  ρ models from `diag_market_proxy.py` dropped — that script computes exactly the discriminator
+  ρ models from `archive/spread-margin-era/scripts/diag_market_proxy.py` dropped — that script computes exactly the discriminator
   needed, `ρ_i = corr(f_i − open, close − open)`, and has never been pointed at this target.
   Report per-method retention of R² and CLV. If E4 keeps ≳ 60% and E6 collapses as it did on the
   margin target, the honest statement is "the *consensus* anticipates a fraction of the move; the
@@ -114,7 +114,7 @@ saved outputs and the code.
 - Dependence: 20 season clusters, wild bootstrap, p floor 1/2000 — adequate. Same-weekend
   steam is absorbed by the season cluster.
 - Line shopping: 29 season-week clusters with t(G−1) — fine. Its stated limits stand.
-- `prereg-spread-model.md` is committed and unfitted; the review of 09-02 already recommends
+- `archive/spread-margin-era/prereg-spread-model.md` is committed and unfitted; the review of 09-02 already recommends
   not building it for spreads. Either fit it once or move it to `archive/` so the "not yet run"
   row stops looking like a queue.
 
@@ -144,7 +144,7 @@ No lookahead found in the live path; `lineca` / `linemidweek` are excluded every
 - **Tests.** `tests/test_prediction_tracker.py` covers the *builder* only. The estimator core —
   `Anchor` (Frisch–Waugh nesting), `gamma_fit`, `wild_cluster_boot`, `holm`, the E6–E14 fitters —
   has no pytest. The "test asserting the anchor reproduces the original estimator to 1e-8" cited
-  in `prediction-tracker-findings.md` §3 and in the research bundle does not exist in `tests/`
+  in `archive/spread-margin-era/prediction-tracker-findings.md` §3 and in the research bundle does not exist in `tests/`
   or `scripts/`; the only checks are inline `_check()` functions run on `__main__`. One
   `tests/test_spread_estimators.py` with three cases (Anchor = R0 at zero correction; `gamma_fit`
   recovers a known γ on synthetic deviations; `wild_cluster_boot` p is ~uniform under the null)

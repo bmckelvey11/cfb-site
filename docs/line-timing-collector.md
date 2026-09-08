@@ -3,7 +3,7 @@
 Two Windows scheduled tasks that capture the one field the Prediction Tracker archive is
 missing: **when each forecast was published**. Set up 2026-08-29.
 
-Read `research/spread/docs/prediction-tracker-model-eval.md` §7–§9 for *why* this exists. This file is the
+Read `research/spread/docs/prereg-line-movement.md` (version B) for *why* this exists. This file is the
 operational side: what runs, how to check it, what to do when it breaks.
 
 ## The one thing to understand
@@ -32,11 +32,22 @@ When a snapshot is actually new, the snapshot run also executes `predict_upcomin
 `movement_forward_log.csv` fill without a hand run. Their output lands in the same log.
 
 Both run as `mckel`, unelevated, **only while that user is logged on** (see Limitations).
+Since 2026-09-08 both may start on battery, are not stopped when the machine goes to battery,
+and start as soon as possible after a missed scheduled time. Before that, the default settings
+refused every run from Fri 09-04 12:30 to Mon 09-08 (result `0x800710E0`) and lost week-2 game
+day. To re-apply after re-registering:
+
+```powershell
+$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+Set-ScheduledTask -TaskName CFB-PT-Snapshot -Settings $s
+Set-ScheduledTask -TaskName CFB-AN-History  -Settings $s
+```
 
 ## What lands where
 
-Everything is under `%CFB_DATA_ROOT%` (`C:\Users\mckel\data\cfb`), which the tasks inherit
-as a persisted user environment variable.
+Everything is under `%CFB_DATA_ROOT%` (`C:\Users\mckel\dev\cfb\data`), which the tasks inherit
+as a persisted user environment variable. The wrapper exits 3 if it is unset; it no longer
+guesses a path.
 
 ```
 ingest/pt_snapshots/

@@ -2,7 +2,7 @@
 
 2026-09-02. Reviews the book fair in `eval_line_shopping.py` and specifies how the
 model numbers (E4, E14, raw consensus) and the book numbers should be combined into one fair
-spread and one bet decision. Evidence cited is in `prediction-tracker-findings.md`,
+spread and one bet decision. Evidence cited is in `archive/spread-margin-era/prediction-tracker-findings.md`,
 `line-shopping-results.md`, and `review-2026-09-02-composite-spread.md`.
 
 ## 1. The book fair as built

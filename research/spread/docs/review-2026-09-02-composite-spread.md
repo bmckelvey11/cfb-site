@@ -9,7 +9,7 @@ A model consensus of the Prediction Tracker panel against the closing spread is 
 evidence is stronger than the handoff states. Ten combination rules (E1–E14) were tried
 walk-forward on 12.8–14.3K games; best Holm p = 0.49; the ATS record is 50.31% on 12,560 bets,
 p = 0.002 *below* the −110 break-even. Nothing here should be reopened without a new information
-source. Details: `prediction-tracker-findings.md`.
+source. Details: `archive/spread-margin-era/prediction-tracker-findings.md`.
 
 One check added in this review, because the handoff's reasoning for *why* had a gap (§1 below).
 
@@ -40,7 +40,7 @@ carries no information.** The strongest-disagreement bucket is the worst, and it
 Corrected statement for the record: the panel disagrees with the close often and by a lot,
 and when it does, the close is right. That is a stronger closure than "no tail."
 
-Exploratory, one run, buckets copied from `prereg-ats-tail-test.md`, not pre-registered.
+Exploratory, one run, buckets copied from `archive/spread-margin-era/prereg-ats-tail-test.md`, not pre-registered.
 Reproduce from `prediction_tracker_lines.csv` in ~40 lines; nothing to persist.
 
 ## 2. Critiques of the handoff itself
@@ -66,7 +66,7 @@ Reproduce from `prediction_tracker_lines.csv` in ~40 lines; nothing to persist.
   the subtractive rules is right because they are free, not because they are evidence of edge.
 - **Skipping GSD is correct.** Pre-registration discipline is the planning artifact here.
 
-## 3. On the pre-registered GBM (`prereg-spread-model.md`)
+## 3. On the pre-registered GBM (`archive/spread-margin-era/prereg-spread-model.md`)
 
 Agree with the lean: do not build it for spreads. Its leakage controls are good and its own
 expectation is null. A 21-feature team-state model is a strict subset of what `lineelo`,
@@ -107,7 +107,7 @@ Average **book lines**, not model outputs: the book fair, not the model consensu
    reason to skip them against the line-movement target (§6, `prereg-line-movement.md`), where
    the same estimators succeed.
    **Done 2026-09-02** — scoped in `research/spread/CLAUDE.md` and bannered at the top of
-   `prediction-tracker-findings.md`.
+   `archive/spread-margin-era/prediction-tracker-findings.md`.
 
 If a midweek fair-value number is wanted for reference, serve E4 from the latest snapshot,
 not the raw median: the raw median disagrees with the close by 2 points on a typical game and
@@ -119,7 +119,7 @@ The user's live question is claim 2, not claim 1: not *does the model consensus 
 forecast* (closed), but *does the model consensus forecast where the close goes*, bet at Monday's
 line. Historically the panel beat the opener by 2.6 MSE in 20 of 20 seasons and bets at the
 opener with ≥2 points of edge won 55.9%; the edge was at break-even once ~25% of the
-open-to-close move had happened (`prediction-tracker-model-eval.md` §8). So everything
+open-to-close move had happened (`archive/spread-margin-era/prediction-tracker-model-eval.md` §8). So everything
 reduces to one number: **how much of the move is left when PT publishes.**
 
 ### Measured on week 1 of 2026 — the first timestamped week that exists

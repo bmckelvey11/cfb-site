@@ -1,6 +1,6 @@
 """Market-anchored combination sweep -- E6 through E14.
 
-Implements research/spread/docs/prediction-tracker-model-eval-plan-addendum.md. Read that first: the
+Implements archive/spread-margin-era/prediction-tracker-model-eval-plan-addendum.md. Read that first: the
 repair/exploratory split, the hyperparameter grids, the nested selection rule, the
 stability gate and the multiplicity budget are all fixed there, before any of this ran.
 
@@ -116,7 +116,7 @@ def regressor_cols(tr, te, models, legacy=False):
     model set active in that season".
 
     `legacy=True` reproduces the original whole-history filter for the correction check in
-    `research/spread/scripts/diag_regressor_filter.py`.
+    `archive/spread-margin-era/scripts/diag_eligibility_tenure.py`.
     """
     active = [m for m in models if te[m].notna().mean() >= 0.5]
     if legacy:

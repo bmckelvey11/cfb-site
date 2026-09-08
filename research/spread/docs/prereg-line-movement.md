@@ -5,7 +5,7 @@ before the first fit, and that edit is recorded here.
 
 ## Why the sweep answered a different question
 
-Every method in `prediction-tracker-model-eval-plan-addendum.md` predicted the **game margin**
+Every method in `archive/spread-margin-era/prediction-tracker-model-eval-plan-addendum.md` predicted the **game margin**
 and measured itself against the closing line. That asks whether the panel out-forecasts the
 market. It does not (Harvey–Newbold p = 0.56, best Holm p = 0.49, 50.3% ATS).
 
@@ -111,3 +111,32 @@ because the signal is estimable; E9 with 1–2 components will land near E4 (R²
 and E11 near E4; E13 below E4; E6w R² within 0.02 of E6 — the wider grid changes little either
 way. No method beats E6 by more than 0.03 R². Stopping rule: one run; anything further is a new
 amendment.
+
+## Amendment A3 — decontamination (run 2026-09-08, one run)
+
+The panel's values are recorded mid-week; a column that reprints the mid-week line predicts
+`close − open` mechanically. Before anything is fitted, drop the top decile of models by
+`ρ_i = corr(f_i − open, close − open)` on the model's own games (the margin-era market-proxy
+discriminator, applied here for the first time). Rerun A and A2 on the reduced panel; report
+each method's retention of R² and of opener CLV. Expectation, recorded before the run: E4
+retains ≥ 60%; E6 falls to E4's level or below; E14 retains less than E4. Result in
+`line-movement-results.md` § decontamination.
+
+## Amendment B1 — the version B read (committed 2026-09-08, before any in-season close exists)
+
+**Power.** SE(slope) ≈ σ_resid / (σ_x √n). With σ_resid ≈ 1.0 (Monday → close) and
+σ_x ≈ 0.45 (E4 − Monday line, from the week-2 snapshots), n = 300 gives SE ≈ 0.13 and an
+80%-power MDE ≈ 0.36. The B4 rule "under 0.1 with a CI excluding 0.2" needs SE ≈ 0.07, i.e.
+n ≈ 1,000–1,200 before clustering by week. The 300-game read cannot decide it.
+
+**Rule, replacing B4's timing.** At every read `eval_version_b.py` reports the slope, its
+season-week cluster CI, the observed σ_resid and σ_x, the MDE at the current n and the n at
+which the MDE reaches 0.2. **No verdict before that n or season end, whichever comes first;**
+at that point B4's thresholds apply unchanged. Reads are not looks: nothing is changed on the
+strength of an interim read.
+
+**Fixed now, before data.** Anchor = the earliest snapshot captured on or after Monday 00:00
+ET of the game's kick week. Close = Action Network consensus (book 15), last full-game spread
+tick before kickoff. Scores = CFBD via the archive build's name matching. Predictor graded =
+E4 (registered); E6 and the model median are reported beside it with no selection among them.
+Grader = `research/spread/scripts/eval_version_b.py`, committed with this amendment.
