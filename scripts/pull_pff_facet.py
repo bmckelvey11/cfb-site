@@ -94,9 +94,12 @@ def exportable_ops(spec: dict) -> dict[str, dict]:
     return found
 
 
-def out_name(op_id: str, values: dict[str, str]) -> str:
+def out_name(op_id: str, values: dict[str, str], optional: set[str] | None = None) -> str:
+    """The file name carries division only when the operation takes one: the
+    signature commands don't, so an NCAA signature file is all-division and
+    must not be labelled `fbs`."""
     parts = [op_id.replace("-", "_"), values["league"], values["season"].replace(",", "-")]
-    if values.get("division"):
+    if values.get("division") and (optional is None or "division" in optional):
         parts.append(values["division"].replace(",", "-"))
     if values.get("week"):
         parts.append("wk" + values["week"].replace(",", "-"))
@@ -157,7 +160,7 @@ def error_code(text: str) -> str | None:
 
 def pull_one(binary: str, entry: dict, values: dict, out_dir: Path, profile: str, env: dict,
              timeout: float) -> str:
-    dest = out_dir / out_name(entry["id"], values)
+    dest = out_dir / out_name(entry["id"], values, entry["optional"])
     cmd = build_cmd(binary, entry, values, profile)
     err = run_to_file(cmd, dest, env, timeout)
     if err:
@@ -245,7 +248,7 @@ def main() -> None:
     if args.dry_run:
         for entry in chosen:
             print(" ".join(build_cmd(binary, entry, values, args.profile)))
-            print(f"  -> {args.out_dir / out_name(entry['id'], values)}")
+            print(f"  -> {args.out_dir / out_name(entry['id'], values, entry['optional'])}")
         print(f"\n{len(chosen)} exports, ~{len(chosen) * EXPORT_PACING_SECONDS / 60:.1f} min paced")
         return
 

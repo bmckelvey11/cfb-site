@@ -65,8 +65,8 @@ from cfb_paths import DATA_ROOT, current_season  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pull_pff_facet import (  # noqa: E402
-    EXPORT_PACING_SECONDS, api_key, error_code, exportable_ops, load_spec, pull_one,
-    resolve, restish_bin,
+    EXPORT_PACING_SECONDS, api_key, error_code, exportable_ops, load_spec, out_name,
+    pull_one, resolve, restish_bin,
 )
 
 READ_PACING_SECONDS = 0.65  # 100 reads/minute, with headroom; measured from call start to call start
@@ -353,7 +353,7 @@ def main() -> None:
             for week in weeks:
                 values = {"league": "ncaa", "season": str(season), "week": str(week), "division": "fbs"}
                 for entry in sorted(facets.values(), key=lambda e: e["id"]):
-                    stem = f"{entry['id'].replace('-', '_')}_ncaa_{season}_fbs_wk{week}"
+                    stem = out_name(entry["id"], values, entry["optional"]).removesuffix(".csv")
                     if args.force or not any((args.out_dir / f"{stem}{ext}").exists() for ext in (".csv", ".json")):
                         exports.append((entry, values))
 
