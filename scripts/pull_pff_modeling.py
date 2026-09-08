@@ -69,7 +69,7 @@ from pull_pff_facet import (  # noqa: E402
     resolve, restish_bin,
 )
 
-READ_PACING_SECONDS = 0.7  # 100 reads/minute, with headroom
+READ_PACING_SECONDS = 0.65  # 100 reads/minute, with headroom; measured from call start to call start
 FBS_GROUP_ID = "11"
 # passing_detail is the union of the other four passing facets and hangs;
 # the other two answer 500 for every NCAA pull. See docs/pff-warehouse-schema.md.
@@ -122,6 +122,17 @@ def command(ops: dict, op_id: str, values: dict) -> list[str]:
         if values.get(wire) is not None:
             cmd += [flag, str(values[wire])]
     return cmd
+
+
+class Pacer:
+    """Space call *starts* by `interval`, so API latency counts toward the budget window."""
+
+    def __init__(self, interval: float):
+        self.interval, self.last = interval, 0.0
+
+    def wait(self) -> None:
+        time.sleep(max(0.0, self.last + self.interval - time.monotonic()))
+        self.last = time.monotonic()
 
 
 def read_json(binary: str, args: list[str], dest: Path, env: dict, timeout: float) -> str | None:
@@ -253,6 +264,7 @@ def main() -> None:
     live = current_season()
     started = time.monotonic()
     failures: list[str] = []
+    read_pace, export_pace = Pacer(READ_PACING_SECONDS), Pacer(EXPORT_PACING_SECONDS)
 
     def wanted(dest: Path, season: int | None) -> bool:
         return args.force or not dest.exists() or not dest.stat().st_size or season == live
@@ -261,10 +273,10 @@ def main() -> None:
         """Reference reads run before planning, because the plan depends on them."""
         if not wanted(dest, season) or args.dry_run:
             return
+        read_pace.wait()
         err = read_json(binary, command(ops, op_id, values), dest, env, args.timeout)
         if err:
             failures.append(f"{op_id}: {err}")
-        time.sleep(READ_PACING_SECONDS)
 
     # 1. reference -------------------------------------------------------------
     leagues_path = team_dir / "leagues.json"
@@ -359,20 +371,20 @@ def main() -> None:
     bar = progress(reads, "read")
     for op_id, values, dest, _ in bar:
         bar.set_postfix_str(" ".join(command(ops, op_id, values))[:60], refresh=False)
+        read_pace.wait()
         err = read_json(binary, command(ops, op_id, values), dest, env, args.timeout)
         if err:
             failures.append(f"{op_id} -> {dest.name}: {err}")
             bar.write(f"FAIL {failures[-1]}")
-        time.sleep(READ_PACING_SECONDS)
 
     bar = progress(exports, "export")
     for entry, values in bar:
         bar.set_postfix_str(f"{entry['id']} {values['season']} wk{values['week']}", refresh=False)
+        export_pace.wait()
         line = pull_one(binary, entry, values, args.out_dir, "ci", env, args.timeout)
         if not line.startswith(("ok", "JSON", "SKIP")):
             failures.append(line)
             bar.write(line)
-        time.sleep(EXPORT_PACING_SECONDS)
 
     # 4. the modeling table, from every season on disk --------------------------
     on_disk = sorted({int(f.stem.split("_")[2]) for f in team_dir.glob("team_overview_*_wk*.json")})
