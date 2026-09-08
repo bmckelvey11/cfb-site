@@ -1296,7 +1296,12 @@
       return;
     }
     exploreEl.innerHTML = "";
-    const points = state.chartPoints || [];
+    // Hard filter: only the selected window is plotted, and every scale below is built
+    // from it, so the dots that survive fill the chart instead of huddling in a corner
+    // of the full domain. The axis ticks then read as the window's own bounds.
+    const points = (state.chartPoints || []).filter((point) =>
+      withinBounds(Number(point.value), state.min, state.max),
+    );
     if (!points.length) {
       const empty = document.createElement("p");
       empty.className = "filter-modal__hint";
@@ -1340,15 +1345,7 @@
     const plotY = (roi) =>
       plotH - 18 - ((roi - minRoi) / roiSpan) * (plotH - 36);
     const zeroY = plotY(0);
-    // Axes stay pinned to the full domain while the fit follows the selected window:
-    // rescaling the plot on every drag would leave nothing fixed to aim the range at.
-    const selected = points.filter((point) =>
-      withinBounds(Number(point.value), state.min, state.max),
-    );
-    const fit = leastSquaresFit(
-      selected.map((point) => Number(point.value)),
-      selected.map((point) => Number(point.roi)),
-    );
+    const fit = leastSquaresFit(values, rois);
 
     // Axis lines
     svg.appendChild(
@@ -1413,13 +1410,11 @@
       );
       // Clipped to the ROI range: the fitted value at an x extreme can sit outside the
       // observed ROI span, and letting it draw there would put the line off the plot.
-      const fitLo = Math.min(...selected.map((point) => Number(point.value)));
-      const fitHi = Math.max(...selected.map((point) => Number(point.value)));
       const ends = clipToRange(
-        fitLo,
-        fit.slope * fitLo + fit.intercept,
-        fitHi,
-        fit.slope * fitHi + fit.intercept,
+        minValue,
+        fit.slope * minValue + fit.intercept,
+        maxValue,
+        fit.slope * maxValue + fit.intercept,
         minRoi,
         maxRoi,
       );
@@ -1433,7 +1428,7 @@
       const label = svgText(
         plotW - 28,
         16,
-        "R² = " + fit.r2.toFixed(3) + "  ·  n = " + selected.length,
+        "R² = " + fit.r2.toFixed(3) + "  ·  n = " + points.length,
         "filter-modal__fit-label",
       );
       label.setAttribute("text-anchor", "end");
@@ -1450,11 +1445,9 @@
       circle.setAttribute("cx", String(x));
       circle.setAttribute("cy", String(y));
       circle.setAttribute("r", "3.5");
-      const inWindow = withinBounds(Number(point.value), state.min, state.max);
       circle.setAttribute(
         "class",
-        (Number(point.roi) >= 0 ? "positive" : "negative") +
-          (inWindow ? "" : " is-muted"),
+        Number(point.roi) >= 0 ? "positive" : "negative",
       );
       const title = document.createElementNS(
         "http://www.w3.org/2000/svg",
