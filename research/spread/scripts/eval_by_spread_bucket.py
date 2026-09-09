@@ -11,7 +11,8 @@ processed/pt_movement_preds_decon_wf.csv) and reports, per |opening spread| buck
 quantities the registered runs report -- R^2 of the move, direction, CLV at the opener, and ATS at
 the opener -- using eval_line_movement's own definitions so the numbers are comparable.
 
-    python research/spread/scripts/eval_by_spread_bucket.py
+    python research/spread/scripts/eval_by_spread_bucket.py             # archive, opener anchor
+    python research/spread/scripts/eval_by_spread_bucket.py --version-b  # live, Monday anchor
 
 EXPLORATORY, and descriptive rather than a registered test. Decision 1 of the plan of record puts
 every archive result outside the one confirmatory family (the version B E4 slope at the Monday
@@ -22,8 +23,10 @@ like "bet the big spreads". Read it as a description of where the archive effect
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -40,7 +43,74 @@ THRESH = 1.0          # |predicted move|, matching the registered CLV tables' lo
 PREDICTOR = "E4"      # the graded predictor; E6 is retired from serving (amendment A7)
 
 
+def version_b_frame():
+    """The graded version B set, rebuilt with eval_version_b's own functions."""
+    import duckdb
+    import eval_version_b as vb
+    log = pd.read_csv(vb.LOG)
+    g = vb.monday_anchor(log)
+    g["kick_utc"] = pd.to_datetime(g.kick, utc=True)
+    g["close"] = [vb.close_from_history(e, k) for e, k in zip(g.event_id, g.kick_utc)]
+    con = duckdb.connect(str(base.cfb_paths.DB_PATH), read_only=True)
+    g["margin"] = vb.margins(g, vb.fetch_scores(con, sorted(set(g.kick_utc.dt.year))))
+    return g[g.close.notna() & (g.kick_utc < datetime.now(timezone.utc))].copy()
+
+
+def run_version_b() -> int:
+    """Same buckets, live data. The anchor is Monday's line, not the opener."""
+    d = version_b_frame()
+    anchor, close, margin = d.line_pt.to_numpy(), d.close.to_numpy(), d.margin.to_numpy()
+    pred = d[PREDICTOR].to_numpy()
+    move, pm = close - anchor, pred - anchor
+    absa = np.abs(anchor)
+    weeks = d.week.nunique()
+
+    print(f"version B: {len(d)} graded games, {weeks} week cluster(s), anchor = Monday's line")
+    print("NO INTERVALS ARE SHOWN. One week cluster cannot support a cluster SE, and the whole")
+    print("sample is below the >= 8 clusters amendment B3 requires before ANY verdict -- a")
+    print("seven-way split of it is further from decidable still. Counts only.")
+    print()
+    print(f"{'|Monday|':>10} {'games':>6} {'bets':>6} {'dir':>7} {'CLV':>7} {'ATS':>7}")
+
+    rows = []
+    for lo, hi in BUCKETS:
+        b = (absa >= lo) & (absa < hi)
+        if not b.any():
+            continue
+        bet = b & (np.abs(pm) >= THRESH)
+        side = np.sign(pm[bet])
+        clv = side * move[bet]
+        res = side * (margin[bet] - anchor[bet])
+        keep = res != 0
+        moved = bet & (move != 0)
+        d_hit = float((np.sign(pm[moved]) == np.sign(move[moved])).mean()) if moved.any() else float("nan")
+        ats = float((res[keep] > 0).mean()) if keep.any() else float("nan")
+        label = f"{lo}-{hi}" if hi < 99 else f"{lo}+"
+        print(f"{label:>10} {int(b.sum()):6d} {int(bet.sum()):6d} "
+              f"{d_hit:7.1%} {clv.mean() if bet.any() else float('nan'):+7.2f} {ats:7.1%}")
+        rows.append({"bucket": label, "games": int(b.sum()), "bets": int(bet.sum()),
+                     "direction": d_hit, "clv": float(clv.mean()) if bet.any() else None,
+                     "ats": ats, "weeks": int(weeks)})
+
+    print()
+    print("Largest bucket holds a single-digit number of bets. Nothing here is a finding, in")
+    print("either direction -- it is the shape of the sample, recorded so the split exists when")
+    print("the season has actually supplied clusters.")
+    out = base.OUT_DIR / "version_b_by_spread.json"
+    out.write_text(json.dumps({"predictor": PREDICTOR, "thresh": THRESH, "n_graded": int(len(d)),
+                               "week_clusters": int(weeks), "readable": False,
+                               "buckets": rows}, indent=2, default=float))
+    print()
+    print(f"wrote {out}")
+    return 0
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--version-b", action="store_true",
+                    help="live forward test, Monday anchor, instead of the archive")
+    if ap.parse_args().version_b:
+        return run_version_b()
     d = pd.read_csv(PREDS)
     open_m, close, margin = d["open"].to_numpy(), d["close"].to_numpy(), d["margin"].to_numpy()
     season, pred = d["season"].to_numpy(), d[PREDICTOR].to_numpy()
