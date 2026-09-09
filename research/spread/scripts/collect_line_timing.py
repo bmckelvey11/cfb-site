@@ -202,7 +202,17 @@ def main() -> int:
                     check=False,
                 )
     if args.mode in ("history", "both"):
+        # Monday routine: health FIRST and it gates the grade. The pull still runs on a stale
+        # stream -- backfilling histories is exactly what you want when collection has been
+        # broken -- but a read off a stale stream is worse than no read.
+        health = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("collector_health.py"))], check=False)
         history(args.season, weeks, force=args.force)
+        if health.returncode == 0:
+            subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("eval_version_b.py"))], check=False)
+        else:
+            print(f"version B grade skipped: collector_health exited {health.returncode}")
     return 0
 
 

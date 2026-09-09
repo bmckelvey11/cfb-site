@@ -25,7 +25,7 @@ the only failure mode here that cannot be repaired after the fact.
 | Task | Command | Schedule | Repairable if missed? |
 |---|---|---|---|
 | `CFB-PT-Snapshot` | `collect_line_timing.cmd snapshot` | every 6 hours, from 00:30 | **No** |
-| `CFB-AN-History` | `collect_line_timing.cmd history --weeks 1-16` | Mondays 09:00 | Yes — just run it |
+| `CFB-AN-History` | `collect_line_timing.cmd history --weeks 1-16` | Mondays 09:00 | Yes — just run it. Also runs `collector_health.py` and `eval_version_b.py`. |
 
 When a snapshot is actually new, the snapshot run also executes `predict_upcoming.py` and
 `weekly_slate.py` on it, so `pt_upcoming_predictions.csv`, `weekly_slate_<stamp>.csv` and
@@ -82,7 +82,31 @@ Get-Content "$env:CFB_DATA_ROOT\logs\line_timing.log" -Tail 20
 during the season means PT is not updating, which is itself worth investigating. During
 football season expect several new snapshots a week.
 
+```bash
+python research/spread/scripts/collector_health.py
+```
+
+Exits 1 when the newest snapshot is more than `MAX_GAP_HOURS` (12) hours old in season (Aug 25
+– Dec 15), 0 otherwise, and prints one line naming the newest snapshot and how old it is. This
+is now the first thing `CFB-AN-History` runs Monday morning (see "What is registered"); its
+exit code gates whether `eval_version_b.py` runs that day, not whether the history pull runs.
+
+A snapshot is only written when PT's file *changes*, so a quiet Sunday can look stale even with
+nothing wrong — 12 hours tolerates two unchanged 6-hour slots. `MAX_GAP_HOURS` was kept at 12
+rather than raised to 18: the gaps on disk from before 2026-09-08 that exceed 12 hours (14–38h,
+scattered across 08-29 through 09-04) are contaminated by the scheduled-task battery/power
+setting bug documented above, not by PT going quiet, so they are not evidence that 12h
+false-alarms under normal operation. Revisit once a full week has accumulated under the fixed
+task settings; raise to 18 and record why here if it turns out to false-alarm weekly.
+
 As of setup: 1 snapshot, 99 history files (2026 week 1), last result 0.
+
+**Known gap, unrecoverable.** The scheduled-task battery/power settings bug above (the same one
+described in "What is registered": every run refused from **Fri 2026-09-04 12:30 to Mon
+2026-09-08**, fixed that Monday) meant no snapshot was captured for that whole window — the last
+snapshot before it landed 2026-09-04 04:30 UTC, the next one only at 2026-09-08 05:15 UTC. PT
+overwrites its file in place, so whatever it published in between is gone — there is no backfill
+for the snapshot half of this collector, unlike the Action Network history half.
 
 ## When it breaks
 
