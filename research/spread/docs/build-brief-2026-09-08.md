@@ -1,5 +1,8 @@
 # Build brief — parallel execution of the hardened spread plan
 
+> **Dispatch appendix, 2026-09-08.** `plan-2026-09-08-master.md` is the plan of record; this
+> file owns the wave structure, per-agent file ownership and acceptance checks.
+
 **For Cursor, running subagents in parallel.** Decomposes
 [`plan-2026-09-08-hardened.md`](plan-2026-09-08-hardened.md) §"Required amendments" plus the
 open tasks of `docs/superpowers/plans/2026-09-08-spread-next-steps.md` into agents that can run

@@ -1,4 +1,9 @@
 # Plan: harden the 2026-09-08 spread line-movement next-steps plan
+
+> **Absorbed 2026-09-08 into `plan-2026-09-08-master.md`.** That document is the plan of
+> record. Retained as audit history of the claudex-loop that produced it — the decisions,
+> risk register and required amendments below are carried forward there.
+
 _Locked via claudex-loop — by Claude + mckel, 2026-09-08. Revised after Codex review rounds 1–2; Risk 6 settled by the user 2026-09-08._
 
 **This plan does not replace `docs/superpowers/plans/2026-09-08-spread-next-steps.md`.** That

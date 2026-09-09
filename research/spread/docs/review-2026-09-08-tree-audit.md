@@ -1,5 +1,11 @@
 # Review — the spread tree, 2026-09-08
 
+> **Open items absorbed 2026-09-08 into `plan-2026-09-08-master.md`.** This audit remains the
+> record of what was found and what was fixed, each finding with its resolution date. It is
+> not superseded — the master carries only what was still open. One caution when reading it
+> as history: the stopping rule it records (amendment B1's MDE gate) was itself later
+> replaced; the master's §3 states the rule in force.
+
 Full pass over `research/spread/`: the theory behind each claim, the code that produces it,
 the operations that feed it, and how the tree is organised. Econometrics audit checklist
 walked in full (leakage, specification, dependence, power, multiplicity, shrinkage, estimated

@@ -1,5 +1,10 @@
 # Spread line-movement — fixes and next steps
 
+> **Execution appendix, 2026-09-08.** `research/spread/docs/plan-2026-09-08-master.md` is the
+> plan of record for *what and why*; this file remains the authority on *how* — task steps,
+> code and expected output. Where the two disagree the master wins and this file is
+> corrected. Dispatch order is in `research/spread/docs/build-brief-2026-09-08.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn the decontaminated archive result (the screened consensus anticipates ~15% of the open→close move at the opener) into a yes/no on whether any of it is bettable at a price PT's timing allows, and remove the remaining defects that would make that answer unreliable.

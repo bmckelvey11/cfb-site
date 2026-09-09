@@ -13,8 +13,9 @@ data, archive, and no-lookahead rules live in root `CLAUDE.md`.
 - Current result (decontaminated, amendment A3): the screened consensus anticipates ~15% of the
   open→close move at the opener. The opener is unreachable through PT and the archive's "close"
   is PT's last recorded line, so this is an upper bound. **Version B** (`eval_version_b.py`,
-  Monday's line vs the real close) is the only thing that can turn it into a bet; amendment B1
-  fixes when it may be read.
+  Monday's line vs the real close) is the only thing that can turn it into a bet.
+  `docs/plan-2026-09-08-master.md` is the plan of record and its §3 states the one rule
+  fixing when version B may be read.
 - The earlier margin-vs-close question is closed and archived in `archive/spread-margin-era/`.
   Do not reopen it; do not cite it as current. Its nulls were about a different target and are
   not a gate on movement methods.

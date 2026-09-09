@@ -1,5 +1,8 @@
 # Plan Review Log: harden the 2026-09-08 spread line-movement next-steps plan
 
+> **Absorbed 2026-09-08 into `plan-2026-09-08-master.md`.** What these three rounds settled
+> is carried into that document's §4 and §7. Retained in full as the record of the argument.
+
 Phases 0-1 (recon + interrogation) complete — plan locked with the user. MAX_ROUNDS=5.
 
 Framing decision (Q1): lift the existing 962-line next-steps plan into the loop rather than
