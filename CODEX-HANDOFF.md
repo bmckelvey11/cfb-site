@@ -1,5 +1,13 @@
 # Codex build handoff — warehouse naming rationalization
 
+> **Superseded 2026-09-01 — do not implement as written.** This handoff describes the
+> `gql_<snake_case>` prefix scheme. That build shipped and was then replaced by schema
+> separation: GraphQL-sourced tables now live in the **`stg_gql`** schema under bare
+> snake_case names (`stg_gql.game`), not `stg.gql_game`. `raw` keeps its `gql_` prefix.
+> See `docs/adr/0002-graphql-stg-tables-in-separate-schema.md` and
+> `docs/superpowers/plans/2026-09-01-warehouse-schema-separation.md`. Retained as build
+> history; the reasoning below about why clash-detection had to go is still sound.
+
 You are implementing a frozen, already-reviewed spec. You have write access to this repo.
 You have no prior context on this work; everything you need is below or in the files it names.
 
