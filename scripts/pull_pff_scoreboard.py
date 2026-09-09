@@ -57,6 +57,7 @@ import os
 import sys
 import time
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -318,7 +319,28 @@ def self_check() -> None:
     }}
     assert greenline_row(game, locked, 2026) is None
     assert greenline_row(game, {}, 2026) is None
+
+    # A cancelled week-1 game keeps is_over False; the default must still say 2.
+    weeks = [
+        {"pff_week": "1", "kickoff_raw": "2026-09-05T00:00:00", "is_over": False},
+        {"pff_week": "2", "kickoff_raw": "2026-09-11T19:30:00", "is_over": False},
+        {"pff_week": "3", "kickoff_raw": "2026-09-18T19:30:00", "is_over": False},
+    ]
+    assert next_week(weeks, now="2026-09-09T22:00:00") == "2"
+    assert next_week(weeks, now="2026-09-12T00:00:00") == "3"
+    assert next_week(weeks, now="2026-12-31T00:00:00") is None
     print("self-check ok")
+
+
+def next_week(raw: list[dict], now: str | None = None) -> str | None:
+    """The week whose kickoffs are still ahead. Keyed on kickoff, not `is_over`:
+    cancelled and postponed games keep `is_over: False` forever, so a stale week-1
+    entry would otherwise pin the default to a week that finished days ago."""
+    now = now or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    upcoming = [g for g in raw if (g.get("kickoff_raw") or "") > now]
+    if not upcoming:
+        return None
+    return min(upcoming, key=lambda g: g["kickoff_raw"])["pff_week"]
 
 
 def greenline_pull(sched: dict, args, games: list[dict]) -> list[dict]:
@@ -330,11 +352,7 @@ def greenline_pull(sched: dict, args, games: list[dict]) -> list[dict]:
         ]
 
     raw = raw_games(sched)
-    week = args.week or next(
-        (g["pff_week"] for g in sorted(raw, key=lambda x: x.get("kickoff_raw") or "")
-         if not g.get("is_over")),
-        None,
-    )
+    week = args.week or next_week(raw)
     if week is None:
         raise SystemExit("no unplayed games left; pass --week")
     wanted = [g for g in raw if str(g.get("pff_week")) == str(week)]
