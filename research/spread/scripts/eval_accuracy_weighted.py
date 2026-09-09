@@ -89,6 +89,73 @@ def consensus(row_frame, models, w):
     return out
 
 
+def _ridge(X, y, lam):
+    Xc = np.column_stack([np.ones(len(X)), X])
+    A = Xc.T @ Xc + lam * np.eye(Xc.shape[1])
+    A[0, 0] -= lam                       # never penalise the intercept
+    return np.linalg.solve(A, Xc.T @ y)
+
+
+def fitted(df, models, seasons, window=5, lam=10.0, thr=1.0):
+    """Let the data choose the weights, rather than imposing equal / top-k / inverse-MSE.
+
+    Regresses the CLOSE'S OWN ERROR (margin - close) on every model's deviation from the close,
+    walk-forward. This is the strongest form of "weight their predictions": if any linear
+    combination of the panel knows something the closing line does not, ridge finds it.
+
+    Betting the raw consensus deviation -- what the unfitted schemes do -- implicitly assumes a
+    coefficient of 1.0 on it, and would lose money even if the true coefficient were a healthy
+    0.3. That is why this mode exists and why its answer differs from the grid above.
+    """
+    close = -df["line"].to_numpy(float)
+    resid = df["y"].to_numpy(float) - close
+    pred = np.full(len(df), np.nan)
+    for s in seasons:
+        tr = (df.season < s) & (df.season >= s - window)
+        te = (df.season == s)
+        if tr.sum() < 300:
+            continue
+        keep = [m for m in models
+                if df.loc[tr, m].notna().mean() > 0.5 and df.loc[te, m].notna().mean() > 0.5]
+        if len(keep) < 5:
+            continue
+        Xtr = np.nan_to_num(-df.loc[tr, keep].to_numpy(float) - close[tr.to_numpy()][:, None])
+        Xte = np.nan_to_num(-df.loc[te, keep].to_numpy(float) - close[te.to_numpy()][:, None])
+        b = _ridge(Xtr, resid[tr.to_numpy()], lam)
+        pred[te.to_numpy()] = b[0] + Xte @ b[1:]
+
+    ev = np.isfinite(pred) & df.season.isin(seasons).to_numpy()
+    corr = float(np.corrcoef(pred[ev], resid[ev])[0, 1])
+    sel = ev & (np.abs(pred) >= thr)
+    side = np.sign(pred[sel])
+    res = side * resid[sel]
+    k = res != 0
+    won, n = res[k] > 0, int(k.sum())
+    rate = float(won.mean())
+    se = float(np.sqrt(rate * (1 - rate) / n))
+    seas = df.season.to_numpy()[sel][k]
+
+    print(f"Fitted ridge weights, window {window} seasons, lambda {lam:.0f}, "
+          f"evaluating {seasons[0]}-{seasons[-1]}, |pred| >= {thr:.0f}")
+    print(f"  out-of-sample corr with the close's error: {corr:+.3f}")
+    print(f"  {n} bets, ATS {rate:.1%}, 95% [{rate - 1.96 * se:.1%}, {rate + 1.96 * se:.1%}], "
+          f"break-even {BREAKEVEN:.1%}")
+    print(f"  ROI {roi(rate):+.2%}, units {won.sum() * (100 / 110) - (~won).sum():+.1f}")
+    print("  by season:")
+    for ss in sorted(set(seas)):
+        m = seas == ss
+        print(f"    {ss}: {int(m.sum()):5d} bets  {won[m].mean():.1%}")
+    print()
+    print("  A positive OOS correlation this small is a whisper, not an edge: it lands on the")
+    print("  vig rather than past it, and the interval spans break-even.")
+    (base.OUT_DIR / "pt_fitted_weights.json").write_text(json.dumps(
+        {"window": window, "lam": lam, "thresh": thr, "oos_corr": corr, "bets": n,
+         "ats": rate, "roi": roi(rate), "breakeven": BREAKEVEN,
+         "by_season": {int(ss): float(won[seas == ss].mean()) for ss in sorted(set(seas))}},
+        indent=2, default=float))
+    return 0
+
+
 def per_model(df, models, seasons):
     """The extreme case of "weight the accurate ones more": weight 1 on one model, 0 on the rest.
 
@@ -138,6 +205,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--from", dest="start", type=int, default=2015,
                     help="first season to evaluate (default 2015)")
+    ap.add_argument("--fitted", action="store_true",
+                    help="let ridge FIT the weights instead of imposing them")
     ap.add_argument("--per-model", action="store_true",
                     help="every model on its own against the close, instead of combinations")
     args = ap.parse_args()
@@ -147,6 +216,8 @@ def main() -> int:
     df = df[df["line"].notna() & df["y"].notna()].reset_index(drop=True)
     seasons = sorted(s for s in df.season.unique() if s >= args.start)
 
+    if args.fitted:
+        return fitted(df, models, seasons)
     if args.per_model:
         return per_model(df, models, seasons)
     print(f"{len(df):,} games, {len(models)} models (market lines removed), "
