@@ -44,14 +44,95 @@ def cluster_rate(win, season):
             "hi": float(BREAKEVEN + ci[1]), "p_vs_breakeven": float(p)}
 
 
+def decontaminate(df, models, before_season=None):
+    """rho_i = corr(f_i - open, close - open); drop the top decile before fitting.
+
+    Amendment A6 (research/spread/docs/prereg-line-movement.md): A3 ran this once on the
+    FULL 2001-2025 frame, so the retained panel's identity was chosen with knowledge of the
+    evaluation seasons it was later scored on -- the direction of the bias on R^2 is
+    conservative (the screen removes the *most* target-correlated columns), but conservative
+    is not the same as fixed-in-advance, and a screen that saw its own test set makes every
+    downstream p-value conditional on that screen.
+
+    `before_season=None` reproduces the original full-sample screen unchanged (still what
+    `--decontaminate` runs). `before_season=s` restricts rho to games with season < s, which
+    is what `--decontaminate-wf` calls once per evaluation season so the drop list for season
+    s never reads season s or later.
+
+    Returns (kept_models, dropped_models sorted by rho descending, rho dict).
+    """
+    hist = df if before_season is None else df[df["season"] < before_season]
+    open_m, close_m = -hist["lineopen"].to_numpy(float), -hist["line"].to_numpy(float)
+    move = close_m - open_m
+    rho = {}
+    for m in models:
+        f = -hist[m].to_numpy(float)
+        ok = np.isfinite(f) & np.isfinite(move)
+        if ok.sum() >= 400 and (f[ok] - open_m[ok]).std() > 0:
+            rho[m] = float(np.corrcoef(f[ok] - open_m[ok], move[ok])[0, 1])
+    if not rho:
+        return list(models), [], rho
+    cut = float(np.quantile(list(rho.values()), 0.90))
+    dropped = sorted((m for m, r in rho.items() if r >= cut), key=rho.get, reverse=True)
+    kept = [m for m in models if m not in set(dropped)]
+    return kept, dropped, rho
+
+
+def sweep_walk_forward(df, models, bench_col, only, grids):
+    """Run `sweep.sweep` season by season, rebuilding `decontaminate` from only the seasons
+    strictly before each evaluation season (amendment A6).
+
+    `sweep.sweep` already fits every method walk-forward within one call (`tr = df[df.season
+    < s]` inside its own loop), but it takes one fixed model list for the whole call -- the
+    decontamination screen has to vary by evaluation season, so this calls it once per season,
+    each time on a frame truncated to `season <= s` with `base.BURN_IN_THROUGH` shifted to
+    `s - 1` so `sweep.sweep`'s own season list collapses to `[s]`. Total work is the same
+    order as one full-panel call: each season is fit exactly once, just via N calls instead
+    of one.
+    """
+    eval_seasons = sorted(df.loc[df["season"] > base.BURN_IN_THROUGH, "season"].unique())
+    keys = list(only) + ["R0", "E4"]
+    preds = {k: np.full(len(df), np.nan) for k in keys}
+    chosen_parts, coefs_parts = [], []
+    drop_lists, rho_by_season = {}, {}
+    orig_burn_in = base.BURN_IN_THROUGH
+    try:
+        for s in eval_seasons:
+            kept, dropped, rho = decontaminate(df, models, before_season=s)
+            drop_lists[int(s)] = dropped
+            rho_by_season[int(s)] = rho
+            df_s = df[df["season"] <= s]
+            base.BURN_IN_THROUGH = int(s) - 1
+            p, ch, co, _ = sweep.sweep(df_s, kept, bench_col, verbose=False, grids=grids, only=only)
+            local = (df_s["season"] == s).to_numpy()
+            global_ = (df["season"] == s).to_numpy()
+            for k in keys:
+                preds[k][global_] = p[k][local]
+            if not ch.empty:
+                chosen_parts.append(ch)
+            if not co.empty:
+                coefs_parts.append(co)
+    finally:
+        base.BURN_IN_THROUGH = orig_burn_in
+    chosen = (pd.concat(chosen_parts, ignore_index=True) if chosen_parts
+              else pd.DataFrame(columns=["season", "method", "param"]))
+    coefs = (pd.concat(coefs_parts, ignore_index=True) if coefs_parts
+             else pd.DataFrame(columns=["season", "method", "coef"]))
+    return preds, chosen, coefs, eval_seasons, drop_lists, rho_by_season
+
+
 def main() -> int:
     global METHODS
     ap = argparse.ArgumentParser()
     ap.add_argument("--amend", action="store_true", help="amendment A2: all methods, wide ridge grid")
     ap.add_argument("--decontaminate", action="store_true",
                     help="drop the top decile of models by corr(f_i - open, close - open) first")
+    ap.add_argument("--decontaminate-wf", action="store_true",
+                    help="amendment A6: same screen, rebuilt per evaluation season from only "
+                         "the seasons before it -- --decontaminate's screen saw its own test set")
     args = ap.parse_args()
-    suffix = ("_a2" if args.amend else "") + ("_decon" if args.decontaminate else "")
+    suffix = ("_a2" if args.amend else "") + (
+        "_decon_wf" if args.decontaminate_wf else "_decon" if args.decontaminate else "")
     grids = None
     if args.amend:
         METHODS = METHODS_A2
@@ -61,23 +142,20 @@ def main() -> int:
     models = [m for m in models if m not in MARKET_LINES]
     df = df[df["line"].notna() & df["lineopen"].notna()].reset_index(drop=True)
     dropped = []
-    if args.decontaminate:
-        # Decontamination (review 2026-09-08 §1.1). A column that reprints the mid-week line
-        # predicts close - open mechanically. rho_i = corr(f_i - open, close - open) on the
-        # model's own games; the top decile is removed BEFORE anything is fitted. Full-sample
-        # rho is a filter on the regressor set, not a target-informed selection, so it can only
-        # cost the methods accuracy -- there is no optimistic bias in using it.
-        open_m, close_m = -df["lineopen"].to_numpy(float), -df["line"].to_numpy(float)
-        move = close_m - open_m
-        rho = {}
-        for m in models:
-            f = -df[m].to_numpy(float)
-            ok = np.isfinite(f) & np.isfinite(move)
-            if ok.sum() >= 400 and (f[ok] - open_m[ok]).std() > 0:
-                rho[m] = float(np.corrcoef(f[ok] - open_m[ok], move[ok])[0, 1])
-        cut = float(np.quantile(list(rho.values()), 0.90))
-        dropped = sorted((m for m, r in rho.items() if r >= cut), key=rho.get, reverse=True)
-        models = [m for m in models if m not in set(dropped)]
+    drop_lists_by_season, rho_by_season = {}, {}
+    if args.decontaminate and not args.decontaminate_wf:
+        # Decontamination (review 2026-09-08 §1.1; corrected by amendment A6). A column that
+        # reprints the mid-week line predicts close - open mechanically. rho_i = corr(f_i -
+        # open, close - open) on the model's own games; the top decile is removed BEFORE
+        # anything is fitted. The direction of the bias on R^2 is conservative -- the screen
+        # removes the *most* target-correlated columns -- but this full-sample rho is computed
+        # over the evaluation seasons too, so the retained panel's identity was chosen with
+        # knowledge of its own test set: conservative is not the same as fixed-in-advance, and
+        # every A3 p-value is conditional on this screen. See --decontaminate-wf (amendment A6)
+        # for the walk-forward version, which builds each season's drop list from earlier
+        # seasons only.
+        models, dropped, rho = decontaminate(df, models, before_season=None)
+        cut = min(rho[m] for m in dropped) if dropped else float("nan")
         print(f"decontaminate: dropped {len(dropped)} models at rho >= {cut:.3f}: "
               + ", ".join(f"{m} ({rho[m]:.2f})" for m in dropped))
     df["margin"] = df["y"]                    # keep the real outcome for the decay curve
@@ -85,7 +163,22 @@ def main() -> int:
     print(f"{len(df)} games with open and close, {len(models)} models, "
           f"seasons {df.season.min()}-{df.season.max()}, bootstrap draws {base.N_BOOT}")
 
-    preds, chosen, coefs, seasons = sweep.sweep(df, models, "lineopen", only=METHODS, grids=grids)
+    if args.decontaminate_wf:
+        (preds, chosen, coefs, seasons,
+         drop_lists_by_season, rho_by_season) = sweep_walk_forward(
+            df, models, "lineopen", only=METHODS, grids=grids)
+        dropped = drop_lists_by_season.get(seasons[-1], [])
+        counts = {}
+        for lst in drop_lists_by_season.values():
+            for m in lst:
+                counts[m] = counts.get(m, 0) + 1
+        always_dropped = sorted(m for m, c in counts.items() if c == len(seasons))
+        print(f"decontaminate-wf: {len(seasons)} evaluation seasons; last season "
+              f"({seasons[-1]}) dropped {len(dropped)} models: {', '.join(dropped)}")
+        print("  models dropped in every evaluation season they had history for: "
+              + (", ".join(always_dropped) if always_dropped else "(none)"))
+    else:
+        preds, chosen, coefs, seasons = sweep.sweep(df, models, "lineopen", only=METHODS, grids=grids)
 
     y = df["y"].to_numpy()                    # close (margin space)
     open_m = -df["lineopen"].to_numpy(float)  # opener (margin space)
@@ -103,6 +196,11 @@ def main() -> int:
 
     out = {"n": n, "seasons": [int(s) for s in seasons], "sd_move": float(move[sup].std()),
            "n_models": len(models), "dropped_models": dropped}
+    if args.decontaminate_wf:
+        # dropped_models above is the LAST evaluation season's list (most history available,
+        # closest to the full-sample screen's window) -- kept as the single headline number.
+        # drop_lists_by_season is every season's list, for the overlap report against A3.
+        out["drop_lists_by_season"] = {str(s): lst for s, lst in drop_lists_by_season.items()}
     rows = []
     r0 = preds["R0"]
     base_mse = float(((y - open_m) ** 2)[sup].mean())     # M0: no movement
