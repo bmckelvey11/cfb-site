@@ -722,7 +722,7 @@ Thursday captures, on a fixed game set.
 
 **Files:**
 - Modify: `research/spread/docs/prereg-line-movement.md` (append B2)
-- Modify: `research/spread/scripts/eval_version_b.py` (`--by-capture`)
+- Modify: `research/spread/scripts/eval_version_b.py` (the B2 block runs unconditionally in `main()`; there is no `--by-capture` flag)
 - Test: `tests/test_spread_version_b.py` (add one case)
 
 **Interfaces:**
@@ -763,12 +763,18 @@ def test_capture_offsets_bucket_by_hours_after_monday():
                         "captured_utc": ["20260907T190500Z", "20260908T223000Z", "20260910T043000Z"],
                         "line_pt": [7.0, 7.5, 7.5], "E4": [8.0, 8.0, 8.0]})
     o = vb.capture_offsets(log)
-    assert o.offset_bucket.tolist() == ["mon", "tue", "wed"]
+    assert o.offset_bucket.tolist() == ["mon", "tue", "thu+"]  # 15.1h, 42.5h, 72.5h
 ```
 
 Run: `python -m pytest tests/test_spread_version_b.py -q` → expected FAIL, `no attribute 'capture_offsets'`.
 
 - [ ] **Step 3: Implement**
+
+> **The sample below is illustrative and was wrong on one point** (corrected in the shipped
+> implementation, 2026-09-08): it returned every (game, snapshot) row, which contradicts the
+> fixed-game-set requirement stated above it. `capture_offsets` returns **one row per game per
+> bucket** — the earliest capture inside that bucket — and `apply_fixed_game_set` drops any game
+> missing from a populated bucket. Do not "fix" the shipped code back to match this sample.
 
 In `eval_version_b.py`:
 

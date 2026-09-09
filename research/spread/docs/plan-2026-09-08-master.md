@@ -30,23 +30,32 @@ That is version B. Everything else here exists to make its answer trustworthy.
 
 ## 2. Where the evidence actually stands (measured 2026-09-08)
 
-**Archive, decontaminated (amendment A3).** Dropping the top decile of models by
-`ρ_i = corr(f_i − open, close − open)` — 15 of 152, including three of the margin era's "best
-forecasters", which is itself the finding:
+**Archive, decontaminated. Amendment A6 (walk-forward) is the citable screen**; A3
+(full-sample) is retained as run. Dropping the top decile of models by
+`ρ_i = corr(f_i − open, close − open)` — 15 of 152 under A3, including three of the margin era's
+"best forecasters", which is itself the finding:
 
-| method | R² full panel | R² decontaminated | retained |
-|---|---|---|---|
-| **E4** screened consensus | 0.170 | **0.153** | **90%** |
-| E6 ridge | 0.248 | 0.163 | 66% |
-| E14 screened CSR | 0.136 | 0.107 | 79% |
+| method | R² full panel | A3 full-sample screen | **A6 walk-forward screen** | A6 retention |
+|---|---|---|---|---|
+| **E4** screened consensus | 0.170 | 0.153 | **0.154** | **90.7%** |
+| E6 ridge | 0.248 | 0.163 | **0.201** | 81.1% |
+| E7 | 0.147 | 0.133 | 0.132 | 90.0% |
+| E14 screened CSR | 0.136 | 0.107 | 0.113 | 82.9% |
 
-E4's γ after decontamination: median **0.291**, positive in 20 of 20 seasons.
+E4's γ under A6: median **0.283**, range 0.182–0.323, positive in 20 of 20 seasons.
 
-**This result is conditional on a full-sample screen** — the drop list was computed over all of
-2001–2025, evaluation seasons included, so the retained panel's identity was chosen with
-knowledge of its own test set. The direction of the bias on R² is conservative (the screen
-removes the *most* target-correlated columns), but the p-values are conditional and must be
-described that way until the walk-forward rerun (amendment A6, §5) lands.
+A6 builds the drop list for evaluation season *s* from seasons < *s* only, so it never sees its
+own test set and A3's conditionality is discharged. The two final-season drop lists overlap 14 of
+15 (A6 keeps `linedokter`). Across all 20 seasons A6's union is 33 models — early seasons flag
+more, because with 5–13 years of history a ρ estimate is noisier. `--decontaminate` still
+reproduces A3 byte-for-byte, so the recorded A3 result stands as run.
+
+**A6 changed a number this plan leaned on, and it does not change the decision.** Under A3, E6
+retained 66% against E4's 90% — the basis for calling E6 "the bigger loser to decontamination".
+Under the honest screen E6 retains 81.1%, and its absolute R² (0.201) is **higher** than E4's
+(0.154), closer to the full-panel ordering. E4 is still the more robust by retention, but the gap
+is narrower than stated and E6 scores better. **The graded predictor stays E4 anyway** — see
+decision 2.
 
 **What the archive's "close" actually is.** PT's `line` is a late line, not the close: on 1,219
 matched 2024–25 games, mean |Δ| **0.69**, exact on 31%, within 0.5 on 67%.
@@ -82,9 +91,14 @@ decide, and amendment B1's MDE gate, which made the stopping time depend on the 
    Holm applies within a family; no across-family correction is attempted, because with one
    confirmatory hypothesis none is needed. This replaced an earlier proposal to merely log the
    amendments — a ledger documents forks without controlling them.
-2. **E4 is graded, not E6**, though E6 scores higher on the full panel. E6 is the bigger loser
-   to decontamination (66% retained vs 90%); grading the more robust method rather than the
-   higher-scoring one is deliberate and was fixed before data.
+2. **E4 is graded, not E6**, though E6 scores higher — on the full panel *and*, since A6, under
+   the honest screen (0.201 vs 0.154). E4 remains the more robust by retention (90.7% vs 81.1%),
+   but that case is weaker than it looked under A3's 66%. **This is exactly why it was fixed
+   before data.** Prereg B1 registered E4 as the graded predictor and placed E6 and the model
+   median beside it *with no selection among them*. Switching now, on a result seen after the
+   fact, is the selection-on-outcome this tree exists to prevent. If E6 is genuinely the better
+   predictor, the way to establish that is a new pre-registration and a forward test, not a
+   substitution.
 3. **The version B predictor set is frozen for the season.** `MODEL_COLS` and `PARAMS` in
    `weekly_slate.py` define `pred_close`; changing them mid-forward-test silently redefines the
    graded quantity. Any change is versioned (`model_set_version`) and existing forward-log rows
