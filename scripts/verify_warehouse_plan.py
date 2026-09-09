@@ -17,13 +17,31 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
+from pathlib import Path
 
 import duckdb
 
-# Section 1. Measured 2026-09-08; step 0 asserts these before anything else runs.
-STRUCTURE = {"core": None, "meta": None, "raw": 116, "stg": 124, "stg_gql": 38}
-RAW_GQL_PREFIXED = 34
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from cfb_system_maker.graphql_client import (  # noqa: E402
+    GQL_ENTITY_TO_RAW,
+    GQL_ENTITY_TO_STG,
+)
+
+# Section 1's table counts are state, not invariants -- `stg` grows with every new source
+# (PFF's S5 adds ~19 `stg.pff_*` tables, and pff-ingest-plan.md owns that work). Pinning
+# them here would fail step 0 for a non-problem. So the counts are printed, and what gets
+# asserted is what section 2's argument actually rests on: the GraphQL entities are all
+# present under both spellings, nothing outside those three names collides, and the two
+# completed migrations have not regressed.
+REPORTED_COUNTS = {"raw": 116, "stg": 124, "stg_gql": 38}  # measured 2026-09-09
 COLLIDERS = ["calendar", "draft_picks", "predicted_points"]
+
+# A `stg` table whose name still carries the transport, or its casing, means the naming
+# rationalization or the schema separation came undone.
+GQL_PREFIXED = re.compile(r"^gql_")
+CAMEL_CASE = re.compile(r"[A-Z]")
 
 # Section 5's drop list, as revised 2026-09-09. Transcribed rather than derived: the point is
 # to fail when the plan and the warehouse disagree, which a self-deriving list cannot do.
@@ -112,42 +130,57 @@ def _filled(con, schema: str, table: str) -> tuple[int, dict[str, int]]:
 
 
 def check_structure(con) -> list[str]:
-    counts = dict(
-        con.execute(
-            "SELECT table_schema, COUNT(*) FROM information_schema.tables GROUP BY 1"
-        ).fetchall()
-    )
+    tables: dict[str, set[str]] = {}
+    for schema, table in con.execute(
+        "SELECT table_schema, table_name FROM information_schema.tables"
+    ).fetchall():
+        tables.setdefault(schema, set()).add(table)
+
     fails = []
-    for schema, expected in STRUCTURE.items():
-        got = counts.get(schema, 0)
-        ok = expected is None or got == expected
-        if not ok:
-            fails.append(f"{schema}: {got} tables, plan says {expected}")
-        note = "" if expected is None else f" (plan {expected})"
-        print(f"  [{'ok' if ok else 'FAIL':4}] {schema:8} {got} tables{note}")
+    for schema in sorted(tables):
+        got = len(tables[schema])
+        note = ""
+        if schema in REPORTED_COUNTS:
+            note = f" (was {REPORTED_COUNTS[schema]} on 2026-09-09; counts move with the data)"
+        print(f"  [--  ] {schema:8} {got} tables{note}")
 
-    prefixed = con.execute(
-        "SELECT COUNT(*) FROM information_schema.tables "
-        "WHERE table_schema = 'raw' AND starts_with(table_name, 'gql_')"
-    ).fetchone()[0]
-    ok = prefixed == RAW_GQL_PREFIXED
-    if not ok:
-        fails.append(f"raw gql_-prefixed: {prefixed}, plan says {RAW_GQL_PREFIXED}")
-    print(f"  [{'ok' if ok else 'FAIL':4}] raw gql_ prefix {prefixed} (plan {RAW_GQL_PREFIXED})")
+    # Every GraphQL entity must have landed under both spellings. This is what the old
+    # `stg_gql == 38` / `raw gql_ == 34` counts were reaching for, said precisely: extra
+    # `stg_gql` tables are explode children and are fine, a *missing* entity is not.
+    for label, mapping, schema in (
+        ("stg_gql", GQL_ENTITY_TO_STG, "stg_gql"),
+        ("raw gql_", GQL_ENTITY_TO_RAW, "raw"),
+    ):
+        missing = sorted(set(mapping.values()) - tables.get(schema, set()))
+        if missing:
+            fails.append(f"{schema} is missing {len(missing)} GraphQL entities: {missing}")
+        print(f"  [{'ok' if not missing else 'FAIL':4}] {label:8} all {len(mapping)} "
+              f"entities present")
 
-    colliders = [
-        row[0]
-        for row in con.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'stg' "
-            "INTERSECT "
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'stg_gql' "
-            "ORDER BY 1"
-        ).fetchall()
-    ]
+    colliders = sorted(tables.get("stg", set()) & tables.get("stg_gql", set()))
     ok = colliders == COLLIDERS
     if not ok:
         fails.append(f"colliders: {colliders}, plan says {COLLIDERS}")
     print(f"  [{'ok' if ok else 'FAIL':4}] colliders       {colliders}")
+
+    # Postconditions of the two migrations section 1 says are done.
+    stray = sorted(t for t in tables.get("stg", set()) if GQL_PREFIXED.match(t))
+    if stray:
+        fails.append(f"stg still holds gql_-prefixed tables: {stray}")
+    print(f"  [{'ok' if not stray else 'FAIL':4}] no gql_ in stg  {len(stray)} found")
+
+    # Reported, not asserted. Step 0's prose claims no camelCase `stg` table remains; 15 do
+    # (2026-09-09), most of them explode children named after a camelCase JSON key, plus
+    # `gameMedia` and `gamePlayerStat` -- which ADR-0003 already noted "need snake_casing, not
+    # relocation." Renaming them is its own job, and failing step 0 on it would block the
+    # rationalization on unrelated work.
+    camel = sorted(
+        f"{s}.{t}"
+        for s in ("stg", "stg_gql")
+        for t in tables.get(s, set())
+        if CAMEL_CASE.search(t)
+    )
+    print(f"  [--  ] camelCase names {len(camel)} (step 0's prose says 0 -- see --camel)")
     return fails
 
 
@@ -291,7 +324,51 @@ def _selftest() -> int:
         assert len(check_merge_keys(con)) == 1
     finally:
         MERGE_KEYS = saved
+
+    assert _selftest_structure() == 0, "structure check is not PFF-proof"
     print("selftest ok")
+    return 0
+
+
+def _selftest_structure() -> int:
+    """A minimal warehouse, then the same one after PFF's S5 lands.
+
+    The point of this check: a new source must not fail step 0. `stg` growing by 19
+    `pff_*` tables is the concrete case, and it is why the table counts are printed
+    rather than asserted.
+    """
+    con = duckdb.connect(":memory:")
+    for schema in ("raw", "stg", "stg_gql"):
+        con.execute(f"CREATE SCHEMA {schema}")
+
+    def make(schema: str, name: str) -> None:
+        con.execute(f'CREATE TABLE "{schema}"."{name}" (x INTEGER)')
+
+    for entity, name in GQL_ENTITY_TO_STG.items():
+        make("stg_gql", name)
+        make("raw", GQL_ENTITY_TO_RAW[entity])
+    for name in COLLIDERS:
+        make("stg", name)
+
+    assert check_structure(con) == [], "a clean warehouse must pass"
+
+    # S5: 19 PFF tables land in `stg`. Nothing about the plan's argument changes.
+    for i in range(19):
+        make("stg", f"pff_table_{i}")
+    fails = check_structure(con)
+    assert fails == [], f"PFF broke step 0: {fails}"
+
+    # Guard the checks that must still bite.
+    make("stg", "gql_leftover")
+    assert any("gql_-prefixed" in f for f in check_structure(con))
+    con.execute('DROP TABLE "stg"."gql_leftover"')
+
+    make("stg", "athlete")  # a fourth collider
+    assert any("colliders" in f for f in check_structure(con))
+    con.execute('DROP TABLE "stg"."athlete"')
+
+    con.execute(f'DROP TABLE "stg_gql"."{COLLIDERS[0]}"')
+    assert any("missing" in f for f in check_structure(con))
     return 0
 
 
@@ -299,6 +376,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--db", default="data/cfb.duckdb")
     ap.add_argument("--coverage", action="store_true", help="year span per pair, then exit")
+    ap.add_argument("--camel", action="store_true", help="list camelCase table names, then exit")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
@@ -307,6 +385,14 @@ def main() -> int:
     con = duckdb.connect(args.db, read_only=True)
     if args.coverage:
         report_coverage(con)
+        return 0
+    if args.camel:
+        for schema, table in con.execute(
+            "SELECT table_schema, table_name FROM information_schema.tables "
+            "WHERE table_schema IN ('stg', 'stg_gql') ORDER BY 1, 2"
+        ).fetchall():
+            if CAMEL_CASE.search(table):
+                print(f"{schema}.{table}")
         return 0
 
     fails: list[str] = []
