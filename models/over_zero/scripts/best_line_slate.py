@@ -50,8 +50,8 @@ REAL_BOOKS = {"49": "Caesars", "68": "DraftKings", "69": "FanDuel",
 OUTLIER_PTS = 2.5        # a book this far off the median of all books is ignored (n >= 3)
 MIN_ODDS = -120          # the model's own price gate (MODEL_GUIDE: over at -120 or better)
 COLUMNS = ["run_at", "kick", "home", "away", "n_books", "spread_fair", "total_fair",
-           "total_range", "bias_fair", "p_over_fair", "pick", "best_total", "best_book",
-           "best_odds", "bias_best", "playable"]
+           "total_range", "dog_implied", "bias_fair", "p_over_fair", "pick", "best_total",
+           "best_book", "best_odds", "bias_best", "playable"]
 
 
 def _usable(m: dict) -> bool:
@@ -97,7 +97,7 @@ def live_markets(now: datetime, days: int) -> pd.DataFrame:
     return pd.DataFrame(rows).drop_duplicates("event_id")
 
 
-def guarded_median(values: pd.Series) -> pd.Series:
+def guarded(values: pd.Series) -> pd.Series:
     """Drop books more than OUTLIER_PTS from the median of all books (n >= 3).
 
     The median of ALL books, not of the others: with three books the outlier drags the
@@ -110,12 +110,24 @@ def guarded_median(values: pd.Series) -> pd.Series:
     return values
 
 
+def conservative_median(values: pd.Series, *, high: bool) -> float:
+    """Median snapped to a number a book actually posts, on the side that lowers the bias.
+
+    An even count interpolates to a total no book offers -- two books at 55.5 and 56.5
+    give a "fair" 56.0, and gating on the bias at a synthetic half-point is the same
+    selection-on-noise the fair number exists to avoid. Break the tie toward the higher
+    total and the smaller spread, both of which raise the underdog's implied score and so
+    make the 1.75 gate harder, never easier.
+    """
+    return float(values.quantile(0.5, interpolation="higher" if high else "lower"))
+
+
 def shop_total(totals: dict) -> dict:
     """Fair total and the best playable over, from {book: (total, odds)}."""
     if len(totals) < 2:
         return {}
-    v = guarded_median(pd.Series({b: t for b, (t, _) in totals.items()}))
-    out = {"n_books": len(v), "total_fair": float(v.median()),
+    v = guarded(pd.Series({b: t for b, (t, _) in totals.items()}))
+    out = {"n_books": len(v), "total_fair": conservative_median(v, high=True),
            "total_range": float(v.max() - v.min())}
     # Lowest total among books pricing the over at MIN_ODDS or better; ties go to the price.
     playable = [(t, -totals[b][1], b) for b, t in v.items() if totals[b][1] >= MIN_ODDS]
@@ -141,6 +153,7 @@ def build(fit_csv: Path, fit_seasons, days: int, threshold: float) -> pd.DataFra
     print(f"Fit on {spread_est.size:,} games from seasons "
           f"{min(fit_seasons)}-{max(fit_seasons)}")
     fit = fit_pipeline(spread_est, totals_est, fav_pts, dog_pts)
+    fit_dog = (totals_est - spread_est) / 2
 
     now = datetime.now(timezone.utc)
     games = live_markets(now, days)
@@ -151,9 +164,12 @@ def build(fit_csv: Path, fit_seasons, days: int, threshold: float) -> pd.DataFra
         shopped = shop_total(g.totals)
         if not shopped or len(g.spreads) < 2:
             continue
-        spread_fair = float(guarded_median(pd.Series(g.spreads)).median())
-        if spread_fair == 0:                       # pick'em -- no favorite, per the paper
+        kept = guarded(pd.Series(g.spreads))
+        # Only the magnitude feeds the model; carry the sign back for the reader.
+        mag = conservative_median(kept.abs(), high=False)
+        if mag == 0:                               # pick'em -- no favorite, per the paper
             continue
+        spread_fair = float(kept[kept.abs() == mag].iloc[0])
         rows.append({"kick": g.kick, "home": g.home, "away": g.away,
                      "spread_fair": spread_fair, **shopped})
     t = pd.DataFrame(rows)
@@ -166,6 +182,16 @@ def build(fit_csv: Path, fit_seasons, days: int, threshold: float) -> pd.DataFra
     t["bias_best"] = bias_of(t.spread_fair.to_numpy(), t.best_total.to_numpy(), fit)
     t["pick"] = np.where(t.bias_fair > threshold, "OVER", "")
     t["run_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    t["dog_implied"] = (t.total_fair - t.spread_fair.abs()) / 2
+    # The picks live where the underdog is implied for a handful of points, and the fit
+    # sample thins out fast down there. Print the support so p_over is read for what it
+    # is: a parametric read at the edge of the calibrated region, not a local rate.
+    floor = t.loc[t.pick == "OVER", "dog_implied"].min() if (t.pick == "OVER").any() else None
+    if floor is not None:
+        print(f"Picks sit at dog_implied {floor:.1f}-"
+              f"{t.loc[t.pick == 'OVER', 'dog_implied'].max():.1f}; the fit sample has "
+              f"{int((fit_dog < 5).sum()):,} games under 5 and {int((fit_dog < 4).sum()):,} "
+              f"under 4 -- thin support, so treat p_over as extrapolated there.")
     return t.sort_values("bias_fair", ascending=False)[COLUMNS]
 
 
@@ -228,6 +254,12 @@ def _check() -> None:
     assert s2["playable"] is False and s2["best_total"] == 44.5, s2
     assert not shop_total({"68": (44.5, -110)}), "one book is not a market"
     assert not _usable({"value": 30.5, "odds": -110, "is_alt_market": True}), "alt lines are not quotes"
+    # Two books straddling: the fair total is the posted 56.5, not the synthetic 56.0.
+    s3 = shop_total({"68": (55.5, -110), "69": (56.5, -110)})
+    assert s3["total_fair"] == 56.5 and s3["best_total"] == 55.5, s3
+    # Spreads break the other way -- the smaller magnitude, which also lowers the bias.
+    sp = pd.Series({"68": -45.5, "69": -44.5})
+    assert conservative_median(sp.abs(), high=False) == 44.5
     print("checks pass")
 
 

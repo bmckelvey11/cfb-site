@@ -16,6 +16,7 @@ Exit code is the number of failed checks, so this gates a step.
 from __future__ import annotations
 
 import argparse
+import re
 
 import duckdb
 
@@ -24,30 +25,29 @@ STRUCTURE = {"core": None, "meta": None, "raw": 116, "stg": 124, "stg_gql": 38}
 RAW_GQL_PREFIXED = 34
 COLLIDERS = ["calendar", "draft_picks", "predicted_points"]
 
-# Section 5's drop list. Kept verbatim so the check reports which entries have gone stale
-# rather than quietly tracking the warehouse.
+# Section 5's drop list, as revised 2026-09-09. Transcribed rather than derived: the point is
+# to fail when the plan and the warehouse disagree, which a self-deriving list cannot do.
+# The 2026-09-08 list held three `stg.plays` columns carrying 6.4M values and three
+# `actionnetwork_scoreboard__*` tables the AN rename had already replaced.
 DEAD_CLAIMED = [
-    ("stg", "plays", "defenseTimeouts"),
-    ("stg", "plays", "offenseTimeouts"),
-    ("stg", "plays", "wallclock"),
+    ("stg", "an_team", "overtime_losses"),
+    ("stg", "team_stats", "statValue_anyof_schema_1_validator"),
+    ("stg", "team_stats__statValue_any_of_schemas", "statValue_anyof_schema_1_validator"),
     ("stg_gql", "game_weather", "windGust"),
     ("stg_gql", "poll_type", "abbreviation"),
     ("stg_gql", "recruit", "overallRank"),
     ("stg_gql", "recruit", "positionRank"),
-    ("stg", "team_stats", "statValue_anyof_schema_1_validator"),
-    ("stg", "team_stats__statValue_any_of_schemas", "statValue_anyof_schema_1_validator"),
-    ("stg", "actionnetwork_scoreboard__teams", "teams_standings_overtime_losses"),
-    (
-        "stg",
-        "actionnetwork_scoreboard__markets__markets_event_moneyline",
-        "markets_event_moneyline_odds_coefficient_score",
-    ),
-    (
-        "stg",
-        "actionnetwork_scoreboard__markets__markets_event_core_bet_type_6_team_score",
-        "markets_event_core_bet_type_6_team_score_odds_coefficient_score",
-    ),
 ]
+
+# Section 5's headline count, printed for comparison but never a failure: it moves every time a
+# 2026 game is played or a new weekly `lines_*` dump lands. A hard count here would fail step 0
+# for a non-problem, which is how section 5 rotted in the first place.
+ALL_NULL_REPORTED = 11
+
+# The only all-NULL columns allowed off the drop list are unplayed games' scores. This is the
+# shape check that replaces counting them.
+FUTURE_DATED = re.compile(r"^lines_.*$")
+FUTURE_DATED_COLUMN = re.compile(r"^(home|away)Score$")
 
 # Loader scaffolding, bound from the dump filename. Section 5 claims 308 all-NULL copies
 # of these survive into `stg`; R3 asks for them to stop being materialized there.
@@ -58,8 +58,8 @@ SPINE = ("season", "week", "season_type")
 MERGE_KEYS = [
     (
         "calendar",
-        ("stg_gql", "calendar", ("year", "week")),
-        ("stg", "calendar", ("season", "week")),
+        ("stg_gql", "calendar", ("year", "week", "seasonType")),
+        ("stg", "calendar", ("season", "week", "seasonType")),
     ),
     (
         "draft_picks",
@@ -164,14 +164,17 @@ def check_dead_columns(con) -> list[str]:
             if non_null == 0:
                 census[(schema, table, col)] = rows
 
+    fails = []
     spine_dead = [key for key in census if key[2] in SPINE]
-    print(f"  all-NULL columns in stg + stg_gql: {len(census)} (plan section 5 says 332)")
-    print(f"    of which loader spine {SPINE}: {len(spine_dead)} (plan says 308)")
+    if spine_dead:
+        fails.append(f"loader spine is all-NULL somewhere: {spine_dead} -- R3 has regressed")
+    print(f"  all-NULL columns in stg + stg_gql: {len(census)} "
+          f"(plan section 5 reported {ALL_NULL_REPORTED}; this count moves with the data)")
+    print(f"    of which loader spine {SPINE}: {len(spine_dead)} (plan says 0)")
     for key in sorted(census):
         print(f"      {key[0]}.{key[1]}.{key[2]}  rows={census[key]}")
 
-    fails = []
-    print("  plan's 12-column drop list, checked:")
+    print(f"  plan's {len(DEAD_CLAIMED)}-column drop list, checked:")
     for schema, table, col in DEAD_CLAIMED:
         exists = con.execute(
             "SELECT COUNT(*) FROM information_schema.columns "
@@ -194,9 +197,17 @@ def check_dead_columns(con) -> list[str]:
 
     claimed = {tuple(entry) for entry in DEAD_CLAIMED}
     unlisted = sorted(k for k in census if k not in claimed and k[2] not in SPINE)
-    if unlisted:
-        print("  all-NULL but absent from the plan's list:")
-        for key in unlisted:
+    # Future-dated scores are all-NULL on purpose -- those games have not been played. How many
+    # there are changes weekly, so assert the shape and not the count.
+    future = [
+        k for k in unlisted if FUTURE_DATED.match(k[1]) and FUTURE_DATED_COLUMN.match(k[2])
+    ]
+    other = [k for k in unlisted if k not in future]
+    print(f"  future-dated scores, kept on purpose: {len(future)}")
+    if other:
+        fails.append(f"all-NULL but neither on the drop list nor a future-dated score: {other}")
+        print("  all-NULL but on neither list -- triage these:")
+        for key in other:
             print(f"    {key[0]}.{key[1]}.{key[2]}  rows={census[key]}")
     return fails
 

@@ -4,12 +4,18 @@
 code on `master` at `33415ad`. Target:
 `docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md`.
 
-Reproduce with `python scripts/verify_warehouse_plan.py` (exit code = failed checks; 8 today)
-and `python scripts/verify_warehouse_plan.py --coverage`.
+Reproduce with `python scripts/verify_warehouse_plan.py` (exit code = failed checks) and
+`python scripts/verify_warehouse_plan.py --coverage`.
 
 **Verdict: do not execute §8 step 6 as written.** Its drop list would delete 6.4 M populated
 values. The plan's structural argument (§1, §2) and its containment analysis (§3) both hold up;
 what has rotted is everything §5 measured, and one merge key in §6 was never right.
+
+> **Resolved 2026-09-09.** All seven §9 recommendations are applied to the plan; the verifier
+> went from 8 failures to 0 against the revised document. Section numbers below refer to the
+> plan **as reviewed** — §8's steps were renumbered by recommendation 2, so the old "step 6"
+> (drop) is now step 4 and "step 7" (collapse) is step 5. This document is the record of what
+> was wrong, not a description of the current plan.
 
 ---
 
@@ -204,27 +210,29 @@ Worth stating, because it means the plan's reasoning is sound and only its measu
 
 ## 9. Recommended edits
 
-Ordered by what blocks execution.
+**All seven applied to the plan on 2026-09-09.** `python scripts/verify_warehouse_plan.py` now
+exits 0 against the revised document, so §8 step 0's gate passes. Ordered by what blocked
+execution.
 
-1. **Rewrite §5 against the current warehouse.** The drop list becomes 7 columns; delete the
+1. ✅ *(2026-09-09)* **Rewrite §5 against the current warehouse.** The drop list becomes 7 columns; delete the
    three `stg.plays.*` entries and the three vanished ActionNetwork ones, add
    `stg.an_team.overtime_losses`. Replace the 332 / 308 / 12 / 12 breakdown with 11 / 0 / 4 / 7.
    Delete the mechanism claim with it — "One loader change removes all 308" and the
    146 / 114 / 48 distribution table are the sentences a reader would actually act on, and both
    describe a warehouse that no longer exists.
-2. **Delete §8 steps 2 and 3, and R3** — or restate R3 as already satisfied, with
+2. ✅ *(2026-09-09)* **Delete §8 steps 2 and 3, and R3** — or restate R3 as already satisfied, with
    `explode_payloads` cited as the mechanism. Re-anchor step 4 on step 1 alone.
-3. **Move `recruit` from Bucket B to Bucket C**, merging on `recruitId`. Restate Bucket B's
+3. ✅ *(2026-09-09)* **Move `recruit` from Bucket B to Bucket C**, merging on `recruitId`. Restate Bucket B's
    remaining two as "column-superset REST, coverage-superset GraphQL — both merge unless
    step 4 changes the picture," so §3 stops contradicting R6.
-4. **Fix `calendar`'s key** to `(season, week, seasonType)` with the `year` → `season` rename,
+4. ✅ *(2026-09-09)* **Fix `calendar`'s key** to `(season, week, seasonType)` with the `year` → `season` rename,
    and drop the "16/16 overlap" figure.
-5. **Correct the code citations** — `_insert_json_file` at `duckdb_load.py:1928` (and note it
+5. ✅ *(2026-09-09)* **Correct the code citations** — `_insert_json_file` at `duckdb_load.py:1928` (and note it
    writes to `raw`), `GQL_RELATION_KEYS` at `graphql_client.py:70`, `team_talent`'s sort as
    `(year, talent)`.
-6. **Update §8 step 8 and §2** to record ADR-0003 as landed, and re-count the `stg_gql`
+6. ✅ *(2026-09-09)* **Update §8 step 8 and §2** to record ADR-0003 as landed, and re-count the `stg_gql`
    references before step 7.
-7. **Pin the numbers to a run, not a date.** Every measured claim in §1, §3, §5, §6 and §7
+7. ✅ *(2026-09-09)* **Pin the numbers to a run, not a date.** Every measured claim in §1, §3, §5, §6 and §7
    should cite `scripts/verify_warehouse_plan.py` output rather than sit inline as prose —
    §5 is what happens otherwise.
 
