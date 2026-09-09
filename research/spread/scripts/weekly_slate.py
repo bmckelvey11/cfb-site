@@ -365,8 +365,22 @@ def write_xlsx(t: pd.DataFrame, path: Path) -> None:
     slate = slate.sort_values("Edge", ascending=False)
     models = t[["road", "home", "open_pt", "line_pt"] + (["book_fair"] if "book_fair" in t else [])
                + ["consensus"] + REPORTED_COLS + ["pred_close"]]
+    shop = None
+    if "home_gain" in t:      # the SHOP printout: best number vs book fair, one row per side
+        sides = []
+        for _, r in t.iterrows():
+            sides.append({"Kick (ET)": r.get("kick_et", ""), "Team": r.home, "Opponent": r.road,
+                          "Best Line": -r.best_home_pt, "Book": r.best_home_book, "Odds": r.best_home_odds,
+                          "Fair": -r.fair_pt, "Gain": r.home_gain, "Key": bool(r.home_key)})
+            sides.append({"Kick (ET)": r.get("kick_et", ""), "Team": r.road, "Opponent": r.home,
+                          "Best Line": r.best_away_pt, "Book": r.best_away_book, "Odds": r.best_away_odds,
+                          "Fair": r.fair_pt, "Gain": r.away_gain, "Key": bool(r.away_key)})
+        shop = pd.DataFrame(sides).dropna(subset=["Gain"]).query("Gain >= 0.5") \
+                 .sort_values(["Key", "Gain"], ascending=False)
     with pd.ExcelWriter(path, engine="openpyxl") as xw:
         slate.to_excel(xw, sheet_name="Slate", index=False)
+        if shop is not None:
+            shop.to_excel(xw, sheet_name="Shop", index=False)
         models.to_excel(xw, sheet_name="Models (PT sign)", index=False)
         for ws in xw.sheets.values():
             ws.freeze_panes = "D2"
