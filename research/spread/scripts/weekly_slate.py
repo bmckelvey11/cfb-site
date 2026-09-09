@@ -5,8 +5,12 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
 
   open_pt      PT's recorded opener (often a months-old look-ahead number for early weeks)
   line_pt      the market line at the moment PT compiled the snapshot
-  book_fair    median home spread across real books RIGHT NOW (DraftKings, FanDuel, BetMGM,
-               BetRivers, Caesars), after the outlier guard
+  book_fair    median home spread across real books RIGHT NOW, after the outlier guard: the
+               five Action Network books (Caesars, DraftKings, FanDuel, BetRivers, BetMGM)
+               plus the five offshore books only the-odds-api carries (BetOnline.ag, Bovada,
+               LowVig.ag, BetUS, MyBookie.ag). One vote per book -- AN wins every overlap
+               because its quote is live. Amendment S2 of prereg-line-shopping.md; tagged
+               `book_set_version` 2 on every forward-log row
   <Book>_home / <Book>_odds   each book's posted home spread (PT sign) and its odds
   consensus    the model consensus: mean of the top-20 models by prior MOVEMENT skill
   E4 .. E14    each movement model's predicted CLOSE, fit on the whole archive with the
@@ -25,13 +29,10 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
                i.e. -E4; the one number to compare against a posted home line
   edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1
 
-  oa_*         the same shopping arithmetic over the-odds-api's nine books, AS OF `oa_as_of`
-               (the 6-hourly snapshot, so up to six hours stale -- not a shoppable number).
-               OBSERVATION ONLY: `oa_fair_pt` never feeds book_fair, move_vs_fair, side, or
-               edge. book_fair is what version B grades and the forward log is its dataset,
-               so widening its book set mid-test would silently redefine the graded quantity.
-               `oa_vs_book_fair` is the agreement check: the two should sit within about a
-               point, and a systematic gap means a sign error or a bad join, not an edge.
+  oa_*         the same arithmetic over the-odds-api's nine books ALONE, AS OF `oa_as_of`
+               (the 6-hourly snapshot, so up to six hours stale). Kept beside book_fair as the
+               agreement check: `oa_vs_book_fair` should sit within about a point, and a
+               systematic gap means a sign error or a bad join, not a better consensus.
 
 Every run writes weekly_slate_<stamp>.csv and overwrites weekly_slate_latest.csv. With
 `--book DraftKings` the side columns use that one book's number and price instead of the best
@@ -97,6 +98,29 @@ MODEL_SET_VERSION = 3   # 2026-09-09: E6 retired from the slate (amendment A7, f
 # Action Network book ids, names from AN's own /web/v1/books (2026-09-08). Until then this map
 # said Pinnacle/FanDuel/BetMGM/Caesars/Bet365 -- every label was wrong; the ids were right.
 REAL_BOOKS = {"49": "Caesars", "68": "DraftKings", "69": "FanDuel", "71": "BetRivers", "75": "BetMGM"}
+
+# the-odds-api book keys -> the same display names, so quotes from both feeds land in one
+# Series keyed by BOOK IDENTITY. Without that, DraftKings/FanDuel/BetRivers/BetMGM arrive twice
+# and vote twice in the median -- a consensus weighted by which books happen to be on two
+# feeds. Action Network wins every overlap: it is fetched live at slate time where the
+# the-odds-api snapshot is up to six hours old, and `book_fair` claims to be the number RIGHT NOW.
+OA_BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betrivers": "BetRivers",
+            "betmgm": "BetMGM", "betonlineag": "BetOnline.ag", "bovada": "Bovada",
+            "lowvig": "LowVig.ag", "betus": "BetUS", "mybookieag": "MyBookie.ag"}
+# What promotion actually added: the five the-odds-api books Action Network does not carry.
+# All five are offshore. They are real venues and OUTLIER_PTS still guards the median, but
+# regulated-only is a one-line change here if that turns out to be the wrong call.
+OA_ONLY_BOOKS = tuple(n for n in OA_BOOKS.values() if n not in REAL_BOOKS.values())
+BOOKS = tuple(REAL_BOOKS.values()) + OA_ONLY_BOOKS
+
+# Which book set produced book_fair, tagged on every forward-log row for the same reason
+# MODEL_SET_VERSION is: a graded quantity that changes mid-test has to say so.
+#   1 = Action Network alone (rows through 2026-09-09)
+#   2 = Action Network + the five the-odds-api books above (2026-09-09 on)
+# Version 1 rows cannot be recomputed under version 2 -- no the-odds-api snapshot exists for
+# those moments, the schedule started 2026-09-09 -- so the break is permanent and version B
+# must either restrict to one era or model the shift.
+BOOK_SET_VERSION = 2
 OUTLIER_PTS = 2.5          # a book > this far from the median of all books is ignored (n >= 3)
 ODDS_WINDOW = (-135, 125)
 KEY_NUMBERS = (3, 7)
@@ -207,7 +231,7 @@ def live_books(now: datetime) -> pd.DataFrame:
                     if (s.get("side") == "home" and not s.get("is_live") and not s.get("is_alt_market")
                             and s.get("value") is not None and s.get("odds") is not None
                             and ODDS_WINDOW[0] <= s["odds"] <= ODDS_WINDOW[1]):
-                        quotes[book] = (float(s["value"]), int(s["odds"]))
+                        quotes[REAL_BOOKS[book]] = (float(s["value"]), int(s["odds"]))
             rows.append({"event_id": g["id"], "kick": ko, "an_home": home.get("display_name"),
                          "an_road": road.get("display_name"),
                          "key": norm(home.get("display_name", "")),
@@ -217,7 +241,11 @@ def live_books(now: datetime) -> pd.DataFrame:
 
 
 def shop(quotes: dict) -> dict:
-    """Book fair and best number per side, in AN sign (negative = home favored)."""
+    """Book fair and best number per side, in AN sign (negative = home favored).
+
+    `quotes` is keyed by display name, not by any one feed's book id, so both sources can be
+    deduped into it before the median is taken -- see `OA_BOOKS`.
+    """
     if len(quotes) < 2:
         return {}
     v = pd.Series({b: q[0] for b, q in quotes.items()})
@@ -228,9 +256,9 @@ def shop(quotes: dict) -> dict:
         if len(kept) >= 2:
             v = kept
     return {"fair_an": v.median(), "n_books": len(v), "range": v.max() - v.min(),
-            "best_home_an": v.max(), "best_home_book": REAL_BOOKS[v.idxmax()],
+            "best_home_an": v.max(), "best_home_book": v.idxmax(),
             "best_home_odds": quotes[v.idxmax()][1],
-            "best_away_an": v.min(), "best_away_book": REAL_BOOKS[v.idxmin()],
+            "best_away_an": v.min(), "best_away_book": v.idxmin(),
             "best_away_odds": quotes[v.idxmin()][1]}
 
 
@@ -280,6 +308,10 @@ def oddsapi_books(now: datetime) -> pd.DataFrame:
             continue
         quotes = {}
         for b in e.get("bookmakers", []):
+            if b.get("key") not in OA_BOOKS:      # a new book must be named before it votes
+                print(f"  the-odds-api: unmapped book {b.get('key')!r}, not counted",
+                      file=sys.stderr)
+                continue
             for m in b.get("markets", []):
                 if m.get("key") != "spreads":
                     continue
@@ -289,7 +321,7 @@ def oddsapi_books(now: datetime) -> pd.DataFrame:
                     if (o.get("name") == e["home_team"] and o.get("point") is not None
                             and o.get("price") is not None
                             and ODDS_WINDOW[0] <= o["price"] <= ODDS_WINDOW[1]):
-                        quotes[b["key"]] = (float(o["point"]), int(o["price"]))
+                        quotes[OA_BOOKS[b["key"]]] = (float(o["point"]), int(o["price"]))
         rows.append({"oa_home_raw": e["home_team"], "oa_road_raw": e["away_team"],
                      "oa_quotes": quotes, "oa_as_of": payload["pulled_at"]})
     return pd.DataFrame(rows)
@@ -388,12 +420,31 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
         t["key"] = t.home.map(norm)
         t["rkey"] = t.road.map(norm)
         t = t.merge(books, on=["key", "rkey"], how="left")
-        qs = [q if isinstance(q, dict) else {} for q in t.quotes]
+
+        # the-odds-api joins here so its books can vote in book_fair (BOOK_SET_VERSION 2).
+        oa = oddsapi_books(now)
+        if not oa.empty:
+            oa["key"] = [oa_resolve(n, set(t.key)) for n in oa.oa_home_raw]
+            oa["rkey"] = [oa_resolve(n, set(t.rkey)) for n in oa.oa_road_raw]
+            oa = oa.drop_duplicates(["key", "rkey"])
+            t = t.merge(oa.drop(columns=["oa_home_raw", "oa_road_raw"]),
+                        on=["key", "rkey"], how="left")
+        else:
+            t["oa_quotes"], t["oa_as_of"] = [{} for _ in range(len(t))], np.nan
+
+        an_qs = [q if isinstance(q, dict) else {} for q in t.quotes]
+        oa_qs = [q if isinstance(q, dict) else {} for q in t.oa_quotes]
+        # Action Network wins every overlapping book: its quote is live, the snapshot's is up
+        # to six hours old. Promotion therefore ADDS the five offshore books AN does not carry
+        # rather than reshuffling the four it already had.
+        qs = [{**o, **a} for o, a in zip(oa_qs, an_qs)]
         s = pd.DataFrame([shop(q) for q in qs])
-        t = pd.concat([t.drop(columns=["quotes"]), s], axis=1)
-        for bid, name in REAL_BOOKS.items():           # every book's own number, PT sign
-            t[f"{name}_home"] = [-q[bid][0] if bid in q else np.nan for q in qs]
-            t[f"{name}_odds"] = [q[bid][1] if bid in q else np.nan for q in qs]
+        # the-odds-api on its own, kept beside the promoted number as the agreement check
+        s_oa = pd.DataFrame([oa_shop(q) for q in oa_qs])
+        t = pd.concat([t.drop(columns=["quotes", "oa_quotes"]), s, s_oa], axis=1)
+        for name in BOOKS:                             # every book's own number, PT sign
+            t[f"{name}_home"] = [-q[name][0] if name in q else np.nan for q in qs]
+            t[f"{name}_odds"] = [q[name][1] if name in q else np.nan for q in qs]
         # AN sign -> PT sign. When nothing matched, shop() yields no columns at all, so these
         # must still exist as float NaN or every downstream arithmetic turns object-dtype.
         for c in ("fair_an", "best_home_an", "best_away_an"):
@@ -418,30 +469,19 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
         if len(unmatched) == len(t):
             print("  ALL games unmatched -- the snapshot is almost certainly a different week "
                   "than the books. book_fair/move_vs_fair are unavailable, not zero.")
-        # the-odds-api, beside book_fair and never inside it -- see `oddsapi_books`.
-        oa = oddsapi_books(now)
-        if not oa.empty:
-            oa["key"] = [oa_resolve(n, set(t.key)) for n in oa.oa_home_raw]
-            oa["rkey"] = [oa_resolve(n, set(t.rkey)) for n in oa.oa_road_raw]
-            oa = oa.drop_duplicates(["key", "rkey"])
-            t = t.merge(oa.drop(columns=["oa_home_raw", "oa_road_raw"]),
-                        on=["key", "rkey"], how="left")
-            oqs = [q if isinstance(q, dict) else {} for q in t.oa_quotes]
-            t = pd.concat([t.drop(columns=["oa_quotes"]),
-                           pd.DataFrame([oa_shop(q) for q in oqs])], axis=1)
-            for c in ("oa_fair_an", "oa_best_home_an", "oa_best_away_an"):
-                t[c.replace("_an", "_pt")] = -t[c] if c in t else np.nan
-            # The two sources should agree to about a point. A systematic gap is a sign error
-            # or a bad join, not an edge -- check it before believing anything downstream.
-            t["oa_vs_book_fair"] = (t.oa_fair_pt - t.book_fair).round(1)
-            priced = int(t.oa_fair_pt.notna().sum())
-            gap = t.oa_vs_book_fair.abs()
-            print(f"  the-odds-api: {priced}/{len(t)} games priced"
-                  + (f", median |oa_fair - book_fair| {gap.median():.1f} pts, "
-                     f"max {gap.max():.1f}" if gap.notna().any() else ""))
-            if priced < len(t):
-                unpriced = t[t.oa_fair_pt.isna()][["road", "home"]].values.tolist()
-                print(f"    unpriced: {unpriced[:8]}{' ...' if len(unpriced) > 8 else ''}")
+        for c in ("oa_fair_an", "oa_best_home_an", "oa_best_away_an"):
+            t[c.replace("_an", "_pt")] = -t[c] if c in t else np.nan
+        # the-odds-api's own median against the promoted one. They should sit within about a
+        # point; a systematic gap is a sign error or a bad join, not a better consensus.
+        t["oa_vs_book_fair"] = (t.oa_fair_pt - t.book_fair).round(1)
+        priced = int(t.oa_fair_pt.notna().sum())
+        gap = t.oa_vs_book_fair.abs()
+        print(f"  the-odds-api: {priced}/{len(t)} games priced"
+              + (f", median |oa_fair - book_fair| {gap.median():.1f} pts, "
+                 f"max {gap.max():.1f}" if gap.notna().any() else ""))
+        if priced < len(t):
+            unpriced = t[t.oa_fair_pt.isna()][["road", "home"]].values.tolist()
+            print(f"    unpriced: {unpriced[:8]}{' ...' if len(unpriced) > 8 else ''}")
 
     t = add_side(t, book)
     t.insert(0, "snapshot", snapshot.name)
@@ -450,6 +490,8 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
     # (amendment A4, 2026-09-08: E6 moved from lambda=1e4 to its A4 modal 5e4). A predictor that
     # changes mid-forward-test silently redefines the graded quantity, so every row is tagged.
     t["model_set_version"] = MODEL_SET_VERSION
+    # Which book set produced book_fair, and therefore side/side_line/edge and the bet set.
+    t["book_set_version"] = BOOK_SET_VERSION if with_books else np.nan
     return t
 
 
@@ -502,7 +544,7 @@ def write_xlsx(t: pd.DataFrame, path: Path) -> None:
         "Our Line": t.our_line, "Edge": t.edge, "Side": t.side, "Take": t.side_line,
         "Book": t.side_book, "Odds": t.side_odds,
     })
-    for b in REAL_BOOKS.values():
+    for b in BOOKS:
         slate[b] = bet(f"{b}_home")
         slate[f"{b} odds"] = t.get(f"{b}_odds", np.nan)
     slate = slate.sort_values("Edge", ascending=False)
@@ -631,7 +673,7 @@ def main() -> int:
     ap.add_argument("--snapshot", type=Path, default=None)
     ap.add_argument("--no-books", action="store_true", help="skip the live Action Network fetch")
     ap.add_argument("--book", default=None,
-                    help="show the side's number and price at this one book: " + ", ".join(REAL_BOOKS.values()))
+                    help="show the side's number and price at this one book: " + ", ".join(BOOKS))
     ap.add_argument("--recompute-forward-log", action="store_true",
                     help="refit every existing forward-log row under the current PARAMS/"
                          "MODEL_COLS and MODEL_SET_VERSION, then exit -- no new slate built")
@@ -641,9 +683,9 @@ def main() -> int:
         return 0
     book = None
     if args.book:
-        book = next((n for n in REAL_BOOKS.values() if n.lower() == args.book.lower()), None)
+        book = next((n for n in BOOKS if n.lower() == args.book.lower()), None)
         if book is None or args.no_books:
-            raise SystemExit(f"--book must be one of {', '.join(REAL_BOOKS.values())}, with the live fetch on")
+            raise SystemExit(f"--book must be one of {', '.join(BOOKS)}, with the live fetch on")
     snap = args.snapshot or pu.latest_snapshot()
     t = build(snap, with_books=not args.no_books, book=book)
     report(t, with_books=not args.no_books)

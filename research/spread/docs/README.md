@@ -76,8 +76,9 @@ fitters, grids, 1-SE rule). Their `main()`s produce the archived margin-era tabl
 |---|---|
 | `collect_line_timing.py snapshot` | Fetch PT's rolling CSV to `ingest/pt_snapshots/`, then invoke the two below on the new file. |
 | `predict_upcoming.py` | E4 / E14 against the line at capture → `processed/pt_upcoming_predictions.csv` |
-| `weekly_slate.py` | Every movement model + live book fair + the side to take, plus `oa_*` observation columns off the-odds-api snapshot (`docs/oddsapi-ingest.md`; never feeds book_fair) → `processed/weekly_slate_<stamp>.csv` and `weekly_slate_latest.csv`; appends `movement_forward_log.csv` (version B's dataset) unless the slate is stale |
+| `weekly_slate.py` | Every movement model + live book fair over 10 books (Action Network + the-odds-api, deduped — amendment S2) + the side to take → `processed/weekly_slate_<stamp>.csv` and `weekly_slate_latest.csv`; appends `movement_forward_log.csv` (version B's dataset) unless the slate is stale |
 | `pt_rollover.py` | Exit 0 once PT's slate flips to a new week. Gates a wait loop; writes nothing. |
+| `migrate_book_set_version.py` | One-time, idempotent: stamps `book_set_version=1` on forward-log rows written before amendment S2 promoted the-odds-api books into `book_fair` |
 | `collect_line_timing.py history` | Mondays: Action Network tick histories → `raw/actionnetwork/history_event_<id>.json` (version B's closes) |
 | `collect_line_timing.cmd` | Scheduled-task wrapper; exits 3 if `CFB_DATA_ROOT` is unset. Runbook: `docs/line-timing-collector.md`. |
 

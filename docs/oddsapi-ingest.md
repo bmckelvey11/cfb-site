@@ -63,21 +63,30 @@ only works if each one says when it was taken. `pulled_at` therefore lives in
 the envelope, not just the filename, alongside the quota headers the call
 returned.
 
-## Read by the spread slate — as observation only
+## Read by the spread slate — promoted into `book_fair`
 
-`research/spread/scripts/weekly_slate.py` reads the latest snapshot and adds `oa_fair_pt`,
-`oa_best_home_pt` / `oa_best_away_pt`, `oa_n_books`, `oa_range`, `oa_as_of`, and
-`oa_vs_book_fair`. None of them feed `book_fair`, `move_vs_fair`, `side`, or `edge`.
+`research/spread/scripts/weekly_slate.py` reads the latest snapshot and its books now **vote in
+`book_fair`**, under **amendment S2** of `research/spread/docs/prereg-line-shopping.md`. The
+slate went from 4 books per game to 10.
 
-That line is deliberate. `book_fair` is the quantity version B grades and
-`movement_forward_log.csv` is its dataset; the Odds API book set is a *different* set from
-Action Network's five (it shares DraftKings, FanDuel, BetRivers and BetMGM, has no Caesars,
-and adds five offshore books), so folding it in would redefine the graded quantity mid-test —
-the same failure `MODEL_SET_VERSION` guards against on the predictor side. Promoting this
-source into `book_fair` is a deliberate, version-tagged decision, not a side effect.
+Promotion adds the five books Action Network does not carry — BetOnline.ag, Bovada, LowVig.ag,
+BetUS, MyBookie.ag, all offshore. The four it shares (DraftKings, FanDuel, BetRivers, BetMGM) are
+**deduped, with Action Network winning**: AN is fetched live at slate time where this snapshot is
+up to six hours old, and `book_fair` claims to be the number right now. Without that dedup those
+four books would vote twice.
 
-First run against 2026 week 3: **49/49 games priced, median |oa_fair − book_fair| 0.0 pts,
-max 0.5** — which is the check that the sign convention and the name join are both right.
+Measured on promotion, 2026 week 3, 49 games: `book_fair` moved a median of 0.00 points, mean
+−0.046, max 0.50, no game past 1.5. E4's side flipped on 5 games; the edge ≥ 1 bet set stayed at
+20. `oa_fair_pt` stays beside it as the agreement check.
+
+**What this does not touch:** version B. `eval_version_b.py` grades `close − line_Monday` on
+`E4 − line_Monday`, where the anchor is Prediction Tracker's line and the close is Action
+Network's consensus book 15 — neither is `book_fair`. What `book_fair` does drive is `side`,
+`side_line`, `edge`, and the slate's printed bet set.
+
+`BOOK_SET_VERSION` = 2 is stamped on every forward-log row from 2026-09-09 on. The 399 earlier
+rows are stamped 1 by `research/spread/scripts/migrate_book_set_version.py` and **cannot be
+recomputed** — no snapshot exists for those moments. Any read pooling the two eras must say so.
 
 Names join by stripping the mascot (`oa_resolve`): Odds API says `"Miami Hurricanes"`, PT says
 `"Miami"`. Residual spellings live in `OA_ALIASES` and grow the way `ALIASES` did — when a game

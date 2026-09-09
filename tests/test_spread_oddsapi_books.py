@@ -85,7 +85,8 @@ def test_reads_home_side_quotes_from_the_latest_snapshot(tmp_path, monkeypatch):
     oa = ws.oddsapi_books(NOW)
 
     assert len(oa) == 1
-    assert oa.oa_quotes.iloc[0] == {"draftkings": (-7.5, -110), "fanduel": (-7.0, -108)}
+    # keyed by display name, not by the feed's own book key, so both feeds dedup into one dict
+    assert oa.oa_quotes.iloc[0] == {"DraftKings": (-7.5, -110), "FanDuel": (-7.0, -108)}
     assert oa.oa_as_of.iloc[0] == "2026-09-09T20:05:31Z"
 
 
@@ -94,7 +95,7 @@ def test_prices_outside_the_odds_window_are_dropped(tmp_path, monkeypatch):
                                     {"draftkings": (-7.5, -110), "betus": (-3.0, -400)})]),
           monkeypatch)
 
-    assert ws.oddsapi_books(NOW).oa_quotes.iloc[0] == {"draftkings": (-7.5, -110)}
+    assert ws.oddsapi_books(NOW).oa_quotes.iloc[0] == {"DraftKings": (-7.5, -110)}
 
 
 def test_games_outside_the_eight_day_window_are_dropped(tmp_path, monkeypatch):
@@ -105,9 +106,44 @@ def test_games_outside_the_eight_day_window_are_dropped(tmp_path, monkeypatch):
     assert ws.oddsapi_books(NOW).empty
 
 
+def test_an_unmapped_book_does_not_vote(tmp_path, monkeypatch):
+    # A book that appears in the feed but not in OA_BOOKS has no display name, so it cannot be
+    # deduped against Action Network's. Counting it anyway would let the same book vote twice.
+    write(tmp_path, snapshot([event("A Team", "B Team",
+                                    {"draftkings": (-7.5, -110), "brandnewbook": (-7.0, -110)})]),
+          monkeypatch)
+
+    assert ws.oddsapi_books(NOW).oa_quotes.iloc[0] == {"DraftKings": (-7.5, -110)}
+
+
+def test_overlapping_books_are_deduped_with_action_network_winning():
+    """The promoted median must count each BOOK once, whichever feeds carried it.
+
+    Four of Action Network's five books are also on the-odds-api. Merging without dedup gives
+    DraftKings, FanDuel, BetRivers and BetMGM two votes each -- a consensus weighted by feed
+    coverage. AN wins the overlap because its quote is live where the snapshot is up to 6h old.
+    """
+    an = {"DraftKings": (-7.0, -110), "Caesars": (-7.5, -110)}
+    oa = {"DraftKings": (-6.0, -110), "Bovada": (-8.0, -110)}   # stale DK quote
+
+    combined = {**oa, **an}
+
+    assert len(combined) == 3                       # not 4: DraftKings counted once
+    assert combined["DraftKings"] == (-7.0, -110)   # the live AN quote, not the stale one
+    assert ws.shop(combined)["n_books"] == 3
+
+
 def test_missing_snapshot_dir_is_not_fatal(tmp_path, monkeypatch):
     monkeypatch.setattr(ws, "OA_SNAP_DIR", tmp_path / "absent")
     assert ws.oddsapi_books(NOW).empty
+
+
+def test_shop_labels_the_best_book_by_name_not_by_feed_id():
+    # shop() used to translate an Action Network id through REAL_BOOKS; with two feeds in one
+    # Series the key has to already be the printable name.
+    out = ws.shop({"Caesars": (-7.5, -110), "Bovada": (-7.0, -108), "BetUS": (-8.0, -105)})
+
+    assert out["best_home_book"] == "Bovada" and out["best_away_book"] == "BetUS"
 
 
 def test_shop_medians_and_bests_in_an_sign():
@@ -127,3 +163,34 @@ def test_outlier_book_is_dropped_from_the_median():
     out = ws.oa_shop({"a": (-7.5, -110), "b": (-7.0, -110), "c": (-7.5, -110), "d": (30.0, -110)})
 
     assert out["oa_n_books"] == 3 and out["oa_fair_an"] == -7.5
+
+
+# ------------------------------------------------------------------ the book-set tag
+
+import migrate_book_set_version as mig  # noqa: E402
+
+
+def test_untagged_rows_are_stamped_as_the_pre_promotion_set():
+    log = pd.DataFrame({"home": ["A", "B"], "book_fair": [-3.0, 7.0]})
+
+    out, n = mig.migrate(log)
+
+    assert n == 2 and (out.book_set_version == mig.PRE_PROMOTION).all()
+
+
+def test_already_tagged_rows_are_left_alone():
+    """Promoted rows carry version 2 and must never be relabelled as the old set."""
+    log = pd.DataFrame({"home": ["A", "B"], "book_set_version": [1, 2]})
+
+    out, n = mig.migrate(log)
+
+    assert n == 0 and list(out.book_set_version) == [1, 2]
+
+
+def test_migration_is_idempotent():
+    log = pd.DataFrame({"home": ["A", "B"]})
+
+    once, _ = mig.migrate(log)
+    twice, n = mig.migrate(once)
+
+    assert n == 0 and once.equals(twice)

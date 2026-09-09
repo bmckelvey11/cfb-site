@@ -98,6 +98,44 @@ mis-oriented side), it is fixed, recorded here, and the run repeated once.
 
 ---
 
+## Amendment S2 — the-odds-api books in the live fair (committed 2026-09-09)
+
+**Names and replaces the "Fair" definition above for the LIVE slate only.** The backtest's
+real-book set **R = {49, 68, 69, 71, 75}** stands unchanged, and every number already reported in
+`line-shopping-results.md` was computed under it. It has to stand: the-odds-api has no history on
+the free plan, so there is no 2024–25 the-odds-api data and no way to recompute the backtest
+under a wider set even if that were wanted.
+
+**Motivation, and it is opportunistic — say so plainly.** An the-odds-api key became available on
+2026-09-09. Nothing in a result motivated this; a data source appeared. It is registered here
+rather than applied silently because the "Fair" definition above is pre-registered, and
+`weekly_slate.py` computes the live fair under it.
+
+**Fixed now.**
+
+- **Live fair set, from 2026-09-09:** R (via Action Network, live at slate time) **∪** the five
+  the-odds-api books Action Network does not carry — BetOnline.ag, Bovada, LowVig.ag, BetUS,
+  MyBookie.ag. All five are offshore. `OA_ONLY_BOOKS` in `weekly_slate.py` is the list.
+- **One vote per book.** Four of R's five are on both feeds. Quotes are keyed by book identity,
+  not by either feed's ids, and **Action Network wins every overlap** — its quote is fetched live
+  where the-odds-api snapshot is up to six hours old. So this amendment ADDS five books; it does
+  not reprice the four already there.
+- **Amendment S1's outlier guard applies unchanged**, over the wider set.
+- **≥ 2 books still required**, unchanged.
+- **Tagged, not silent.** `BOOK_SET_VERSION` = 2 is written on every `movement_forward_log.csv`
+  row from here on; the 399 rows written before it are stamped 1 by
+  `migrate_book_set_version.py` and **cannot be recomputed** under set 2 — no the-odds-api
+  snapshot exists for those moments. Any read that pools the two eras must say so.
+- **Scope.** This changes `book_fair`, and therefore `side`, `side_line`, `edge` and the slate's
+  printed bet set. It does **not** touch version B: `eval_version_b.py` grades
+  `close − line_Monday` on `E4 − line_Monday`, where the anchor is Prediction Tracker's line and
+  the close is Action Network's consensus book 15. Neither is `book_fair`.
+
+**Measured on commit, 2026 week 3, 49 games.** Books per game rose 4 → 10 (dedup working: 10, not
+14). `book_fair` moved a median of 0.00 points, mean −0.046, max 0.50; no game moved more than
+1.5. E4's side flipped on 5 of 49 games and the edge ≥ 1 bet set stayed at 20. A larger shift
+would have meant a dedup failure or a sign error, not a better consensus.
+
 ## Amendment S1 — outlier guard and price-adjusted value (committed before the rerun)
 
 Motivated by `combining-predictions.md` §1: the backtest's book fair has no outlier guard,
