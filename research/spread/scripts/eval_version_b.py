@@ -234,8 +234,17 @@ def main() -> int:
     graded = g[g.close.notna() & (g.kick_utc < now)].copy()
     print(f"forward log: {log.snapshot.nunique()} snapshots, {len(g)} games with a Monday anchor, "
           f"{len(graded)} graded against a close, {int(graded.margin.notna().sum())} with a score")
+    # Which model-set definition produced the rows being graded. pred_close is the median of
+    # weekly_slate.MODEL_COLS, so a change to that set redefines the graded quantity; more than
+    # one version among these rows means pred_close is silently two different things.
+    versions = (sorted(int(v) for v in graded.model_set_version.dropna().unique())
+                if "model_set_version" in graded else [])
+    if len(versions) > 1:
+        print(f"WARNING: forward log mixes model_set_version {versions}; pred_close is not one "
+              f"quantity across these rows. Recompute with weekly_slate.py --recompute-forward-log.")
     out = {"n_anchor": int(len(g)), "n_graded": int(len(graded)),
-           "weeks": sorted(graded.week.unique().tolist()), "verdict": None}
+           "weeks": sorted(graded.week.unique().tolist()),
+           "model_set_version": versions, "verdict": None}
     if len(graded) < 30:
         print("fewer than 30 graded games -- nothing to estimate yet")
         OUT.write_text(json.dumps(out, indent=2))
