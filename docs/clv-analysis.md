@@ -87,6 +87,30 @@ overstate the edge.
 - Opening lines only exist from 2021 in this dataset (43–56% coverage 2023-25), which limited some
   secondary checks.
 
+## Reconciling with bet-history-analysis-2023-2025.md's spread figure
+
+`docs/bet-history-analysis-2023-2025.md` reports spread CLV of **+0.07 on 250 bets, no CLV-results
+gradient** — disagreeing with this document's own **+0.318 on 154 spreads**, which is already the
+weaker, non-significant half of the headline above (p=0.0577, versus p=0.012 for unders). Both
+draw from the same `history.csv` export and the same 2023–2025 seasons, but the joins behind them
+are not comparable: this document matches bets to CFBD games through the 114-entry AN→CFBD
+abbreviation map that `docs/superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md` itself
+calls "throwaway, never-committed," and that match was never checked against final scores — it
+landed on 154 of what is presumably the same underlying ~250-bet spread population. Its closing
+line also comes from a six-book preference cascade over `data/raw/lines_*.json` (consensus →
+DraftKings → Bovada → ESPN Bet → Caesars → William Hill) rather than one fixed definition, so a
+different book's close can back different bets. `bet-history-analysis-2023-2025.md` instead joins
+through `cfb_system_maker`'s established `games.csv` team-abbreviation resolution, matches 488 of
+489 qualifying bets, re-grades every one against the database's final score with 0 mismatches, and
+reads a single "database consensus" closing line. Neither document states why 96 spread bets are
+missing from the match here, so the gap is not fully reconcilable from what is written — but given
+that `bet-history-analysis-2023-2025.md`'s join is the only one validated end to end and covers the
+fuller population, **its +0.07-on-250, no-gradient figure is the one to quote for spread CLV**,
+not this document's 154-bet number. What would fully settle it: rerun this document's spread match
+using `cfb_system_maker`'s existing games.csv join and a single fixed closing-line definition, then
+check whether the 154 bets matched here are a strict subset of the 250 and whether the CLV gap
+survives on the same rows.
+
 ---
 
 ## What this changes
