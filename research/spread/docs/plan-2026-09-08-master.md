@@ -38,7 +38,7 @@ That is version B. Everything else here exists to make its answer trustworthy.
 | method | R² full panel | A3 full-sample screen | **A6 walk-forward screen** | A6 retention |
 |---|---|---|---|---|
 | **E4** screened consensus | 0.170 | 0.153 | **0.154** | **90.7%** |
-| E6 ridge | 0.248 | 0.163 | **0.201** | 81.1% |
+| E6 ridge | 0.248 | 0.163 | 0.201 *(grid-bound artifact — see A7)* | 81.1% |
 | E7 | 0.147 | 0.133 | 0.132 | 90.0% |
 | E14 screened CSR | 0.136 | 0.107 | 0.113 | 82.9% |
 
@@ -50,12 +50,13 @@ own test set and A3's conditionality is discharged. The two final-season drop li
 more, because with 5–13 years of history a ρ estimate is noisier. `--decontaminate` still
 reproduces A3 byte-for-byte, so the recorded A3 result stands as run.
 
-**A6 changed a number this plan leaned on, and it does not change the decision.** Under A3, E6
-retained 66% against E4's 90% — the basis for calling E6 "the bigger loser to decontamination".
-Under the honest screen E6 retains 81.1%, and its absolute R² (0.201) is **higher** than E4's
-(0.154), closer to the full-panel ordering. E4 is still the more robust by retention, but the gap
-is narrower than stated and E6 scores better. **The graded predictor stays E4 anyway** — see
-decision 2.
+**E6 never outscored E4 — withdrawn 2026-09-09 by amendment A7.** A6 briefly appeared to show E6
+retaining 81.1% and scoring 0.201 against E4's 0.154. A7 widened the ridge grid to 10⁹ and found
+that every grid this tree had run was truncated near the R² peak, which prevented E6's own 1-SE
+selection rule from reaching the shrinkage it actually prefers. Run as registered on an honest
+grid, the rule modally picks λ = 3×10⁶ and **E6 scores 0.0655, well below E4's 0.1537**. The
+0.201 was a property of the grid bound, not the estimator. E6 is retired from the served slate;
+E4 was already the graded predictor and is unchanged.
 
 **What the archive's "close" actually is.** PT's `line` is a late line, not the close: on **1,440**
 matched 2024–25 games, mean |Δ| **0.69**, exact on 31.7%, within 0.5 on 66.9%. (An earlier
@@ -117,10 +118,12 @@ decide, and amendment B1's MDE gate, which made the stopping time depend on the 
    are recomputed before a read quotes `pred_close`.
 4. **A4's output is an engineering decision, not an inferential claim.** It chooses which λ
    `weekly_slate.py` serves. It does not license "the ridge works", carries no p-value, and is
-   labelled exploratory. **A4 has run:** its pre-registered rule (retire E6 if it clears E4 by
-   ≤ 0.02) did not fire — 0.2002 against 0.1537 — so E6 is kept, now served at **λ = 5e4**, with
-   the model set versioned to 2 and all 350 forward-log rows recomputed. See risk 3: the grid
-   edge did not resolve, it moved.
+   labelled exploratory. **A4 ran and was then superseded by A7 (2026-09-09).** A4's rule kept E6
+   at λ = 5e4 on a 0.2002-vs-0.1537 gap; A7 showed that gap was an artifact of the grid bound.
+   **E6 is now retired from the served slate** — `pred_close` is the median of E4, E7–E12 and
+   E14 — with the model set at version 3 and all 350 forward-log rows recomputed. E6 is still
+   computed and reported beside E4 (prereg B1 requires it), at λ = 3e6, the value its own rule
+   chooses.
 5. **The `3.2` win-rate-per-point constant is kept for line shopping, and stays retired for the
    movement CLV claim** (settled by the user, 2026-09-08). It was estimated on the line-shopping
    sample itself, so it is the in-sample conversion for that sample; the audit's §1.5 objection
@@ -190,17 +193,13 @@ fix being *claimed* and *verified*).
 2. **A3's screen saw its own test set** — **closed 2026-09-08.** Amendment A6 rebuilt the screen
    walk-forward; A6 is now the citable screen and A3 is retained as run. It also reversed a
    framing this plan carried: E6 retains 81.1%, not 66%, and outscores E4 (see §2).
-3. **A4 is post-hoc grid selection** — the data chose the grid. Bounded by decision 4, and the
-   rule was applied as written rather than overridden after the fact. **But A4 did not resolve
-   what it was run to resolve.** λ = 5e4 was chosen in 19 of 19 seasons that produced a choice,
-   and 5e4 is the *new* grid's top edge — the old edge was 1e4, so widening moved the edge
-   instead of finding an interior optimum. A ridge whose shrinkage parameter runs to whatever
-   bound it is given is not well identified, and E6 is now served at such a bound. **Amendment A7
-   is registered** (2026-09-08, not yet run): a grid reaching λ = 10⁹, which must bracket the
-   turnover because ridge degenerates to the anchor as λ grows, plus the λ → R² curve itself —
-   the diagnostic that separates "the data want more shrinkage" from "the curve is flat and the
-   1-SE rule is a tie-breaker running to whatever bound it is given". Two of its three branches
-   retire E6 from the served slate.
+3. **The ridge penalty is not identified — closed 2026-09-09 by amendment A7.** A and A4 both
+   chose their grid's top value (1e4, then 5e4). A7 ran the grid out to 10⁹, where ridge must
+   degenerate to the anchor, and reported the λ → R² curve for the first time. The curve has a
+   real interior optimum at 3e4, but sits within one SE of its best across a median 3.0 decades,
+   so the 1-SE rule — which takes the *most-shrunk* λ within one SE — modally picks 3e6, where
+   R² is half the peak. The registered `flat` branch fired and E6 left the served slate. The
+   sanity check passed (R²(10⁹) = 0.0012 against R0's 0.0005), so the run was readable.
 4. **A5 treats a walk-forward prediction as a fixed regressor**; its CI is conditional on the
    fitted predictor and must be labelled so.
 5. **The collector fix is claimed, not verified.** The Task Scheduler conditions live in the UI,

@@ -347,6 +347,68 @@ predictor is graded: **E4 stays the graded predictor** regardless of how E6 scor
 `movement_forward_log.csv` row (350 of 350) was recomputed under the new definition — a
 predictor that changes mid-forward-test silently redefines the graded quantity.
 
+## Amendment A7 — is the ridge penalty identified? (run 2026-09-09, registered in `prereg-line-movement.md`)
+
+**No. E6's advantage over E4 was an artifact of where the grid stopped.**
+
+Version A chose λ = 10⁴, the top of its grid, in 19 of 20 seasons; A4 widened to 5×10⁴ and chose
+*its* top value in 19 of 19. A7 asked whether the data want more shrinkage or whether the
+selection rule is simply running to whatever bound it is given. `pick_1se` takes the
+**most-shrunk** λ within one SE of the best, so a flat validation curve makes it a tie-breaker,
+not an identification. Grid: λ ∈ {10³ … 10⁹}, run on the A6 walk-forward panel, E6 alone at each
+point (`eval_ridge_curve.py`), n = 14,068.
+
+**Registered sanity check — passed.** As λ grows the ridge coefficients go to zero and E6 must
+degenerate to R0. R²(10⁹) = 0.0012 against R0's 0.0005, a gap of 0.0006 inside the registered
+0.01 tolerance. The curve turns over, so a decision may be read from this run.
+
+| λ | 10³ | 3×10³ | 10⁴ | 3×10⁴ | 10⁵ | 3×10⁵ | 10⁶ | 3×10⁶ | 10⁷ | 3×10⁷ | 10⁸ | 3×10⁸ | 10⁹ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| R² | .198 | .199 | .201 | **.202** | .194 | .175 | .139 | .094 | .047 | .019 | .007 | .003 | .001 |
+
+The estimator has a genuine interior optimum at λ = 3×10⁴ (R² 0.2019). **Its selection rule does
+not find it.** The validation curve sits within one SE of its best across a median of **3.0
+decades** of λ, so the 1-SE rule modally picks **λ = 3×10⁶** — where R² is 0.094, less than half
+the peak. The modal validation argmin is 10⁵; only 4 of 19 seasons chose the grid's top value,
+so this is not an edge hit.
+
+**The number that matters.** Running E6 exactly as registered — the 1-SE rule, on a grid wide
+enough to let it express itself:
+
+| | R² of the move |
+|---|---|
+| E6, as reported under A4/A6 (grid stopped at 5×10⁴) | 0.2009 |
+| **E6, registered estimator, honest grid** | **0.0655** |
+| E4, same support | **0.1537** |
+
+E6 never outscored E4. Every ridge grid this tree has run was truncated near the R² peak, which
+flattered the method by preventing its own selection rule from wandering to the shrinkage it
+actually prefers. The A6 finding that "E6 retains 81.1% and outscores E4" is withdrawn: it was a
+property of the grid bound, not of the estimator.
+
+**Branch fired: `flat`** — the pre-registered action. **E6 is retired from the served slate.**
+`weekly_slate.py` serves E4 and the model median; `pred_close` no longer includes E6, the model
+set is versioned to **3**, and all 350 forward-log rows were recomputed under it. E6 is still
+computed and reported beside E4 in every version B read, because prereg B1 requires that and A7
+retired it from *serving*, not from existence — now fitted at λ = 3×10⁶, the value its own rule
+chooses, rather than A4's retired 5×10⁴.
+
+**E4, the graded predictor, is unchanged** (version B slope +0.202, identical before and after).
+
+### Scorecard against the pre-registration
+
+| expectation | outcome |
+|---|---|
+| Curve flat ~10³–10⁵, declining beyond ~10⁶ | **Partial.** Flat 10³–10⁵ as predicted, but the decline starts earlier, at 3×10⁵. |
+| Argmax low, near 10³–10⁴ | **Miss.** The R² peak is at 3×10⁴ and the modal validation argmin is 10⁵ — both above the predicted range. |
+| R² at the argmax within 0.01 of A4's 0.2002 | **Hit.** 0.2019. |
+| 1-SE λ lands ≥ 10⁶ | **Hit.** Modal 3×10⁶. |
+| Branch 2 (`flat`) fires; E6 leaves the served slate | **Hit.** Median 3.0 decades within 1 SE. |
+
+Not predicted, and the most consequential result: that E6's headline R² would collapse to 0.0655
+once the rule was allowed to choose freely. The amendment was written to test whether the penalty
+was identified, not to re-rank the methods; it did both.
+
 ## Amendment A5 — the move remaining after PT's last capture (run 2026-09-08, registered in `prereg-line-movement.md`)
 
 Regress `y = AN_close − PT_line` on `x = pred − PT_line` for E4, E6, E14, on the matched
