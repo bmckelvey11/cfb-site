@@ -4,8 +4,24 @@
     {
       "name": "CFB System Maker (web)",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "cfb_system_maker", "web"],
+      "runtimeArgs": [
+        "-m",
+        "cfb_system_maker",
+        "web"
+      ],
       "port": 5000,
+      "autoPort": true
+    },
+    {
+      "name": "Redpanda Overs (site)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "models/over_zero/site",
+        "run",
+        "dev"
+      ],
+      "port": 3000,
       "autoPort": true
     }
   ]
