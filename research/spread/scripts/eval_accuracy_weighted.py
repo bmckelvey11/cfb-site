@@ -106,6 +106,11 @@ def fitted(df, models, seasons, window=5, lam=10.0, thr=1.0):
     Betting the raw consensus deviation -- what the unfitted schemes do -- implicitly assumes a
     coefficient of 1.0 on it, and would lose money even if the true coefficient were a healthy
     0.3. That is why this mode exists and why its answer differs from the grid above.
+
+    Missing forecasts are set to a zero deviation, i.e. a model with nothing to say is treated as
+    agreeing with the close, which is the neutral contribution for a linear model. Note this
+    differs from `consensus()` above, which drops missing models out of the mean entirely -- both
+    are defensible, and they are not the same choice.
     """
     close = -df["line"].to_numpy(float)
     resid = df["y"].to_numpy(float) - close
