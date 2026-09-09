@@ -1,5 +1,9 @@
 # Warehouse Source Rationalization — Spec
 
+> **Absorbed 2026-09-08 into `docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md`.** Buckets, the scraper defect, the
+> dead-column analysis and R1-R7 are carried forward there (R8 was added). Retained as the
+> measurement record; the master is authoritative where they differ.
+
 **Status:** draft
 **Date:** 2026-09-01
 **Origin:** follow-up to the external schema audit finding #5, after measurement contradicted its premise

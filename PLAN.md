@@ -1,4 +1,9 @@
 # Plan: Warehouse source rationalization (merge, prune, drop)
+
+> **Absorbed 2026-09-08 into `docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md`.** That document is the plan of record;
+> its §2 also supersedes the naming this file assumes. Retained as audit history of the
+> claudex-loop that produced it — do not execute from here.
+
 _Locked via claudex-loop — by Claude + mckel_
 
 ## Goal

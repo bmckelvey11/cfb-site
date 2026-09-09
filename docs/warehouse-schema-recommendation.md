@@ -108,6 +108,12 @@ to misfile them, so all they need is snake_casing to `game_media` / `game_player
 
 ## 3. `stg_gql` — collapse it; the constraint is 2 table names, not 38
 
+> **Adopted 2026-09-08.** This section is now ADR-0003 and §2 of
+> `docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md`. Measured again that day: 3 exact collisions
+> (`calendar` has since become the third), 28 of 38 with no counterpart. The collapse is
+> sequenced *after* the drops and merges, so no suffix is ever created.
+
+
 **My first draft recommended keeping it. That was wrong, and the correction is worth showing.**
 
 I wrote that bare names collide on "3 exactly, 7 more by a trailing `s`". I took that from ADR

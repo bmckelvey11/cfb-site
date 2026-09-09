@@ -1,5 +1,9 @@
 # Plan Review Log: Warehouse source rationalization
 
+> **Absorbed 2026-09-08 into `docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md`.** The decisions these five rounds
+> produced, and the one open item the deadlock left, are carried into that document's §10.
+> Retained in full as the record of the argument.
+
 Phases 0-1 (recon + interrogation) complete — plan locked with the user. MAX_ROUNDS=5.
 
 ## Phase 0 — Recon

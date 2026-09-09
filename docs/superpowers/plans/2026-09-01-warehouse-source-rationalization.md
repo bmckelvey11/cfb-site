@@ -1,5 +1,11 @@
 # Warehouse Source Rationalization Implementation Plan
 
+> **Execution appendix, 2026-09-08.** `docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md` is the plan of record for
+> *what and why*; this file remains the authority on *how* — the task-level steps, code and
+> expected output. Where the two disagree the master wins and this file is corrected. Note
+> its §2: the end-state schema is one `stg`, so table names here are current-state, not
+> final.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Repair the two unjoinable GraphQL tables, remove 308 dead scaffolding columns, merge the seven complementary source pairs, and drop only what is provably superseded.
