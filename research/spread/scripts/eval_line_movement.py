@@ -30,6 +30,7 @@ MARKET_LINES = base.MARKET_LINES
 METHODS = ["E6", "E7", "E14"]          # M3 ridge, M2 k-by-rule, M4 screened CSR (version A)
 METHODS_A2 = ["E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14"]  # amendment A2
 WIDE_LAMBDA = [10.0, 100.0, 1000.0, 1e4, 1e5, 1e6]
+FINE_LAMBDA = [1000.0, 2000.0, 5000.0, 1e4, 2e4, 5e4]   # amendment A4: finer grid around the edge
 BREAKEVEN = 0.5238
 FRACS = (0.0, 0.25, 0.5, 0.75, 1.0)
 THRESH = (1.0, 2.0)
@@ -130,14 +131,23 @@ def main() -> int:
     ap.add_argument("--decontaminate-wf", action="store_true",
                     help="amendment A6: same screen, rebuilt per evaluation season from only "
                          "the seasons before it -- --decontaminate's screen saw its own test set")
+    ap.add_argument("--fine-ridge", action="store_true",
+                    help="amendment A4: E6 only, finer ridge grid around the A6 grid edge (10**4)")
     args = ap.parse_args()
     suffix = ("_a2" if args.amend else "") + (
-        "_decon_wf" if args.decontaminate_wf else "_decon" if args.decontaminate else "")
+        "_decon_wf" if args.decontaminate_wf else "_decon" if args.decontaminate else "") + (
+        "_a4" if args.fine_ridge else "")
     grids = None
     if args.amend:
         METHODS = METHODS_A2
         grids = {k: list(v) for k, v in sweep.GRIDS.items()}
         grids["E6"] = WIDE_LAMBDA
+    if args.fine_ridge:
+        # amendment A4: an engineering decision about which lambda weekly_slate.py serves, not
+        # an inferential claim -- reported without a p-value (prereg-line-movement.md, A4).
+        METHODS = ["E6"]
+        grids = {k: list(v) for k, v in sweep.GRIDS.items()}
+        grids["E6"] = FINE_LAMBDA
     df, models = base.load()
     models = [m for m in models if m not in MARKET_LINES]
     df = df[df["line"].notna() & df["lineopen"].notna()].reset_index(drop=True)

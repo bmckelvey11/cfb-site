@@ -62,12 +62,21 @@ import collect_line_timing as clt  # noqa: E402
 BENCH = "lineopen"
 # Modal hyperparameter choice across the 20 walk-forward seasons of the movement runs:
 # `chosen_params` in {CFB_DATA_ROOT}/processed/pt_movement.json (version A, E6) and
-# pt_movement_a2.json (the rest). E6's 1e4 is the grid edge; line-movement-results.md records
-# that a wider grid over-shrank and a finer one below 1e4 is untested, so it stays. E13 (Hedge)
-# is omitted: weakest method and it needs sequential state that a one-shot live fit lacks.
-PARAMS = {"E6": 10000.0, "E7": "all", "E8": 0.3, "E9": 1, "E10": 1.0, "E11": 0.4,
+# pt_movement_a2.json (the rest), except E6 -- amendment A4
+# ({CFB_DATA_ROOT}/processed/pt_movement_decon_wf_a4.json) reran E6 on the walk-forward
+# decontaminated panel (A6) with a finer grid, FINE_LAMBDA = [1e3, 2e3, 5e3, 1e4, 2e4, 5e4].
+# R2(E6, A4) 0.2002 vs R2(E4, A6) 0.1537, a 0.046 gap that clears A4's pre-registered 0.02
+# keep/retire threshold, so E6 stays served, now at its A4 modal lambda 5e4 (chosen in 19 of 19
+# seasons that produced a choice). The grid-edge problem did not resolve at finer resolution --
+# it moved from 1e4 (the old grid's top) to 5e4 (this grid's top) -- so E6 is still an edge hit;
+# A4 is an engineering decision about which lambda to serve, not a claim the ridge is well
+# identified. This does not change which predictor version B grades: that stays E4 (plan of
+# record, decision 2), regardless of E6's score here. E13 (Hedge) is omitted: weakest method
+# and it needs sequential state that a one-shot live fit lacks.
+PARAMS = {"E6": 50000.0, "E7": "all", "E8": 0.3, "E9": 1, "E10": 1.0, "E11": 0.4,
           "E12": (10.0, 0.1), "E14": 1}
 MODEL_COLS = ["E4", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E14"]
+MODEL_SET_VERSION = 2   # 2026-09-08: E6 re-parameterized to A4's modal lambda (5e4, was 1e4)
 
 # Action Network book ids, names from AN's own /web/v1/books (2026-09-08). Until then this map
 # said Pinnacle/FanDuel/BetMGM/Caesars/Bet365 -- every label was wrong; the ids were right.
@@ -287,6 +296,10 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
     t = add_side(t, book)
     t.insert(0, "snapshot", snapshot.name)
     t.insert(1, "captured_utc", snapshot.stem.split("_")[-1])
+    # Which PARAMS/MODEL_COLS definition produced pred_close -- bumped whenever either changes
+    # (amendment A4, 2026-09-08: E6 moved from lambda=1e4 to its A4 modal 5e4). A predictor that
+    # changes mid-forward-test silently redefines the graded quantity, so every row is tagged.
+    t["model_set_version"] = MODEL_SET_VERSION
     return t
 
 
@@ -356,6 +369,55 @@ def report(t: pd.DataFrame, with_books: bool) -> None:
             print(f"  {r.side:20s} {line:>11s} @ {r.side_book or '-':10s}{odds:8s} edge {r.edge:.1f}")
 
 
+def recompute_forward_log() -> int:
+    """Refit every model column for every existing forward-log row from its raw PT snapshot,
+    under the CURRENT PARAMS/MODEL_COLS, and re-tag every row with MODEL_SET_VERSION.
+
+    Run this whenever PARAMS or MODEL_COLS changes (amendment A4 and any future one) and BEFORE
+    any read quotes pred_close -- a predictor that changes mid-forward-test silently redefines
+    the graded quantity (plan of record, decision 3). Book-derived columns (book_fair, side,
+    side_line, edge, ...) do not depend on the model set and are left as originally captured;
+    only the model columns, pred_close, move_vs_line and move_vs_fair are recomputed.
+    """
+    if not FORWARD_LOG.exists():
+        print("no forward log to recompute"); return 0
+    log = pd.read_csv(FORWARD_LOG)
+    hist, models = base.load()
+    hist = hist[hist["line"].notna() & hist[BENCH].notna()].reset_index(drop=True)
+    parts = []
+    for snap, grp in log.groupby("snapshot", sort=False):
+        path = clt.SNAP_DIR / snap
+        if not path.exists():
+            print(f"  {snap}: raw snapshot missing on disk, {len(grp)} rows left unrecomputed")
+            parts.append(grp)
+            continue
+        live_raw = pd.read_csv(path).drop_duplicates(["road", "home"], keep="last").reset_index(drop=True)
+        gap = (live_raw["lineopen"] - live_raw["line"]).abs()
+        live_raw["open_suspect"] = gap > 14
+        live_raw.loc[live_raw.open_suspect, "lineopen"] = live_raw.loc[live_raw.open_suspect, "line"]
+        live = pu.to_archive_convention(live_raw.drop(columns=["open_suspect"]))
+        live["season"] = int(hist.season.max()) + 1
+        live = live.reset_index(drop=True)
+        preds, *_ = fit_movement_models(hist, models, live)
+        new = pd.DataFrame({"road": live_raw["road"], "home": live_raw["home"]})
+        for m in MODEL_COLS:
+            new[m] = np.round(preds[m], 1)
+        new["pred_close"] = new[MODEL_COLS].median(axis=1).round(1)
+        grp = grp.drop(columns=[c for c in MODEL_COLS + ["pred_close"] if c in grp]) \
+                 .merge(new, on=["road", "home"], how="left")
+        grp["move_vs_line"] = (grp.pred_close - grp.line_pt).round(1)
+        if "book_fair" in grp:
+            grp["move_vs_fair"] = (grp.pred_close - grp.book_fair).round(1)
+        parts.append(grp)
+    out = pd.concat(parts, ignore_index=True)
+    out["model_set_version"] = MODEL_SET_VERSION
+    out.to_csv(FORWARD_LOG, index=False)
+    n_snaps = log.snapshot.nunique()
+    print(f"recomputed {len(out)} forward-log rows across {n_snaps} snapshots "
+          f"under model_set_version {MODEL_SET_VERSION}")
+    return len(out)
+
+
 def append_forward_log(t: pd.DataFrame) -> int:
     """One row per game per snapshot, deduplicated on snapshot; this is version B's dataset."""
     keep = [c for c in t.columns if c not in ("quotes", "key", "rkey")]
@@ -376,7 +438,13 @@ def main() -> int:
     ap.add_argument("--no-books", action="store_true", help="skip the live Action Network fetch")
     ap.add_argument("--book", default=None,
                     help="show the side's number and price at this one book: " + ", ".join(REAL_BOOKS.values()))
+    ap.add_argument("--recompute-forward-log", action="store_true",
+                    help="refit every existing forward-log row under the current PARAMS/"
+                         "MODEL_COLS and MODEL_SET_VERSION, then exit -- no new slate built")
     args = ap.parse_args()
+    if args.recompute_forward_log:
+        recompute_forward_log()
+        return 0
     book = None
     if args.book:
         book = next((n for n in REAL_BOOKS.values() if n.lower() == args.book.lower()), None)
