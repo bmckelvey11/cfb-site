@@ -28,6 +28,9 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
   our_line     E4's predicted close as a home spread in BETTING sign (negative = home favored),
                i.e. -E4; the one number to compare against a posted home line
   edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1
+  Pinnacle_home / Pinnacle_odds / pin_limit   Pinnacle's full-game main line from the latest
+               oddspapi snapshot (scripts/pull_oddspapi.py), PT sign. Shown beside the fair,
+               NOT in it. pin_vs_fair = Pinnacle_home - book_fair.
 
   oa_*         the same arithmetic over the-odds-api's nine books ALONE, AS OF `oa_as_of`
                (the 6-hourly snapshot, so up to six hours stale). Kept beside book_fair as the
@@ -330,7 +333,9 @@ def oddsapi_books(now: datetime) -> pd.DataFrame:
 # the-odds-api school spellings that do not normalize onto Prediction Tracker's, checked
 # after the mascot is stripped. Grows the way ALIASES did -- add a line when a game shows up
 # in the unpriced list with books actually posted for it in the snapshot.
-OA_ALIASES = {"florida international": "florida intl", "middle tennessee": "middle tenn"}
+OA_ALIASES = {"florida international": "florida intl", "middle tennessee": "middle tenn",
+              # oddspapi spellings (Pinnacle feed)
+              "middle tennessee state": "middle tenn", "ut san antonio": "texas-san antonio"}
 
 # Mascots are one or two trailing tokens ("Hurricanes", "Thundering Herd"), so the strip never
 # needs to drop more than two. The cap does NOT make a single name unambiguous -- "Alabama
@@ -373,6 +378,57 @@ def oa_shop(quotes: dict) -> dict:
             "oa_best_home_odds": quotes[v.idxmax()][1],
             "oa_best_away_an": v.min(), "oa_best_away_book": v.idxmin(),
             "oa_best_away_odds": quotes[v.idxmin()][1]}
+
+
+# ---------------------------------------------------------------- Pinnacle via oddspapi (observation)
+
+PIN_SNAP_DIR = cfb_paths.INGEST / "oddspapi"
+
+
+def is_full_game_spread(market: dict) -> bool:
+    """Pinnacle's market path is `line/<...>/<period>/spreads`; period 0 is the full game.
+    `altLine/...` entries are alternate numbers, periods 1+ are halves and quarters -- the
+    first-half line at half the number is what a period-blind parse picks up."""
+    parts = (market.get("bookmakerMarketId") or "").split("/")
+    return parts[0] == "line" and parts[-1] == "spreads" and parts[-2] == "0"
+
+
+def pinnacle_lines(now: datetime) -> pd.DataFrame:
+    """Pinnacle's full-game main-line home spread from the latest oddspapi snapshot
+    (`scripts/pull_oddspapi.py`, one request per pull). OBSERVATION ONLY: never feeds
+    `book_fair`, `side`, or `edge`; putting the sharpest book into the fair is a prereg
+    amendment, not a side effect of having the data.
+
+    The file carries betting sign from the home side (`-3.5/home` = home favored by 3.5);
+    stored here in PT sign like every other `<Book>_home` column. participant1 is the home
+    team: 46 of 46 games joined that way and 0 the other way on 2026-09-09.
+    """
+    snaps = sorted(PIN_SNAP_DIR.glob("oddspapi_ncaa_*.json"))
+    if not snaps:
+        print(f"  no oddspapi snapshot in {PIN_SNAP_DIR}; Pinnacle columns unavailable", file=sys.stderr)
+        return pd.DataFrame()
+    payload = json.loads(snaps[-1].read_text(encoding="utf-8"))
+    as_of = datetime.fromisoformat(payload["pulled_at"].replace("Z", "+00:00"))
+    print(f"  oddspapi snapshot {snaps[-1].name}: {len(payload['fixtures'])} fixtures, "
+          f"{(now - as_of).total_seconds() / 3600:.1f}h old")
+    lo, hi = now - timedelta(days=1), now + timedelta(days=8)
+    rows = []
+    for f in payload["fixtures"]:
+        ko = datetime.fromisoformat(f["startTime"].replace("Z", "+00:00"))
+        if not (lo <= ko <= hi):
+            continue
+        book = (f.get("bookmakerOdds") or {}).get("pinnacle") or {}
+        for m in (book.get("markets") or {}).values():
+            if not is_full_game_spread(m):
+                continue
+            for o in m["outcomes"].values():
+                for pl in o["players"].values():
+                    if pl.get("mainLine") and pl["bookmakerOutcomeId"].endswith("/home"):
+                        rows.append({"pin_home_raw": f["participant1Name"], "pin_road_raw": f["participant2Name"],
+                                     "Pinnacle_home": -float(pl["bookmakerOutcomeId"].split("/")[0]),
+                                     "Pinnacle_odds": int(pl["priceAmerican"]), "pin_limit": pl.get("limit"),
+                                     "pin_active": bool(pl.get("active")), "pin_as_of": payload["pulled_at"]})
+    return pd.DataFrame(rows)
 
 
 def crosses_key(a: float, b: float) -> bool:
@@ -461,6 +517,21 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
                          for f, b in zip(t.fair_pt, t.best_home_pt)]
         t["away_key"] = [crosses_key(f, b) if np.isfinite(f) and np.isfinite(b) else False
                          for f, b in zip(t.fair_pt, t.best_away_pt)]
+        # Pinnacle beside the fair, never inside it (see pinnacle_lines)
+        pin = pinnacle_lines(now)
+        if not pin.empty:
+            pin["key"] = [oa_resolve(n, set(t.key)) for n in pin.pin_home_raw]
+            pin["rkey"] = [oa_resolve(n, set(t.rkey)) for n in pin.pin_road_raw]
+            t = t.merge(pin.drop(columns=["pin_home_raw", "pin_road_raw"]).drop_duplicates(["key", "rkey"]),
+                        on=["key", "rkey"], how="left")
+        for c in ("Pinnacle_home", "Pinnacle_odds", "pin_limit", "pin_active", "pin_as_of"):
+            if c not in t:
+                t[c] = np.nan
+        t["pin_vs_fair"] = (t.Pinnacle_home - t.book_fair).round(2)
+        n_pin = int(t.Pinnacle_home.notna().sum())
+        print(f"  Pinnacle (oddspapi): {n_pin}/{len(t)} games priced"
+              + (f", median |Pinnacle - book_fair| {t.pin_vs_fair.abs().median():.2f} pts, "
+                 f"max {t.pin_vs_fair.abs().max():.1f}" if n_pin else ""))
         t["kick_et"] = pd.to_datetime(t.kick, utc=True).dt.tz_convert(ET).dt.strftime("%a %m-%d %I:%M%p")
         unmatched = t[t.event_id.isna()][["road", "home"]].values.tolist()
         if unmatched:
@@ -544,9 +615,10 @@ def write_xlsx(t: pd.DataFrame, path: Path) -> None:
         "Our Line": t.our_line, "Edge": t.edge, "Side": t.side, "Take": t.side_line,
         "Book": t.side_book, "Odds": t.side_odds,
     })
-    for b in BOOKS:
+    for b in BOOKS + ("Pinnacle",):        # Pinnacle is shown, not voted (see pinnacle_lines)
         slate[b] = bet(f"{b}_home")
         slate[f"{b} odds"] = t.get(f"{b}_odds", np.nan)
+    slate["Pinnacle vs Fair"] = -t.get("pin_vs_fair", np.nan)     # betting sign, home side
     slate = slate.sort_values("Edge", ascending=False)
     models = t[["road", "home", "open_pt", "line_pt"] + (["book_fair"] if "book_fair" in t else [])
                + ["consensus"] + REPORTED_COLS + ["pred_close"]]
@@ -555,7 +627,7 @@ def write_xlsx(t: pd.DataFrame, path: Path) -> None:
         sides = []
         for _, r in t.iterrows():
             # every book's number from the side's perspective; only home-side odds are captured
-            per_book = {b: r.get(f"{b}_home", np.nan) for b in BOOKS}
+            per_book = {b: r.get(f"{b}_home", np.nan) for b in BOOKS + ("Pinnacle",)}
             sides.append({"Kick (ET)": r.get("kick_et", ""), "Team": r.home, "Opponent": r.road,
                           "Best Line": -r.best_home_pt, "Book": r.best_home_book, "Odds": r.best_home_odds,
                           "Fair": -r.fair_pt, "Gain": r.home_gain, "Key": bool(r.home_key),
@@ -737,6 +809,11 @@ def _check() -> None:
     assert s.side_book.tolist() == ["BetMGM", "BetRivers"] and s.edge.tolist() == [5.0, 1.0], s
     assert s.side_odds.tolist() == [100, -110], s
     assert s.our_line.tolist() == [-28.5, -36.5], s
+    # Pinnacle: only the full-game main line (period 0); halves and alt lines are skipped
+    assert is_full_game_spread({"bookmakerMarketId": "line/15/880/1/2/0/spreads"})
+    assert not is_full_game_spread({"bookmakerMarketId": "line/15/880/1/2/1/spreads"})
+    assert not is_full_game_spread({"bookmakerMarketId": "altLine/15/880/1/2/3/0/spreads"})
+    assert not is_full_game_spread({"bookmakerMarketId": "line/15/880/1/2/0/totals"})
     d = add_side(frame.copy(), book="DraftKings")        # same side; that book's number, NaN if unposted
     assert d.side.tolist() == ["S Miss", "LSU"] and d.side_line.iloc[0] == 33.5 and np.isnan(d.side_line.iloc[1]), d
     assert d.side_book.tolist() == ["DraftKings", ""] and d.side_odds.iloc[0] == -115, d
