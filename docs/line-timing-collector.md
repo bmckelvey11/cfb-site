@@ -74,7 +74,7 @@ schtasks /Query /TN "CFB-PT-Snapshot" /FO LIST /V | Select-String "Last Run Time
 `Last Result: 0` is success. Then confirm data is actually accumulating:
 
 ```powershell
-Get-ChildItem "$env:CFB_DATA_ROOT\raw\pt_snapshots\*.csv" | Measure-Object
+Get-ChildItem "$env:CFB_DATA_ROOT\ingest\pt_snapshots\*.csv" | Measure-Object
 Get-Content "$env:CFB_DATA_ROOT\logs\line_timing.log" -Tail 20
 ```
 
@@ -100,6 +100,22 @@ false-alarms under normal operation. Revisit once a full week has accumulated un
 task settings; raise to 18 and record why here if it turns out to false-alarm weekly.
 
 As of setup: 1 snapshot, 99 history files (2026 week 1), last result 0.
+
+**Verified running unattended, 2026-09-09.** The battery/power fix of 2026-09-08 is confirmed
+working — not by a hand run, but by the schedule itself:
+
+| task | last run | result | next |
+|---|---|---|---|
+| `CFB-PT-Snapshot` | Wed 2026-09-09 00:30 | `0x0` | 06:30 |
+| `CFB-AN-History` | Tue 2026-09-08 21:15 | `0x0` | 02:15 |
+| `CFB-CFBD-Daily` | Tue 2026-09-08 05:00 | `0x0` | 05:00 |
+
+The 09-08 21:15 history run wrote 91 files with 0 errors; the 18:30 and 00:30 snapshot runs both
+logged `unchanged ... nothing written`, which is the correct outcome -- PT had not republished.
+All 92 events in `movement_forward_log.csv` have a history file on disk (190 files total), so the
+post-outage backfill completed on the schedule rather than needing the hand pull the plan
+budgeted for. That is stronger evidence than a hand run would have been: it demonstrates the
+automation, which is the thing the outage called into question.
 
 **Known gap, unrecoverable.** The scheduled-task battery/power settings bug above (the same one
 described in "What is registered": every run refused from **Fri 2026-09-04 12:30 to Mon

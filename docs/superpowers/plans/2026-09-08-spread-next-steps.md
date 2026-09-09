@@ -40,13 +40,13 @@
 
 ## Phase 1 — this week: data integrity and the cheap questions
 
-### Task 1: Backfill Action Network histories and prove the collector is alive
+### Task 1: Backfill Action Network histories and prove the collector is alive — **done 2026-09-09** (scheduler verified unattended, 92/92 forward-log events have histories)
 
 **Files:**
 - Modify: `docs/line-timing-collector.md` (add the health command from Task 3 once it exists)
 - No code.
 
-- [ ] **Step 1: Pull histories for every 2026 week posted so far**
+- [x] **Step 1: Pull histories for every 2026 week posted so far**
 
 ```bash
 research\spread\scripts\collect_line_timing.cmd history --season 2026 --weeks 1-4
@@ -54,7 +54,7 @@ research\spread\scripts\collect_line_timing.cmd history --season 2026 --weeks 1-
 
 Expected: log shows `history: N written, 106 already on disk, M not yet posted`, N ≥ 40 (AN week 2 had 86 games; those with posted histories get files).
 
-- [ ] **Step 2: Verify week-2 events now have files**
+- [x] **Step 2: Verify week-2 events now have files**
 
 ```bash
 python - <<'EOF'
@@ -70,7 +70,7 @@ EOF
 
 Expected: `42 of 43` or better. If under 35, AN has not posted them yet; rerun Step 1 tomorrow.
 
-- [ ] **Step 3: Confirm the PT task fires on schedule without a hand run**
+- [x] **Step 3: Confirm the PT task fires on schedule without a hand run**
 
 Wait for the next 6-hour slot (00:30, 06:30, 12:30, 18:30 local), then:
 
@@ -81,7 +81,7 @@ Get-Content data\logs\line_timing.log -Tail 3
 
 Expected: `LastTaskResult 0` at the slot time, and a `==== ... :: snapshot ====` line in the log at that time.
 
-- [ ] **Step 4: Record in the runbook**
+- [x] **Step 4: Record in the runbook**
 
 Append under "Checking it is alive" in `docs/line-timing-collector.md`:
 
@@ -90,7 +90,7 @@ Backfilled 2026 weeks 1–4 on <date> after the 09-04 → 09-08 outage; the PT s
 Thu 09-04 12:30 through Sun 09-07 are gone and cannot be recovered.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/line-timing-collector.md

@@ -211,9 +211,11 @@ fix being *claimed* and *verified*).
    sanity check passed (R²(10⁹) = 0.0012 against R0's 0.0005), so the run was readable.
 4. **A5 treats a walk-forward prediction as a fixed regressor**; its CI is conditional on the
    fitted predictor and must be labelled so.
-5. **The collector fix is claimed, not verified.** The Task Scheduler conditions live in the UI,
-   not in git, and T1's confirmation step is still unchecked. Enough 6-hour slots have now passed
-   that `LastTaskResult` can simply be read.
+5. **The collector fix is verified — closed 2026-09-09.** All three tasks report `0x0` and fire
+   unattended (`CFB-PT-Snapshot` at 00:30, `CFB-AN-History` at 21:15 writing 91 files with 0
+   errors). The post-outage Action Network backfill completed on the schedule rather than by
+   hand: all 92 forward-log events have a history file, 190 on disk. The snapshot half of the
+   09-04 → 09-08 outage stays unrecoverable — PT overwrites its file in place.
 6. **`archive/spread-margin-era/scripts/diag_weight_concentration.py:46`** still carries a
    hardcoded `C:/Users/mckel/data/cfb/processed` fallback. Archived and `hasattr`-guarded, so it
    is a note, not a defect.
