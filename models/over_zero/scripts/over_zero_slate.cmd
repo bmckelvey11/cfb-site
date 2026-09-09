@@ -1,0 +1,37 @@
+@echo off
+REM Wrapper for Windows Task Scheduler around the over-zero slate.
+REM
+REM Same shape as scripts/refresh_cfbd.cmd: one command for the task definition,
+REM every run appended to one log. Runs the slate, then rebuilds the site so
+REM site/dist matches the new board. Deploying that build stays a hand job --
+REM the sites remote needs your auth.
+REM
+REM   over_zero_slate.cmd
+REM   over_zero_slate.cmd --days 3
+REM
+REM Override PYTHON to use a different interpreter (defaults to the repo venv).
+setlocal
+set "REPO=%~dp0..\..\.."
+set "SITE=%REPO%\models\over_zero\site"
+if "%PYTHON%"=="" set "PYTHON=%REPO%\.venv\Scripts\python.exe"
+if "%CFB_DATA_ROOT%"=="" set "CFB_DATA_ROOT=%REPO%\data"
+set "LOGDIR=%CFB_DATA_ROOT%\logs"
+if not exist "%LOGDIR%" mkdir "%LOGDIR%"
+set "LOG=%LOGDIR%\over_zero_slate.log"
+
+echo.>> "%LOG%"
+echo ==== %DATE% %TIME% :: %* ====>> "%LOG%"
+REM -u so a killed run keeps the partial trail (see refresh_cfbd.cmd).
+"%PYTHON%" -u "%REPO%\models\over_zero\scripts\best_line_slate.py" --json "%SITE%\lib\board.json" %*>> "%LOG%" 2>&1
+set RC=%ERRORLEVEL%
+if not "%RC%"=="0" (
+    echo ---- slate exited %RC%, skipping build ---->> "%LOG%"
+    exit /b %RC%
+)
+
+REM npm is npm.cmd -- without call, control never comes back here.
+cd /d "%SITE%"
+call npm run build>> "%LOG%" 2>&1
+set RC=%ERRORLEVEL%
+if not "%RC%"=="0" echo ---- build exited %RC% ---->> "%LOG%"
+exit /b %RC%

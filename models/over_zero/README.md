@@ -114,3 +114,21 @@ Scripts read required `CFB_DATA_ROOT` (`raw/games_{season}.json`,
 `raw/lines_{season}.json`, and `processed/games.csv`). Data stays outside this git tree.
 Refresh newer seasons with `python -m cfb_system_maker scrape --season ...` from repository
 root. `v1/run_on_project_data.py` also accepts an explicit `--csv` path.
+
+## Scheduled slate
+
+`CFB-OverZero-Slate` (Windows Task Scheduler, registered 2026-09-09) runs
+`scripts/over_zero_slate.cmd` at 09:00 and 18:00, Mon–Fri. Each run scores the live
+slate, rewrites `site/lib/board.json`, and rebuilds `site/dist`. It does **not** deploy —
+the `sites` remote needs your auth, so pushing the board stays a hand step.
+
+Like the line-timing tasks, it only fires while `mckel` is logged on
+(`docs/line-timing-collector.md` § Limitations). Every run appends to
+`$CFB_DATA_ROOT/logs/over_zero_slate.log`; a failed slate skips the build and the log
+says so.
+
+```powershell
+schtasks /Query /TN "CFB-OverZero-Slate" /FO LIST /V | Select-String "Last Run Time|Last Result|Next Run Time"
+schtasks /Run /TN "CFB-OverZero-Slate"      # force one now
+schtasks /Change /TN "CFB-OverZero-Slate" /DISABLE
+```
