@@ -158,12 +158,31 @@ def test_an_ambiguous_school_is_never_guessed():
 
 @pytest.mark.skipif(not (OUT_DIR / "pff_franchise.csv").exists(),
                     reason="run scripts/pff_flatten.py first")
-def test_every_franchise_maps_to_a_distinct_cfbd_team():
+def test_every_fbs_franchise_maps_to_a_distinct_cfbd_team():
+    """FBS coverage must be total; distinctness must hold everywhere.
+
+    Below FBS the two vendors genuinely disagree on which schools exist -- PFF added
+    Chicago State for 2026 and CFBD carries no such team -- so an unmapped FCS franchise is
+    data, not a defect. Forcing it to map would be worse than leaving it: the nearest CFBD
+    school is D-III `Chicago`, and a successful match to the wrong team is invisible in any
+    coverage count. A *duplicate* id is always a defect.
+    """
+    import json
+
     with (OUT_DIR / "pff_franchise.csv").open(encoding="utf-8") as fh:
-        rows = [r for r in csv.DictReader(fh) if r["kind"] == "team"]
-    unmapped = [r["slug"] for r in rows if not r["cfbd_team_id"]]
-    assert not unmapped, f"unmapped franchises: {unmapped}"
-    ids = [r["cfbd_team_id"] for r in rows]
+        rows = {r["franchise_id"]: r for r in csv.DictReader(fh)}
+
+    fbs = set()
+    for path in (IN_DIR / "team").glob("team_directory_*.json"):
+        for row in json.loads(path.read_text(encoding="utf-8"))["rows"]:
+            if "11" in row["groupIds"].split(";"):        # group 11 is FBS
+                fbs.add(str(row["franchiseId"]))
+    assert fbs, "no team_directory on disk, so FBS coverage is unchecked"
+
+    unmapped = sorted(fid for fid in fbs if not rows.get(fid, {}).get("cfbd_team_id"))
+    assert not unmapped, f"FBS franchises with no CFBD team: {unmapped}"
+
+    ids = [r["cfbd_team_id"] for r in rows.values() if r["cfbd_team_id"]]
     assert len(set(ids)) == len(ids), "two PFF franchises claim one CFBD team"
 
 

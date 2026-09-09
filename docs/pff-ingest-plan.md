@@ -419,3 +419,20 @@ Unrelated, found by `--validate` on the same run and left alone: `pff_rushing_di
 carries direction label `NV`, which `docs/pff-sample-schema.sql`'s CHECK constraint does not
 declare, so that one table fails its round-trip insert. It predates this change and is not
 `jersey_number`'s to fix.
+
+### 2026-09-09 — S4 follow-up: FBS coverage is the assertion, not total coverage
+
+`test_every_franchise_maps_to_a_distinct_cfbd_team` demanded that every PFF franchise of
+`kind = 'team'` carry a `cfbd_team_id`. That held until PFF's 2026 directory added Chicago
+State (`franchiseId` 1548, `groupIds` `12;29` — FCS), and CFBD has no such football team;
+the school dropped the sport in 1988.
+
+The assertion was measuring the wrong thing. Below FBS the two vendors genuinely disagree
+on which schools exist, so an unmapped FCS franchise is data. Worse, satisfying the old
+assertion would have meant forcing a match, and the nearest CFBD school is D-III `Chicago`
+— the `louisiana-monroe-warhawks` → `Louisiana` failure again, a successful match to the
+wrong team that no coverage count would show.
+
+Now gated on PFF's own FBS group (`groups` id 11, read from `team_directory_*.json`): all
+138 FBS franchises must map, and that is checked rather than assumed. Distinctness stays
+global, since a duplicate `cfbd_team_id` is a defect at any level.
