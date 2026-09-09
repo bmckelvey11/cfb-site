@@ -122,9 +122,13 @@ def conservative_median(values: pd.Series, *, high: bool) -> float:
     return float(values.quantile(0.5, interpolation="higher" if high else "lower"))
 
 
-def shop_total(totals: dict) -> dict:
-    """Fair total and the best playable over, from {book: (total, odds)}."""
-    if len(totals) < 2:
+def shop_total(totals: dict, min_books: int = 2) -> dict:
+    """Fair total and the best playable over, from {book: (total, odds)}.
+
+    Two books are the minimum for a "fair" number worth the name. `min_books=1` is the
+    single-book read (--book): fair and best collapse onto that book's own line.
+    """
+    if len(totals) < min_books:
         return {}
     v = guarded(pd.Series({b: t for b, (t, _) in totals.items()}))
     out = {"n_books": len(v), "total_fair": conservative_median(v, high=True),
@@ -148,7 +152,8 @@ def bias_of(spread: np.ndarray, total: np.ndarray, fit) -> np.ndarray:
     return bias
 
 
-def build(fit_csv: Path, fit_seasons, days: int, threshold: float) -> pd.DataFrame:
+def build(fit_csv: Path, fit_seasons, days: int, threshold: float,
+          book: str | None = None) -> pd.DataFrame:
     spread_est, totals_est, fav_pts, dog_pts = load(fit_csv, fit_seasons)
     print(f"Fit on {spread_est.size:,} games from seasons "
           f"{min(fit_seasons)}-{max(fit_seasons)}")
@@ -159,12 +164,20 @@ def build(fit_csv: Path, fit_seasons, days: int, threshold: float) -> pd.DataFra
     games = live_markets(now, days)
     print(f"Fetched {len(games)} games kicking off in the next {days} days")
 
+    # One book means no shopping and no cross-book fair: that book IS both numbers.
+    only = next((k for k, v in REAL_BOOKS.items() if v == book), None) if book else None
+    need = 1 if only else 2
+
     rows = []
     for g in games.itertuples():
-        shopped = shop_total(g.totals)
-        if not shopped or len(g.spreads) < 2:
+        totals, spreads = g.totals, g.spreads
+        if only:
+            totals = {only: totals[only]} if only in totals else {}
+            spreads = {only: spreads[only]} if only in spreads else {}
+        shopped = shop_total(totals, need)
+        if not shopped or len(spreads) < need:
             continue
-        kept = guarded(pd.Series(g.spreads))
+        kept = guarded(pd.Series(spreads))
         # Only the magnitude feeds the model; carry the sign back for the reader.
         mag = conservative_median(kept.abs(), high=False)
         if mag == 0:                               # pick'em -- no favorite, per the paper
@@ -195,9 +208,9 @@ def build(fit_csv: Path, fit_seasons, days: int, threshold: float) -> pd.DataFra
     return t.sort_values("bias_fair", ascending=False)[COLUMNS]
 
 
-def report(t: pd.DataFrame, threshold: float) -> None:
+def report(t: pd.DataFrame, threshold: float, book: str | None = None) -> None:
     if t.empty:
-        print("No games with two or more books quoting both markets.")
+        print(f"No games with {book or 'two or more books'} quoting both markets.")
         return
     print(f"\n{'home':<22} {'away':<22} {'fair':>6} {'bias':>6} {'P(over)':>8} "
           f"{'best':>6} {'book':<11} {'odds':>6} pick")
@@ -209,10 +222,15 @@ def report(t: pd.DataFrame, threshold: float) -> None:
     on_fair = int((t.bias_fair > threshold).sum())
     on_best = int((t.bias_best > threshold).sum())
     playable = int(((t.bias_fair > threshold) & t.playable).sum())
-    print(f"\n{on_fair}/{len(t)} games clear bias > {threshold} on the fair total; "
+    label = f"{book}'s total" if book else "the fair total"
+    print(f"\n{on_fair}/{len(t)} games clear bias > {threshold} on {label}; "
           f"{playable} of those have a price at {MIN_ODDS} or better.")
-    print(f"{on_best} would clear if qualified on the shopped total instead -- that gap "
-          f"is selection on book noise, which is why the gate is the fair number.")
+    if book:
+        print(f"Single-book run: no shopping, and {book}'s own number is the gate rather "
+              f"than the market's -- one book's noise passes straight through it.")
+    else:
+        print(f"{on_best} would clear if qualified on the shopped total instead -- that "
+              f"gap is selection on book noise, which is why the gate is the fair number.")
 
 
 def main() -> int:
@@ -225,18 +243,23 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=8, help="kickoff window from now")
     ap.add_argument("--threshold", type=float, default=1.75,
                     help="bet rule: over when expected censoring bias exceeds this")
+    ap.add_argument("--book", choices=sorted(REAL_BOOKS.values()),
+                    help="score one book's own number instead of shopping across all of "
+                         "them; the fair and best columns collapse onto that book")
     ap.add_argument("--out-dir", default=str(OUT_DIR), help="'' to skip writing")
     args = ap.parse_args()
 
     seasons = list(range(args.fit_from, args.season))
-    t = build(Path(args.fit_csv), seasons, args.days, args.threshold)
-    report(t, args.threshold)
+    t = build(Path(args.fit_csv), seasons, args.days, args.threshold, args.book)
+    report(t, args.threshold, args.book)
 
     if args.out_dir and not t.empty:
         out = Path(args.out_dir)
         out.mkdir(parents=True, exist_ok=True)
         stamp = t.run_at.iloc[0].replace(":", "").replace("-", "")
-        for path in (out / f"best_line_slate_{stamp}.csv", out / "best_line_slate_latest.csv"):
+        tag = f"_{args.book.lower()}" if args.book else ""
+        for path in (out / f"best_line_slate_{stamp}{tag}.csv",
+                     out / f"best_line_slate_latest{tag}.csv"):
             t.to_csv(path, index=False)
             print(f"Wrote {len(t)} rows to {path}")
     return 0
@@ -253,6 +276,9 @@ def _check() -> None:
     s2 = shop_total({"68": (44.5, -135), "69": (45.0, -130)})
     assert s2["playable"] is False and s2["best_total"] == 44.5, s2
     assert not shop_total({"68": (44.5, -110)}), "one book is not a market"
+    # ...unless the run asked for that one book, where fair and best are the same number.
+    s1 = shop_total({"68": (44.5, -110)}, 1)
+    assert s1["total_fair"] == s1["best_total"] == 44.5 and s1["n_books"] == 1, s1
     assert not _usable({"value": 30.5, "odds": -110, "is_alt_market": True}), "alt lines are not quotes"
     # Two books straddling: the fair total is the posted 56.5, not the synthetic 56.0.
     s3 = shop_total({"68": (55.5, -110), "69": (56.5, -110)})
