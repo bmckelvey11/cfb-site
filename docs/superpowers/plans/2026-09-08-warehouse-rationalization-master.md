@@ -42,6 +42,49 @@ Two migrations already landed and are not in scope to redo:
 `gql_` prefix (`raw.gql_game`) so they do not collide with REST dumps of the same name. **That
 prefix is load-bearing — nothing in this plan strips it.**
 
+## 1b. PFF now shares this schema *(added 2026-09-09)*
+
+`stg` stopped being CFBD-only while this plan was being written. PFF's S4 and S5 landed
+2026-09-09 and put **21 `stg.pff_*` tables** into the same schema this plan is rationalizing —
+`stg` went 124 → 145.
+
+**`docs/pff-ingest-plan.md` owns that work and nothing here changes it.** This section records
+only where the two touch, because four of this plan's claims are about `stg` as a whole and PFF
+is now part of `stg`.
+
+**PFF is not a fourteenth concept pair.** §3's buckets are about one concept arriving twice from
+two CFBD transports. PFF grades have no CFBD counterpart, so no bucket, no containment test, no
+merge. It is a third source, not a second spelling.
+
+**The naming rule, stated so the next vendor does not have to guess.** §2 says no name in `stg`
+may refer to which source produced it, and `stg.pff_passing` plainly does. The rule that
+reconciles them is about *what the prefix is for*:
+
+> A source prefix is wrong when it disambiguates two spellings of one concept — `gql_calendar`
+> against `calendar` names the transport because the concept was already taken. It is right when
+> it namespaces a vendor's own concepts — `pff_passing` has no CFBD twin, so the prefix is the
+> concept's name, not a tie-breaker.
+
+ADR-0003's objection was that the survivor of a rationalized pair would stay "permanently named
+after which API produced it." Nothing in `stg.pff_*` is a survivor of anything. **`stg.pff_*` is
+correct and this plan does not touch it.**
+
+**Three consequences for the steps below:**
+
+1. **Table counts stopped being assertable, and this is already fixed.** §1's 124/38/116 are
+   state, not invariants — PFF proved it four days after they were measured.
+   `scripts/verify_warehouse_plan.py` reports the counts and asserts what §2 actually rests on
+   (every GraphQL entity present under both spellings, exactly three colliders, no `gql_` left
+   in `stg`). Verified against the live warehouse at `stg` = 145: the structure block is green.
+2. **`core.dim_team` has three consumers now, not one.** See §6.
+3. **Step 5's one-commit rewrite got bigger.** See §8.
+
+**One PFF column trips §5 and should not.** `stg.pff_player_season.jersey_number` is all-NULL
+across 30,716 rows, but it is not dead data — `scripts/pff_flatten.py:222` writes `""` into it
+unconditionally, so it is a flattener stub. Dropping it would lose to the next flatten. It is
+therefore exempt from §5's drop list, and the fix belongs to PFF's S3/S8, not here. §5 carries
+the exemption.
+
 ## 2. The naming end state — one `stg`, nothing named after a transport
 
 **Decided 2026-09-08.** The end state is a single `stg` schema. This adopts
@@ -207,6 +250,11 @@ problems:
   **none of the three is all-NULL anywhere**. There is no loader change to make. See R3.
 - **4 are future-dated and must be kept** — `stg.lines_2026_week2_20260908` and its `__lines`
   child, `homeScore`/`awayScore`. Those games have not been played.
+- **1 is a flattener stub and is exempt** *(2026-09-09)* — `stg.pff_player_season.jersey_number`,
+  all-NULL over 30,716 rows because `scripts/pff_flatten.py:222` writes `""` into it
+  unconditionally. All-NULL here means "never populated by the writer," not "dead data," so
+  dropping it would simply lose to the next flatten. PFF's S3/S8 owns filling or removing it.
+  See §1b.
 - **7 are genuinely dead** and are the drop list:
 
 ```
@@ -258,6 +306,21 @@ Two pairs cannot merge on a scalar key alone and are called out as such: `coach`
 `recruiting_team`/`recruiting_teams` (an id against a name — no bridge exists, so it is
 deferred, not merged).
 
+**`core.dim_team` is a shared dependency, not a one-pair blocker** *(2026-09-09)*. The
+`recruiting_team` deferral above reads as a single stuck pair. It is not — three consumers now
+want the same team dimension, and each is solving it separately:
+
+| Consumer | How it bridges today |
+|---|---|
+| `recruiting_team` / `recruiting_teams` | nothing — deferred on this exact gap |
+| `stg.massey_teams` | hand-maintained id column |
+| `stg.pff_franchise` *(landed 2026-09-09)* | hand-maintained `cfbd_team_id`, 266 of 363 rows mapped; the rest are all-star and non-FBS entries that `kind` filters |
+
+Two hand-maintained mappings of the same relationship, and a third pair blocked for want of it,
+is the argument for building `core.dim_team` rather than deferring again. It stays out of this
+plan's scope (§12) — but the next plan that touches team identity should build it once, and
+these three should collapse onto it.
+
 **`calendar`'s key needs all three columns.** `(season, week)` is not unique on either side —
 424 rows to 387 distinct on the GraphQL side, 258 to 231 on REST — because `seasonType` splits
 regular from postseason. With `seasonType` both sides are fully unique. The GraphQL table has no
@@ -296,10 +359,17 @@ fix would have made canonical.
 
 **Step 5 cannot be incremental.** `tests/test_catalog_resolution.py` asserts that *every*
 non-docstring `<schema>.<table>` literal under `cfb_system_maker/`, `models/`, `research/` and
-`scripts/` resolves against the live catalog. So the rename, all ~50 `stg_gql.*` literals, and
-the test's own `ALLOW` entry for `("stg_gql", "game_lines__backfill")` move together in a single
-commit, or the suite goes red between them. R8 is a constraint on how step 5 lands, not only a
-safety net under it.
+`scripts/` resolves against the live catalog. So the rename, all 50 `stg_gql.*` literals
+(re-counted 2026-09-09), and the test's own `ALLOW` entry for
+`("stg_gql", "game_lines__backfill")` move together in a single commit, or the suite goes red
+between them. R8 is a constraint on how step 5 lands, not only a safety net under it.
+
+PFF widened the blast radius without adding to the rewrite: its 59 `pff_*` literals across
+`duckdb_load.py`, `pff_schema.py`, `audit_pff_pull.py`, `check_pff_pin.py` and
+`gen_pff_endpoint_reference.py` are scanned by the same test, but they name `stg.pff_*` and the
+collapse does not rename them. They break only if step 5 is done carelessly — a blanket
+`stg_gql` → `stg` sweep that also rewrites unrelated `stg.` literals. Re-count both before
+step 5; the `stg_gql` figure has grown once already.
 
 **Two steps from the 2026-09-08 draft are gone.** "Stop materializing all-NULL scaffolding
 columns" removed zero columns and "rebuild `stg` so the pruning applies everywhere" had nothing
@@ -401,7 +471,10 @@ corrected.
 `scripts/verify_warehouse_plan.py` as its reproducible half.
 
 **Untouched and still authoritative in its own right:** `docs/duckdb-warehouse-plan.md` —
-`cfb_system_maker/CLAUDE.md` points at its MotherDuck promote runbook.
+`cfb_system_maker/CLAUDE.md` points at its MotherDuck promote runbook. And, since 2026-09-09,
+`docs/pff-ingest-plan.md` with `docs/pff-warehouse-schema.md`: a live status board for a source
+that shares `stg` with this plan. §1b is the whole of the overlap; neither document absorbs the
+other.
 
 ## 12. Out of scope
 
@@ -415,6 +488,11 @@ corrected.
   API contract. They stay camelCase everywhere and are not table names; do not sweep them into
   any rename.
 - Re-scraping is user-run and never automatic.
+- **PFF ingest**, in every form — the pull, the flattener, the loader entries, the backfill, and
+  `jersey_number`. `docs/pff-ingest-plan.md` owns all of it. §1b records where PFF touches this
+  plan and nothing more; a PFF step never belongs in §8.
+- **`core.dim_team`**, despite §6 making the case for it. Three consumers want it, none of them
+  is this plan's job.
 
 ## 13. Global constraints
 

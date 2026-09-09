@@ -62,10 +62,19 @@ DEAD_CLAIMED = [
 # for a non-problem, which is how section 5 rotted in the first place.
 ALL_NULL_REPORTED = 11
 
-# The only all-NULL columns allowed off the drop list are unplayed games' scores. This is the
-# shape check that replaces counting them.
+# Two kinds of all-NULL column are allowed off the drop list. Shape checks, not counts: how
+# many there are moves with the data, but what they are does not.
+#
+# Unplayed games have no score yet.
 FUTURE_DATED = re.compile(r"^lines_.*$")
 FUTURE_DATED_COLUMN = re.compile(r"^(home|away)Score$")
+
+# A writer that emits a column but never fills it. All-NULL here means "the flattener writes
+# `""`", not "the data is dead" -- dropping one loses to the next flatten, so it is the writer's
+# bug and belongs to the owning plan. See section 1b and section 5.
+STUB_COLUMNS = {
+    ("stg", "pff_player_season", "jersey_number"): "pff_flatten.py:222 writes '' -- PFF S3/S8",
+}
 
 # Loader scaffolding, bound from the dump filename. Section 5 claims 308 all-NULL copies
 # of these survive into `stg`; R3 asks for them to stop being materialized there.
@@ -235,8 +244,11 @@ def check_dead_columns(con) -> list[str]:
     future = [
         k for k in unlisted if FUTURE_DATED.match(k[1]) and FUTURE_DATED_COLUMN.match(k[2])
     ]
-    other = [k for k in unlisted if k not in future]
+    stubs = [k for k in unlisted if k in STUB_COLUMNS]
+    other = [k for k in unlisted if k not in future and k not in stubs]
     print(f"  future-dated scores, kept on purpose: {len(future)}")
+    for key in stubs:
+        print(f"  writer stub, exempt: {key[0]}.{key[1]}.{key[2]}  ({STUB_COLUMNS[key]})")
     if other:
         fails.append(f"all-NULL but neither on the drop list nor a future-dated score: {other}")
         print("  all-NULL but on neither list -- triage these:")
