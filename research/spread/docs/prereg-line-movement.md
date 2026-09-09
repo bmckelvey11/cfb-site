@@ -153,7 +153,7 @@ amendment exists because of something seen in an earlier result.**
 | A2 | Ran E8–E13 and a wider ridge grid on the same target | The registered set was a subset of the library | No — the user's instruction of 2026-09-02, before A ran |
 | A3 | Dropped the top decile of market-proxying models before fitting | The 2026-09-08 audit's blocker finding | No — a defect correction, and it *lowered* every estimate |
 | B1 | Replaced B4's 300-game read with an MDE gate | The audit showed 300 games cannot decide B4 | No — a power calculation, no outcome seen |
-| A4 (queued) | Finer ridge grid | **E6 chose λ = 10⁴, the grid edge, in 19 of 20 seasons** | **Yes** |
+| A4 (below) | Finer ridge grid, run on the walk-forward (A6) panel | **E6 chose λ = 10⁴, the grid edge, in 19 of 20 seasons — on both A3's full-sample screen and A6's walk-forward screen** | **Yes** |
 | A5 (queued) | Whether E4's disagreement with PT's `line` predicts the residual move | PT's `line` measured 0.69 off the close | Partly — the measurement prompted it, no slope was seen |
 | A6 (below) | Walk-forward decontamination screen | A3's screen was fit on the full sample | No — a defect correction |
 | B2 (queued) | Slope decay across weekday captures | Registered as part of the version B design | No |
@@ -211,3 +211,83 @@ what makes that true.
 **MDE from the cluster SE.** The MDE and any `n_for_mde` figure are computed from the
 season-week cluster SE. While the HC1 fallback is active the grader emits them marked
 `se_kind: "hc1"` and informational; they may not be quoted as the n a clustered design needs.
+
+## Amendment A5 — the move remaining after PT's last capture (committed 2026-09-08, before the run)
+
+**Motivated by the PT-line-vs-AN-close measurement**, not by any A5 result: on the 1,219 matched
+2024–25 games, PT's `line` sits a mean 0.69 points from the Action Network consensus close,
+exact on 31%. That gap is a residual move — `AN_close − PT_line` — that happens after PT's last
+capture. The question A5 answers: does the panel's disagreement with PT's `line` predict that
+residual, i.e. does the panel carry information the market had not yet priced when PT last
+looked? This is the only archive evidence that could distinguish "the panel leads the market"
+from "the panel reports the line after it moved" — the distinction the 2026-09-08 audit found
+unsupported.
+
+**The run.** On the matched 2024–25 games from `check_pt_line_is_close.py`, regress
+`y = AN_close − PT_line` on `x = E4 − PT_line`, both in PT sign, using the **walk-forward**
+decontaminated predictions (amendment A6, `pt_movement_preds_decon_wf.csv`) — not the
+full-sample `_decon` file, whose screen saw its own test set. E6 and E14 reported beside E4, no
+selection among them. Clustered by season-week via `cluster_ols`
+(`research/spread/scripts/eval_version_b.py`).
+
+**Conditional CI, stated now.** E4's (and E6's, E14's) prediction is itself a fitted quantity
+from a first-stage model; `cluster_ols`'s cluster-robust SE does not propagate that first
+stage's uncertainty. Every A5 interval carries `conditional_on_fitted_predictor: true` in the
+script's output and must be read as conditional on the fitted predictor, not as an unconditional
+inference.
+
+**Expectation, recorded before the run.** n ≈ 1,100 (games with a walk-forward E4 prediction
+inside the matched 2024–25 set). Slope between 0.0 and 0.10, CI including 0 — the panel's edge
+is expected to live in the earlier part of the move, largely absorbed by the market before PT's
+last capture. A slope ≥ 0.2 with a CI excluding 0 would be the first archive evidence of
+information the market had not priced by PT's last look, and would raise the prior on version B.
+
+**Exploratory, not confirmatory.** A5 is not the tree's one confirmatory hypothesis — the
+version B E4 slope at the Monday anchor. A positive A5 result does not by itself license "the
+panel leads the market" as a settled claim; it would be one piece of evidence, on an archive
+whose "close" is itself a proxy (PT's `line`, matched to AN's consensus close, not a verified
+true close — see amendment A5's own gap measurement above).
+
+## Amendment A4 — finer ridge grid on the walk-forward panel (committed 2026-09-08, before the run)
+
+**Names A3's queued A4 and moves its baseline to A6.** A3's original text compared a finer ridge
+grid against the full-sample decontaminated panel. Amendment A6 replaced that screen with a
+walk-forward one before this ran, and the plan of record (§4, decision 4) requires A4 to run on
+whichever panel is current — the full-sample one bakes A3's leak into a serving decision. So A4
+runs against `--decontaminate-wf`, and its baseline is A6's numbers, not A3's.
+
+**What is already on the record, from A6 (`pt_movement_decon_wf.json`, coarse default grid
+`[0.1, 1, 10, 100, 1000, 10⁴]`):** R²(E4, A6) = **0.1537**; R²(E6, A6) = **0.2009**, chosen
+λ = 10⁴ (the grid edge) in 19 of 20 walk-forward evaluation seasons. The grid-edge problem A3
+flagged is not an artifact of the full-sample screen — it reproduces on the walk-forward one.
+
+**The run.** `FINE_LAMBDA = [1000, 2000, 5000, 1e4, 2e4, 5e4]` — extending past 10⁴ in both
+directions around the edge that A3 and A6 both hit — E6 only, same support, inference and 1-SE
+rule, run once with `--decontaminate-wf --fine-ridge`. Output `pt_movement_decon_wf_a4.json`.
+Report the chosen-λ distribution across the 20 walk-forward seasons and whether the grid edge
+(now 5×10⁴, the top of `FINE_LAMBDA`) is still hit.
+
+**A4 is exploratory and its output is an engineering decision, not an inferential claim**, per
+the amendment ledger above: it chooses which λ `weekly_slate.py` serves for E6. Report R² without
+a p-value; it licenses no claim that the ridge works. It does **not** touch which predictor is
+graded — that stays E4 by decision 2 of the plan of record, regardless of how E6 scores here.
+
+**Decision rule, fixed now, before the fine-grid numbers exist:**
+
+> If R²(E6, A4) − R²(E4, A6) ≤ 0.02, ridge is E4 with more parameters bought for less than 0.02
+> R² and is **retired** from `weekly_slate.py`: removed from `PARAMS` and `MODEL_COLS`, the
+> docstring's column list updated, and `pred_close` (the median of the served model columns)
+> stops including it. If R²(E6, A4) − R²(E4, A6) > 0.02, E6 is **kept**, served at the modal A4
+> λ (the most common chosen value across the 20 walk-forward seasons), and the `PARAMS` comment
+> cites `pt_movement_decon_wf_a4.json`. Either way the model set is versioned
+> (`model_set_version`) in the forward log and in `version_b.json`, and every existing
+> `movement_forward_log.csv` row is recomputed under the new definition before any read quotes
+> `pred_close` — a predictor that changes mid-forward-test silently redefines the graded
+> quantity, and E4 stays the graded predictor in either branch.
+
+**Expectation, recorded before the run.** Given R²(E6, A6) already clears R²(E4, A6) by 0.047 on
+the coarse grid, the fine grid is expected to land in the same regime (R² difference > 0.02) and
+the keep branch is expected to fire; the fine grid's purpose is to see whether the 1-SE choice
+moves off the coarse grid's edge value (10⁴) now that finer steps exist nearby, and whether R²
+changes materially — not to re-litigate whether E6 clears E4, which A6 already shows on the
+coarse grid.
