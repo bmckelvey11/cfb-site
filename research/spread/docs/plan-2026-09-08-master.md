@@ -57,8 +57,20 @@ Under the honest screen E6 retains 81.1%, and its absolute R² (0.201) is **high
 is narrower than stated and E6 scores better. **The graded predictor stays E4 anyway** — see
 decision 2.
 
-**What the archive's "close" actually is.** PT's `line` is a late line, not the close: on 1,219
-matched 2024–25 games, mean |Δ| **0.69**, exact on 31%, within 0.5 on 67%.
+**What the archive's "close" actually is.** PT's `line` is a late line, not the close: on **1,440**
+matched 2024–25 games, mean |Δ| **0.69**, exact on 31.7%, within 0.5 on 66.9%. (An earlier
+reading of this document said 1,219 — the same measurement on a smaller Action Network table.
+The matching logic is unchanged and the merge loses no rows; the table grew.)
+
+**A5 — is any of that residual move predictable?** No. Regressing `AN_close − PT_line` on each
+predictor's deviation from PT's `line`, walk-forward predictions, season-week clusters, CIs
+conditional on the fitted predictor: E4 **−0.033** [−0.059, −0.007], E6 −0.022 [−0.049, +0.006],
+E14 −0.027 [−0.051, −0.003], n = 1,440 over 31 clusters. The pre-registered expectation was
+0.0–0.10 with a CI including zero, and ≥ 0.2 excluding zero would have been evidence of unpriced
+information; the result misses on sign and is an order of magnitude short. A one-SD disagreement
+(sd ≈ 1.79) predicts a −0.06 shift against a mean residual move of 0.69. This was the only
+evidence the archive could produce that the panel *leads* rather than *reports* — it does not
+produce it, and it is too small to be read as a substantive negative either.
 
 **Version B, live.** `data/processed/version_b.json`, 8 snapshots / 350 forward-log rows:
 
@@ -105,8 +117,10 @@ decide, and amendment B1's MDE gate, which made the stopping time depend on the 
    are recomputed before a read quotes `pred_close`.
 4. **A4's output is an engineering decision, not an inferential claim.** It chooses which λ
    `weekly_slate.py` serves. It does not license "the ridge works", carries no p-value, and is
-   labelled exploratory. E6 keeps running at λ = 10⁴ — a known grid edge — until A4 decides,
-   rather than being pulled on a hunch before the registered run.
+   labelled exploratory. **A4 has run:** its pre-registered rule (retire E6 if it clears E4 by
+   ≤ 0.02) did not fire — 0.2002 against 0.1537 — so E6 is kept, now served at **λ = 5e4**, with
+   the model set versioned to 2 and all 350 forward-log rows recomputed. See risk 3: the grid
+   edge did not resolve, it moved.
 5. **The `3.2` win-rate-per-point constant is kept for line shopping, and stays retired for the
    movement CLV claim** (settled by the user, 2026-09-08). It was estimated on the line-shopping
    sample itself, so it is the in-sample conversion for that sample; the audit's §1.5 objection
@@ -121,8 +135,9 @@ decide, and amendment B1's MDE gate, which made the stopping time depend on the 
 ## 5. What must change before the affected work runs
 
 The audit's own findings were resolved on 2026-09-08 (decontamination run, scheduled task fixed,
-grader written, PT-line check measured, estimator tests added, docs de-duplicated). These are the
-items a later adversarial review added, and none has landed yet.
+grader written, PT-line check measured, estimator tests added, docs de-duplicated). The items
+below were added by a later adversarial review. **All of them landed on 2026-09-08** across waves
+0–2 of `build-brief-2026-09-08.md`; they are kept here as the record of what the review required.
 
 **Pre-registration** (`prereg-line-movement.md` — appended to, never rewritten):
 
@@ -172,9 +187,17 @@ fix being *claimed* and *verified*).
    queued. Each is honestly pre-registered before its own run — the right pattern — but the count
    is itself the forking-paths risk the pre-registration existed to prevent. Decision 1 is the
    control; the ledger is the record.
-2. **A3's screen saw its own test set** (§2). Amendment A6 is the fix, and until it lands every
-   citation of the decontaminated numbers says "conditional on a full-sample screen".
-3. **A4 is post-hoc grid selection** — the data chose the grid. Bounded by decision 4.
+2. **A3's screen saw its own test set** — **closed 2026-09-08.** Amendment A6 rebuilt the screen
+   walk-forward; A6 is now the citable screen and A3 is retained as run. It also reversed a
+   framing this plan carried: E6 retains 81.1%, not 66%, and outscores E4 (see §2).
+3. **A4 is post-hoc grid selection** — the data chose the grid. Bounded by decision 4, and the
+   rule was applied as written rather than overridden after the fact. **But A4 did not resolve
+   what it was run to resolve.** λ = 5e4 was chosen in 19 of 19 seasons that produced a choice,
+   and 5e4 is the *new* grid's top edge — the old edge was 1e4, so widening moved the edge
+   instead of finding an interior optimum. A ridge whose shrinkage parameter runs to whatever
+   bound it is given is not well identified, and E6 is now served at such a bound. The honest
+   next step is a fresh pre-registration — a wider or unbounded grid, or a different estimator —
+   not another quiet widening, and not an override of a rule that was fixed before the run.
 4. **A5 treats a walk-forward prediction as a fixed regressor**; its CI is conditional on the
    fitted predictor and must be labelled so.
 5. **The collector fix is claimed, not verified.** The Task Scheduler conditions live in the UI,
