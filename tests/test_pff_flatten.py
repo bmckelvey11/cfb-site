@@ -165,3 +165,18 @@ def test_every_franchise_maps_to_a_distinct_cfbd_team():
     assert not unmapped, f"unmapped franchises: {unmapped}"
     ids = [r["cfbd_team_id"] for r in rows]
     assert len(set(ids)) == len(ids), "two PFF franchises claim one CFBD team"
+
+
+@pytest.mark.skipif(not (OUT_DIR / "pff_player_season.csv").exists(),
+                    reason="run scripts/pff_flatten.py first")
+def test_jersey_number_survives_the_player_spine():
+    """Only the JSON-only leaderboards carry it, so it is always a later-pass backfill.
+
+    A player's first sighting is usually a CSV leaderboard with no jersey at all. If the
+    fill ever moves back to `people.setdefault`, this column silently returns to 100% NULL
+    -- which is the state it spent its whole life in before 2026-09-09.
+    """
+    with (OUT_DIR / "pff_player_season.csv").open(encoding="utf-8") as fh:
+        jerseys = [r["jersey_number"] for r in csv.DictReader(fh)]
+    assert any(jerseys), "jersey_number is all-empty again -- the backfill stopped firing"
+    assert any(j.startswith("0") for j in jerseys if j), "zero padding was lost to a numeric cast"
