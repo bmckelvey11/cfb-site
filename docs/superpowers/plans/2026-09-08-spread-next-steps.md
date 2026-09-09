@@ -1050,10 +1050,23 @@ The estimator core the whole tree rests on is thinly covered. Add to
 - [x] In `eval_prediction_tracker_models.py` and `eval_combination_sweep.py`, change the first docstring line to: `"""Estimator core for the spread tree (imported by the live scripts). main() reproduces the archived margin-era tables: archive/spread-margin-era/."""` keeping the rest.
 - [x] Commit: `git commit -am "docs(spread): mark the core modules' main() as margin-era"`.
 
-### Task 13: Clear the margin-era outputs from the data dir (user's call; not committed data)
+### Task 13: Clear the margin-era outputs from the data dir — **done 2026-09-09** (30 files, 2.37 MB deleted; the orphan kept)
 
-- [ ] List first: `ls data/processed/pt_leaderboard_* pt_ensemble_* pt_e4_weights_* pt_sweep_* pt_recency_* pt_neff_* pt_ats_tail_* pt_model_eval.json pt_combination_sweep*.json pt_recency_screen.json pt_model_season_stability.csv weekly_slate_2026w2.csv`.
-- [ ] Delete only after the user confirms; they are regenerable from the archived scripts at commit `d212537` except `pt_model_season_stability.csv`, which has no script.
+- [x] List first: `ls data/processed/pt_leaderboard_* pt_ensemble_* pt_e4_weights_* pt_sweep_* pt_recency_* pt_neff_* pt_ats_tail_* pt_model_eval.json pt_combination_sweep*.json pt_recency_screen.json pt_model_season_stability.csv weekly_slate_2026w2.csv`.
+- [x] Delete only after the user confirms; they are regenerable from the archived scripts at commit `d212537` except `pt_model_season_stability.csv`, which has no script.
+
+**Outcome.** 30 of the 31 files deleted (2.37 MB). The plan's claim that they need the archived
+scripts at `d212537` was understated: 29 regenerate today by running
+`eval_prediction_tracker_models.py` / `eval_combination_sweep.py`, whose `main()` reproduces the
+margin-era tables, and nothing in the live forward path reads any of them.
+`weekly_slate_2026w2.csv` was superseded — all 41 of its games are in the forward log, stamped
+slates cover the period, and its columns are an older schema.
+
+**`pt_model_season_stability.csv` was kept** (5.9 KB). No script in the repo or the archive
+writes it — only `archive/spread-margin-era/prediction-tracker-model-eval.md` describes it (69
+models) — so deletion would be permanent, and `data/` is gitignored so git holds no copy. The
+audit flagged it as an orphan, not as garbage; 5.9 KB is not worth destroying an irreplaceable
+table. If it is ever deliberately discarded, that is a separate decision.
 
 ### Task 14: Reconcile the two spread CLV figures outside this tree — **done 2026-09-08**
 
