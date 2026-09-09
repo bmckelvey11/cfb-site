@@ -93,13 +93,17 @@ CREATE TABLE stg.pff_passing (
 
 -- `team-rushing-direction` is pulled twice per team for one distinct body -- but the body
 -- already holds *both* views: `rows` is player-grain and `teamTotals` is franchise-grain,
--- same 19-value direction vocabulary. Nothing is lost by dropping the second call, and the
+-- same 20-value direction vocabulary. Nothing is lost by dropping the second call, and the
 -- two payloads become two tables from one file (ingest plan S7).
 --
--- The direction vocabulary is 19 values, not the 8 gaps §3 lists: the gaps (LE..RE, ML,
+-- The direction vocabulary is 20 values, not the 8 gaps §3 lists: the gaps (LE..RE, ML,
 -- MR), plus end-around and jet-sweep by side (EA-L/R, JS-L/R), scrambles and designed QB
--- runs (QBK, QBSc, QBSn, QBT, QBF), and R-L/R-R. Enumerated rather than free text so a new
--- value fails loudly instead of silently widening the split.
+-- runs (QBK, QBSc, QBSn, QBT, QBF), R-L/R-R, and NV. Enumerated rather than free text so a
+-- new value fails loudly instead of silently widening the split -- which is how NV was
+-- found: PFF's unclassified-gap label, absent from 2025 and first seen in 2026 wk1 (26
+-- rows, 30 attempts, spread across franchises). It is declared rather than dropped in the
+-- flattener because those attempts are inside the player's own `total_attempts`, so
+-- discarding the rows would stop the split summing to the total the same file reports.
 CREATE TABLE stg.pff_rushing_direction (
     season       INTEGER NOT NULL,
     week         INTEGER NOT NULL,
@@ -108,7 +112,7 @@ CREATE TABLE stg.pff_rushing_direction (
     direction    VARCHAR NOT NULL CHECK (direction IN (
                      'LE', 'LT', 'LG', 'ML', 'MR', 'RG', 'RT', 'RE',
                      'EA-L', 'EA-R', 'JS-L', 'JS-R', 'R-L', 'R-R',
-                     'QBK', 'QBSc', 'QBSn', 'QBT', 'QBF')),
+                     'QBK', 'QBSc', 'QBSn', 'QBT', 'QBF', 'NV')),
     attempts INTEGER, yards INTEGER, touchdowns INTEGER, first_downs INTEGER,
     explosive INTEGER, avoided_tackles INTEGER, fumbles INTEGER, longest INTEGER,
     yards_after_contact INTEGER,

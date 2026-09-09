@@ -370,3 +370,28 @@ Also repaired a self-inflicted one: an earlier patch wrote literal backspace byt
 strip silently stopped firing, and `bryant-university-bulldogs` fell through to the
 override list rather than matching by rule. Found by testing `norm` directly instead of
 trusting the match count, which had stayed plausible at 264/265.
+
+### 2026-09-09 — NV, the twentieth direction
+
+`--validate` failed one table: `pff_rushing_direction`, on the CHECK. The offending label
+is `NV`, which the sample schema's enumerated vocabulary did not declare. That is the
+constraint doing its job — the comment above it says a new value should fail loudly rather
+than silently widen the split, and it did.
+
+`NV` is PFF's own label and it is real. It appears in no 2025 file; it enters with the 2026
+pull, 26 rows and 30 attempts, spread across many franchises and mostly one or two attempts
+each. It is kept rather than dropped because the rows carry charted production that is
+already counted one level up: on all 26 players `sum(directions[].attempts)` equals the
+record's `total_attempts` exactly. Dropping them would leave the per-direction split not
+summing to the total the same file reports — a defect no constraint downstream would catch.
+So the CHECK list is now 20 values, and consumers that read `direction` as a gap have to
+treat `NV` as unclassified rather than as a gap.
+
+Two notes on blast radius. `stg.pff_team_rushing_direction` declares `direction` without a
+CHECK, so it never failed and needs no mirror; it also has no CSV yet, since the
+`team-rushing-direction` pull is still S7. And `pff-warehouse-schema.md` §3 lists the
+vocabulary as the 8 gaps, which the 2026-09-08 entry above already records as wrong — left
+as-is rather than half-corrected, since the correction lives here.
+
+Unrelated to the `jersey_number` backfill fix of the same day (0ff057a); this one predates
+it and touches only the declared vocabulary.
