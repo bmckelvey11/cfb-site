@@ -109,3 +109,32 @@ A flatten that gates further pulls on `requests_remaining` has to handle that.
 No-lookahead: these are pre-game snapshots and safe. Any future historical pull
 must keep the snapshot timestamp on the row — a snapshot taken after kickoff is
 result-contaminated.
+
+## Pinnacle via oddspapi.io — a second vendor, observation only
+
+the-odds-api's NCAAF feed has no Pinnacle. **oddspapi.io** does, on its free plan, and
+`scripts/pull_oddspapi.py` pulls it into `data/ingest/oddspapi/` (a different directory from
+`oddsapi/`; the names are one letter apart, so check which one you are in).
+
+- **Auth** is `apiKey` as a query parameter, read from `ODDSPAPI_API` in `.env`. The API sits
+  behind Cloudflare, which 403s urllib's default User-Agent (error 1010); the puller sends its own.
+- **One request per pull** via `/v4/odds-by-tournaments?tournamentIds=27653&bookmakers=pinnacle`.
+  27653 is "NCAA, Regular Season" under sportId 14. The per-fixture `/v4/odds` endpoint costs one
+  request *per game*, so never use it for the slate. `/v4/account` echoes the API key back in its
+  response body; do not print it.
+- **Budget:** free plan is 250 requests/month. Task **`CFB-Pinnacle-Snapshot`** runs
+  `scripts/pull_oddspapi.cmd` daily at 08:00, ~30/month. Log: `data/logs/oddspapi_pull.log`.
+- **Spread parsing.** Pinnacle's `bookmakerMarketId` is `line/<...>/<period>/spreads`; only
+  period 0 is the full game. Periods 1+ are halves and quarters and `altLine/...` are alternate
+  numbers, all also flagged `mainLine` within their own market — a period-blind parse returns the
+  first-half line at roughly half the number. `bookmakerOutcomeId` is `<home spread>/home` in
+  betting sign. `participant1` is the home team (46/46 joined that way on 2026-09-09, 0 swapped).
+- **Read by the slate as observation columns** `Pinnacle_home`, `Pinnacle_odds`, `pin_limit`,
+  `pin_vs_fair`. Pinnacle does **not** vote in `book_fair`; that would be an amendment to
+  `research/spread/docs/prereg-line-shopping.md`, not a side effect of having the feed.
+
+```powershell
+schtasks /Query /TN "CFB-Pinnacle-Snapshot" /FO LIST /V | Select-String "Last Run Time|Last Result|Next Run Time"
+Start-ScheduledTask -TaskName CFB-Pinnacle-Snapshot          # fire once by hand
+Disable-ScheduledTask -TaskName CFB-Pinnacle-Snapshot
+```
