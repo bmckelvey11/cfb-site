@@ -61,22 +61,27 @@ import collect_line_timing as clt  # noqa: E402
 
 BENCH = "lineopen"
 # Modal hyperparameter choice across the 20 walk-forward seasons of the movement runs:
-# `chosen_params` in {CFB_DATA_ROOT}/processed/pt_movement.json (version A, E6) and
-# pt_movement_a2.json (the rest), except E6 -- amendment A4
-# ({CFB_DATA_ROOT}/processed/pt_movement_decon_wf_a4.json) reran E6 on the walk-forward
-# decontaminated panel (A6) with a finer grid, FINE_LAMBDA = [1e3, 2e3, 5e3, 1e4, 2e4, 5e4].
-# R2(E6, A4) 0.2002 vs R2(E4, A6) 0.1537, a 0.046 gap that clears A4's pre-registered 0.02
-# keep/retire threshold, so E6 stays served, now at its A4 modal lambda 5e4 (chosen in 19 of 19
-# seasons that produced a choice). The grid-edge problem did not resolve at finer resolution --
-# it moved from 1e4 (the old grid's top) to 5e4 (this grid's top) -- so E6 is still an edge hit;
-# A4 is an engineering decision about which lambda to serve, not a claim the ridge is well
-# identified. This does not change which predictor version B grades: that stays E4 (plan of
-# record, decision 2), regardless of E6's score here. E13 (Hedge) is omitted: weakest method
-# and it needs sequential state that a one-shot live fit lacks.
-PARAMS = {"E6": 50000.0, "E7": "all", "E8": 0.3, "E9": 1, "E10": 1.0, "E11": 0.4,
+# `chosen_params` in {CFB_DATA_ROOT}/processed/pt_movement.json (version A) and
+# pt_movement_a2.json (the rest).
+#
+# Amendment A7 (2026-09-09) retired E6 from the served slate. Given a grid wide enough for the
+# 1-SE rule to express itself (to 1e9), the rule modally picks lambda ~3e6 and E6 scores 0.0655
+# -- below E4's 0.1537 on the same support. Its previously reported 0.2009 depended on the grid
+# stopping near the R^2 peak; the estimator's own selection rule does not find that peak. A7's
+# pre-registered "flat" branch (the curve sits within 1 SE across a median 3.0 decades of lambda)
+# therefore fired: E6 leaves the slate rather than being served at a value the rule would not
+# have chosen. E13 (Hedge) is omitted: weakest method and it needs sequential state that a
+# one-shot live fit lacks.
+PARAMS = {"E6": 3e6, "E7": "all", "E8": 0.3, "E9": 1, "E10": 1.0, "E11": 0.4,
           "E12": (10.0, 0.1), "E14": 1}
-MODEL_COLS = ["E4", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E14"]
-MODEL_SET_VERSION = 2   # 2026-09-08: E6 re-parameterized to A4's modal lambda (5e4, was 1e4)
+MODEL_COLS = ["E4", "E7", "E8", "E9", "E10", "E11", "E12", "E14"]   # feeds pred_close
+# E6 is still COMPUTED and REPORTED -- prereg B1 requires it beside E4 in every version B read,
+# and A7 retired it from serving, not from existence. It is out of MODEL_COLS so it no longer
+# enters pred_close, and it is fitted at A7's modal 1-SE lambda (3e6), which is what the
+# registered estimator actually chooses once the grid is wide enough to let the rule express
+# itself -- not A4's 5e4, which A7 showed the rule would never have picked.
+REPORTED_COLS = MODEL_COLS + ["E6"]
+MODEL_SET_VERSION = 3   # 2026-09-09: E6 retired from the slate (amendment A7, flat branch)
 
 # Action Network book ids, names from AN's own /web/v1/books (2026-09-08). Until then this map
 # said Pinnacle/FanDuel/BetMGM/Caesars/Bet365 -- every label was wrong; the ids were right.
@@ -249,7 +254,7 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
     t = pd.DataFrame({"road": live_raw["road"], "home": live_raw["home"],
                       "open_pt": live_raw[BENCH].astype(float), "line_pt": live_raw["line"].astype(float),
                       "open_suspect": live_raw["open_suspect"], "consensus": np.round(consensus, 1)})
-    for m in MODEL_COLS:
+    for m in REPORTED_COLS:
         t[m] = np.round(preds[m], 1)
     t["pred_close"] = t[MODEL_COLS].median(axis=1).round(1)
     t["move_vs_line"] = (t.pred_close - t.line_pt).round(1)
@@ -344,7 +349,7 @@ def report(t: pd.DataFrame, with_books: bool) -> None:
     pd.set_option("display.max_columns", 40)
     sort_col = "move_vs_fair" if with_books and "move_vs_fair" in t else "move_vs_line"
     view = ["road", "home", "open_pt", "line_pt"] + (["book_fair"] if with_books else []) + \
-           ["consensus"] + MODEL_COLS + ["pred_close", sort_col]
+           ["consensus"] + REPORTED_COLS + ["pred_close", sort_col]
     print(f"\n=== LINE: predicted close by model (PT sign, + = home favored), sorted by |{sort_col}| ===")
     print(t.sort_values(sort_col, key=lambda s: s.abs(), ascending=False)[view].to_string(index=False))
     if with_books and "home_gain" in t:
@@ -400,10 +405,10 @@ def recompute_forward_log() -> int:
         live = live.reset_index(drop=True)
         preds, *_ = fit_movement_models(hist, models, live)
         new = pd.DataFrame({"road": live_raw["road"], "home": live_raw["home"]})
-        for m in MODEL_COLS:
+        for m in REPORTED_COLS:
             new[m] = np.round(preds[m], 1)
         new["pred_close"] = new[MODEL_COLS].median(axis=1).round(1)
-        grp = grp.drop(columns=[c for c in MODEL_COLS + ["pred_close"] if c in grp]) \
+        grp = grp.drop(columns=[c for c in REPORTED_COLS + ["pred_close"] if c in grp]) \
                  .merge(new, on=["road", "home"], how="left")
         grp["move_vs_line"] = (grp.pred_close - grp.line_pt).round(1)
         if "book_fair" in grp:
