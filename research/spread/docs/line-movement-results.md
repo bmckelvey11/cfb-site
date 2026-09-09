@@ -123,9 +123,24 @@ Two of five wrong, both in the direction of *more* predictability than expected.
 ## What this does and does not establish
 
 Establishes: the 154-model panel carries **real, stable, estimable information about where the
-closing line will be**, worth 1.3–3.9 points of CLV at the opener, and the ATS record at the
-opener confirms the CLV is cashable. The forecast-combination library the sweep exhausted
-against the wrong target works against the right one, ridge included.
+closing line will be**, worth 1.3–3.9 points of CLV at the opener. The forecast-combination
+library the sweep exhausted against the wrong target works against the right one.
+
+**Corrected 2026-09-09 — the ATS record does NOT confirm the CLV is cashable.** This section
+previously said it did. It does not, for the graded predictor: E4 at |pred| ≥ 1 goes **52.0%
+[49.3, 54.6] against a −110 break-even of 52.38%**, i.e. the point estimate is on the losing
+side, ROI −0.72%, p vs break-even 0.79. The decay curve is worse — negative ROI at *every* entry
+price, −9.9% at a quarter of the way into the move and −4.0% at the close itself. Only two rows
+in the whole opener-CLV table clear break-even with an interval excluding it: **E6 at |pred| ≥ 2**,
+which amendment A7 retired as an artifact of the ridge grid, and **E14 at |pred| ≥ 2 on 35 bets**,
+whose 95% interval runs to 110.7% and is therefore not an interval. The original claim rested on
+those two cells.
+
+This does not contradict the CLV. Beating the closing *number* and beating the closing *bet* come
+apart when a point buys less win probability than assumed, and these bets sit disproportionately
+on large spreads — the same reason the 2026-09-08 audit retired the 3.2 points-to-win-rate
+constant for movement bets. Predicting where the line goes is not the same as beating it, and
+this tree has only ever established the former.
 
 Does not establish: that any of it is reachable. The archive has no publication timestamps.
 Week 1 of 2026 showed the remaining move on Monday was zero for early-season games whose openers
