@@ -272,6 +272,108 @@ def flatten(seasons: set[int] | None) -> tuple[dict[str, list[dict]], dict[str, 
     return rows, metrics, dropped, names, people
 
 
+# ---------------------------------------------------------------- CFBD team map (S4)
+
+CFBD_RAW = DATA_ROOT / "raw"
+
+# PFF slug -> CFBD school, for the cases no normalization rule reaches. Kept small on
+# purpose: a rule that fixes a class of names beats an entry that fixes one.
+OVERRIDES = {
+    "albany-great-danes": "UAlbany",
+    "liu-sharks": "LIU Post",
+    "mississippi-rebels": "Ole Miss",
+    "southeastern-louisiana-lions": "SE Louisiana",
+    "usf-bulls": "South Florida",
+    # CFBD files the Florida school as plain `Miami`, so both Miamis normalize to `miami`
+    # and the ambiguity rule correctly refuses to guess.
+    "miami-fl-hurricanes": "Miami",
+    "louisiana-monroe-warhawks": "UL Monroe",
+    # PFF carries a longer mascot than CFBD does, so the mascot strip cannot reach the
+    # school: `Fightin' Blue Hens` vs `Blue Hens`, `Golden Panthers` vs `Panthers`.
+    "delaware-fightin-blue-hens": "Delaware",
+    "florida-international-golden-panthers": "Florida International",
+    "mcneese-state-cowboys": "McNeese",   # CFBD dropped the `State` in 2024
+    "ut-rio-grand-valley-vaqueros": "UT Rio Grande Valley",   # PFF spells it "Grand"
+}
+
+
+def norm(name: str) -> str:
+    """Normalize a school name for matching.
+
+    `&` is dropped rather than expanded, because PFF's slug drops it too: `East Texas A&M`
+    and `east-texas-am` both reduce to `east texas am`. `St` expands to `State` only when
+    it is not the first token -- leading `St` is Saint, as in `st-thomas-tommies`. A
+    trailing disambiguator in parentheses (`St. Thomas (MN)`) is cut.
+    """
+    name = re.sub(r"\s*\([^)]*\)\s*$", " ", name.lower().replace("&", "").replace("'", ""))
+    name = re.sub(r"\b(university|univ|college of|the)\b", " ", name)
+    tokens = re.sub(r"[^a-z0-9]+", " ", name).split()
+    return " ".join("state" if t == "st" and i else t for i, t in enumerate(tokens))
+
+
+def cfbd_index() -> tuple[dict[str, int], dict[str, set[int]], dict[int, str], set[str]]:
+    """(school+mascot -> id, school or alternate name -> ids, id -> school, mascots)."""
+    full: dict[str, int] = {}
+    school: dict[str, set[int]] = collections.defaultdict(set)
+    names: dict[int, str] = {}
+    mascots: set[str] = set()
+    for path in sorted(CFBD_RAW.glob("teams_2*.json")):
+        if "ats" in path.name:
+            continue
+        for team in json.loads(path.read_text(encoding="utf-8")):
+            name, mascot, tid = team.get("school"), team.get("mascot"), team.get("id")
+            if not name or tid is None:
+                continue
+            names[tid] = name
+            if mascot:
+                full.setdefault(norm(f"{name} {mascot}"), tid)
+                mascots.add(norm(mascot))
+            school[norm(name)].add(tid)
+            for alternate in team.get("alternateNames") or []:
+                # `liu`, `cal`, `sou` are abbreviations CFBD files under alternateNames,
+                # and they collide across schools. Only real names are indexed.
+                if alternate and len(alternate) > 3 and not alternate.isupper():
+                    school[norm(alternate)].add(tid)
+    return full, school, names, mascots
+
+
+def map_to_cfbd(franchises: list[dict]) -> collections.Counter:
+    """Fill `cfbd_team_id` and `match` in place; returns the tally by match kind."""
+    full, school, names, mascots = cfbd_index()
+    by_school = {v: k for k, v in names.items()}   # raw name: `Miami` != `Miami (OH)`
+    tally: collections.Counter = collections.Counter()
+    for row in franchises:
+        if row["kind"] != "team":
+            tally["allstar or lower division (not mapped)"] += 1
+            continue
+        slug = row["slug"]
+        if slug in OVERRIDES:
+            row["cfbd_team_id"], row["match"] = by_school.get(OVERRIDES[slug], ""), "override"
+            tally["override"] += 1
+            continue
+        name = norm(slug.replace("-", " "))
+        if name in full:
+            row["cfbd_team_id"], row["match"] = full[name], "school+mascot"
+            tally["school+mascot"] += 1
+            continue
+        # Drop the mascot, and only the mascot: the removed suffix has to be a mascot CFBD
+        # knows. Stripping trailing tokens freely reads `louisiana monroe warhawks` down to
+        # `louisiana` and hands UL Monroe the Ragin' Cajuns' id. The remainder must then
+        # name exactly one school -- an ambiguous hit is left unmatched, never guessed.
+        tokens = name.split()
+        for cut in range(len(tokens) - 1, 0, -1):
+            if " ".join(tokens[cut:]) not in mascots:
+                continue
+            ids = school.get(" ".join(tokens[:cut]))
+            if ids and len(ids) == 1:
+                row["cfbd_team_id"], row["match"] = next(iter(ids)), "school"
+                tally["school"] += 1
+                break
+        else:
+            tally["unmatched"] += 1
+    return tally
+
+
 def dimensions(rows: dict[str, list[dict]], seasons: set[int] | None,
                names: dict[str, str], people: dict) -> None:
     """`pff_franchise` and `pff_player_season`, from the directory and the summaries.
@@ -301,6 +403,8 @@ def dimensions(rows: dict[str, list[dict]], seasons: set[int] | None,
                           "team_name": names.get(fid, f"franchise {fid}"),
                           "kind": "allstar", "cfbd_team_id": "", "match": ""}
     rows["pff_franchise"] = list(franchise.values())
+    tally = map_to_cfbd(rows["pff_franchise"])
+    print("  cfbd map: " + ", ".join(f"{k} {v}" for k, v in sorted(tally.items())))
 
     rows["pff_player_season"] = list(people.values())
 

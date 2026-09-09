@@ -108,3 +108,60 @@ def test_a_real_value_survives_the_round_trip():
     assert row["grades_pass"] == wanted["grades_pass"]
     # the column the greedy regex would have destroyed
     assert row["pressure_to_sack_rate"] == wanted["pressure_to_sack_rate"]
+
+
+# ---------------------------------------------------------------- the CFBD map (S4)
+
+from pff_flatten import CFBD_RAW, OVERRIDES, cfbd_index, map_to_cfbd, norm  # noqa: E402
+
+HAVE_TEAMS = CFBD_RAW.exists() and any(CFBD_RAW.glob("teams_2*.json"))
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("East Texas A&M", "east texas am"),        # PFF's slug drops the &, so both do
+    ("William & Mary", "william mary"),
+    ("St. Thomas (MN)", "st thomas"),           # leading St is Saint; the (MN) is cut
+    ("San Jose St", "san jose state"),          # trailing St is State
+    ("Bryant University Bulldogs", "bryant bulldogs"),
+    ("Southern Miss Golden Eagles", "southern miss golden eagles"),   # `the` is not in
+])
+def test_norm_rules(raw, expected):
+    assert norm(raw) == expected
+
+
+@pytest.mark.skipif(not HAVE_TEAMS, reason="the CFBD teams pull is not on this machine")
+def test_the_mascot_strip_cannot_eat_a_real_name_token():
+    """Free suffix-stripping read `louisiana monroe warhawks` down to `louisiana`, which
+    handed UL Monroe the Ragin' Cajuns' CFBD id. Only a known mascot may be removed."""
+    _, _, names, mascots = cfbd_index()
+    assert "warhawks" in mascots and "monroe" not in mascots
+    rows = [{"franchise_id": "209", "slug": "louisiana-monroe-warhawks",
+             "team_name": "", "kind": "team", "cfbd_team_id": "", "match": ""},
+            {"franchise_id": "207", "slug": "louisiana-ragin-cajuns",
+             "team_name": "", "kind": "team", "cfbd_team_id": "", "match": ""}]
+    map_to_cfbd(rows)
+    assert rows[0]["cfbd_team_id"] != rows[1]["cfbd_team_id"]
+    assert names[rows[0]["cfbd_team_id"]] == "UL Monroe"
+
+
+@pytest.mark.skipif(not HAVE_TEAMS, reason="the CFBD teams pull is not on this machine")
+def test_an_ambiguous_school_is_never_guessed():
+    """Both Miamis normalize to `miami`, so the rule must refuse and the override decide."""
+    _, school, names, _ = cfbd_index()
+    assert len(school["miami"]) > 1
+    assert OVERRIDES["miami-fl-hurricanes"] == "Miami"
+    row = [{"franchise_id": "220", "slug": "miami-fl-hurricanes", "team_name": "",
+            "kind": "team", "cfbd_team_id": "", "match": ""}]
+    map_to_cfbd(row)
+    assert names[row[0]["cfbd_team_id"]] == "Miami" and row[0]["match"] == "override"
+
+
+@pytest.mark.skipif(not (OUT_DIR / "pff_franchise.csv").exists(),
+                    reason="run scripts/pff_flatten.py first")
+def test_every_franchise_maps_to_a_distinct_cfbd_team():
+    with (OUT_DIR / "pff_franchise.csv").open(encoding="utf-8") as fh:
+        rows = [r for r in csv.DictReader(fh) if r["kind"] == "team"]
+    unmapped = [r["slug"] for r in rows if not r["cfbd_team_id"]]
+    assert not unmapped, f"unmapped franchises: {unmapped}"
+    ids = [r["cfbd_team_id"] for r in rows]
+    assert len(set(ids)) == len(ids), "two PFF franchises claim one CFBD team"

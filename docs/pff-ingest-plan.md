@@ -25,7 +25,7 @@ wins on what is finished.
 | S1 | Audit the pull — every file verified, gaps named | everything | **done** | 2026-09-08 |
 | S2 | Settle point-in-time: per-week pulls vs dated snapshots | S3 | **done** — per week | 2026-09-08 |
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
-| S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` (~35 by hand) | S5 | open | — |
+| S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
 | S5 | `_PFF_TABLES` loader entries → `stg` | S6 | open | — |
 | S6 | Backfill 2014–2024, finish 2026 | — | **held** — gated on S3/S5/S7 | — |
 | S7 | Trim the pull plan using 2025 as the reference season | S6 | in progress | 2026-09-08 |
@@ -123,13 +123,39 @@ duplicated split label fails on the primary key and an undeclared direction fail
 CHECK. All 21 pass; 25 tests in `tests/test_pff_flatten.py`, one of which round-trips a
 real 2025 value.
 
-## S4 — `pff_franchise` map
+## S4 — `pff_franchise` map ✅ 2026-09-09
 
-~35 names that do not match on their own. Same shape as `massey_teams.match`; check
-`stg.teams.alternateNames` before hand-typing anything.
+Built into `pff_flatten.map_to_cfbd`, the way `massey_flatten` matches: normalize, index
+CFBD by school+mascot and by school, and hand-map only what no rule reaches. **11 overrides,
+not the ~35 estimated** — all 265 `kind = 'team'` franchises resolve, to 265 distinct CFBD
+ids.
+
+| Match | Franchises |
+| --- | --- |
+| `school+mascot` exact | 243 |
+| `school`, after stripping a known mascot | 11 |
+| `override` | 11 |
+| not mapped (`kind = 'allstar'`, no CFBD counterpart) | 76 |
+
+Three normalization rules did the work an override list would otherwise have absorbed:
+`&` is dropped rather than expanded (PFF's slug drops it, so `East Texas A&M` and
+`east-texas-am` meet at `east texas am`); `St` expands to `State` only when it is not the
+first token, because a leading `St` is Saint; and a trailing `(MN)`-style disambiguator is
+cut.
+
+Two rules exist to refuse rather than to match, and both earned it:
+
+- **Only a known mascot may be stripped.** Free suffix-stripping reads
+  `louisiana-monroe-warhawks` down to `louisiana` and hands UL Monroe the Ragin' Cajuns'
+  CFBD id. Caught by asserting the mapped ids are distinct, not by reading the output.
+- **An ambiguous school is never guessed.** CFBD files the Florida school as plain `Miami`,
+  so both Miamis normalize to `miami`; the rule declines and an override decides. CFBD's
+  three-letter `alternateNames` (`liu`, `cal`, `sou`) are excluded from the index for the
+  same reason -- they collide across schools.
 
 **Done when:** every FBS franchise in the 2025 `team_directory` resolves to a
-`cfbd_team_id`, and the join is asserted at 100% in a test.
+`cfbd_team_id`, and the join is asserted at 100% in a test. ✅
+`tests/test_pff_flatten.py` asserts full coverage *and* distinctness.
 
 ## S5 — Loader entries
 
@@ -325,3 +351,22 @@ Two things only the data could have said:
 relabelled so the split column says what it means. That is the fifth correction the files
 have made to the prose, which is why the registry declares sources and the columns come
 from the headers.
+
+### 2026-09-09 — S4 done: 265 franchises, 11 overrides
+
+The map is rules plus a short override list, and the rules are the interesting part: `&`
+dropped rather than expanded, `St` expanded only when it is not the first token, trailing
+parentheticals cut. That took the hand-mapped residue from the estimated ~35 to 11.
+
+Two near-misses are worth keeping in mind for the next vendor map. Free suffix-stripping
+matched `louisiana-monroe-warhawks` to plain `Louisiana` -- a *successful* match to the
+wrong team, invisible in any coverage count. Only comparing distinct mapped ids against
+mapped rows caught it; the fix is that the stripped suffix has to be a mascot CFBD knows.
+And CFBD's `alternateNames` carries three-letter abbreviations (`liu`, `cal`, `sou`) that
+collide across schools, so indexing them created ambiguity that looked like signal.
+
+Also repaired a self-inflicted one: an earlier patch wrote literal backspace bytes into
+`norm`'s regex in place of ``, which greps and `sed` render invisibly. The word-boundary
+strip silently stopped firing, and `bryant-university-bulldogs` fell through to the
+override list rather than matching by rule. Found by testing `norm` directly instead of
+trusting the match count, which had stayed plausible at 264/265.
