@@ -293,7 +293,7 @@ Merging is per-pair, not one mechanism applied 13 times. GraphQL names are shown
 | conference | `stg_gql.conference` | `stg.conferences` | `conferenceId` | `core.dim_conference` | merge |
 | calendar | `stg_gql.calendar` | `stg.calendar` | `(season, week, seasonType)`, GraphQL spelling `year` for `season` | `core.dim_week` | merge |
 | coach | `stg_gql.coach` | — | `coachId` | `core.dim_coach` + `core.coach_name_conflicts` | dimension, D3 |
-| coach season | `stg_gql.coach_season` | `stg.coaches__seasons`, `stg.coach_seasons` | `(coachId, teamId, season)` after the scraper fix | `core.fact_coach_season` | merge at season grain |
+| coach season | `stg_gql.coach_season` | `stg.coaches__seasons`, `stg.coach_seasons` | `(coachId, teamId, season)` after the scraper fix | `core.fact_coach_season` + `core.coach_season_unmatched` | merge at season grain, see below |
 | recruiting team | `stg_gql.recruiting_team` | `stg.recruiting_teams` | **none — needs `core.dim_team` to bridge** | — | deferred |
 | draft position | `stg_gql.draft_position` | `stg.draft_positions` | `name` | — | drop REST |
 | draft team | `stg_gql.draft_team` | `stg.draft_teams` | `name` | — | drop REST |
@@ -306,6 +306,31 @@ Two pairs cannot merge on a scalar key alone and are called out as such: `coach`
 `recruiting_team`/`recruiting_teams` (an id against a name — no bridge exists, so it is
 deferred, not merged).
 
+### Coach-season sources and grain *(restored 2026-09-09 — Round 5 F1/F4)*
+
+Three sources, each with its grain stated and proven before merge. Carried back from `PLAN.md`,
+which the 2026-09-08 absorption dropped; see `docs/warehouse-round5-rereview-2026-09-09.md`.
+
+| Source | Grain | Bridge to `(coachId, teamId, season)` |
+|---|---|---|
+| `stg_gql.coach_season` | one row per coach-season-team, **once step 1 supplies `coach.id` and `team.teamId`** | direct |
+| `stg.coaches__seasons` | `(firstName, lastName, seasons_year, seasons_school)` — 1,937 rows | name → `coachId` via `stg_gql.coach`; `seasons_school` → `teamId` needs `core.dim_team` |
+| `stg.coach_seasons` | `(coach_id, team_id, season)` — 1,961 rows, 70 columns, unique across all 1,961 | direct |
+
+The flat `stg.coaches` is **not** a merge source — it has no team at all, which is exactly why
+its Blake Anderson row looked duplicated. It contributes only `hireDate`, joined at coach grain.
+
+**The REST team bridge is one-directional, and that is why the unmatched table exists.**
+`coaches__seasons` carries `seasons_school` beside `seasons_year`, so a *coach*-season resolves
+to a team without inference. The reverse does not hold: 1,937 rows hold only **1,816 distinct
+`(seasons_school, seasons_year)`**, because **118 school-seasons have two or three coaches** —
+Southern Miss 2020 is Hopson (1 game), Walden (4), Billings (5); USC 2013 is Kiffin, Orgeron,
+Helton. Codex raised this in Round 5 and it is confirmed by the data.
+
+So a REST row whose name resolves to more than one `coachId`, or whose `seasons_school` fails to
+resolve to a `teamId`, is preserved in **`core.coach_season_unmatched`** with its source keys and
+is never guessed into the fact. Step 3 publishes a match rate alongside it.
+
 **`core.dim_team` is a shared dependency, not a one-pair blocker** *(2026-09-09)*. The
 `recruiting_team` deferral above reads as a single stuck pair. It is not — three consumers now
 want the same team dimension, and each is solving it separately:
@@ -313,10 +338,11 @@ want the same team dimension, and each is solving it separately:
 | Consumer | How it bridges today |
 |---|---|
 | `recruiting_team` / `recruiting_teams` | nothing — deferred on this exact gap |
+| `stg.coaches__seasons` → `teamId` *(above)* | nothing — `seasons_school` is a name, and this is what sends rows to `core.coach_season_unmatched` |
 | `stg.massey_teams` | hand-maintained id column |
 | `stg.pff_franchise` *(landed 2026-09-09)* | hand-maintained `cfbd_team_id`, 266 of 363 rows mapped; the rest are all-star and non-FBS entries that `kind` filters |
 
-Two hand-maintained mappings of the same relationship, and a third pair blocked for want of it,
+Two hand-maintained mappings of the same relationship, and two merges blocked for want of it,
 is the argument for building `core.dim_team` rather than deferring again. It stays out of this
 plan's scope (§12) — but the next plan that touches team identity should build it once, and
 these three should collapse onto it.
@@ -342,6 +368,19 @@ unique on `(gameId, linesProviderId, period)` — 63,730 of 63,730 as of 2026-09
 normalizes directly. The row count grows with every refresh; the uniqueness is the invariant,
 and `scripts/verify_warehouse_plan.py` is what asserts it.
 
+REST offers come from `stg.lines__lines` — 38,972 rows, unique on `(gameId, lines_provider)` —
+not from the nested `lines` column. If a provider *name* fails to resolve to an id, that offer is
+unmatched and reported, never dropped. Unmatched offers on either side land in
+`core.fact_game_line` with a `_provenance` value naming the single source.
+
+**Step 3 gates on the full-game match count** *(restored 2026-09-09 — Round 5 F2)*. Round 5 asked
+for this and the answer promised it against a step number that no longer exists; it is anchored
+here instead. REST carries no period and normalizes to `game`, so the merge resolves 38,972 REST
+offers against 47,225 GraphQL `game` rows. A matched count outside the bound reported at merge
+time **fails step 3** rather than silently producing unmatched rows on both sides. The 1H/1Q rows
+have no REST counterpart and are expected, not an error — exclude them from the gate. Re-measure
+both counts before the run; they move with every refresh.
+
 ## 8. Sequencing
 
 The order is not arbitrary. Dropping before re-measurement risks deleting the table the scraper
@@ -363,6 +402,22 @@ non-docstring `<schema>.<table>` literal under `cfb_system_maker/`, `models/`, `
 (re-counted 2026-09-09), and the test's own `ALLOW` entry for
 `("stg_gql", "game_lines__backfill")` move together in a single commit, or the suite goes red
 between them. R8 is a constraint on how step 5 lands, not only a safety net under it.
+
+**The re-scrape is staged, not promoted on arrival** *(restored 2026-09-09 — Round 5 F3)*. Step 0
+has re-scrapes write to new versioned paths, which leaves `data/graphql/` holding two generations
+of `coach_season` and `team_talent`. So:
+
+- **Version selection is explicit.** The loader reads a version manifest naming exactly which
+  dump file each entity loads from. It never globs a directory that now holds two generations of
+  the same entity — the warehouse glob is not recursive and a stray file becomes a permanent
+  table (`cfb_paths.py`).
+- **The new version is staged through every step and promoted only after step 4 passes in full.**
+  Step 4 is the drop; it is the irreversible one, and a failure there must not leave a new source
+  already active. A failed run at any point leaves the previous version selected and the
+  warehouse rebuildable from it.
+- Round 5 phrased this as "promote only after step 9," against the old numbering. Step 9 no
+  longer exists — the 2026-09-09 revision deleted two steps and renumbered the rest — so the rule
+  is re-anchored on the drop, which is what it was protecting.
 
 **The two snake-case renames have a trap.** `stg.gameMedia` → `stg.game_media` and
 `stg.gamePlayerStat` → `stg.game_player_stat` are *table* renames only. The same spelling also
@@ -444,10 +499,15 @@ also remove.
 - **The plan's review loop ended in deadlock, not convergence.** Five Codex rounds, 31 findings,
   30 accepted (one rejected with reason: concurrency machinery for a single-writer local file).
   Findings narrowed from structural to specificational, but `VERDICT: APPROVED` never came.
-  **Round 5's fixes are applied but were never re-reviewed** — that is the one genuinely open
-  item from the loop, and it predates this synthesis. The 2026-09-09 review
-  (`docs/warehouse-plan-review-2026-09-09.md`) is not that re-review: it checked this document
-  against the live warehouse and the code, not the loop's findings against each other.
+  ~~**Round 5's fixes are applied but were never re-reviewed**~~ — **closed 2026-09-09**,
+  `docs/warehouse-round5-rereview-2026-09-09.md`. The item was understated: the fixes were
+  applied to root `PLAN.md`, which this document superseded, and §11's absorption carried only
+  some of them. Of the four, F2 and F4 held, F3 was lost entirely, and **F1 was refuted by the
+  data** — the REST team bridge resolves coach → team but not team-season → coach, because 118
+  school-seasons have two or three coaches. All four are now carried forward: §6 has the grain
+  table and `core.coach_season_unmatched`, §7 has the full-game match gate, §8 has the staged
+  version manifest. The deadlock does not reopen; none of the four needed an adversarial
+  reviewer, only a decision.
 - Step 1 is user-run against a live API and is the gate on everything downstream.
 - **Bucket C's five unre-measured pairs.** The 2026-09-09 review re-derived Buckets A and B and
   `game`/`games`' Elo fill rates, but not the column diffs for `game_lines`, `coach`,
@@ -506,8 +566,9 @@ other.
   step 5 now owns it: the collapse is already renaming tables and rewriting every literal, so
   these two ride along at no extra risk.
 - `core` layer changes beyond the targets named in §6's disposition table, plus
-  `core.coach_name_conflicts`. *(The 2026-09-08 draft enumerated a shorter list here that §6
-  already contradicted; §6 is the one place that decides targets.)*
+  `core.coach_name_conflicts` and `core.coach_season_unmatched`. *(The 2026-09-08 draft
+  enumerated a shorter list here that §6 already contradicted; §6 is the one place that decides
+  targets.)*
 - `raw` naming, in any form — **and `raw`'s loader scaffolding**, which is where `season`,
   `week` and `season_type` are bound (§5).
 - GraphQL **entity and field** names — `coachSeason`, `teamTalent`, `gameLines` — are an upstream

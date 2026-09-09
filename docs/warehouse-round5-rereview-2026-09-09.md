@@ -132,21 +132,23 @@ keep the argument."
 
 ## What to do — four carry-forward decisions
 
-Not a review round. Each is a decision about the plan of record.
+**All four applied to the plan of record on 2026-09-09** (see the checkmarks below);
+the plan now carries the grain table, the unmatched table, the match gate and the manifest.
+Not a review round. Each was a decision about the plan of record.
 
-1. **Restore `core.coach_season_unmatched`, or decide the 118 ambiguous team-seasons another
+1. ✅ *(applied 2026-09-09)* **Restore `core.coach_season_unmatched`, or decide the 118 ambiguous team-seasons another
    way.** This is the only one that blocks: §8 step 3 cannot merge coach-seasons at
    `(coachId, teamId, season)` without an answer. Add it to §6's target column and to §12's core
    scope. *(Recommended: restore it — Codex's original reasoning is confirmed by the data.)*
-2. **Give F2's gate a step.** Either fold "matched full-game offer count is as expected" into §8
+2. ✅ *(applied 2026-09-09)* **Give F2's gate a step.** Either fold "matched full-game offer count is as expected" into §8
    step 3's merge criteria, or add it to §7 as a stated post-merge check. It is cheap and it
    catches a whole class of normalization error.
-3. **Decide whether the version manifest comes back.** Step 0 still creates new versioned paths,
+3. ✅ *(applied 2026-09-09)* **Decide whether the version manifest comes back.** Step 0 still creates new versioned paths,
    so the hazard it guarded is still real. Either carry the staged-promotion rule into §8 —
    re-anchored on step 4, the drop, which is the irreversible one — or state in §12 that
    single-writer local rebuilds do not need it and delete the versioned-paths language with it.
    *(Recommended: carry it. Step 4 drops tables; that is exactly the "late failure" case.)*
-4. **Carry F4's grain table into §6**, and correct 72 → 70 columns.
+4. ✅ *(applied 2026-09-09)* **Carry F4's grain table into §6**, and correct 72 → 70 columns.
 
 **Not doing:** reopening the Codex loop. The findings were specificational by round 5, 30 of 31
 were accepted, and none of the four above needs an adversarial reviewer to settle — they need
