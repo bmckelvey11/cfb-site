@@ -388,6 +388,29 @@ def precompute_ewa(df, models, bench_col, etas):
 # ------------------------------------------------------------------------ walk-forward
 
 
+CURVE_LOG = None   # amendment A7: set to a list to record each (season, method) tuning curve
+
+
+def _curve_row(season, method, cands, chosen):
+    """The tuning curve behind one pick_1se call: mean validation error per grid point, the
+    SE the rule compares against, the argmin, and what the 1-SE rule actually chose.
+
+    A flat curve makes the 1-SE rule a tie-breaker that runs to the top of whatever grid it is
+    given, which is indistinguishable from "the data want more shrinkage" unless the curve is
+    reported. Amendment A7 exists to tell those apart.
+    """
+    scored = [(p, e) for p, e in cands if e is not None and len(e) > 30]
+    if not scored:
+        return None
+    means = [float(e.mean()) for _, e in scored]
+    best = int(np.argmin(means))
+    se = float(scored[best][1].std(ddof=1) / np.sqrt(len(scored[best][1])))
+    return {"season": int(season), "method": method,
+            "params": [str(p) for p, _ in scored], "val_mse": means,
+            "se_at_best": se, "argmin": str(scored[best][0]),
+            "chosen_1se": str(chosen), "n_val": int(len(scored[best][1]))}
+
+
 def pick_1se(cands):
     """1-SE rule. `cands` is [(param, val_sq_errors)] ordered least -> most conservative."""
     scored = [(p, e) for p, e in cands if e is not None and len(e) > 30]
@@ -461,6 +484,10 @@ def sweep(df, models, bench_col, verbose=True, grids=None, only=None):
                 e = (y_va - pv) ** 2
                 cands.append((p, e[np.isfinite(e)]))
             param = pick_1se(cands)
+            if CURVE_LOG is not None:
+                row = _curve_row(s, m, cands, param)
+                if row is not None:
+                    CURVE_LOG.append(row)
             if param is None:
                 continue
             kw = {"ewa": ewa} if m == "E13" else {}
