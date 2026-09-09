@@ -30,6 +30,7 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -49,6 +50,7 @@ REAL_BOOKS = {"49": "Caesars", "68": "DraftKings", "69": "FanDuel",
               "71": "BetRivers", "75": "BetMGM"}
 OUTLIER_PTS = 2.5        # a book this far off the median of all books is ignored (n >= 3)
 MIN_ODDS = -120          # the model's own price gate (MODEL_GUIDE: over at -120 or better)
+ET = ZoneInfo("America/New_York")
 COLUMNS = ["run_at", "kick", "home", "away", "n_books", "spread_fair", "total_fair",
            "total_range", "dog_implied", "bias_fair", "p_over_fair", "pick", "best_total",
            "best_book", "best_odds", "bias_best", "playable"]
@@ -152,18 +154,18 @@ def bias_of(spread: np.ndarray, total: np.ndarray, fit) -> np.ndarray:
     return bias
 
 
-def build(fit_csv: Path, fit_seasons, days: int, threshold: float,
-          book: str | None = None) -> pd.DataFrame:
+def fit_model(fit_csv: Path, fit_seasons):
+    """The Arscott pipeline, plus the fit sample's underdog-implied support."""
     spread_est, totals_est, fav_pts, dog_pts = load(fit_csv, fit_seasons)
     print(f"Fit on {spread_est.size:,} games from seasons "
           f"{min(fit_seasons)}-{max(fit_seasons)}")
-    fit = fit_pipeline(spread_est, totals_est, fav_pts, dog_pts)
-    fit_dog = (totals_est - spread_est) / 2
+    return (fit_pipeline(spread_est, totals_est, fav_pts, dog_pts),
+            (totals_est - spread_est) / 2)
 
-    now = datetime.now(timezone.utc)
-    games = live_markets(now, days)
-    print(f"Fetched {len(games)} games kicking off in the next {days} days")
 
+def score(games: pd.DataFrame, fit, fit_dog: np.ndarray, run_at: str, threshold: float,
+          book: str | None = None, quiet: bool = False) -> pd.DataFrame:
+    """One view of an already-fetched slate: shopped across books, or one book alone."""
     # One book means no shopping and no cross-book fair: that book IS both numbers.
     only = next((k for k, v in REAL_BOOKS.items() if v == book), None) if book else None
     need = 1 if only else 2
@@ -194,18 +196,56 @@ def build(fit_csv: Path, fit_seasons, days: int, threshold: float,
     # Same spread, best total: isolates what shopping the total alone does to the bias.
     t["bias_best"] = bias_of(t.spread_fair.to_numpy(), t.best_total.to_numpy(), fit)
     t["pick"] = np.where(t.bias_fair > threshold, "OVER", "")
-    t["run_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    t["run_at"] = run_at
     t["dog_implied"] = (t.total_fair - t.spread_fair.abs()) / 2
     # The picks live where the underdog is implied for a handful of points, and the fit
     # sample thins out fast down there. Print the support so p_over is read for what it
     # is: a parametric read at the edge of the calibrated region, not a local rate.
     floor = t.loc[t.pick == "OVER", "dog_implied"].min() if (t.pick == "OVER").any() else None
-    if floor is not None:
+    if floor is not None and not quiet:
         print(f"Picks sit at dog_implied {floor:.1f}-"
               f"{t.loc[t.pick == 'OVER', 'dog_implied'].max():.1f}; the fit sample has "
               f"{int((fit_dog < 5).sum()):,} games under 5 and {int((fit_dog < 4).sum()):,} "
               f"under 4 -- thin support, so treat p_over as extrapolated there.")
     return t.sort_values("bias_fair", ascending=False)[COLUMNS]
+
+
+def et_clock(kick: datetime) -> str:
+    """Kickoff as the board has always shown it: 12-hour Eastern, no leading zero.
+
+    strftime's no-pad hour is %-I on POSIX and %#I on Windows, so neither is portable.
+    """
+    d = kick.astimezone(ET)
+    return f"{d.hour % 12 or 12}:{d.minute:02d} {'AM' if d.hour < 12 else 'PM'} ET"
+
+
+def export_json(views: dict[str, pd.DataFrame], path: Path, run_at: str,
+                threshold: float) -> None:
+    """Every view in one payload, for a static site that switches between them.
+
+    The board is a build-time import, not a fetch, so all six views ship together. Kickoffs
+    are pre-formatted in Eastern -- the reader's frame, and the one the board has always
+    used; leaving them in UTC would move every Saturday night game to Sunday.
+    """
+    payload = {"run_at": run_at, "threshold": threshold, "min_odds": MIN_ODDS,
+               "books": list(REAL_BOOKS.values()), "views": {}}
+    for name, t in views.items():
+        picks = t[t.pick == "OVER"] if not t.empty else t
+        # `scored` is how many games the view could price at all. A book that posts a total
+        # but no spread scores nothing -- the model needs both -- and an empty board should
+        # say that rather than imply the book had no qualifying games.
+        payload["views"][name] = {"scored": len(t), "picks": [
+            {"date": r.kick.astimezone(ET).strftime("%b %d"),
+             "time": et_clock(r.kick),
+             "away": r.away, "home": r.home, "total": r.total_fair, "spread": r.spread_fair,
+             "bias": round(r.bias_fair, 3), "probability": round(r.p_over_fair * 100, 2),
+             "dogImplied": r.dog_implied, "bestTotal": r.best_total, "bestBook": r.best_book,
+             "bestOdds": int(r.best_odds), "books": int(r.n_books), "playable": bool(r.playable)}
+            for r in picks.itertuples()]}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+    counts = ", ".join(f"{k} {len(v['picks'])}/{v['scored']}" for k, v in payload["views"].items())
+    print(f"Wrote {path} ({counts})")
 
 
 def report(t: pd.DataFrame, threshold: float, book: str | None = None) -> None:
@@ -247,11 +287,26 @@ def main() -> int:
                     help="score one book's own number instead of shopping across all of "
                          "them; the fair and best columns collapse onto that book")
     ap.add_argument("--out-dir", default=str(OUT_DIR), help="'' to skip writing")
+    ap.add_argument("--json", help="also write every view -- shopped plus each book on its "
+                                   "own -- to this path, for the signal board to import")
     args = ap.parse_args()
 
     seasons = list(range(args.fit_from, args.season))
-    t = build(Path(args.fit_csv), seasons, args.days, args.threshold, args.book)
+    fit, fit_dog = fit_model(Path(args.fit_csv), seasons)
+    now = datetime.now(timezone.utc)
+    run_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    games = live_markets(now, args.days)
+    print(f"Fetched {len(games)} games kicking off in the next {args.days} days")
+
+    t = score(games, fit, fit_dog, run_at, args.threshold, args.book)
     report(t, args.threshold, args.book)
+
+    if args.json:
+        # Every view off the one fetch: six scorings of the same games, not six AN pulls.
+        views = {"Best lines": score(games, fit, fit_dog, run_at, args.threshold, quiet=True)}
+        for name in REAL_BOOKS.values():
+            views[name] = score(games, fit, fit_dog, run_at, args.threshold, name, quiet=True)
+        export_json(views, Path(args.json), run_at, args.threshold)
 
     if args.out_dir and not t.empty:
         out = Path(args.out_dir)
