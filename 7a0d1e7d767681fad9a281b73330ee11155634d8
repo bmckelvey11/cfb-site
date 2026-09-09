@@ -1,0 +1,25 @@
+Mixed commit: this holds two unrelated concerns, and the subject describes only one.
+
+The over_zero change is what the subject names:
+
+  models/over_zero/scripts/best_line_slate.py
+
+The other three files are a warehouse-plan revision that was staged in the shared
+index by a concurrent session and swept in here by accident:
+
+  docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md
+  docs/warehouse-plan-review-2026-09-09.md
+  scripts/verify_warehouse_plan.py
+
+Those three apply the seven recommendations in docs/warehouse-plan-review-2026-09-09.md:
+section 5's dead-column census rewritten (11 all-NULL columns, not 332; drop list 7,
+not 12 -- three of the old entries held 6.4M populated values), steps 2 and 3 deleted
+with R3 marked satisfied, recruit moved from Bucket B to Bucket C, calendar's merge key
+corrected to (season, week, seasonType), and the code citations fixed. Their intended
+subject was:
+
+  docs(warehouse): revise the master plan against the live warehouse
+
+Left unsplit deliberately (2026-09-09): the commit was already pushed and the branch was
+being pushed to every ~90s by another session, so a rewrite would have raced. An attempt
+to split it briefly dropped a concurrent commit and was reverted.
