@@ -105,11 +105,12 @@ decide, and amendment B1's MDE gate, which made the stopping time depend on the 
 
 ## 4. Decisions
 
-1. **One confirmatory family: the version B E4 slope at the Monday anchor.** Everything
-   archive-side (A1–A6) and all line-shopping work is **exploratory** and its sections say so.
-   Holm applies within a family; no across-family correction is attempted, because with one
-   confirmatory hypothesis none is needed. This replaced an earlier proposal to merely log the
-   amendments — a ledger documents forks without controlling them.
+1. **One confirmatory family — two members since 2026-09-09** (amendment T1): the version B E4
+   slope at the Monday anchor on all games, and the same slope restricted to games whose line
+   opened inside 21 days of kickoff. **Bonferroni across the two, α = 0.025 each.** Everything
+   archive-side (A1–A7) and all line-shopping work stays **exploratory** and its sections say so.
+   Holm applies within a family. This replaced an earlier proposal to merely log the amendments —
+   a ledger documents forks without controlling them.
 2. **E4 is graded, not E6** — and since A7 it is also the better method, which was not known
    when the choice was made. E6 led on the full panel and briefly appeared to lead under A6
    (0.201 vs 0.154), but A7 showed those numbers came from grids truncated near the R² peak;
@@ -142,6 +143,15 @@ decide, and amendment B1's MDE gate, which made the stopping time depend on the 
    before kickoff), not PT's `line` — see §2 for why.
 7. **Weekly reads are reported but decide nothing**, now enforced by §3's rule rather than
    asserted.
+8. **Timing is the tree's hardest constraint** (measured 2026-09-09, `eval_timing_decay.py`).
+   Lines post a median 41 days before kickoff, and by Monday of game week the median game has
+   completed **100%** of its open→close move — 90% are fully moved. Version B anchors where, for
+   nine games in ten, the move it is trying to predict is already over. The only subgroup with
+   anything left is late-opening lines, 22% of which retain a quarter of the move; that is what
+   T1 registers. After Monday the line still changes a median 4 times and 45% of games swing a
+   point or more in range — shopping room, not a forecast. A full-season version cannot be run:
+   Action Network does not serve histories for past seasons, so this record only accumulates
+   forward.
 
 ## 5. What must change before the affected work runs
 
