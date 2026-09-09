@@ -13,9 +13,14 @@ Everything in PT sign: POSITIVE = home favoured. y = close - line_Monday; x = pr
 
   B4  slope of y on x, season-week cluster SE, for E4 (registered), E6 and the model median
   B5  CLV and ATS of a Monday bet on the E4 side at |x| >= 1 and >= 2
+  B2  slope by capture offset (mon/tue/wed/thu+ after Monday 00:00 ET), fixed game set
 
-Prints the observed sigmas, the MDE at the current n and the n at which the MDE reaches 0.2.
-No verdict is printed before that n (amendment B1); the numbers are reported either way.
+Prints the observed sigmas and the MDE at the current n. The MDE is informational only and
+never sets a verdict (amendment B3 replaced B1's MDE gate). The stopping rule, verbatim, and
+not to be paraphrased anywhere else in this repo:
+
+    No verdict before season end; at season end, confirmatory inference requires ≥ 8 week
+    clusters, and with fewer the read is reported as inconclusive.
 
     python research/spread/scripts/eval_version_b.py
 """
@@ -47,6 +52,12 @@ THRESH = (1.0, 2.0)
 BREAKEVEN = 0.5238
 TARGET_MDE = 0.2                        # the slope B4 must be able to exclude
 MIN_WEEKS = 5                           # below this the cluster SE is degenerate; HC1 is printed instead
+MIN_CLUSTERS_FOR_VERDICT = 8            # amendment B3: the stopping rule's cluster floor
+SEASON_WINDOW = ((8, 25), (12, 15))     # in-season (month, day) window, ET -- matches collector_health.in_season
+BUCKETS = [(0, 24, "mon"), (24, 48, "tue"), (48, 72, "wed"), (72, 1e9, "thu+")]   # amendment B2
+BUCKET_LABELS = [b[2] for b in BUCKETS]
+STOPPING_RULE = ("No verdict before season end; at season end, confirmatory inference requires "
+                  "≥ 8 week clusters, and with fewer the read is reported as inconclusive.")
 
 
 def monday_anchor(log: pd.DataFrame) -> pd.DataFrame:
@@ -58,6 +69,64 @@ def monday_anchor(log: pd.DataFrame) -> pd.DataFrame:
     log["captured"], log["week"] = cap, monday.dt.strftime("%Y-%m-%d")
     log = log[cap.dt.tz_convert(ET) >= monday].sort_values("captured")
     return log.groupby("event_id", as_index=False).first()
+
+
+def season_has_ended(now: datetime) -> bool:
+    """Season-end half of amendment B3's gate: True once the ET date falls outside the
+    regular-season window (SEASON_WINDOW). Independent of collector_health.py by design --
+    that module is owned by a different agent in this build."""
+    d = now.astimezone(ET)
+    md = (d.month, d.day)
+    return not (SEASON_WINDOW[0] <= md <= SEASON_WINDOW[1])
+
+
+def apply_stopping_rule(e4_result: dict, season_ended: bool) -> dict | None:
+    """Amendment B3, applied literally: null unless season_ended AND clusters >=
+    MIN_CLUSTERS_FOR_VERDICT. e4_result's mde_80 is not read here -- a computed MDE must never
+    set a verdict, however small it is."""
+    if season_ended and e4_result["clusters"] >= MIN_CLUSTERS_FOR_VERDICT:
+        return {"gate": "met", "clusters": e4_result["clusters"]}
+    return None
+
+
+def capture_offsets(log: pd.DataFrame) -> pd.DataFrame:
+    """One row per (game, bucket): the earliest capture inside that bucket, bucketed by hours
+    after the game's week's Monday 00:00 ET into {"mon", "tue", "wed", "thu+"} (amendment B2).
+
+    Does not apply the fixed game set -- see apply_fixed_game_set.
+    """
+    log = log[log.event_id.notna() & log.kick.notna()].copy()
+    cap = pd.to_datetime(log.captured_utc, format="%Y%m%dT%H%M%SZ", utc=True)
+    kick_et = pd.to_datetime(log.kick, utc=True).dt.tz_convert(ET)
+    monday = (kick_et - pd.to_timedelta(kick_et.dt.weekday, unit="D")).dt.normalize()
+    log["hours_after_monday_et"] = (cap.dt.tz_convert(ET) - monday).dt.total_seconds() / 3600
+    log["week"] = monday.dt.strftime("%Y-%m-%d")
+    log = log[log.hours_after_monday_et >= 0]
+    log["offset_bucket"] = pd.cut(log.hours_after_monday_et, [b[0] for b in BUCKETS] + [1e9],
+                                   labels=BUCKET_LABELS, right=False)
+    log = log.dropna(subset=["offset_bucket"])
+    log = log.sort_values("hours_after_monday_et")
+    return log.groupby(["event_id", "offset_bucket"], as_index=False, observed=True).first()
+
+
+def apply_fixed_game_set(per_bucket: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """Amendment B2's fixed game set: a game missing from any (populated) bucket is dropped
+    from every bucket it does have, so the decay across buckets is not confounded with which
+    games happened to get captured when. Grouped by (event_id, week) -- by game and by week --
+    though a game's week is a deterministic function of its event_id, so this is equivalent to
+    grouping by event_id alone; the explicit pair avoids ever conflating two different games
+    that reused an event_id across seasons.
+
+    Returns (kept rows, number of games dropped).
+    """
+    if per_bucket.empty:
+        return per_bucket, 0
+    n_buckets = per_bucket.offset_bucket.nunique()
+    counts = per_bucket.groupby(["event_id", "week"]).offset_bucket.nunique()
+    keep = counts[counts == n_buckets].index
+    dropped = int((counts < n_buckets).sum())
+    kept = per_bucket[per_bucket.set_index(["event_id", "week"]).index.isin(keep)]
+    return kept, dropped
 
 
 def close_from_history(event_id: float, kick: datetime) -> float:
@@ -108,8 +177,13 @@ def margins(games: pd.DataFrame, scores: dict) -> pd.Series:
     return pd.Series(out, index=games.index, dtype=float)
 
 
-def cluster_ols(y, x, cl):
-    """Slope of y on x with a cluster-robust SE and a t(G-1) interval."""
+def cluster_ols(y, x, cl, conditional_on_fitted_predictor: bool = False):
+    """Slope of y on x with a cluster-robust SE and a t(G-1) interval.
+
+    Set conditional_on_fitted_predictor=True when x is itself a walk-forward prediction from a
+    first-stage model (amendment A5) -- this SE does not propagate the first stage's
+    uncertainty, and the result is marked so downstream readers can't miss it.
+    """
     X = np.column_stack([np.ones(len(x)), x])
     b = np.linalg.lstsq(X, y, rcond=None)[0]
     e = y - X @ b
@@ -128,7 +202,8 @@ def cluster_ols(y, x, cl):
     se = float(np.sqrt(V[1, 1]))
     crit = float(tdist.ppf(0.975, max(df, 1)))
     return {"slope": float(b[1]), "se": se, "lo": float(b[1] - crit * se),
-            "hi": float(b[1] + crit * se), "clusters": int(G), "n": int(n), "se_kind": kind}
+            "hi": float(b[1] + crit * se), "clusters": int(G), "n": int(n), "se_kind": kind,
+            "conditional_on_fitted_predictor": bool(conditional_on_fitted_predictor)}
 
 
 def cluster_mean(v, cl):
@@ -160,7 +235,7 @@ def main() -> int:
     print(f"forward log: {log.snapshot.nunique()} snapshots, {len(g)} games with a Monday anchor, "
           f"{len(graded)} graded against a close, {int(graded.margin.notna().sum())} with a score")
     out = {"n_anchor": int(len(g)), "n_graded": int(len(graded)),
-           "weeks": sorted(graded.week.unique().tolist())}
+           "weeks": sorted(graded.week.unique().tolist()), "verdict": None}
     if len(graded) < 30:
         print("fewer than 30 graded games -- nothing to estimate yet")
         OUT.write_text(json.dumps(out, indent=2))
@@ -178,10 +253,15 @@ def main() -> int:
         r["sd_x"] = float(x[ok].std())
         r["mde_80"] = 2.8 * r["se"]
         r["n_for_mde_0.2"] = int(np.ceil(r["n"] * (r["mde_80"] / TARGET_MDE) ** 2))
+        # amendment B3: the MDE is computed from whichever SE cluster_ols returned (cluster-robust
+        # when clusters >= MIN_WEEKS, HC1 below it) -- mark the HC1 case explicit and unmissable,
+        # because it is informational only, not cluster evidence, and must never set a verdict.
+        r["mde_kind"] = "cluster" if r["se_kind"] == "cluster" else "informational_hc1_fallback"
         out["slope"][p] = r
+        flag = "" if r["mde_kind"] == "cluster" else "  [INFORMATIONAL -- HC1 fallback, not cluster evidence]"
         print(f"  {p:10s} slope {r['slope']:+.3f} [{r['lo']:+.3f}, {r['hi']:+.3f}]  se {r['se']:.3f} ({r['se_kind']})  "
               f"sd(x) {r['sd_x']:.2f}  n {r['n']}  weeks {r['clusters']}  MDE {r['mde_80']:.2f}  "
-              f"n for MDE {TARGET_MDE}: {r['n_for_mde_0.2']}")
+              f"n for MDE {TARGET_MDE}: {r['n_for_mde_0.2']}{flag}")
 
     print("\nB5  Monday bet on E4's side vs Monday's line")
     out["bets"] = []
@@ -204,13 +284,41 @@ def main() -> int:
               f"beat close {row['beat_close']:.1%}"
               + (f"  ATS {ats['mean']:.3f} [{ats['lo']:.3f}, {ats['hi']:.3f}] vs {BREAKEVEN}" if ats else "  ATS: no scores yet"))
 
+    print("\nB2  slope by capture offset (fixed game set; season-week clusters)")
+    per_bucket = capture_offsets(log[log.event_id.isin(graded.event_id)])
+    per_bucket = per_bucket.merge(graded[["event_id", "close"]], on="event_id")
+    fixed, dropped = apply_fixed_game_set(per_bucket)
+    fixed_universe = sorted(per_bucket.offset_bucket.unique().tolist(), key=BUCKET_LABELS.index)
+    before_counts = {b: int((per_bucket.offset_bucket == b).sum()) for b in BUCKET_LABELS}
+    out["by_capture"] = {"games_dropped_for_fixed_set": dropped, "buckets_in_fixed_set": fixed_universe,
+                          "games_per_bucket_before_fixed_set": before_counts}
+    print(f"  fixed game set over {fixed_universe} (before: {before_counts}): "
+          f"{dropped} game(s) dropped for missing at least one of those buckets")
+    for b in BUCKET_LABELS:
+        sub = fixed[fixed.offset_bucket == b]
+        if len(sub) < 30:
+            print(f"  {b:4s} n {len(sub)} -- too few"); continue
+        yy = (sub.close - sub.line_pt).to_numpy(float)
+        xx = (sub.E4 - sub.line_pt).to_numpy(float)
+        r = cluster_ols(yy, xx, sub.week.to_numpy())
+        out["by_capture"][b] = r
+        print(f"  {b:4s} slope {r['slope']:+.3f} [{r['lo']:+.3f}, {r['hi']:+.3f}]  n {r['n']}  weeks {r['clusters']}")
+
     print("\nper week: games graded / mean |close - Monday| / mean |E4 - Monday|")
     wk = graded.assign(ay=np.abs(y), ax=np.abs(x4)).groupby("week").agg(n=("event_id", "size"),
                                                                        move=("ay", "mean"), gap=("ax", "mean"))
     print(wk.round(2).to_string())
     out["per_week"] = json.loads(wk.reset_index().to_json(orient="records"))
-    need = out["slope"]["E4"]["n_for_mde_0.2"]
-    print(f"\nAmendment B1: no verdict until n >= {need} (MDE {TARGET_MDE}) or season end. Reported, not decided.")
+
+    season_ended = season_has_ended(now)
+    out["season_ended"] = season_ended
+    out["verdict"] = apply_stopping_rule(out["slope"]["E4"], season_ended)
+    status = ("confirmatory_gate_met" if out["verdict"] else
+              "inconclusive" if season_ended else "pre_season_end")
+    out["read_status"] = status
+    print(f"\nAmendment B3 (stopping rule): {STOPPING_RULE}")
+    print(f"  season_ended={season_ended}  clusters(E4)={out['slope']['E4']['clusters']}  "
+          f"verdict={out['verdict']}  status={status}")
     OUT.write_text(json.dumps(out, indent=2, default=float))
     print(f"wrote {OUT}")
     return 0
