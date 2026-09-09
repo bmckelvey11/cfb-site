@@ -170,6 +170,13 @@ still holds only `pollRank`, at `cfb_system_maker/graphql_client.py:70` (§4 say
   worktrees and docs: `stg_gql.game` **20**, `game_lines` 12, `lines_provider` 6, `calendar`
   **6**, plus `game_lines__backfill` 3, `game__away_line_scores` 2, `current_teams` 1 — about
   **50**. The step-7 collapse is riskier than documented.
+- **R8's gate cuts both ways, which changes how step 7 is sequenced.**
+  `tests/test_catalog_resolution.py` asserts that *every* non-docstring `<schema>.<table>`
+  literal under `cfb_system_maker/`, `models/`, `research/` and `scripts/` resolves against the
+  live catalog. So the collapse cannot land incrementally: every one of those ~50 `stg_gql.*`
+  literals must be rewritten in the same commit as the rename, and the test's `ALLOW` entry for
+  `("stg_gql", "game_lines__backfill")` has to move with them. §2 and R8 present the test purely
+  as a safety net; it is also a hard all-at-once constraint on step 7.
 - `stg_gql.calendar` has no `season` column at all (`year`, `week`, `seasonType`, `startDate`,
   `endDate`), which §6's key table implies it does.
 
@@ -202,6 +209,9 @@ Ordered by what blocks execution.
 1. **Rewrite §5 against the current warehouse.** The drop list becomes 7 columns; delete the
    three `stg.plays.*` entries and the three vanished ActionNetwork ones, add
    `stg.an_team.overtime_losses`. Replace the 332 / 308 / 12 / 12 breakdown with 11 / 0 / 4 / 7.
+   Delete the mechanism claim with it — "One loader change removes all 308" and the
+   146 / 114 / 48 distribution table are the sentences a reader would actually act on, and both
+   describe a warehouse that no longer exists.
 2. **Delete §8 steps 2 and 3, and R3** — or restate R3 as already satisfied, with
    `explode_payloads` cited as the mechanism. Re-anchor step 4 on step 1 alone.
 3. **Move `recruit` from Bucket B to Bucket C**, merging on `recruitId`. Restate Bucket B's
