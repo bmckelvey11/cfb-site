@@ -215,7 +215,7 @@ git commit -m "fix(spread): version B grades scores from core.fact_game, which t
 
 ---
 
-### Task 3: Collector health check
+### Task 3: Collector health check — **done 2026-09-08**
 
 The runbook's safeguard is "count snapshots once a month". The 09-04 outage cost four days
 before anyone looked. A script that exits non-zero when the stream is stale gives the Monday
@@ -229,7 +229,7 @@ routine (Task 8) something to fail on.
 **Interfaces:**
 - Produces: `stale(latest: datetime, now: datetime, max_gap_hours: float = 12) -> bool`; `in_season(now: datetime) -> bool` (Aug 25 – Dec 15).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_spread_collector_health.py
@@ -254,12 +254,12 @@ def test_in_season_window():
     assert not ch.in_season(datetime(2026, 2, 1, tzinfo=UTC))
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `python -m pytest tests/test_spread_collector_health.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'collector_health'`
 
-- [ ] **Step 3: Write the script**
+- [x] **Step 3: Write the script**
 
 ```python
 # research/spread/scripts/collector_health.py
@@ -314,12 +314,12 @@ Note: a snapshot is only written when PT's file changes, so a quiet PT (Sunday n
 look stale. `MAX_GAP_HOURS = 12` tolerates two unchanged slots; if this false-alarms weekly,
 raise it to 18 and record why.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `python -m pytest tests/test_spread_collector_health.py -q`
 Expected: 2 passed
 
-- [ ] **Step 5: Run it for real and add to the runbook**
+- [x] **Step 5: Run it for real and add to the runbook**
 
 Run: `python research/spread/scripts/collector_health.py`
 Expected: exit 0 and one line naming the newest snapshot.
@@ -331,7 +331,7 @@ Add to `docs/line-timing-collector.md` under "Checking it is alive":
 than 12 hours old in season. Run it Monday morning before reading version B.
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add research/spread/scripts/collector_health.py tests/test_spread_collector_health.py docs/line-timing-collector.md
@@ -340,7 +340,7 @@ git commit -m "feat(spread): collector health check that fails on a stale snapsh
 
 ---
 
-### Task 4: When does each model publish? (from the snapshots we already have)
+### Task 4: When does each model publish? (from the snapshots we already have) — **done 2026-09-08**
 
 The "get earlier than PT" idea assumes the leading movement forecasters post before PT's Monday
 compile. The 6-hourly snapshots already record, per model column, the first capture in which it
@@ -354,7 +354,7 @@ is non-null each week — that *is* the publication time. No scraping needed.
 **Interfaces:**
 - Produces: `first_seen(snapshots: list[tuple[str, pd.DataFrame]]) -> pd.DataFrame` with columns `slate, model, first_capture_utc, hours_after_monday_et`; `slate` is the Monday date (ET) of the week the snapshot's games belong to, computed from the kick dates via `weekly_slate.live_books`? No — kick dates are not in PT's file. Use the game *set*: a new slate starts when > 50% of (road, home) pairs differ from the previous snapshot (same rule as `pt_rollover.NEW_SLATE_FRAC`), and the slate is labelled by the Monday on or before its first capture.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_spread_publish_times.py
@@ -390,12 +390,12 @@ def test_first_seen_per_slate_and_model():
     assert ("2026-09-07", "linefpi") not in row.index          # never published that week
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `python -m pytest tests/test_spread_publish_times.py -q`
 Expected: FAIL with `ModuleNotFoundError`
 
-- [ ] **Step 3: Write the script**
+- [x] **Step 3: Write the script**
 
 ```python
 # research/spread/scripts/model_publish_times.py
@@ -487,12 +487,12 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `python -m pytest tests/test_spread_publish_times.py -q`
 Expected: 1 passed
 
-- [ ] **Step 5: Run it and write the section**
+- [x] **Step 5: Run it and write the section**
 
 Run: `python research/spread/scripts/model_publish_times.py`
 
@@ -505,7 +505,7 @@ Add to `line-movement-results.md` a section **"When the constituents publish (fr
   reader can see whether a slate's read rested on a thin panel. Revisit only at season end.
 - < 10 present Monday → the consensus is not complete on Monday; amendment B2 (Task 7) must anchor on the first snapshot where ≥ 15 of 20 are present, and the "Monday" read is partly a "which models are in yet" read.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add research/spread/scripts/model_publish_times.py tests/test_spread_publish_times.py research/spread/docs/line-movement-results.md
@@ -514,7 +514,7 @@ git commit -m "feat(spread): model publication times from the snapshot stream"
 
 ---
 
-### Task 15: Amendment A6 — the walk-forward decontamination screen
+### Task 15: Amendment A6 — the walk-forward decontamination screen — **done 2026-09-08**
 
 **Highest priority in Phase 1, and Task 5 depends on it.** A3's screen computed
 `ρ_i = corr(f_i − open, close − open)` over all of 2001–2025 and dropped the top decile before
@@ -528,25 +528,25 @@ but conservative is not fixed-in-advance, and A3's p-values are conditional unti
 - Create: `tests/test_spread_decontam.py`
 - Registered in: `research/spread/docs/prereg-line-movement.md` (amendment A6, already committed)
 
-- [ ] **Step 1: Write the failing test.** The drop list for a given evaluation season is
+- [x] **Step 1: Write the failing test.** The drop list for a given evaluation season is
       identical when rows from that season and later are deleted from the input, and no
       evaluation-season row reaches the screen. That is the whole point of the change.
-- [ ] **Step 2: Extract the screen** into a function taking the seasons it may look at, and
+- [x] **Step 2: Extract the screen** into a function taking the seasons it may look at, and
       compute it walk-forward: for evaluation season *s*, build the list from seasons < *s*.
-- [ ] **Step 3: Add `--decontaminate-wf`**, keeping `--decontaminate` working — A3 stays on the
+- [x] **Step 3: Add `--decontaminate-wf`**, keeping `--decontaminate` working — A3 stays on the
       record as run.
-- [ ] **Step 4: Run once**, with and without `--amend`. Outputs `pt_movement_decon_wf.json`,
+- [x] **Step 4: Run once**, with and without `--amend`. Outputs `pt_movement_decon_wf.json`,
       `pt_movement_a2_decon_wf.json` and the matching `_preds` files.
-- [ ] **Step 5:** Leave the numbers in JSON. Wave 3 writes the prose — do not edit
+- [x] **Step 5:** Leave the numbers in JSON. Wave 3 writes the prose — do not edit
       `line-movement-results.md` here.
-- [ ] **Step 6: Commit** — `feat(spread): walk-forward decontamination screen (amendment A6)`
+- [x] **Step 6: Commit** — `feat(spread): walk-forward decontamination screen (amendment A6)`
 
 Report per method: R² on the full panel, under the full-sample screen, and under the
 walk-forward screen, plus both drop lists and their overlap.
 
 ---
 
-### Task 5: Amendment A4 — a finer ridge grid, and whether to keep serving E6
+### Task 5: Amendment A4 — a finer ridge grid, and whether to keep serving E6 — **done 2026-09-08**
 
 **Depends on Task 15.** A4 runs on the **walk-forward** decontaminated panel, not the
 full-sample one — running it on the old panel bakes A3's screen into a serving decision.
@@ -570,7 +570,7 @@ whether ridge earns its place next to E4 on the decontaminated panel, then eithe
 - Modify: `research/spread/docs/line-movement-results.md` (A4 section)
 - Modify: `research/spread/scripts/weekly_slate.py:219-221` (`PARAMS`, `MODEL_COLS`) — only if the decision says drop
 
-- [ ] **Step 1: Pre-register, commit before running**
+- [x] **Step 1: Pre-register, commit before running**
 
 Append to `prereg-line-movement.md`:
 
@@ -594,7 +594,7 @@ git add research/spread/docs/prereg-line-movement.md
 git commit -m "docs(spread): pre-register amendment A4, finer ridge grid"
 ```
 
-- [ ] **Step 2: Add the flag**
+- [x] **Step 2: Add the flag**
 
 In `eval_line_movement.py`, after `WIDE_LAMBDA = [...]` add `FINE_LAMBDA = [1000.0, 2000.0, 5000.0, 1e4, 2e4, 5e4]`, and in `main()`:
 
@@ -614,7 +614,7 @@ after the `--amend` block:
 
 (`suffix` is built before this; move its assignment below so `_a4` lands after `_decon`.)
 
-- [ ] **Step 3: Run once**
+- [x] **Step 3: Run once**
 
 ```bash
 python research/spread/scripts/eval_line_movement.py --decontaminate --fine-ridge
@@ -622,7 +622,7 @@ python research/spread/scripts/eval_line_movement.py --decontaminate --fine-ridg
 
 Expected: ~3 minutes; a table with R0, E4, E6 and the chosen λ counts. Output `pt_movement_decon_a4.json`.
 
-- [ ] **Step 4: Write the A4 section and apply the decision**
+- [x] **Step 4: Write the A4 section and apply the decision**
 
 In `line-movement-results.md` add "Amendment A4 — finer ridge grid" with the R², chosen-λ
 distribution and the scorecard line. Then apply the pre-registered rule:
@@ -630,7 +630,7 @@ distribution and the scorecard line. Then apply the pre-registered rule:
 - Retire: in `weekly_slate.py` remove `"E6": 10000.0` from `PARAMS` and `"E6"` from `MODEL_COLS`; update the docstring column list; `pred_close` (median of model columns) then excludes it. Run `python research/spread/scripts/weekly_slate.py --no-books` to confirm it still builds.
 - Keep: change `"E6": 10000.0` to the modal A4 λ and cite `pt_movement_decon_a4.json` in the `PARAMS` comment.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add research/spread/scripts/eval_line_movement.py research/spread/scripts/weekly_slate.py research/spread/docs/line-movement-results.md
@@ -639,7 +639,7 @@ git commit -m "feat(spread): amendment A4 -- fine ridge grid; serve or retire E6
 
 ---
 
-### Task 6: Does the panel's information extend past PT's last capture?
+### Task 6: Does the panel's information extend past PT's last capture? — **done 2026-09-08**
 
 PT's `line` is 0.7 points short of the consensus close. On the 1,219 matched 2024–25 games
 the walk-forward E4 predictions exist (`pt_movement_preds_decon.csv`). If E4's disagreement
@@ -652,7 +652,7 @@ market had not priced by PT's last capture — the only archive evidence that co
 - Modify: `research/spread/scripts/check_pt_line_is_close.py` (second section)
 - Modify: `research/spread/docs/line-movement-results.md` (§ target)
 
-- [ ] **Step 1: Pre-register, commit before running**
+- [x] **Step 1: Pre-register, commit before running**
 
 ```markdown
 ## Amendment A5 — the remaining move after PT's capture (committed before the run)
@@ -672,7 +672,7 @@ git add research/spread/docs/prereg-line-movement.md
 git commit -m "docs(spread): pre-register amendment A5, the move after PT's capture"
 ```
 
-- [ ] **Step 2: Add the section to the script**
+- [x] **Step 2: Add the section to the script**
 
 In `check_pt_line_is_close.py`, after `out = {...}` and before the prints, add:
 
@@ -693,7 +693,7 @@ In `check_pt_line_is_close.py`, after `out = {...}` and before the prints, add:
 
 with `import eval_version_b as vb` added to the imports (it provides `cluster_ols`). `pt_week` and `game_id` come from `base.load()`; keep them in the frame by not selecting columns before the merge.
 
-- [ ] **Step 3: Run once**
+- [x] **Step 3: Run once**
 
 ```bash
 python research/spread/scripts/check_pt_line_is_close.py
@@ -701,11 +701,11 @@ python research/spread/scripts/check_pt_line_is_close.py
 
 Expected: the existing table plus three slope lines; n ≈ 1,100 (games with an E4 prediction, 2024–25 are in the walk-forward support).
 
-- [ ] **Step 4: Record**
+- [x] **Step 4: Record**
 
 In `line-movement-results.md` § "The target", add the A5 table and its scorecard line against the expectation.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add research/spread/scripts/check_pt_line_is_close.py research/spread/docs/line-movement-results.md
@@ -714,7 +714,7 @@ git commit -m "feat(spread): amendment A5 -- does the panel predict the move aft
 
 ---
 
-### Task 7: Amendment B2 — timing decay at live prices (pre-register now, read weekly)
+### Task 7: Amendment B2 — timing decay at live prices (pre-register now, read weekly) — **done 2026-09-08**
 
 Version B anchors on the first Monday snapshot. The tradeable question is how fast the
 predictable move is absorbed *after* that: the same slope at the Monday, Tuesday, Wednesday and
@@ -736,7 +736,7 @@ the decay would be confounded with which games happen to be captured when. A gam
 any bucket is excluded from all of them, and the count that costs is reported. Resample by game
 **and** week.
 
-- [ ] **Step 1: Pre-register, commit before any in-season read**
+- [x] **Step 1: Pre-register, commit before any in-season read**
 
 ```markdown
 ## Amendment B2 — decay at live prices (committed 2026-09-xx, before the first in-season read)
@@ -753,7 +753,7 @@ gate and "tue" is under half of it, the bet window is Monday only and the consti
 route (Task 4's decision) is the next step.
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Append to `tests/test_spread_version_b.py`:
 
@@ -768,7 +768,7 @@ def test_capture_offsets_bucket_by_hours_after_monday():
 
 Run: `python -m pytest tests/test_spread_version_b.py -q` → expected FAIL, `no attribute 'capture_offsets'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 > **The sample below is illustrative and was wrong on one point** (corrected in the shipped
 > implementation, 2026-09-08): it returned every (game, snapshot) row, which contradicts the
@@ -814,12 +814,12 @@ and in `main()`, after the B5 block:
         print(f"  {b:4s} slope {r['slope']:+.3f} [{r['lo']:+.3f}, {r['hi']:+.3f}]  n {r['n']}  weeks {r['clusters']}")
 ```
 
-- [ ] **Step 4: Run the tests and the grader**
+- [x] **Step 4: Run the tests and the grader**
 
 Run: `python -m pytest tests/test_spread_version_b.py -q` → 3 passed.
 Run: `python research/spread/scripts/eval_version_b.py` → a B2 block with `mon`, `tue`, `wed` rows for week 2 (one week; HC1 SE).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add research/spread/docs/prereg-line-movement.md research/spread/scripts/eval_version_b.py tests/test_spread_version_b.py
@@ -830,7 +830,7 @@ git commit -m "feat(spread): amendment B2 -- version B slope by capture offset"
 
 ## Phase 2 — every week of the season
 
-### Task 8: The Monday routine, automated
+### Task 8: The Monday routine, automated — **wiring done 2026-09-08** (steps below complete; the routine itself runs every Monday of the season, so the task stays open)
 
 `CFB-AN-History` already runs Mondays 09:00. Make that run also grade version B, so the read
 exists without a hand run, and make the health check the first thing it does.
@@ -840,7 +840,7 @@ exists without a hand run, and make the health check the first thing it does.
 - Modify: `docs/line-timing-collector.md` ("What is registered")
 - Modify: `research/spread/docs/line-movement-results.md` (a "Version B reads" table, one row per Monday)
 
-- [ ] **Step 1: Chain the grader after the history pull**
+- [x] **Step 1: Chain the grader after the history pull**
 
 In `collect_line_timing.main()`, replace the history branch with:
 
@@ -859,7 +859,7 @@ In `collect_line_timing.main()`, replace the history branch with:
             print(f"version B grade skipped: collector_health exited {health.returncode}")
 ```
 
-- [ ] **Step 2: Run the history mode by hand once to see the chain**
+- [x] **Step 2: Run the history mode by hand once to see the chain**
 
 ```bash
 research\spread\scripts\collect_line_timing.cmd history --season 2026 --weeks 1-16
@@ -867,7 +867,7 @@ research\spread\scripts\collect_line_timing.cmd history --season 2026 --weeks 1-
 
 Expected: history summary, then the health line, then the version B tables, all in `logs/line_timing.log`.
 
-- [ ] **Step 3: Add the reads table**
+- [x] **Step 3: Add the reads table**
 
 In `line-movement-results.md` § "Version B", add:
 
@@ -881,13 +881,13 @@ In `line-movement-results.md` § "Version B", add:
 
 and append one row each Monday from `processed/version_b.json`.
 
-- [ ] **Step 4: Update the runbook's registered-task table**
+- [x] **Step 4: Update the runbook's registered-task table**
 
 ```markdown
 | `CFB-AN-History` | `collect_line_timing.cmd history --weeks 1-16` | Mondays 09:00 | Yes — just run it. Also runs `collector_health.py` and `eval_version_b.py`. |
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add research/spread/scripts/collect_line_timing.py docs/line-timing-collector.md research/spread/docs/line-movement-results.md
@@ -896,7 +896,7 @@ git commit -m "feat(spread): Monday routine -- backfill, health check, version B
 
 ---
 
-### Task 9: Line-shopping amendment — outlier guard and price-adjusted value
+### Task 9: Line-shopping amendment — outlier guard and price-adjusted value — **done 2026-09-08**
 
 **The `3.2` constant is settled (user, 2026-09-08): keep it for shopping.** It was estimated on
 the line-shopping sample itself (2024–25, 3,574 sides), so it is the in-sample conversion for
@@ -914,7 +914,7 @@ are pre-registered here and run once.
 - Modify: `research/spread/scripts/eval_line_shopping.py` (guard + value column; read the file first — its `fair`/`best` construction is in the function that groups by `event_id`)
 - Modify: `research/spread/docs/line-shopping-results.md` (S1 section)
 
-- [ ] **Step 1: Pre-register, commit before running**
+- [x] **Step 1: Pre-register, commit before running**
 
 ```markdown
 ## Amendment S1 — outlier guard and price (committed before the rerun)
@@ -932,7 +932,7 @@ mis-posts); at gain ≥ 1 about 12% of sides have value ≤ 0 once priced (the f
 post hoc on 2026-09-02); the gain ≥ 1 ATS at best stays inside [48, 57]. One run.
 ```
 
-- [ ] **Step 2: Implement the guard**
+- [x] **Step 2: Implement the guard**
 
 Where `eval_line_shopping.py` builds the per-game book table (the group over `event_id` that produces `fair`), insert before the median:
 
@@ -945,7 +945,7 @@ Where `eval_line_shopping.py` builds the per-game book table (the group over `ev
 
 (`v` is the Series of home spreads by book for that game — match the variable name used there.)
 
-- [ ] **Step 3: Implement price-adjusted value**
+- [x] **Step 3: Implement price-adjusted value**
 
 Add near the top:
 
@@ -956,7 +956,7 @@ def breakeven(odds: float) -> float:
 
 and in the per-side table add `value = 3.2 * gain - 100 * (breakeven(best_odds) - breakeven(median_odds))`, where `median_odds` is the odds at the book that supplied the median number (or −110 when the median is an average of two books). Report `value.mean()` at gain ≥ 0.5 and ≥ 1.0 and `(value <= 0).mean()`.
 
-- [ ] **Step 4: Run once and record**
+- [x] **Step 4: Run once and record**
 
 ```bash
 python research/spread/scripts/eval_line_shopping.py
@@ -964,7 +964,7 @@ python research/spread/scripts/eval_line_shopping.py
 
 Add "Amendment S1" to `line-shopping-results.md` with the P2 figure, the value means and the scorecard.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add research/spread/docs/prereg-line-shopping.md research/spread/scripts/eval_line_shopping.py research/spread/docs/line-shopping-results.md
@@ -1025,19 +1025,19 @@ git commit -m "docs(spread): version B verdict"
 
 ## Hygiene (any time; each is its own small commit)
 
-### Task 12a: The four estimator tests
+### Task 12a: The four estimator tests — **done 2026-09-08**
 
 The estimator core the whole tree rests on is thinly covered. Add to
 `tests/test_spread_estimators.py`:
 
-- [ ] `holm` on a known input, including ties and the monotonicity step.
-- [ ] `pick_1se` on a known curve — the chosen point is the most-shrunk parameter within one SE
+- [x] `holm` on a known input, including ties and the monotonicity step.
+- [x] `pick_1se` on a known curve — the chosen point is the most-shrunk parameter within one SE
       of the best, and an edge hit is reported as an edge hit.
-- [ ] `wild_cluster_boot` calibration: over many independent null draws the p-values are
+- [x] `wild_cluster_boot` calibration: over many independent null draws the p-values are
       ~uniform. The existing test checks a single draw, which cannot detect a miscalibrated
       bootstrap. Keep the draw count off the slow list — a few hundred with a fixed seed,
       asserting the rejection rate at α = 0.1 is within binomial tolerance.
-- [ ] The walk-forward drop-list test from Task 15: the list for a given evaluation season is
+- [x] The walk-forward drop-list test from Task 15: the list for a given evaluation season is
       unchanged when rows from that season and later are deleted, and no evaluation-season row
       reaches the screen.
 
@@ -1045,21 +1045,21 @@ The estimator core the whole tree rests on is thinly covered. Add to
 
 ---
 
-### Task 12: Mark the estimator modules' `main()` as archived-era
+### Task 12: Mark the estimator modules' `main()` as archived-era — **done 2026-09-08**
 
-- [ ] In `eval_prediction_tracker_models.py` and `eval_combination_sweep.py`, change the first docstring line to: `"""Estimator core for the spread tree (imported by the live scripts). main() reproduces the archived margin-era tables: archive/spread-margin-era/."""` keeping the rest.
-- [ ] Commit: `git commit -am "docs(spread): mark the core modules' main() as margin-era"`.
+- [x] In `eval_prediction_tracker_models.py` and `eval_combination_sweep.py`, change the first docstring line to: `"""Estimator core for the spread tree (imported by the live scripts). main() reproduces the archived margin-era tables: archive/spread-margin-era/."""` keeping the rest.
+- [x] Commit: `git commit -am "docs(spread): mark the core modules' main() as margin-era"`.
 
 ### Task 13: Clear the margin-era outputs from the data dir (user's call; not committed data)
 
 - [ ] List first: `ls data/processed/pt_leaderboard_* pt_ensemble_* pt_e4_weights_* pt_sweep_* pt_recency_* pt_neff_* pt_ats_tail_* pt_model_eval.json pt_combination_sweep*.json pt_recency_screen.json pt_model_season_stability.csv weekly_slate_2026w2.csv`.
 - [ ] Delete only after the user confirms; they are regenerable from the archived scripts at commit `d212537` except `pt_model_season_stability.csv`, which has no script.
 
-### Task 14: Reconcile the two spread CLV figures outside this tree
+### Task 14: Reconcile the two spread CLV figures outside this tree — **done 2026-09-08**
 
 `docs/clv-analysis.md` (+0.318 on 154 spreads) and `docs/bet-history-analysis-2023-2025.md` (+0.07 on 250) disagree; the 09-02 review flagged it. Not this tree's data, but version B's CLV will be compared to the user's own record, so:
 
-- [ ] Open both, list the join each uses, and write one paragraph in `docs/clv-analysis.md` saying which number to quote and why. Commit.
+- [x] Open both, list the join each uses, and write one paragraph in `docs/clv-analysis.md` saying which number to quote and why. Commit.
 
 ---
 

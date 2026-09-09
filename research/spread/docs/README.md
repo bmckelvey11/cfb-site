@@ -12,13 +12,14 @@ that the live tree still uses is listed in that folder's README.
 ## Current position, in three sentences
 
 Anchored on the opener, the screened consensus (E4) anticipates about 15% of the open→close
-move, and that survives removing the most market-anchored columns (γ ≈ 0.29, R² 0.15, direction
-right ~69%, +1.2 to +3.8 points of CLV at the opener). The opener is unreachable through PT,
+move, and that survives the walk-forward decontamination screen (amendment A6) — the screen
+that never sees its own test set, now the citable one. The opener is unreachable through PT,
 and the archive's "close" is PT's last recorded line, 0.7 points short of the consensus close.
 **Version B** — the same forecast graded at Monday's line against the real close — decides
-whether anything is bettable; its first read (42 games) is a slope of 0.20 with an interval that
+whether anything is bettable; its first read (42 games) is a slope with an interval that
 includes zero on one week cluster. Amendment B3 fixes when a verdict is due: no verdict
-before season end, and at season end confirmatory inference needs ≥ 8 week clusters.
+before season end, and at season end confirmatory inference needs ≥ 8 week clusters. Every
+number above lives in `line-movement-results.md`, never here.
 
 ## Reading order for someone new
 
@@ -33,8 +34,8 @@ before season end, and at season end confirmatory inference needs ≥ 8 week clu
 
 | Document | Kind | What it holds |
 |---|---|---|
-| `prereg-line-movement.md` | prereg | Retarget the panel at line movement. Version A, amendments A2 (rest of the library), A3 (decontamination), B1 (the version B read). |
-| `line-movement-results.md` | results | A, A2, A3; what PT's `line` is; version B first read. |
+| `prereg-line-movement.md` | prereg | Retarget the panel at line movement. Version A, amendments A2 (rest of the library), A3 (decontamination), B1 (the version B read), the amendment ledger, A6 (walk-forward screen), B3 (stopping rule), A5 (post-capture move), A4 (finer ridge grid). |
+| `line-movement-results.md` | results | A, A2, A3, A6, A4, A5; what PT's `line` is; when the constituents publish; B2 (capture buckets); version B reads. |
 | `prereg-line-shopping.md` | prereg | Book fair = median of books; the outlier book is the bet. |
 | `line-shopping-results.md` | results | Dispersion tail across 7 Action Network books, 2024–2025. |
 | `combining-predictions.md` | review | How E4 and the book fair combine into one fair spread and one bet decision. |
@@ -54,10 +55,11 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | Script | Implements | Writes |
 |---|---|---|
 | `build_prediction_tracker.py` | `prediction-tracker.md` | `ingest/prediction_tracker_lines.csv` |
-| `eval_line_movement.py` [`--amend`] [`--decontaminate`] | `prereg-line-movement.md` A / A2 / A3 | `processed/pt_movement_preds{,_a2}{,_decon}.csv`, `pt_movement{…}.json` |
-| `eval_version_b.py` | `prereg-line-movement.md` B4–B5, amendment B1 | `processed/version_b.json` |
+| `eval_line_movement.py` [`--amend`] [`--decontaminate`] [`--decontaminate-wf`] [`--fine-ridge`] | `prereg-line-movement.md` A / A2 / A3 / A6 / A4 | `processed/pt_movement_preds{,_a2}{,_decon,_decon_wf}.csv`, `pt_movement{…}.json`, `pt_movement_decon_wf_a4.json` |
+| `eval_version_b.py` | `prereg-line-movement.md` B4–B5, amendments B1, B2, B3 | `processed/version_b.json` |
 | `eval_line_shopping.py` | `prereg-line-shopping.md` | `processed/line_shopping_sides.csv`, `line_shopping.json` |
-| `check_pt_line_is_close.py` | `line-movement-results.md` § target | `processed/pt_line_vs_an_close.json` |
+| `check_pt_line_is_close.py` | `line-movement-results.md` § target, amendment A5 | `processed/pt_line_vs_an_close.json` |
+| `model_publish_times.py` | `line-movement-results.md` § when the constituents publish | `processed/model_publish_times.csv` |
 
 Estimator core, imported by all of the above and not run on its own for live work:
 `eval_prediction_tracker_models.py` (loader, `MARKET_LINES`, prior skill, wild cluster
@@ -86,7 +88,7 @@ Never committed. `CFB_DATA_ROOT` is `C:\Users\mckel\dev\cfb\data`.
 | `ingest/prediction_tracker_lines.csv` | The joined panel. Regenerate, don't archive. |
 | `ingest/pt_snapshots/` | Forward collector: live slate + `.meta.json`, one pair per fetch. Irreplaceable. |
 | `raw/actionnetwork/history_event_*.json` | Per-book price paths; the close for version B. Backfillable. |
-| `processed/pt_movement*`, `version_b.json`, `movement_forward_log.csv`, `weekly_slate_*.csv`, `line_shopping*`, `pt_line_vs_an_close.json` | Every analysis output above. |
+| `processed/pt_movement*`, `version_b.json`, `movement_forward_log.csv`, `weekly_slate_*.csv`, `line_shopping*`, `pt_line_vs_an_close.json`, `model_publish_times.csv` | Every analysis output above. |
 
 `processed/pt_*` files not listed (leaderboards, sweeps, recency, neff, ats tail, season
 stability) are margin-era outputs; their scripts are archived and they are not regenerated.

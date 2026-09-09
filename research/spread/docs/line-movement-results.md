@@ -11,14 +11,20 @@ walk-forward support 14,068 games, 2006–2025. sd(close − open) = 2.48 points
 
 ## The one-line result
 
-**The screened consensus anticipates about 15% of the open→close move, and that survives
-removing the most market-anchored columns** (amendment A3, below): E4 keeps 90% of its R²
-(0.170 → 0.153), γ stays at 0.29, direction is right seven times in ten, and a bet on its side
-at the opener earns 1.2 to 3.8 points of closing line value. The ridge's extra (R² 0.248) was
-the mid-week line read back: decontaminated it falls to E4's level (0.163). **The opener is
-the only price at which any of this is measured**, the archive's "close" is PT's last recorded
-line (0.7 points from the consensus close on average, § target), and week 1 of 2026 showed the
-opener is months gone by Monday. Whether anything is left at Monday's price is version B.
+**The screened consensus anticipates about 15% of the open→close move, and that survives a
+decontamination screen that never sees its own test set** (amendment A6, the walk-forward
+screen, below — superseding A3's full-sample screen as the citable number): E4 keeps 90.7% of
+its R² (0.170 → 0.154), γ stays at 0.28, direction is right roughly seven times in ten, and a
+bet on its side at the opener earns CLV at the opener (A6 CLV table, below). **What A3 got
+wrong is not E4's number, it is E6's**: under A3's full-sample screen E6 looked like it fell to
+E4's level (0.163); under A6 it does not — E6 retains 81.1% and its decontaminated R² (0.201)
+stays *above* E4's (0.154). E4 is still graded, not because it scores higher (it doesn't), but
+because prereg B1 fixed it before any of this was seen — see decision 2 / the A6 section for why
+that still holds. A3 is retained as run (`--decontaminate` still reproduces it byte for byte).
+**The opener is the only price at which any of this is measured**, the archive's "close" is
+PT's last recorded line (0.69 points from the consensus close on average on 1,440 matched
+games, § target), and week 1 of 2026 showed the opener is months gone by Monday. Whether
+anything is left at Monday's price is version B.
 
 ## A1 — how much of the move is predictable
 
@@ -254,18 +260,136 @@ mid-week and only version B can time-stamp them.
 | expectation | outcome |
 |---|---|
 | E4 retains ≥ 60% | ✓ 90% |
-| E6 falls to E4's level or below | ✓ 0.163 vs 0.153 |
+| E6 falls to E4's level or below | ✓ under A3's own (conditional) screen, 0.163 vs 0.153 — **A6 below reverses this** |
 | E14 retains less than E4 | ✓ 79% vs 90% |
 
-## The target — what PT's `line` is (checked 2026-09-08)
+A3's screen saw the seasons it was later scored on. A6, next, is the fix and the citable number;
+A3 stands as the run it was, not as the number to quote going forward.
+
+## Amendment A6 — walk-forward decontamination screen (run 2026-09-08, registered in `prereg-line-movement.md`)
+
+A3 computed `ρ_i = corr(f_i − open, close − open)` over the full 2001–2025 archive and dropped
+the top decile before fitting — the screen saw every evaluation season, so A3's inference was
+conditional on a full-sample screen. A6 fixes that: the drop list for evaluation season *s* is
+built from seasons **< *s* only**, so it never sees its own test set. `--decontaminate` still
+reproduces A3 byte for byte; A3 is retained as run, and **A6 is now the citable screen**.
+
+| method | R² full panel | A3 full-sample screen | A6 walk-forward screen | A6 retention |
+|---|---|---|---|---|
+| **E4** screened consensus | 0.170 | 0.153 | **0.154** | **90.7%** |
+| E6 ridge | 0.248 | 0.163 | **0.201** | 81.1% |
+| E7 | 0.147 | 0.133 | 0.132 | 90.0% |
+| E14 screened CSR | 0.136 | 0.107 | 0.113 | 82.9% |
+
+E4's γ under A6: median **0.283**, range 0.182–0.323, positive in all 20 of 20 seasons.
+
+**Drop lists.** A3's fixed list has 15 models. A6's final-season (2025) list has 14, and overlaps
+A3's list on all 14 — the one difference is `linedokter`, which A3 dropped and A6 keeps. Across
+all 20 walk-forward evaluation seasons, A6's union of dropped models is 33 (versus A3's constant
+15), because early seasons have only 5–13 prior seasons to estimate ρ on and the estimate is
+noisier there — more models get flagged in the thin early years, not fewer.
+
+**A6 reverses a framing the tree carried.** Under A3, E6 retained 66% of its R² against E4's
+90% — the basis for calling E6 "the bigger loser to decontamination". Under the honest,
+walk-forward screen, E6 retains **81.1%**, and its absolute decontaminated R² (**0.201**) is
+**higher** than E4's (0.154) — closer to the full-panel ordering, where E6 also led. E4 is still
+the more robust estimator by retention (90.7% vs 81.1%), but that case is materially weaker than
+A3 made it look.
+
+**E4 stays the graded predictor anyway.** Prereg B1 fixed E4 as the predictor version B grades
+*before any version B data existed*, with E6 and the model median reported beside it and no
+selection among them. A6 showing E6 scores better on the archive is exactly the kind of
+result-seen-after-the-fact information that selection is built on — switching now would be the
+selection-on-outcome this tree exists to prevent. If E6 is genuinely the better predictor, the
+way to establish that is a new pre-registration and its own forward test, not a substitution
+into the one already running.
+
+Closing line value at the opener, A6 walk-forward decontaminated:
+
+| rule | bets | mean CLV | 95% CI | beat close | ATS at the opener |
+|---|---|---|---|---|---|
+| E4, pred move ≥ 1 | 2,902 | +1.24 | [+0.76, +1.70] | 60.8% | 52.0% [49.3, 54.6] |
+| E4, pred move ≥ 2 | 338 | +3.72 | [+1.58, +5.85] | 72.2% | 60.4% [49.4, 72.4] |
+| E6, pred move ≥ 2 | 1,088 | +2.39 | [+1.73, +3.05] | 73.9% | 57.9% [52.8, 63.2] |
+| E14, pred move ≥ 1 | 519 | +3.10 | [+1.71, +4.51] | 71.9% | 57.4% [51.3, 63.5] |
+
+### A6 scorecard
+
+| expectation | outcome |
+|---|---|
+| walk-forward drop list overlaps the full-sample one substantially | ✓ 14 of 15 final-season models overlap; A6 keeps `linedokter` |
+| E4's retention stays within a few points of 90% | ✓ 90.7% |
+
+## Amendment A4 — finer ridge grid on the walk-forward panel (run 2026-09-08, registered in `prereg-line-movement.md`)
+
+Baseline is A6, not A3 — A6 replaced the full-sample screen before A4 ran, and the plan of
+record requires A4 to run on whichever screen is current. `FINE_LAMBDA = [1000, 2000, 5000,
+1e4, 2e4, 5e4]`, E6 only, `--decontaminate-wf --fine-ridge`, same support, inference and 1-SE
+rule, run once.
+
+R²(E6, A4 fine grid) = **0.2002**, against R²(E4, A6) = 0.1537. The pre-registered decision rule
+(retire E6 if the gap ≤ 0.02) does not fire — the gap is 0.046 — so **E6 is kept**, served at
+the modal chosen λ.
+
+**The decision is not the finding.** λ = 50,000 — the top edge of the new grid — was chosen in
+**19 of 19** walk-forward evaluation seasons that produced a choice (the earliest walk-forward
+season has no prior seasons to choose a λ from). The old coarse grid's edge was 10⁴; widening
+the grid past it moved the edge to 5×10⁴ rather than resolving it — every season still wants
+more shrinkage than the grid offers. **A ridge whose 1-SE choice runs to whatever bound the
+grid is given is not well identified on this target.** The decision rule does not gate on that,
+and it is not being overridden here — E6 is kept exactly per the rule as written — but it has
+to be visible rather than a footnote under "E6 kept."
+
+Per decision 2 of the plan of record and the amendment ledger, A4 is an engineering decision
+about which λ `weekly_slate.py` serves, not an inferential claim, and it does not touch which
+predictor is graded: **E4 stays the graded predictor** regardless of how E6 scores here.
+`weekly_slate.py` now serves E6 at λ = 5×10⁴ (`MODEL_SET_VERSION = 2`), and every existing
+`movement_forward_log.csv` row (350 of 350) was recomputed under the new definition — a
+predictor that changes mid-forward-test silently redefines the graded quantity.
+
+## Amendment A5 — the move remaining after PT's last capture (run 2026-09-08, registered in `prereg-line-movement.md`)
+
+Regress `y = AN_close − PT_line` on `x = pred − PT_line` for E4, E6, E14, on the matched
+2024–25 archive games, using the **walk-forward decontaminated (A6)** predictions, clustered by
+season-week (`cluster_ols`).
+
+| predictor | slope | 95% CI (conditional) | n | clusters |
+|---|---|---|---|---|
+| E4 | −0.033 | [−0.059, −0.007] | 1,440 | 31 |
+| E6 | −0.022 | [−0.049, +0.006] | 1,440 | 31 |
+| E14 | −0.027 | [−0.051, −0.003] | 1,440 | 31 |
+
+**Correction: 1,440 matched games, not the 1,219 this file recorded before this run** (see the
+target section below, updated with this run). The matching logic (`check_pt_line_is_close.py`)
+is unmodified and the merge loses zero rows to NaN; the difference is Action Network table
+growth between measurements, not a join change — 1,219 was the same measurement on a smaller
+table.
+
+Every interval above carries `conditional_on_fitted_predictor: true` — E4/E6/E14 are themselves
+fitted first-stage predictions, and `cluster_ols`'s cluster-robust SE does not propagate that
+first stage's uncertainty (A5's own caveat, registered before the run).
+
+**Result misses the pre-registered expectation on sign and by an order of magnitude.**
+Pre-registered: slope 0.0–0.10 with a CI including zero; ≥ 0.2 excluding zero would have been
+evidence of unpriced information. What came back is negative and small: sd(E4 − PT_line) ≈
+1.79, so a full one-standard-deviation disagreement between E4 and PT's line predicts roughly a
+−0.06 point shift, in the direction opposite the panel's read, against a mean residual move of
+0.69 points. This was the only archive evidence that could distinguish "the panel leads the
+market" from "the panel reports the line after it moved" — it does not produce that evidence.
+Do not read the negative sign as a substantive finding either: a slope this small against a
+0.69-point average gap is closer to noise than to a real negative effect, on an archive whose
+"close" (PT's `line`) is itself a proxy, not a verified true close.
+
+## The target — what PT's `line` is (checked 2026-09-08, updated with the A5 run)
 
 `check_pt_line_is_close.py` joins the 2024–25 archive rows to Action Network's consensus close
-(book 15) on season and both team names, rematches dropped: **1,219 games matched**.
+(book 15) on season and both team names, rematches dropped: **1,440 games matched** (was 1,219
+at first measurement — see amendment A5 above for why the count grew).
 
 | | mean \|Δ\| | median | exact | within 0.5 | within 1 |
 |---|---|---|---|---|---|
-| PT `line` vs AN close | **0.69** | 0.50 | 31.4% | 66.7% | 83.6% |
-| PT `lineopen` vs AN close | 1.58 | — | — | 33.3% | — |
+| PT `line` vs AN close | **0.69** | 0.50 | 31.7% | 66.9% | 83.3% |
+| PT `lineopen` vs AN close | 1.57 | — | — | 33.6% | — |
 
 PT's `line` is a late line, not the close: it sits 0.7 points from the consensus close on a
 typical game, against 1.6 for the opener. Every "close" in this file is that number. The
@@ -273,24 +397,83 @@ movement it measures is therefore open → PT's last capture, roughly the first 
 thirds of the full move; the R² and CLV above are on that shorter path. Version B grades
 against the real close and is not affected.
 
-## Version B — first read (2026-09-08, reported, not decided; amendment B1)
+## When the constituents publish (from snapshots, checked 2026-09-08)
 
-`eval_version_b.py` on the 2026 week-2 slate: 42 games with a Monday anchor (2026-08-31
-19:05Z), graded against the AN consensus close. One week, so the SE is HC1, not clustered, and
-the interval is optimistic.
+The "get earlier than PT" idea (results doc "What follows" item 2, above) assumed the leading
+movement forecasters post before PT's Monday compile. Three slates of 6-hourly snapshots exist
+so far. **Not yet evaluable** — mechanically the `< 10 of 20 present Monday` branch fires for
+all three, but the denominators explain why before the counts do:
 
-| predictor | slope of close − Monday on pred − Monday | 95% | sd(x) | MDE (80%) |
+| slate | top-20 (by prior movement skill) present at first Monday-window capture | first capture, hours after Monday 00:00 ET |
+|---|---|---|
+| 2026-08-24 | 0 of 6 | 129.7h |
+| 2026-08-31 | 2 of 7 | 15.1h |
+| 2026-09-07 | 0 of 3 | 39.2h |
+
+Only **8 of the top-20** archive movement-ranked models appear as columns in the live scrape at
+all (the live scraper carries 54 line-model columns, of which 28–45 are populated in any one
+snapshot) — a schema difference between
+the archive file and the live scraper, not a publication-timing signal — so these denominators
+(6/7/3, not 20) are already capped low before the timing question is even asked. Two of the
+three slates never had a real Monday capture: collection began mid-slate for 08-24 (first
+capture 129.7h after its Monday), and the 09-04 collector outage pushed 09-07's first capture to
+39.2h. Only the **08-31 slate (15.1h)** actually tests the question this branch is nominally
+answering.
+
+**Do not read the branch's stated consequence — re-anchoring amendment B2 to the first snapshot
+with ≥ 15 of 20 present — as triggered.** It fires mechanically on thin, mostly-empty data (two
+of three slates missing a real Monday capture), not on a measured finding that PT's Monday
+compile is incomplete. Revisit once collection has run cleanly through several ordinary Mondays.
+
+This does not affect E4 as currently served: `screened()` ranks by prior skill restricted to the
+models actually active in a given snapshot, so live E4 takes the top 20 among the 28–45 model
+columns the live scraper carries, not the 20 that a full archive panel would pick.
+
+## Amendment B2 — capture buckets (first read 2026-09-08, registered in `prereg-line-movement.md`)
+
+One capture per game per bucket — 0–24h "mon", 24–48h "tue", 48–72h "wed", ≥ 72h "thu+" after
+the week's Monday 00:00 ET — on a fixed game set: a game missing from any populated bucket is
+dropped from every bucket.
+
+Currently populated buckets: `tue`, `wed`, `thu+`. **No snapshot has yet landed in the `mon`
+bucket**, so `mon` is excluded from the fixed-set universe and **0 games are dropped** (42 of 42
+week-2 games present in each of tue/wed/thu+). This is a fact about the current collector
+cadence relative to Monday 00:00 ET, not the amendment failing — a future non-zero drop count is
+B2 working as designed, not a regression.
+
+| bucket | slope | 95% CI | n | week clusters |
 |---|---|---|---|---|
-| E4 (registered) | **+0.20** | [0.00, +0.40] | 1.17 | 0.28 |
-| E6 | +0.43 | [+0.17, +0.70] | 1.07 | 0.36 |
-| model median | +0.18 | [−0.03, +0.39] | 1.16 | 0.29 |
+| tue | +0.202 | [+0.004, +0.401] | 42 | 1 |
+| wed | +0.174 | [−0.009, +0.357] | 42 | 1 |
+| thu+ | +0.396 | [+0.114, +0.678] | 42 | 1 |
 
-sd(close − Monday) = 0.81, mean +0.25. E4's side at |x| ≥ 1: 20 bets, CLV +0.47 [+0.09, +0.86],
-beat the close on 55%; graded 2026-09-08 once `core.fact_game` carried the scores: **11–9 ATS
-at Monday's number (55.0% [31, 79])**, an interval that says nothing yet. The dispersion of E4
-against Monday's line (1.17) is far larger than the
-0.45 assumed in amendment B1, so the n at which the MDE reaches 0.2 is about **80–140 games
-before week clustering**, not a thousand — but that figure comes from a single week's HC1 SE,
-not from cluster evidence, and **amendment B3 has since removed it from the stopping rule**.
-It is reported, and it triggers nothing. The verdict waits for season end with ≥ 8 week
+One week, HC1 SE — not the season-week clustered design B2 is registered for. The `tue` row is
+the same games and the same slope as the version B anchor read below (the current collector's
+first capture after Monday lands in the `tue` window). Decides nothing; read weekly alongside
+B4, per B3's stopping rule.
+
+## Version B — reads (updated 2026-09-08; amendment B1, stopping rule B3)
+
+One row per Monday read. **No verdict before season end; at season end, confirmatory inference
+requires ≥ 8 week clusters, and with fewer the read is reported as inconclusive** (amendment
+B3, verbatim). The MDE the grader prints at every read is informational — derived from the same
+un-clustered HC1 SE as the slope while under `MIN_WEEKS` — and triggers nothing.
+
+| Monday | n graded | E4 slope | 95% CI | week clusters | SE kind | model_set_version | verdict |
+|---|---|---|---|---|---|---|---|
+| 2026-08-31 | 42 | +0.202 | [+0.004, +0.401] | 1 | HC1 | [2] | null |
+
+`read_status: pre_season_end`. One week cluster is not clustered inference; the interval above
+is optimistic and must not be read as evidence either way. E6 (+0.371 [+0.082, +0.660]) and the
+model median `pred_close` (+0.181 [−0.029, +0.391]) are reported beside E4 with no selection
+among them — E4 is graded per prereg B1, not because it scores highest here (it doesn't — see
+amendment A6 above for the same pattern on the archive).
+
+The dispersion of E4 against the anchor line (sd(x) = 1.17) is what makes the informational MDE
+land where it does (`mde_80` 0.28, `n_for_mde_0.2` 80) — reported, and, per amendment B3,
+triggering nothing.
+
+Cumulative bet record, |x| ≥ 1, E4's side: 20 bets, CLV +0.47 [+0.09, +0.86], beat close on 55%;
+graded once `core.fact_game` carried the scores: **11–9 ATS at the anchor price (55.0% [31.1,
+78.9])** — an interval that says nothing yet. The verdict waits for season end with ≥ 8 week
 clusters.
