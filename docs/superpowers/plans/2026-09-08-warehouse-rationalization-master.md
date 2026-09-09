@@ -349,12 +349,12 @@ fix would have made canonical.
 
 | # | Step | Depends on | Note |
 |---|---|---|---|
-| 0 | **Preflight** | — | `python scripts/verify_warehouse_plan.py` must exit 0. It asserts the §1 counts, the three colliders, `raw`'s 34 `gql_` tables, §5's drop list and §6–7's merge keys. Then snapshot `data/cfb.duckdb` and content-hash every `data/graphql/*.json`; re-scrapes write to **new versioned paths**. |
+| 0 | **Preflight** | — | `python scripts/verify_warehouse_plan.py` must exit 0. It asserts every GraphQL entity present under both spellings, exactly the three colliders, no `gql_`-prefixed table left in `stg`, §5's drop list, and §6–7's merge keys. It *reports* — never asserts — the table counts, the all-NULL total and the camelCase table names, because all three move with the data (§1b). Then snapshot `data/cfb.duckdb` and content-hash every `data/graphql/*.json`; re-scrapes write to **new versioned paths**. |
 | 1 | **Fix relation keys**, re-scrape `coach_season` and `team_talent` | 0 | Until this lands, Bucket B's merge on those two is a union on `year` rather than a join on FKs, and the row counts may be short (§4). User-run — it hits the live CFBD GraphQL API and needs a token. **This is the only gate on everything downstream.** |
 | 2 | **Re-measure containment** and record the buckets | 1 | Gates step 4. Bucket assignments for the two repaired entities are recomputed from re-scraped data. `verify_warehouse_plan.py --coverage` plus `audit_canonical_sources.py`. |
 | 3 | **Merge Bucket C** into `core` | 2 | Full outer unions with R5's `_source`, not left joins — GraphQL out-rows REST on every pair. |
 | 4 | **Drop** Bucket A's REST sides and the 7 dead columns | 2, 3 | Proof-gated — see R6. **No Bucket B table is dropped**; both fail R6 on year coverage. |
-| 5 | **Collapse `stg_gql` into `stg`** | 4, and `tests/test_catalog_resolution.py` | By this point the three colliders are already non-duplicate, so **zero suffixes are needed**. This is why the collapse comes last rather than first. Must land in one commit — see below. |
+| 5 | **Collapse `stg_gql` into `stg`** | 4, and `tests/test_catalog_resolution.py` | By this point the three colliders are already non-duplicate, so **zero suffixes are needed**. This is why the collapse comes last rather than first. Must land in one commit — see below. Also snake-cases `stg.gameMedia` → `stg.game_media` and `stg.gamePlayerStat` → `stg.game_player_stat`, which ADR-0003 committed to and nothing has done. |
 | 6 | **Remove scraper entries** for dropped sources | 5 | Config only. ADR-0003 already landed 2026-09-08. |
 
 **Step 5 cannot be incremental.** `tests/test_catalog_resolution.py` asserts that *every*
@@ -363,6 +363,15 @@ non-docstring `<schema>.<table>` literal under `cfb_system_maker/`, `models/`, `
 (re-counted 2026-09-09), and the test's own `ALLOW` entry for
 `("stg_gql", "game_lines__backfill")` move together in a single commit, or the suite goes red
 between them. R8 is a constraint on how step 5 lands, not only a safety net under it.
+
+**The two snake-case renames have a trap.** `stg.gameMedia` → `stg.game_media` and
+`stg.gamePlayerStat` → `stg.game_player_stat` are *table* renames only. The same spelling also
+appears as, and must not be touched in: the GraphQL entity name (`GQL_EXCLUDED`'s keys and the
+`gamePlayerStat(...)` query in `graphql_client.py` — an upstream API contract, §12), the `raw`
+table (`raw."gamePlayerStat"` — `raw` is out of scope, §10 decision 5), and dump stems
+(`gamePlayerStat_2012.json`, which `parse_dump_stem` parses). A blanket find-and-replace on
+either name breaks the scraper and violates two out-of-scope rules. Rename the `stg` tables and
+their `stg.`-qualified literals, nothing else.
 
 PFF widened the blast radius without adding to the rewrite: its 59 `pff_*` literals across
 `duckdb_load.py`, `pff_schema.py`, `audit_pff_pull.py`, `check_pff_pin.py` and
@@ -478,7 +487,24 @@ other.
 
 ## 12. Out of scope
 
-- Column *casing* (984 camelCase columns) — deferred, and still deferred.
+- Column *casing* — deferred, and still deferred. **1,410 of 3,429 `stg`/`stg_gql` columns are
+  camelCase** (measured 2026-09-09); the plan said 984, which was already stale. The figure
+  tracks whatever the payloads carry, so treat it as reported rather than fixed. None of the
+  growth is PFF's — all 597 `stg.pff_*` columns are snake_case, pinned by
+  `cfb_system_maker/pff_schema.py`.
+- **Table-name casing** *(2026-09-09)*. An earlier draft of step 0 asserted "no camelCase `stg`
+  table remains." That was never true: **15 do**, listed by
+  `python scripts/verify_warehouse_plan.py --camel`. Twelve are explode children named after the
+  camelCase JSON key they unnest (`games__awayLineScores`, `teams__alternateNames`,
+  `advanced_box_score__teams_cumulativePpa`, `stg_gql.game_team__lineScores`), so fixing them
+  means changing how `explode_payloads` derives child names — a rename touching every consumer
+  of those tables, which is its own project. The verifier reports the count and never fails on
+  it; blocking rationalization on unrelated renames would be the same mistake as pinning the
+  table counts. **`stg.gameMedia` and `stg.gamePlayerStat` are the exception and are in scope** —
+  they are root tables, not explode children, and ADR-0003 already committed to snake-casing
+  them ("they need snake_casing, not relocation") without assigning the work to anything. §8
+  step 5 now owns it: the collapse is already renaming tables and rewriting every literal, so
+  these two ride along at no extra risk.
 - `core` layer changes beyond the targets named in §6's disposition table, plus
   `core.coach_name_conflicts`. *(The 2026-09-08 draft enumerated a shorter list here that §6
   already contradicted; §6 is the one place that decides targets.)*

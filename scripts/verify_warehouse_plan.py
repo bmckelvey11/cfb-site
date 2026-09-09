@@ -178,11 +178,12 @@ def check_structure(con) -> list[str]:
         fails.append(f"stg still holds gql_-prefixed tables: {stray}")
     print(f"  [{'ok' if not stray else 'FAIL':4}] no gql_ in stg  {len(stray)} found")
 
-    # Reported, not asserted. Step 0's prose claims no camelCase `stg` table remains; 15 do
-    # (2026-09-09), most of them explode children named after a camelCase JSON key, plus
-    # `gameMedia` and `gamePlayerStat` -- which ADR-0003 already noted "need snake_casing, not
-    # relocation." Renaming them is its own job, and failing step 0 on it would block the
-    # rationalization on unrelated work.
+    # Reported, not asserted. 15 camelCase table names survive (2026-09-09). Twelve are explode
+    # children named after the camelCase JSON key they unnest, and renaming those means changing
+    # how `explode_payloads` derives child names -- out of scope per section 12. The other two,
+    # `gameMedia` and `gamePlayerStat`, are root tables that section 8 step 5 snake-cases along
+    # with the collapse. Failing step 0 on any of it would block the rationalization on
+    # unrelated renames.
     camel = sorted(
         f"{s}.{t}"
         for s in ("stg", "stg_gql")
