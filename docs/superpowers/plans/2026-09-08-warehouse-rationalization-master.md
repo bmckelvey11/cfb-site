@@ -79,11 +79,13 @@ correct and this plan does not touch it.**
 2. **`core.dim_team` has three consumers now, not one.** See §6.
 3. **Step 5's one-commit rewrite got bigger.** See §8.
 
-**One PFF column trips §5 and should not.** `stg.pff_player_season.jersey_number` is all-NULL
-across 30,716 rows, but it is not dead data — `scripts/pff_flatten.py:222` writes `""` into it
-unconditionally, so it is a flattener stub. Dropping it would lose to the next flatten. It is
-therefore exempt from §5's drop list, and the fix belongs to PFF's S3/S8, not here. §5 carries
-the exemption.
+**One PFF column tripped §5 and no longer does.** *(Closed 2026-09-09.)*
+`stg.pff_player_season.jersey_number` was all-NULL across 30,716 rows — a flattener stub, not
+dead data — so §5 exempted it and pointed at PFF's S3/S8. S3/S8 has now filled it:
+`scripts/pff_flatten.py` reads the value the JSON-only leaderboards already carry, and the
+column is 9,887/30,716 populated. It is not all-NULL any more, so it is out of §5's census
+entirely and the exemption is gone from both §5 and the verifier. See
+`docs/pff-ingest-plan.md`.
 
 ## 2. The naming end state — one `stg`, nothing named after a transport
 
@@ -250,11 +252,6 @@ problems:
   **none of the three is all-NULL anywhere**. There is no loader change to make. See R3.
 - **4 are future-dated and must be kept** — `stg.lines_2026_week2_20260908` and its `__lines`
   child, `homeScore`/`awayScore`. Those games have not been played.
-- **1 is a flattener stub and is exempt** *(2026-09-09)* — `stg.pff_player_season.jersey_number`,
-  all-NULL over 30,716 rows because `scripts/pff_flatten.py:222` writes `""` into it
-  unconditionally. All-NULL here means "never populated by the writer," not "dead data," so
-  dropping it would simply lose to the next flatten. PFF's S3/S8 owns filling or removing it.
-  See §1b.
 - **7 are genuinely dead** and are the drop list:
 
 ```

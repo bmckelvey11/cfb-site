@@ -24,7 +24,7 @@ wins on what is finished.
 |---|---|---|---|---|
 | S1 | Audit the pull — every file verified, gaps named | everything | **done** | 2026-09-08 |
 | S2 | Settle point-in-time: per-week pulls vs dated snapshots | S3 | **done** — per week | 2026-09-08 |
-| S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
+| S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** — amended 2026-09-09 (`jersey_number`) | 2026-09-08 |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
 | S5 | `_PFF_TABLES` loader entries → `stg` | S6 | open | — |
 | S6 | Backfill 2014–2024, finish 2026 | — | **held** — gated on S3/S5/S7 | — |
@@ -370,3 +370,52 @@ Also repaired a self-inflicted one: an earlier patch wrote literal backspace byt
 strip silently stopped firing, and `bryant-university-bulldogs` fell through to the
 override list rather than matching by rule. Found by testing `norm` directly instead of
 trusting the match count, which had stayed plausible at 264/265.
+
+### 2026-09-09 — S3 amended: `jersey_number` was a stub over data we already had
+
+`stg.pff_player_season.jersey_number` was 100% NULL across 30,716 rows. It read as missing
+source data and the warehouse rationalization plan exempted it from its dead-column drop
+list on that basis (§1b, §5). It was neither: the value was on disk the whole time.
+
+The trap is that PFF's CSV and JSON exports of the same leaderboard are **not** the same
+columns. Scanning all 648 `data/raw/pff/*.csv` headers finds no jersey field anywhere,
+which is what makes "the source doesn't carry it" look proven. But `facet_offense_summary`,
+`facet_rushing_direction` and `facet_passing_detail` are pulled as JSON *only* — there is no
+CSV twin — and their rows do carry `jersey_number`. `read_rows` already parses both shapes,
+so those rows were reaching the flattener with the field intact.
+
+What dropped it was the player dimension in `flatten`. `people.setdefault` seeds a spine row
+on a player's first sighting, and the first sighting is usually one of the CSV leaderboards,
+which has no jersey. `draft_season` and `eligible_season` have exactly the same problem and
+are repaired by the backfill loop underneath — `jersey_number` was simply left out of that
+tuple and kept its seeded `""` forever. Adding it to the tuple is the whole fix.
+
+Result: 9,887 of 30,716 rows populated (2025 34.6%, 2026 28.8%). It is partial by
+construction, not by defect — only the three sources above carry the field, so a player who
+never appears on an offensive leaderboard has no jersey to read. Values are zero-padded
+strings (`'08'`, `'00'`) and PFF also emits `D`-prefixed ones (`'D47'`), both as
+`docs/pff-cli.md` documents. `pff_schema.py` already types `jersey_number` VARCHAR, so the
+loader needed no change; the live `stg.pff_player_season` was reloaded in place from the new
+CSV with the pinned types.
+
+`docs/pff-warehouse-schema.md` §F1 and its provenance column were right all along —
+"jersey/draft/eligible from `offense_summary` and `rushing_direction` where present" is an
+accurate description of the JSON rows. No doc correction was needed; the code had drifted
+from the doc, not the other way round.
+
+**Two things left open, deliberately.**
+
+`data/raw/pff/team/roster_*.json` (274 files, the team tier) also carries a `jersey` field,
+covering 51.9% of the table's player-seasons — a different and slightly larger population
+than the leaderboards. It was not used. On the 7,317 rows where both sources have a value
+they agree exactly 4,707 times, differ by zero-padding 215 times, and **genuinely disagree
+2,395 times** (`Jon Jon Kamara` is `D08` on the leaderboard and `D28` on the roster). Until
+that is explained, merging the two tiers would manufacture a conflict rather than improve
+coverage. `pff_tier_overlap.py` already classifies jersey as roster-tier biographical data,
+so if fuller coverage is ever wanted the honest shape is a roster table, not a wider
+`pff_player_season`.
+
+Unrelated, found by `--validate` on the same run and left alone: `pff_rushing_direction`
+carries direction label `NV`, which `docs/pff-sample-schema.sql`'s CHECK constraint does not
+declare, so that one table fails its round-trip insert. It predates this change and is not
+`jersey_number`'s to fix.

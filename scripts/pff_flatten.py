@@ -223,7 +223,10 @@ def flatten(seasons: set[int] | None) -> tuple[dict[str, list[dict]], dict[str, 
                         "franchise_id": key["franchise_id"], "player": str(record["player"]),
                         "position": clean(record.get("position")), "jersey_number": "",
                         "draft_season": "", "eligible_season": ""})
-                    for column in ("draft_season", "eligible_season"):
+                    # Only `offense_summary`, `rushing_direction` and `passing_detail` carry
+                    # these, so the first sighting of a player is usually a file without
+                    # them and they have to be filled in on a later pass.
+                    for column in ("jersey_number", "draft_season", "eligible_season"):
                         if not person[column]:
                             person[column] = clean(record.get(column))
                 if source.nested_key:
