@@ -118,7 +118,7 @@ No code. Every edit below comes from the hardened plan's §"Required amendments"
 **Acceptance**
 
 ```bash
-grep -rn "mde_80 <= 0.2\|MDE reaches 0.2" research/spread/docs/ docs/superpowers/plans/
+grep -rn "mde_80 <= 0.2\|MDE reaches 0.2" research/spread/docs/ docs/superpowers/plans/ \n  | grep -v "review-2026-09-08-tree-audit\|plan-review-log\|plan-2026-09-08-hardened\|build-brief"
 grep -rc "confirmatory" research/spread/docs/prereg-line-movement.md
 ```
 

@@ -290,5 +290,7 @@ beat the close on 55%; graded 2026-09-08 once `core.fact_game` carried the score
 at Monday's number (55.0% [31, 79])**, an interval that says nothing yet. The dispersion of E4
 against Monday's line (1.17) is far larger than the
 0.45 assumed in amendment B1, so the n at which the MDE reaches 0.2 is about **80–140 games
-before week clustering**, not a thousand. Reported here because B1 says every read is reported;
-the verdict waits for that n.
+before week clustering**, not a thousand — but that figure comes from a single week's HC1 SE,
+not from cluster evidence, and **amendment B3 has since removed it from the stopping rule**.
+It is reported, and it triggers nothing. The verdict waits for season end with ≥ 8 week
+clusters.

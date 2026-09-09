@@ -17,7 +17,8 @@ right ~69%, +1.2 to +3.8 points of CLV at the opener). The opener is unreachable
 and the archive's "close" is PT's last recorded line, 0.7 points short of the consensus close.
 **Version B** — the same forecast graded at Monday's line against the real close — decides
 whether anything is bettable; its first read (42 games) is a slope of 0.20 with an interval that
-includes zero, and no verdict is due before the MDE reaches 0.2.
+includes zero on one week cluster. Amendment B3 fixes when a verdict is due: no verdict
+before season end, and at season end confirmatory inference needs ≥ 8 week clusters.
 
 ## Reading order for someone new
 
