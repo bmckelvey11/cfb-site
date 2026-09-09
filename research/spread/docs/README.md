@@ -12,14 +12,17 @@ that the live tree still uses is listed in that folder's README.
 ## Current position, in three sentences
 
 Anchored on the opener, the screened consensus (E4) anticipates about 15% of the open→close
-move, and that survives the walk-forward decontamination screen (amendment A6) — the screen
-that never sees its own test set, now the citable one. The opener is unreachable through PT,
-and the archive's "close" is PT's last recorded line, 0.7 points short of the consensus close.
-**Version B** — the same forecast graded at Monday's line against the real close — decides
-whether anything is bettable; its first read (42 games) is a slope with an interval that
-includes zero on one week cluster. Amendment B3 fixes when a verdict is due: no verdict
-before season end, and at season end confirmatory inference needs ≥ 8 week clusters. Every
-number above lives in `line-movement-results.md`, never here.
+move; that survives the walk-forward decontamination screen (amendment A6, the screen that never
+sees its own test set, now the citable one), and E4 is also the best method here — the ridge that
+briefly appeared to beat it was an artifact of where its grid stopped, withdrawn by amendment A7,
+which retired the ridge from the served slate. But the opener is unreachable through PT, the
+archive's "close" is PT's last recorded line about 0.7 points short of the consensus close, and
+amendment A5 found no information in the panel past PT's last capture — so nothing here shows
+the panel leading the market rather than reporting it late. **Version B** — the same forecast
+graded at Monday's line against the real close — is what decides whether anything is bettable;
+it has returned no verdict, and amendment B3 fixes that it cannot before season end, where
+confirmatory inference needs ≥ 8 week clusters. Every number above lives in
+`line-movement-results.md`, never here.
 
 ## Reading order for someone new
 

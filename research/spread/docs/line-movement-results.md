@@ -15,16 +15,24 @@ walk-forward support 14,068 games, 2006–2025. sd(close − open) = 2.48 points
 decontamination screen that never sees its own test set** (amendment A6, the walk-forward
 screen, below — superseding A3's full-sample screen as the citable number): E4 keeps 90.7% of
 its R² (0.170 → 0.154), γ stays at 0.28, direction is right roughly seven times in ten, and a
-bet on its side at the opener earns CLV at the opener (A6 CLV table, below). **What A3 got
-wrong is not E4's number, it is E6's**: under A3's full-sample screen E6 looked like it fell to
-E4's level (0.163); under A6 it does not — E6 retains 81.1% and its decontaminated R² (0.201)
-stays *above* E4's (0.154). E4 is still graded, not because it scores higher (it doesn't), but
-because prereg B1 fixed it before any of this was seen — see decision 2 / the A6 section for why
-that still holds. A3 is retained as run (`--decontaminate` still reproduces it byte for byte).
+bet on its side at the opener earns CLV at the opener (A6 CLV table, below). A3 is retained as
+run (`--decontaminate` still reproduces it byte for byte).
+
+**E4 is also the best method here, which took three amendments to establish.** The ridge (E6)
+appeared to beat it under A6 at 0.201 — that was withdrawn on 2026-09-09 by amendment A7. Every
+ridge grid this tree had run stopped near the R² peak, which prevented E6's own 1-SE rule from
+reaching the shrinkage it prefers; given a grid out to 10⁹ the rule modally picks λ = 3×10⁶ and
+**E6 scores 0.0655, well under E4's 0.1537**. E6 is retired from the served slate. E4 was graded
+from the start anyway, because prereg B1 fixed it before any of this was seen — it now turns out
+to be the higher-scoring choice as well.
+
 **The opener is the only price at which any of this is measured**, the archive's "close" is
 PT's last recorded line (0.69 points from the consensus close on average on 1,440 matched
-games, § target), and week 1 of 2026 showed the opener is months gone by Monday. Whether
-anything is left at Monday's price is version B.
+games, § target), and week 1 of 2026 showed the opener is months gone by Monday. Amendment A5
+looked for information the panel held past PT's last capture and found none — a slope of −0.033,
+wrong sign and an order of magnitude short of the registered threshold — so the archive gives no
+evidence the panel *leads* the market rather than reporting it late. Whether anything is left at
+Monday's price is version B, and version B has not returned a verdict.
 
 ## A1 — how much of the move is predictable
 
@@ -289,12 +297,14 @@ all 20 walk-forward evaluation seasons, A6's union of dropped models is 33 (vers
 15), because early seasons have only 5–13 prior seasons to estimate ρ on and the estimate is
 noisier there — more models get flagged in the thin early years, not fewer.
 
-**A6 reverses a framing the tree carried.** Under A3, E6 retained 66% of its R² against E4's
-90% — the basis for calling E6 "the bigger loser to decontamination". Under the honest,
-walk-forward screen, E6 retains **81.1%**, and its absolute decontaminated R² (**0.201**) is
-**higher** than E4's (0.154) — closer to the full-panel ordering, where E6 also led. E4 is still
-the more robust estimator by retention (90.7% vs 81.1%), but that case is materially weaker than
-A3 made it look.
+**A6 appeared to reverse a framing the tree carried — and that reversal was itself withdrawn by
+amendment A7 on 2026-09-09.** Under A3, E6 retained 66% of its R² against E4's 90%, the basis
+for calling E6 "the bigger loser to decontamination". Under the walk-forward screen E6 retained
+**81.1%** with a decontaminated R² of **0.201**, above E4's 0.154. **That comparison is not
+valid.** Both figures were produced on ridge grids truncated near the R² peak; A7 showed that
+E6's own 1-SE rule, given a grid wide enough to express itself, picks λ = 3×10⁶ and scores
+**0.0655** — far below E4. The retention percentages below are what A6 computed and are left as
+run; the *ranking* they imply is superseded by the A7 section.
 
 **E4 stays the graded predictor anyway.** Prereg B1 fixed E4 as the predictor version B grades
 *before any version B data existed*, with E6 and the model median reported beside it and no

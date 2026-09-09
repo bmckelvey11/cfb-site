@@ -18,15 +18,21 @@ This master points at all four; it never restates their numbers as though it wer
 
 The Prediction Tracker panel does not out-forecast the market on game margin — that question is
 closed and archived (Harvey–Newbold p = 0.56, 50.3% ATS). Retargeted at **where the line goes**,
-it does something: on the archive, the screened consensus anticipates roughly 15% of the
-open→close move.
+it does something: on the archive, the screened consensus (E4) anticipates roughly 15% of the
+open→close move, and that survives a decontamination screen built without seeing its own test
+set (A6). It is also the best method available: the ridge that appeared to beat it was a grid
+artifact, withdrawn by A7.
 
-But the archive measures that at the **opener**, a price PT's timing cannot reach — week 1 of
-2026 showed the opener is months gone by game week. So the whole tree reduces to one question:
+Two things bound that result hard. It is measured at the **opener**, a price PT's timing cannot
+reach — week 1 of 2026 showed the opener is months gone by game week. And the panel shows **no
+information past PT's last capture** (A5: slope −0.033, wrong sign, an order of magnitude short
+of the registered threshold), so nothing here says the panel *leads* the market rather than
+reporting it late. So the whole tree reduces to one question:
 
 > **Is any of that move still available at the first Monday snapshot of the week?**
 
-That is version B. Everything else here exists to make its answer trustworthy.
+That is version B, it has not returned a verdict, and it cannot before season end. Everything
+else here exists to make its answer trustworthy.
 
 ## 2. Where the evidence actually stands (measured 2026-09-08)
 
@@ -104,12 +110,14 @@ decide, and amendment B1's MDE gate, which made the stopping time depend on the 
    Holm applies within a family; no across-family correction is attempted, because with one
    confirmatory hypothesis none is needed. This replaced an earlier proposal to merely log the
    amendments — a ledger documents forks without controlling them.
-2. **E4 is graded, not E6**, though E6 scores higher — on the full panel *and*, since A6, under
-   the honest screen (0.201 vs 0.154). E4 remains the more robust by retention (90.7% vs 81.1%),
-   but that case is weaker than it looked under A3's 66%. **This is exactly why it was fixed
-   before data.** Prereg B1 registered E4 as the graded predictor and placed E6 and the model
-   median beside it *with no selection among them*. Switching now, on a result seen after the
-   fact, is the selection-on-outcome this tree exists to prevent. If E6 is genuinely the better
+2. **E4 is graded, not E6** — and since A7 it is also the better method, which was not known
+   when the choice was made. E6 led on the full panel and briefly appeared to lead under A6
+   (0.201 vs 0.154), but A7 showed those numbers came from grids truncated near the R² peak;
+   run as registered on an honest grid E6 scores 0.0655 against E4's 0.1537. **The point stands
+   regardless of which way the ranking went.** Prereg B1 registered E4 as the graded predictor
+   before any version B data existed and placed E6 and the model median beside it *with no
+   selection among them*. Had the tree switched to E6 when A6 made it look better, A7 would have
+   caught it grading an artifact. If E6 is genuinely the better
    predictor, the way to establish that is a new pre-registration and a forward test, not a
    substitution.
 3. **The version B predictor set is frozen for the season.** `MODEL_COLS` and `PARAMS` in
@@ -192,7 +200,8 @@ fix being *claimed* and *verified*).
    control; the ledger is the record.
 2. **A3's screen saw its own test set** — **closed 2026-09-08.** Amendment A6 rebuilt the screen
    walk-forward; A6 is now the citable screen and A3 is retained as run. It also reversed a
-   framing this plan carried: E6 retains 81.1%, not 66%, and outscores E4 (see §2).
+   framing this plan briefly carried — E6 retaining 81.1% rather than 66% — though A7 later
+   showed the implied ranking was a grid artifact (see §2 and risk 3).
 3. **The ridge penalty is not identified — closed 2026-09-09 by amendment A7.** A and A4 both
    chose their grid's top value (1e4, then 5e4). A7 ran the grid out to 10⁹, where ridge must
    degenerate to the anchor, and reported the λ → R² curve for the first time. The curve has a
