@@ -95,3 +95,76 @@ not "system found": two seasons, four books, and no confirmation window.
 One run at these settings. No changes to R, the odds window, the gain thresholds, or the
 cluster definition after seeing results. If a data defect is found (a duplicated market, a
 mis-oriented side), it is fixed, recorded here, and the run repeated once.
+
+---
+
+## Amendment S1 — outlier guard and price-adjusted value (committed before the rerun)
+
+Motivated by `combining-predictions.md` §1: the backtest's book fair has no outlier guard,
+though the live slate (`weekly_slate.shop`) has always applied one, and price is ignored
+entirely — spreads are compared at face value, so a shopped gain that costs more juice than
+it is worth still counts as a win. Both defects must be fixed before the book fair drives a
+live bet.
+
+### 1. Outlier guard
+
+A book's number is ignored when it is more than **2.5 points** from the median of *all* real
+books on the game, and at least two books remain. Applied in `build_sides` before `fair`,
+`hi`/`lo`, and `book_hi`/`book_lo` are computed — the same rule and the same threshold
+`weekly_slate.shop()` applies live (`OUTLIER_PTS = 2.5`), so the backtest and the live slate
+agree on what a book fair is. Not a new threshold chosen for this run: it is the constant
+already serving live traffic.
+
+### 2. Price-adjusted value
+
+Each side gets one scored number on a single scale:
+
+```
+value = 3.2 * gain - 100 * (breakeven(best_odds) - breakeven(median_odds))
+breakeven(o) = |o| / (|o| + 100)   for o < 0
+             = 100 / (o + 100)     for o > 0
+```
+
+`gain` is unchanged (points, `best − fair` for home / `fair − best` for away, post-guard).
+`best_odds` is the odds posted at the book supplying the best number. `median_odds` is the
+odds at the book supplying the (post-guard) median number — when the guarded book count is
+even, the median is the average of two books' numbers and no single book supplies it, so
+`median_odds` is taken as **−110**. Missing odds (not every AN row carries one) also fall back
+to −110, matching the assumption already made throughout `line-shopping-results.md` ("−110 is
+assumed throughout").
+
+Reported: `value.mean()` at gain ≥ 0.5 and ≥ 1.0, and the share of sides at each threshold
+where `value ≤ 0` — a shopped gain the juice cancels out.
+
+### The 3.2 constant — what it is, and what it is not
+
+`3.2` is **not** re-derived here. It is the win-rate-points-per-point-of-spread figure measured
+in P2 of the original line-shopping run (`line-shopping-results.md`, "win-rate pts per point:
+3.16", rounded and carried forward as the registered constant), fit on 2024–25, 3,574
+game-sides, dominated by the 3/7 key-number crossings on small spreads. It is the **in-sample**
+conversion rate for *that sample* — a number a fresh sample from the same population would
+likely land close to, not a structural constant good for any spread on any market.
+
+This is a deliberate decision, made by the user on 2026-09-08, not an oversight.
+`docs/superpowers/plans/2026-09-08-spread-next-steps.md` Task 9's heading records the
+resolution: keep `3.2` for line shopping, where it was estimated; the review that retired the
+same constant applied it to a **different** claim — the movement/CLV claim, where bets sit on
+larger spreads and a point is worth less, so "3–5× the bar" was the wrong multiple to quote
+there. One number, two uses; only the movement use was wrong. It is not the right conversion
+for movement CLV and must not be reused there. The S1 results section carries this caveat
+again, in place, so a reader who only reads results does not miss it.
+
+### Expectations, recorded before running
+
+- P2 (win(best) − win(fair)) falls from **+1.26** to **about +1.1** win-rate points once the
+  guard removes book 71's mis-posts from the "best" side.
+- At gain ≥ 1, about **12%** of sides have `value ≤ 0` once priced (post-hoc estimate from the
+  2026-09-02 run's odds distribution: 18% of gain ≥ 0.5 sides lost ≥ 1 win-rate point of juice,
+  and 12% lost the whole gain).
+- The gain ≥ 1 ATS-at-best figure stays inside **[48, 57]** — pricing should not move the P3
+  headline by more than the guard does.
+
+### Stopping rule
+
+One run at these settings, same as the parent prereg. If a data defect surfaces (a duplicated
+odds row, a sign error), it is fixed, recorded here, and the run repeated once.
