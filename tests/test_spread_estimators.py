@@ -1,8 +1,9 @@
 """The estimator core every spread result rests on, checked on synthetic data.
 
-Anchor (Frisch-Waugh nesting of R0), gamma_fit (one slope on a consensus deviation) and
-wild_cluster_boot (season-cluster inference). None of these had a test outside the scripts'
-own ``_check()`` blocks before 2026-09-08.
+Anchor (Frisch-Waugh nesting of R0), gamma_fit (one slope on a consensus deviation),
+wild_cluster_boot (season-cluster inference), holm (multiplicity correction) and pick_1se
+(the walk-forward hyperparameter rule). None of these had a test outside the scripts' own
+``_check()`` blocks before 2026-09-08.
 """
 
 import sys
@@ -59,3 +60,61 @@ def test_wild_cluster_boot_null_and_signal():
     mean, (lo, hi), p = base.wild_cluster_boot(signal, clusters, n_boot=400)
     assert lo > 0 and p < 0.01
     assert abs(mean - signal.mean()) < 1e-12
+
+
+def test_wild_cluster_boot_calibration_under_the_null():
+    """A single null draw (above) can't catch a miscalibrated bootstrap -- it could pass
+    by luck. Run many independent null draws instead and check the rejection rate at
+    alpha=0.1 lands within binomial sampling error of 0.1 (draw/boot counts kept small so
+    this stays off the slow-test list)."""
+    rng = np.random.default_rng(7)
+    n_clusters, per_cluster, n_boot, n_draws, alpha = 20, 30, 200, 300, 0.1
+    clusters = np.repeat(np.arange(n_clusters), per_cluster)
+    rejections = 0
+    for _ in range(n_draws):
+        d = rng.normal(0, 1, n_clusters * per_cluster)
+        _, _, p = base.wild_cluster_boot(d, clusters, n_boot=n_boot)
+        rejections += p < alpha
+    rate = rejections / n_draws
+    se_binom = np.sqrt(alpha * (1 - alpha) / n_draws)  # binomial SE of the rejection rate
+    assert abs(rate - alpha) < 4 * se_binom
+
+
+def test_holm_ties_and_monotonicity_step():
+    """Hand-computed Holm step-down. Sorted ascending, multipliers are m..1:
+    raw products .005*5=.025, .01*4=.04, .01*3=.03, .04*2=.08, .20*1=.20.
+    p[1] and p[2] tie at 0.01 -- their raw products differ (.04 vs .03) but the
+    running-max (monotonicity) step forces the smaller one up to .04, so both land on
+    the same adjusted value. That is Holm's step-down guarantee, exercised by a tie."""
+    p = np.array([0.005, 0.01, 0.01, 0.04, 0.20])
+    expected = np.array([0.025, 0.04, 0.04, 0.08, 0.20])
+    got = sweep.holm(p)
+    assert np.allclose(got, expected)
+    assert got[1] == got[2]
+
+
+def test_pick_1se_known_curve():
+    """Grid ordered least -> most conservative: params 0.0, 1.0 (best), 2.0, 3.0.
+    Candidate 2.0 sits just inside one SE of the best mean; 3.0 sits just outside.
+    The rule should return 2.0 -- the most-shrunk point still within tolerance, not the
+    best point itself and not the one that misses."""
+    best = np.array([0.0] * 20 + [2.0] * 20)  # mean 1.0, std(ddof=1) ~1.0127
+    se = best.std(ddof=1) / np.sqrt(len(best))  # ~0.1601
+    cands = [
+        (0.0, np.full(40, 5.0)),
+        (1.0, best),
+        (2.0, np.full(40, 1.0 + se - 0.001)),  # just inside best + 1SE
+        (3.0, np.full(40, 1.0 + se + 0.001)),  # just outside
+    ]
+    assert sweep.pick_1se(cands) == 2.0
+
+    # Edge hit: when the best validation error sits at the most conservative grid point,
+    # the rule must return that point -- the live sweep's diagnostic
+    # (`v == str(grids[m][-1])` in eval_combination_sweep.sweep) flags this as the rule
+    # running to the grid edge.
+    edge_cands = [
+        (0.0, np.full(40, 5.0)),
+        (1.0, np.full(40, 3.0)),
+        (2.0, np.array([1.0] * 20 + [3.0] * 20)),  # best, and the last (most conservative) param
+    ]
+    assert sweep.pick_1se(edge_cands) == 2.0
