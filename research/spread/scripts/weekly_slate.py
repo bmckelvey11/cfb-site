@@ -21,6 +21,8 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
                3.5), at the best book; PT's line when no book matched
   side_book    where that number is posted
   side_odds    the price at that book
+  our_line     E4's predicted close as a home spread in BETTING sign (negative = home favored),
+               i.e. -E4; the one number to compare against a posted home line
   edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1
 
 Every run writes weekly_slate_<stamp>.csv and overwrites weekly_slate_latest.csv. With
@@ -340,6 +342,7 @@ def add_side(t: pd.DataFrame, book: str | None = None) -> pd.DataFrame:
     t["side_book"] = np.where(home, home_book, away_book)
     t["side_odds"] = np.where(home, home_odds, away_odds)
     t.loc[t.side == "", ["side_line", "side_book", "side_odds"]] = [np.nan, "", np.nan]
+    t["our_line"] = (-t.E4).round(1)
     t["edge"] = gap.abs().round(2)
     return t
 
@@ -349,7 +352,8 @@ def report(t: pd.DataFrame, with_books: bool) -> None:
     pd.set_option("display.max_columns", 40)
     sort_col = "move_vs_fair" if with_books and "move_vs_fair" in t else "move_vs_line"
     view = ["road", "home", "open_pt", "line_pt"] + (["book_fair"] if with_books else []) + \
-           ["consensus"] + REPORTED_COLS + ["pred_close", sort_col]
+           ["consensus"] + REPORTED_COLS + ["pred_close", sort_col] + \
+           (["our_line", "edge"] if "our_line" in t else [])
     print(f"\n=== LINE: predicted close by model (PT sign, + = home favored), sorted by |{sort_col}| ===")
     print(t.sort_values(sort_col, key=lambda s: s.abs(), ascending=False)[view].to_string(index=False))
     if with_books and "home_gain" in t:
@@ -501,6 +505,7 @@ def _check() -> None:
     assert s.side.tolist() == ["S Miss", "LSU"] and s.side_line.tolist() == [34.0, -36.0], s
     assert s.side_book.tolist() == ["BetMGM", "BetRivers"] and s.edge.tolist() == [5.0, 1.0], s
     assert s.side_odds.tolist() == [100, -110], s
+    assert s.our_line.tolist() == [-28.5, -36.5], s
     d = add_side(frame.copy(), book="DraftKings")        # same side; that book's number, NaN if unposted
     assert d.side.tolist() == ["S Miss", "LSU"] and d.side_line.iloc[0] == 33.5 and np.isnan(d.side_line.iloc[1]), d
     assert d.side_book.tolist() == ["DraftKings", ""] and d.side_odds.iloc[0] == -115, d
