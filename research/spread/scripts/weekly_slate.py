@@ -347,6 +347,34 @@ def add_side(t: pd.DataFrame, book: str | None = None) -> pd.DataFrame:
     return t
 
 
+def write_xlsx(t: pd.DataFrame, path: Path) -> None:
+    """Two-sheet workbook. 'Slate' is the slip view in BETTING sign (negative = home favored):
+    market numbers, our line, edge, the side to take and where, then each book's home number
+    and price. 'Models' keeps every model column in PT sign, as printed."""
+    def bet(col):        # PT sign -> betting sign, NaN-safe
+        return -t[col] if col in t else pd.Series(np.nan, index=t.index)
+    slate = pd.DataFrame({
+        "Kick (ET)": t.get("kick_et", ""), "Road": t.road, "Home": t.home,
+        "Open": bet("open_pt"), "Market": bet("line_pt"), "Book Fair": bet("book_fair"),
+        "Our Line": t.our_line, "Edge": t.edge, "Side": t.side, "Take": t.side_line,
+        "Book": t.side_book, "Odds": t.side_odds,
+    })
+    for b in REAL_BOOKS.values():
+        slate[b] = bet(f"{b}_home")
+        slate[f"{b} odds"] = t.get(f"{b}_odds", np.nan)
+    slate = slate.sort_values("Edge", ascending=False)
+    models = t[["road", "home", "open_pt", "line_pt"] + (["book_fair"] if "book_fair" in t else [])
+               + ["consensus"] + REPORTED_COLS + ["pred_close"]]
+    with pd.ExcelWriter(path, engine="openpyxl") as xw:
+        slate.to_excel(xw, sheet_name="Slate", index=False)
+        models.to_excel(xw, sheet_name="Models (PT sign)", index=False)
+        for ws in xw.sheets.values():
+            ws.freeze_panes = "D2"
+            for col in ws.columns:
+                ws.column_dimensions[col[0].column_letter].width = max(
+                    8, min(22, max(len(str(c.value or "")) for c in col) + 2))
+
+
 def report(t: pd.DataFrame, with_books: bool) -> None:
     pd.set_option("display.width", 250)
     pd.set_option("display.max_columns", 40)
@@ -468,6 +496,7 @@ def main() -> int:
     out = t.drop(columns=[c for c in ("quotes", "key", "rkey") if c in t])
     out.to_csv(path, index=False)
     out.to_csv(OUT / f"weekly_slate_latest{suffix}.csv", index=False)
+    write_xlsx(t, OUT / f"weekly_slate_latest{suffix}.xlsx")
     # A snapshot with no book match is a stale slate (PT still serving last week's games after
     # they kicked off); logging it would add ungradable rows to version B's dataset. A --book
     # run is a view, not new data.
