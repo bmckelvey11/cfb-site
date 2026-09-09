@@ -1,8 +1,14 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 0003-one-stg-schema-suffix-only-the-colliders
 ---
 
 # GraphQL-sourced staging tables live in `stg_gql`, not a `gql_`-prefixed name in `stg`
+
+> **Superseded 2026-09-08 by ADR-0003.** The destination choice below was reversed: there is
+> one `stg` schema, with a temporary `_gql` suffix on the colliding names only. The diagnosis
+> of the load-order bug, the `raw` decoupling analysis and the DuckDB migration findings in
+> this ADR remain accurate and are relied on by ADR-0003.
 
 `stg` is fed by two ingestion sources — CFBD REST and CFBD GraphQL — that can name the same
 concept differently or, for 3 of 34 GraphQL entities (`draftPicks`, `predictedPoints`,
