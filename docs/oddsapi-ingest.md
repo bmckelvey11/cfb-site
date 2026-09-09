@@ -63,7 +63,27 @@ only works if each one says when it was taken. `pulled_at` therefore lives in
 the envelope, not just the filename, alongside the quota headers the call
 returned.
 
-## Before this loads: the join key
+## Read by the spread slate — as observation only
+
+`research/spread/scripts/weekly_slate.py` reads the latest snapshot and adds `oa_fair_pt`,
+`oa_best_home_pt` / `oa_best_away_pt`, `oa_n_books`, `oa_range`, `oa_as_of`, and
+`oa_vs_book_fair`. None of them feed `book_fair`, `move_vs_fair`, `side`, or `edge`.
+
+That line is deliberate. `book_fair` is the quantity version B grades and
+`movement_forward_log.csv` is its dataset; the Odds API book set is a *different* set from
+Action Network's five (it shares DraftKings, FanDuel, BetRivers and BetMGM, has no Caesars,
+and adds five offshore books), so folding it in would redefine the graded quantity mid-test —
+the same failure `MODEL_SET_VERSION` guards against on the predictor side. Promoting this
+source into `book_fair` is a deliberate, version-tagged decision, not a side effect.
+
+First run against 2026 week 3: **49/49 games priced, median |oa_fair − book_fair| 0.0 pts,
+max 0.5** — which is the check that the sign convention and the name join are both right.
+
+Names join by stripping the mascot (`oa_resolve`): Odds API says `"Miami Hurricanes"`, PT says
+`"Miami"`. Residual spellings live in `OA_ALIASES` and grow the way `ALIASES` did — when a game
+shows up in the unpriced list with books actually posted for it.
+
+## Before this loads into the warehouse: the join key
 
 Odds API events carry their own `id`, `commence_time` (UTC ISO8601), and team
 names **including the mascot** — `"Miami Hurricanes"`, `"Florida A&M Rattlers"`.

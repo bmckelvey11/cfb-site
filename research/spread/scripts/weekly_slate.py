@@ -25,6 +25,14 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
                i.e. -E4; the one number to compare against a posted home line
   edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1
 
+  oa_*         the same shopping arithmetic over the-odds-api's nine books, AS OF `oa_as_of`
+               (the 6-hourly snapshot, so up to six hours stale -- not a shoppable number).
+               OBSERVATION ONLY: `oa_fair_pt` never feeds book_fair, move_vs_fair, side, or
+               edge. book_fair is what version B grades and the forward log is its dataset,
+               so widening its book set mid-test would silently redefine the graded quantity.
+               `oa_vs_book_fair` is the agreement check: the two should sit within about a
+               point, and a systematic gap means a sign error or a bad join, not an edge.
+
 Every run writes weekly_slate_<stamp>.csv and overwrites weekly_slate_latest.csv. With
 `--book DraftKings` the side columns use that one book's number and price instead of the best
 across books, the files get a `_draftkings` suffix, and the forward log is left alone.
@@ -60,6 +68,7 @@ import eval_prediction_tracker_models as base  # noqa: E402
 import eval_combination_sweep as sweep  # noqa: E402
 import predict_upcoming as pu  # noqa: E402
 import collect_line_timing as clt  # noqa: E402
+import cfb_paths  # noqa: E402  (clt put the repo root on sys.path)
 
 BENCH = "lineopen"
 # Modal hyperparameter choice across the 20 walk-forward seasons of the movement runs:
@@ -225,6 +234,115 @@ def shop(quotes: dict) -> dict:
             "best_away_odds": quotes[v.idxmin()][1]}
 
 
+# ---------------------------------------------------------------- the-odds-api (observation)
+
+OA_SNAP_DIR = cfb_paths.INGEST / "oddsapi"
+# Books the-odds-api returns for `regions=us`. The four that overlap Action Network's set
+# (DraftKings, FanDuel, BetRivers, BetMGM) plus five offshore books AN does not carry; it has
+# no Caesars, which AN does. So `oa_fair` is a DIFFERENT book set from `book_fair`, not a
+# second opinion on the same one -- that is the point of keeping it beside rather than inside.
+OA_MIN_BOOKS = 2
+
+
+def oddsapi_books(now: datetime) -> pd.DataFrame:
+    """Per-book home spreads from the latest the-odds-api snapshot. OBSERVATION ONLY.
+
+    These columns never feed `book_fair`, `move_vs_fair`, `side`, or `edge`. `book_fair` is the
+    quantity version B grades, and the forward log is its dataset; widening the book set mid-test
+    would silently redefine what was graded, exactly as `MODEL_SET_VERSION` guards against on the
+    predictor side. Promoting this source into `book_fair` is a deliberate, version-tagged
+    decision, not a side effect of having the data.
+
+    Read from disk, not live: `CFB-Odds-Snapshot` pulls every 6 hours (see
+    `docs/oddsapi-ingest.md`) and a slate run costs no credits this way. That makes every number
+    here AS OF `oa_as_of`, up to six hours stale -- which is why the best-number columns are
+    named `oa_*` and not merged into the shoppable ones.
+    """
+    snaps = sorted(OA_SNAP_DIR.glob("odds_americanfootball_ncaaf_*.json"))
+    if not snaps:
+        print(f"  no the-odds-api snapshot in {OA_SNAP_DIR}; oa_* columns unavailable",
+              file=sys.stderr)
+        return pd.DataFrame()
+    payload = json.loads(snaps[-1].read_text(encoding="utf-8"))
+    as_of = datetime.fromisoformat(payload["pulled_at"].replace("Z", "+00:00"))
+    age_h = (now - as_of).total_seconds() / 3600
+    print(f"  the-odds-api snapshot {snaps[-1].name}: {len(payload['events'])} events, "
+          f"{age_h:.1f}h old")
+    if age_h > 12:
+        print(f"  WARNING: snapshot is {age_h:.0f}h old -- is CFB-Odds-Snapshot still running?",
+              file=sys.stderr)
+
+    lo, hi = now - timedelta(days=1), now + timedelta(days=8)
+    rows = []
+    for e in payload["events"]:
+        ko = datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00"))
+        if not (lo <= ko <= hi):
+            continue
+        quotes = {}
+        for b in e.get("bookmakers", []):
+            for m in b.get("markets", []):
+                if m.get("key") != "spreads":
+                    continue
+                for o in m.get("outcomes", []):
+                    # the home team's own outcome carries the home spread in betting sign
+                    # (negative = home favored), the same convention AN uses.
+                    if (o.get("name") == e["home_team"] and o.get("point") is not None
+                            and o.get("price") is not None
+                            and ODDS_WINDOW[0] <= o["price"] <= ODDS_WINDOW[1]):
+                        quotes[b["key"]] = (float(o["point"]), int(o["price"]))
+        rows.append({"oa_home_raw": e["home_team"], "oa_road_raw": e["away_team"],
+                     "oa_quotes": quotes, "oa_as_of": payload["pulled_at"]})
+    return pd.DataFrame(rows)
+
+
+# the-odds-api school spellings that do not normalize onto Prediction Tracker's, checked
+# after the mascot is stripped. Grows the way ALIASES did -- add a line when a game shows up
+# in the unpriced list with books actually posted for it in the snapshot.
+OA_ALIASES = {"florida international": "florida intl", "middle tennessee": "middle tenn"}
+
+# Mascots are one or two trailing tokens ("Hurricanes", "Thundering Herd"), so the strip never
+# needs to drop more than two. The cap does NOT make a single name unambiguous -- "Alabama
+# Crimson Tide" and "Florida International Panthers" are both three tokens, and dropping two
+# gives the right school for one and the Gators for the other. What actually prevents a wrong
+# price is that the merge keys on BOTH teams: a misresolved home name has to be paired with a
+# road name that misresolves onto the same PT row, which is why a bad strip lands in the
+# unpriced list instead of pricing a game against another game's number.
+OA_MAX_MASCOT_TOKENS = 2
+
+
+def oa_resolve(name: str, keys: set[str]) -> str:
+    """Odds API names carry the mascot ("Miami Hurricanes"); PT carries the school ("Miami").
+
+    Drop trailing tokens longest-match-first, at most `OA_MAX_MASCOT_TOKENS` of them, until the
+    head normalizes onto a name the slate actually has. Longest-first is what keeps
+    "Miami (OH) RedHawks" off "miami". An over-eager strip is caught by the both-teams merge,
+    not here -- see `OA_MAX_MASCOT_TOKENS`.
+    """
+    parts = str(name).split()
+    for cut in range(len(parts), max(0, len(parts) - OA_MAX_MASCOT_TOKENS) - 1, -1):
+        candidate = norm(" ".join(parts[:cut]))
+        candidate = OA_ALIASES.get(candidate, candidate)
+        if candidate in keys:
+            return candidate
+    return norm(name)
+
+
+def oa_shop(quotes: dict) -> dict:
+    """`shop()`'s arithmetic over the-odds-api books, on `oa_`-prefixed names."""
+    if len(quotes) < OA_MIN_BOOKS:
+        return {}
+    v = pd.Series({b: q[0] for b, q in quotes.items()})
+    if len(v) >= 3:
+        kept = v[(v - v.median()).abs() <= OUTLIER_PTS]
+        if len(kept) >= 2:
+            v = kept
+    return {"oa_fair_an": v.median(), "oa_n_books": len(v), "oa_range": v.max() - v.min(),
+            "oa_best_home_an": v.max(), "oa_best_home_book": v.idxmax(),
+            "oa_best_home_odds": quotes[v.idxmax()][1],
+            "oa_best_away_an": v.min(), "oa_best_away_book": v.idxmin(),
+            "oa_best_away_odds": quotes[v.idxmin()][1]}
+
+
 def crosses_key(a: float, b: float) -> bool:
     lo, hi = min(abs(a), abs(b)), max(abs(a), abs(b))
     return any(lo <= k <= hi and lo != hi for k in KEY_NUMBERS)
@@ -300,6 +418,31 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
         if len(unmatched) == len(t):
             print("  ALL games unmatched -- the snapshot is almost certainly a different week "
                   "than the books. book_fair/move_vs_fair are unavailable, not zero.")
+        # the-odds-api, beside book_fair and never inside it -- see `oddsapi_books`.
+        oa = oddsapi_books(now)
+        if not oa.empty:
+            oa["key"] = [oa_resolve(n, set(t.key)) for n in oa.oa_home_raw]
+            oa["rkey"] = [oa_resolve(n, set(t.rkey)) for n in oa.oa_road_raw]
+            oa = oa.drop_duplicates(["key", "rkey"])
+            t = t.merge(oa.drop(columns=["oa_home_raw", "oa_road_raw"]),
+                        on=["key", "rkey"], how="left")
+            oqs = [q if isinstance(q, dict) else {} for q in t.oa_quotes]
+            t = pd.concat([t.drop(columns=["oa_quotes"]),
+                           pd.DataFrame([oa_shop(q) for q in oqs])], axis=1)
+            for c in ("oa_fair_an", "oa_best_home_an", "oa_best_away_an"):
+                t[c.replace("_an", "_pt")] = -t[c] if c in t else np.nan
+            # The two sources should agree to about a point. A systematic gap is a sign error
+            # or a bad join, not an edge -- check it before believing anything downstream.
+            t["oa_vs_book_fair"] = (t.oa_fair_pt - t.book_fair).round(1)
+            priced = int(t.oa_fair_pt.notna().sum())
+            gap = t.oa_vs_book_fair.abs()
+            print(f"  the-odds-api: {priced}/{len(t)} games priced"
+                  + (f", median |oa_fair - book_fair| {gap.median():.1f} pts, "
+                     f"max {gap.max():.1f}" if gap.notna().any() else ""))
+            if priced < len(t):
+                unpriced = t[t.oa_fair_pt.isna()][["road", "home"]].values.tolist()
+                print(f"    unpriced: {unpriced[:8]}{' ...' if len(unpriced) > 8 else ''}")
+
     t = add_side(t, book)
     t.insert(0, "snapshot", snapshot.name)
     t.insert(1, "captured_utc", snapshot.stem.split("_")[-1])
