@@ -98,6 +98,43 @@ mis-oriented side), it is fixed, recorded here, and the run repeated once.
 
 ---
 
+## Amendment S3 — Pinnacle in the live fair (committed 2026-09-09)
+
+**Names and extends S2's live fair set.** The backtest set R stands unchanged, for S2's reason:
+no history exists for the added feed, so nothing already reported can be recomputed.
+
+**Motivation, opportunistic again.** An oddspapi.io key became available on 2026-09-09; it is
+the only feed in the repo that carries Pinnacle, which neither Action Network nor the-odds-api
+serves for college football. Nothing in a result motivated this.
+
+**Fixed now.**
+
+- **Live fair set, from 2026-09-09 (same day as S2, later in the day):** S2's ten books **∪**
+  Pinnacle, read from the daily `scripts/pull_oddspapi.py` snapshot by `pinnacle_lines` in
+  `weekly_slate.py`. Only the full-game main line (Pinnacle market path period 0) counts; halves,
+  quarters and alternate numbers are ignored.
+- **One vote, not a weight.** Pinnacle enters the median as one book of up to eleven. It is the
+  sharpest book on the list and the median does not know that; weighting it, or using it as the
+  fair outright, would be a further amendment with its own measurement, not an interpretation of
+  this one.
+- **Staleness.** The Pinnacle quote is up to 24 hours old where Action Network's is live and
+  the-odds-api's is up to six hours old. Amendment S1's outlier guard (2.5 points from the
+  all-book median) is what keeps a stale Pinnacle number on a moved line out of the fair.
+- **≥ 2 books still required; the outlier guard applies unchanged.**
+- **Tagged.** `BOOK_SET_VERSION` = 3 on every `movement_forward_log.csv` row from here on. No
+  version-2 rows exist beyond the same day's captures; version-1 rows remain as S2 left them.
+  Any read pooling eras must say so.
+- **Scope.** As S2: this changes `book_fair`, `side`, `side_line`, `edge` and the printed bet set.
+  Version B is untouched — its anchor is Prediction Tracker's line and its close is Action
+  Network's consensus, neither of which is `book_fair`.
+
+**Measured on commit, 2026 week 3, 49 games, against the set-2 slate from the same snapshots.**
+Pinnacle priced 48 of 49 (UCF at Pittsburgh not yet posted); books per game 10 → 11.
+`book_fair` moved on 5 games, median 0.00, mean −0.015, max 0.25 points. E4's side flipped on 0
+games. The edge ≥ 1 bet set went 20 → 19: Oregon at Oklahoma St fell from 1.00 to 0.75. Pinnacle
+sat exactly on the eleven-book median in 33 of 48 priced games and within 0.5 points in 46; its
+largest disagreement was 2.0 points (LSU, −33.5 against −35.5), inside the guard.
+
 ## Amendment S2 — the-odds-api books in the live fair (committed 2026-09-09)
 
 **Names and replaces the "Fair" definition above for the LIVE slate only.** The backtest's

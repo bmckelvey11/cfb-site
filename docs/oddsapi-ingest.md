@@ -129,9 +129,9 @@ the-odds-api's NCAAF feed has no Pinnacle. **oddspapi.io** does, on its free pla
   numbers, all also flagged `mainLine` within their own market — a period-blind parse returns the
   first-half line at roughly half the number. `bookmakerOutcomeId` is `<home spread>/home` in
   betting sign. `participant1` is the home team (46/46 joined that way on 2026-09-09, 0 swapped).
-- **Read by the slate as observation columns** `Pinnacle_home`, `Pinnacle_odds`, `pin_limit`,
-  `pin_vs_fair`. Pinnacle does **not** vote in `book_fair`; that would be an amendment to
-  `research/spread/docs/prereg-line-shopping.md`, not a side effect of having the feed.
+- **Read by the slate** into `Pinnacle_home`, `Pinnacle_odds`, `pin_limit`, `pin_vs_fair`, and
+  Pinnacle **votes in `book_fair`** as one book of up to eleven under **amendment S3** of
+  `research/spread/docs/prereg-line-shopping.md` (`book_set_version` 3 on forward-log rows).
 
 ```powershell
 schtasks /Query /TN "CFB-Pinnacle-Snapshot" /FO LIST /V | Select-String "Last Run Time|Last Result|Next Run Time"

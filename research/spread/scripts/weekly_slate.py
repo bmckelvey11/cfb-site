@@ -8,9 +8,9 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
   book_fair    median home spread across real books RIGHT NOW, after the outlier guard: the
                five Action Network books (Caesars, DraftKings, FanDuel, BetRivers, BetMGM)
                plus the five offshore books only the-odds-api carries (BetOnline.ag, Bovada,
-               LowVig.ag, BetUS, MyBookie.ag). One vote per book -- AN wins every overlap
-               because its quote is live. Amendment S2 of prereg-line-shopping.md; tagged
-               `book_set_version` 2 on every forward-log row
+               LowVig.ag, BetUS, MyBookie.ag) plus Pinnacle from oddspapi. One vote per book --
+               AN wins every overlap because its quote is live. Amendments S2 and S3 of
+               prereg-line-shopping.md; tagged `book_set_version` 3 on every forward-log row
   <Book>_home / <Book>_odds   each book's posted home spread (PT sign) and its odds
   consensus    the model consensus: mean of the top-20 models by prior MOVEMENT skill
   E4 .. E14    each movement model's predicted CLOSE, fit on the whole archive with the
@@ -29,8 +29,9 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
                i.e. -E4; the one number to compare against a posted home line
   edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1
   Pinnacle_home / Pinnacle_odds / pin_limit   Pinnacle's full-game main line from the latest
-               oddspapi snapshot (scripts/pull_oddspapi.py), PT sign. Shown beside the fair,
-               NOT in it. pin_vs_fair = Pinnacle_home - book_fair.
+               oddspapi snapshot (scripts/pull_oddspapi.py, daily), PT sign. Votes in book_fair
+               as one book of up to eleven since amendment S3 (`book_set_version` 3).
+               pin_vs_fair = Pinnacle_home - book_fair.
 
   oa_*         the same arithmetic over the-odds-api's nine books ALONE, AS OF `oa_as_of`
                (the 6-hourly snapshot, so up to six hours stale). Kept beside book_fair as the
@@ -114,16 +115,21 @@ OA_BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betrivers": "BetR
 # All five are offshore. They are real venues and OUTLIER_PTS still guards the median, but
 # regulated-only is a one-line change here if that turns out to be the wrong call.
 OA_ONLY_BOOKS = tuple(n for n in OA_BOOKS.values() if n not in REAL_BOOKS.values())
-BOOKS = tuple(REAL_BOOKS.values()) + OA_ONLY_BOOKS
+# Amendment S3 (2026-09-09): Pinnacle, from the oddspapi snapshot (pinnacle_lines), votes too.
+# One book, one vote, same as the rest; it is the sharpest book but the median does not know
+# that. Its quote is up to 24h old (daily pull); the outlier guard is what stops a stale number
+# on a moved line from dragging the fair.
+BOOKS = tuple(REAL_BOOKS.values()) + OA_ONLY_BOOKS + ("Pinnacle",)
 
 # Which book set produced book_fair, tagged on every forward-log row for the same reason
 # MODEL_SET_VERSION is: a graded quantity that changes mid-test has to say so.
 #   1 = Action Network alone (rows through 2026-09-09)
-#   2 = Action Network + the five the-odds-api books above (2026-09-09 on)
-# Version 1 rows cannot be recomputed under version 2 -- no the-odds-api snapshot exists for
-# those moments, the schedule started 2026-09-09 -- so the break is permanent and version B
-# must either restrict to one era or model the shift.
-BOOK_SET_VERSION = 2
+#   2 = Action Network + the five the-odds-api books above (2026-09-09, same day)
+#   3 = version 2 + Pinnacle via oddspapi (2026-09-09 on; amendment S3)
+# Earlier rows cannot be recomputed under a later version -- no snapshot from the added feed
+# exists for those moments -- so each break is permanent and version B must either restrict to
+# one era or model the shift.
+BOOK_SET_VERSION = 3
 OUTLIER_PTS = 2.5          # a book > this far from the median of all books is ignored (n >= 3)
 ODDS_WINDOW = (-135, 125)
 KEY_NUMBERS = (3, 7)
@@ -395,9 +401,8 @@ def is_full_game_spread(market: dict) -> bool:
 
 def pinnacle_lines(now: datetime) -> pd.DataFrame:
     """Pinnacle's full-game main-line home spread from the latest oddspapi snapshot
-    (`scripts/pull_oddspapi.py`, one request per pull). OBSERVATION ONLY: never feeds
-    `book_fair`, `side`, or `edge`; putting the sharpest book into the fair is a prereg
-    amendment, not a side effect of having the data.
+    (`scripts/pull_oddspapi.py`, one request per pull, daily). Votes in `book_fair` as one book
+    among up to eleven under amendment S3 of prereg-line-shopping.md (BOOK_SET_VERSION 3).
 
     The file carries betting sign from the home side (`-3.5/home` = home favored by 3.5);
     stored here in PT sign like every other `<Book>_home` column. participant1 is the home
@@ -488,12 +493,26 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
         else:
             t["oa_quotes"], t["oa_as_of"] = [{} for _ in range(len(t))], np.nan
 
+        # Pinnacle joins here too (BOOK_SET_VERSION 3); it is on neither other feed, so no overlap.
+        pin = pinnacle_lines(now)
+        if not pin.empty:
+            pin["key"] = [oa_resolve(n, set(t.key)) for n in pin.pin_home_raw]
+            pin["rkey"] = [oa_resolve(n, set(t.rkey)) for n in pin.pin_road_raw]
+            t = t.merge(pin.drop(columns=["pin_home_raw", "pin_road_raw"]).drop_duplicates(["key", "rkey"]),
+                        on=["key", "rkey"], how="left")
+        for c in ("Pinnacle_home", "Pinnacle_odds", "pin_limit", "pin_active", "pin_as_of"):
+            if c not in t:
+                t[c] = np.nan
+        # AN sign for the vote (negative = home favored), like every other quote in qs
+        pin_qs = [{"Pinnacle": (-h, int(o))} if np.isfinite(h) else {}
+                  for h, o in zip(t.Pinnacle_home, t.Pinnacle_odds.fillna(0))]
+
         an_qs = [q if isinstance(q, dict) else {} for q in t.quotes]
         oa_qs = [q if isinstance(q, dict) else {} for q in t.oa_quotes]
         # Action Network wins every overlapping book: its quote is live, the snapshot's is up
         # to six hours old. Promotion therefore ADDS the five offshore books AN does not carry
         # rather than reshuffling the four it already had.
-        qs = [{**o, **a} for o, a in zip(oa_qs, an_qs)]
+        qs = [{**o, **p, **a} for o, p, a in zip(oa_qs, pin_qs, an_qs)]
         s = pd.DataFrame([shop(q) for q in qs])
         # the-odds-api on its own, kept beside the promoted number as the agreement check
         s_oa = pd.DataFrame([oa_shop(q) for q in oa_qs])
@@ -517,16 +536,8 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
                          for f, b in zip(t.fair_pt, t.best_home_pt)]
         t["away_key"] = [crosses_key(f, b) if np.isfinite(f) and np.isfinite(b) else False
                          for f, b in zip(t.fair_pt, t.best_away_pt)]
-        # Pinnacle beside the fair, never inside it (see pinnacle_lines)
-        pin = pinnacle_lines(now)
-        if not pin.empty:
-            pin["key"] = [oa_resolve(n, set(t.key)) for n in pin.pin_home_raw]
-            pin["rkey"] = [oa_resolve(n, set(t.rkey)) for n in pin.pin_road_raw]
-            t = t.merge(pin.drop(columns=["pin_home_raw", "pin_road_raw"]).drop_duplicates(["key", "rkey"]),
-                        on=["key", "rkey"], how="left")
-        for c in ("Pinnacle_home", "Pinnacle_odds", "pin_limit", "pin_active", "pin_as_of"):
-            if c not in t:
-                t[c] = np.nan
+        # Pinnacle against the fair it now votes in -- one of up to eleven, so a gap here is
+        # Pinnacle disagreeing with the rest, not a join problem
         t["pin_vs_fair"] = (t.Pinnacle_home - t.book_fair).round(2)
         n_pin = int(t.Pinnacle_home.notna().sum())
         print(f"  Pinnacle (oddspapi): {n_pin}/{len(t)} games priced"
@@ -615,7 +626,7 @@ def write_xlsx(t: pd.DataFrame, path: Path) -> None:
         "Our Line": t.our_line, "Edge": t.edge, "Side": t.side, "Take": t.side_line,
         "Book": t.side_book, "Odds": t.side_odds,
     })
-    for b in BOOKS + ("Pinnacle",):        # Pinnacle is shown, not voted (see pinnacle_lines)
+    for b in BOOKS:
         slate[b] = bet(f"{b}_home")
         slate[f"{b} odds"] = t.get(f"{b}_odds", np.nan)
     slate["Pinnacle vs Fair"] = -t.get("pin_vs_fair", np.nan)     # betting sign, home side
@@ -627,7 +638,7 @@ def write_xlsx(t: pd.DataFrame, path: Path) -> None:
         sides = []
         for _, r in t.iterrows():
             # every book's number from the side's perspective; only home-side odds are captured
-            per_book = {b: r.get(f"{b}_home", np.nan) for b in BOOKS + ("Pinnacle",)}
+            per_book = {b: r.get(f"{b}_home", np.nan) for b in BOOKS}
             sides.append({"Kick (ET)": r.get("kick_et", ""), "Team": r.home, "Opponent": r.road,
                           "Best Line": -r.best_home_pt, "Book": r.best_home_book, "Odds": r.best_home_odds,
                           "Fair": -r.fair_pt, "Gain": r.home_gain, "Key": bool(r.home_key),
@@ -770,7 +781,11 @@ def main() -> int:
     out = t.drop(columns=[c for c in ("quotes", "key", "rkey") if c in t])
     out.to_csv(path, index=False)
     out.to_csv(OUT / f"weekly_slate_latest{suffix}.csv", index=False)
-    write_xlsx(t, OUT / f"weekly_slate_latest{suffix}.xlsx")
+    try:
+        write_xlsx(t, OUT / f"weekly_slate_latest{suffix}.xlsx")
+    except PermissionError:      # the workbook is open in Excel; the CSV and forward log still land
+        print(f"  weekly_slate_latest{suffix}.xlsx is open elsewhere -- workbook not refreshed",
+              file=sys.stderr)
     # A snapshot with no book match is a stale slate (PT still serving last week's games after
     # they kicked off); logging it would add ungradable rows to version B's dataset. A --book
     # run is a view, not new data.
