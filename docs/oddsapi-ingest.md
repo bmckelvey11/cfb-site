@@ -1,17 +1,35 @@
 # the-odds-api.com ingest
 
-Status: **live pull landed, not wired to the warehouse.** Snapshots go to
+Status: **pulling on a schedule, not wired to the warehouse.** Snapshots go to
 `data/ingest/oddsapi/`, which `cfb_paths` does not glob. Flatten and loader
 wiring are deliberately deferred — see *Before this loads* below.
 
 - Client: `cfb_system_maker/oddsapi_client.py`
 - Pull: `scripts/pull_odds.py`
+- Scheduler wrapper: `scripts/pull_odds.cmd`
 - Tests: `tests/test_oddsapi_client.py`
 - Key: `ODDS_API` in `env.env` (gitignored)
 - Guide: <https://the-odds-api.com/liveapi/guides/v4/>
 
 ```bash
 python scripts/pull_odds.py
+```
+
+## Schedule
+
+Windows Task Scheduler task **`CFB-Odds-Snapshot`**, repeating every 6 hours from
+02:00 (so 02:00 / 08:00 / 14:00 / 20:00), running `scripts/pull_odds.cmd` as
+`mckel`. `StartWhenAvailable` is on, so a run missed to sleep fires late rather
+than being skipped; `MultipleInstances` is `IgnoreNew`. Every run appends to
+`data/logs/odds_pull.log`. Registered 2026-09-09 and verified by a manual
+`Start-ScheduledTask` (exit 0, snapshot written).
+
+Cadence is the budget: 3 credits × 4/day ≈ **360/month against the free plan's
+500**, leaving room for ad-hoc pulls. Changing the interval means redoing that
+math. To pause it:
+
+```powershell
+Disable-ScheduledTask -TaskName CFB-Odds-Snapshot
 ```
 
 ## Plan and quota — probed 2026-09-09
@@ -30,7 +48,7 @@ python scripts/pull_odds.py
 | Cadence | Credits/month (3 per pull) | Fits in 500? |
 | --- | --- | --- |
 | Daily | 90 | yes |
-| Every 6h | 360 | yes, ~72% of cap |
+| Every 6h | 360 | yes, ~72% of cap — **current schedule** |
 | Hourly | 2,160 | no |
 
 `/v4/sports` costs 0, so probing the sport list is free.
