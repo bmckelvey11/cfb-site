@@ -31,8 +31,19 @@ or env.env). To get it: signed into pff.com, open DevTools -> Network on any
 value. It is a credential; it expires, and a 401 or a `premium: False` row means
 re-copy it.
 
-Current season only. season=2025 and earlier return zero games, so there is no
-backfill here -- like the Action Network history, coverage starts when you log it.
+CURRENT SEASON ONLY, and that is a server-side fact, not a missing parameter.
+Swept 2019-2027 for NCAA and 2025-2026 for NFL against a premium session: every
+season but 2026 returns zero games, with or without `&week=`. Asking the matchup
+endpoint for a 2025 game by its real id answers `No game in schedules with id
+29099 and 5` -- the scoreboard's schedule store holds this season and nothing
+else. So there is no backfill here; like the Action Network history, coverage
+starts when you log it.
+
+For historical PFF game ids, use the developer API instead: `/v1/games?league=
+ncaa&season=<year>&week=<n>` serves back to at least 2014 (id, teams, kickoff,
+final score, stadium). No odds and no Greenline on it -- it is a game index, good
+for joining PFF ids to the warehouse, not for lines.
+
 Each run overwrites its CSVs; the schedule snapshot is self-describing (it carries
 both opener and current), so re-running gives a fresh state, not an appended one.
 """
