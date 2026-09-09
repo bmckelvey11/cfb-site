@@ -137,6 +137,20 @@ def main() -> int:
         print(f"Games whose in-week range is at least 1 point: "
               f"{(gr.range_after_monday >= 1).mean():.0%}. That is shopping room, not a forecast.")
 
+    # Is the "already moved" result just an artifact of openers posting in April? Split by how
+    # long the line had been up. If short-lead games behave differently, that is where whatever
+    # remains at Monday actually lives.
+    e2 = e.dropna(subset=["monday"])
+    print()
+    print("By how far ahead the line opened:")
+    for lo, hi, lab in [(0, 21, "opened < 3 weeks out"), (21, 60, "3-8 weeks out"),
+                        (60, 9999, "more than 8 weeks out")]:
+        sub = e2[(e2.opened_days_out >= lo) & (e2.opened_days_out < hi)]
+        if len(sub) < 15:
+            continue
+        print(f"  {lab:<22} n={len(sub):3d}  share done by Monday {sub.monday.median():4.0%}"
+              f"   with a quarter or more left: {(sub.monday < 0.75).mean():.0%}")
+
     print("\nShare of move done is a median across games; each game's own total move is the")
     print("denominator, so a game that barely moved cannot dominate one that moved five points.")
 
