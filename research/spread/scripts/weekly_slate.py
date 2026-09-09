@@ -18,7 +18,9 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
   pred_close   median of the model columns -- a summary, not another model
   move_vs_fair pred_close - book_fair: where the models say the line still has to go.
                Positive = toward the home side being favored by more.
-  best_home / best_away   the most favorable posted number for each side, and its book
+  best_home / best_away   the most favorable posted number for each side among the books a
+               bet can be placed at (BETTABLE: DraftKings, FanDuel), and which one. The fair
+               still uses every book; only the slip is restricted.
   side         which team E4 (the registered predictor, the one version B grades) says to
                take: home when E4 sits above the book fair, road when below
   side_line    the number to take for that side, from that side's perspective (+3.5 = getting
@@ -120,6 +122,10 @@ OA_ONLY_BOOKS = tuple(n for n in OA_BOOKS.values() if n not in REAL_BOOKS.values
 # that. Its quote is up to 24h old (daily pull); the outlier guard is what stops a stale number
 # on a moved line from dragging the fair.
 BOOKS = tuple(REAL_BOOKS.values()) + OA_ONLY_BOOKS + ("Pinnacle",)
+# Where a bet can actually be placed. Every book in BOOKS votes in the fair; only these can
+# supply best_home/best_away, side_line/side_book, and the SHOP/AGREE rows. The fair is the
+# market's number and does not care about accounts; the slip does.
+BETTABLE = ("DraftKings", "FanDuel")
 
 # Which book set produced book_fair, tagged on every forward-log row for the same reason
 # MODEL_SET_VERSION is: a graded quantity that changes mid-test has to say so.
@@ -264,11 +270,14 @@ def shop(quotes: dict) -> dict:
         kept = v[(v - v.median()).abs() <= OUTLIER_PTS]
         if len(kept) >= 2:
             v = kept
-    return {"fair_an": v.median(), "n_books": len(v), "range": v.max() - v.min(),
-            "best_home_an": v.max(), "best_home_book": v.idxmax(),
-            "best_home_odds": quotes[v.idxmax()][1],
-            "best_away_an": v.min(), "best_away_book": v.idxmin(),
-            "best_away_odds": quotes[v.idxmin()][1]}
+    out = {"fair_an": v.median(), "n_books": len(v), "range": v.max() - v.min()}
+    b = v[v.index.isin(BETTABLE)]          # best number only where a bet can be placed
+    if len(b):
+        out.update({"best_home_an": b.max(), "best_home_book": b.idxmax(),
+                    "best_home_odds": quotes[b.idxmax()][1],
+                    "best_away_an": b.min(), "best_away_book": b.idxmin(),
+                    "best_away_odds": quotes[b.idxmin()][1]})
+    return out
 
 
 # ---------------------------------------------------------------- the-odds-api (observation)
@@ -843,6 +852,12 @@ def _check() -> None:
     q = {"68": (-7.5, -110), "69": (-7.0, -110), "71": (18.0, -110)}
     s = shop(q)
     assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # BetRivers' 18 was guarded out
+    assert "best_home_an" not in s, s                       # no bettable book posted -> no best
+    # fair over every book, best only at a bettable one: Pinnacle's -6.5 sets neither side's best
+    q = {"DraftKings": (-7.5, -110), "FanDuel": (-7.0, -105), "Pinnacle": (-6.5, -108), "Bovada": (-7.5, -110)}
+    s = shop(q)
+    assert s["fair_an"] == -7.25 and s["best_home_book"] == "FanDuel" and s["best_home_an"] == -7.0, s
+    assert s["best_away_book"] == "DraftKings" and s["best_away_an"] == -7.5, s
     # the cross-game guard: same home team, different opponent must NOT inherit book numbers
     pt = pd.DataFrame({"key": ["ole miss"], "rkey": ["louisville"]})
     an = pd.DataFrame({"key": ["ole miss"], "rkey": ["charlotte"], "event_id": [1]})
