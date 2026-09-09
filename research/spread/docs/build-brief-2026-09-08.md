@@ -20,7 +20,9 @@ another agent is already fitting against it. So:
 - **Wave 0 (one agent, alone)** makes every contract edit. Nothing may fit anything until it lands,
   because the repository's preregistration order is that expectation text is committed *before*
   the run that tests it.
-- **Wave 1 (six agents, parallel)** does the code. Every agent owns a disjoint file set.
+- **Wave 1 (seven agents, parallel)** does the code. Every agent owns a disjoint file set. The
+  shopping tree (`prereg-line-shopping.md`, `line-shopping-results.md`) has its own single
+  writer for the same reason — agent I.
 - **Wave 2 (two agents)** does the work that needs Wave 1's outputs.
 - **Wave 3 (one agent, alone)** writes every results section and the index, from the JSON the
   earlier waves produced.
@@ -97,9 +99,12 @@ No code. Every edit below comes from the hardened plan's §"Required amendments"
 11. **T11 Step 2:** fill the branch where the slope is under 0.10 but the CI does not exclude
     0.20 — the gate makes this the likely outcome, not a corner case. Also replace the Step 1
     gate (`mde_80 ≤ 0.2`) with the verbatim stopping rule.
-12. **T9:** mark **BLOCKED — pending user decision on the `3.2` constant** at the task heading, so
-    an executor cannot run it. Review §1.5 retired that constant; T9 Step 3 reuses it. Both
-    readings are defensible and the user has not chosen.
+12. **T9:** record the resolution at the task heading. The user settled it on 2026-09-08: the
+    `3.2` win-rate-per-point constant is **kept for line shopping** and stays retired for the
+    movement CLV claim. It was estimated on the line-shopping sample itself, so it is the
+    in-sample conversion for that sample; review §1.5's objection was to the "3–5× the bar"
+    phrasing on movement bets, which sit on larger spreads where a point is worth less. Note
+    that the S1 results section must carry the in-sample caveat. T9 is unblocked (agent I).
 13. **T10:** relabel as blocked on an external dependency (a `cfb_system_maker` Action Network
     scoreboard re-scrape that nothing in this plan triggers).
 14. **New task T15 — walk-forward decontamination screen** (agent A's work), placed in Phase 1
@@ -121,9 +126,9 @@ their original wording). Second must be non-zero.
 
 ---
 
-## Wave 1 — code, six agents in parallel
+## Wave 1 — code, seven agents in parallel
 
-Every agent's file set is disjoint from every other's. Dispatch all six at once.
+Every agent's file set is disjoint from every other's. Dispatch all seven at once.
 
 ### Agent A — walk-forward decontamination screen (amendment A6)
 
@@ -272,6 +277,41 @@ eval_combination_sweep, eval_prediction_tracker_models"` succeeds.
 **Commit:** `docs(spread): mark the core modules' main() as margin-era`
 (the CLV paragraph is a second commit: `docs(clv): say which spread CLV figure to quote`)
 
+### Agent I — line shopping, amendment S1 (T9)
+
+**Owns:** `research/spread/docs/prereg-line-shopping.md`,
+`research/spread/scripts/eval_line_shopping.py`,
+`research/spread/docs/line-shopping-results.md`
+
+Lettered out of sequence because this task was unblocked after the brief was first written. It
+runs in Wave 1 — its files are disjoint from every other agent's, and it is the only agent that
+touches the shopping tree.
+
+`combining-predictions.md` §1 lists two defects that must be fixed before the book fair drives a
+live bet: the backtest has no outlier guard although the live slate does, and price is ignored.
+
+1. **Pre-register S1 first, and commit it before you run anything.** Two commits, in this order:
+   the amendment text, then the implementation and its result. The repository's preregistration
+   order is not negotiable — the expectation is committed before the run that tests it.
+2. **Outlier guard.** Where `eval_line_shopping.py` builds the per-game book table (the group
+   over `event_id` that produces `fair`), apply the same guard the live slate uses, before the
+   median.
+3. **Price-adjusted value.** `value = 3.2 * gain - 100 * (breakeven(best_odds) -
+   breakeven(median_odds))`, where `median_odds` is the odds at the book supplying the median
+   number (or −110 when the median averages two books). Report `value.mean()` at gain ≥ 0.5 and
+   ≥ 1.0, and `(value <= 0).mean()`.
+4. **Write the caveat.** The `3.2` constant is in-sample — it came from line-shopping P2 on
+   2024–25, 3,574 sides, dominated by 3/7 crossings on small spreads. The S1 section must say
+   so. Keeping it here was a deliberate decision, not an oversight, and the section should read
+   that way: it is the in-sample conversion for this sample, and it is not the right conversion
+   for movement CLV, where review §1.5 retired it.
+
+**Acceptance:** the prereg commit precedes the run commit in `git log`; the S1 section reports
+the P2 figure, both value means and the caveat.
+
+**Commit:** `docs(spread): pre-register S1, outlier guard and price` then
+`feat(spread): outlier guard and price-adjusted value for shopping`
+
 ---
 
 ## Wave 2 — depends on Wave 1 (two agents, parallel with each other)
@@ -354,7 +394,6 @@ returns nothing; every task this build completed is checked off with a date.
 
 | Item | Why |
 |---|---|
-| **T9** — line-shopping amendment S1 | Blocked on a user decision. Review §1.5 retired the `3.2` win-rate-per-point constant; T9's price-adjusted value column reuses it. Both readings are defensible: the constant was estimated on the line-shopping sample itself, and §1.5's retirement was aimed at the movement CLV claim. Nobody should guess. |
 | **T10** — "scoreboard = close" | Needs an Action Network scoreboard re-scrape that lives in `cfb_system_maker`, which nothing here triggers. |
 | **T1** — AN backfill and the scheduler check | A vendor data pull plus an observation that a scheduled task fired on its own. Run it by hand; it is not agent work and its Step 3 answer is a fact about the machine, not the repo. |
 | Alpha-spending for the weekly reads | The fixed season-end checkpoint removes the sequential-test problem. A spending function would be machinery for a design that no longer stops early. |
@@ -365,7 +404,7 @@ returns nothing; every task this build completed is checked off with a date.
 ```
 Wave 0  ──────────────►  contract (blocks all)
                           │
-Wave 1  ──────────────►  A  B  C  D  E  F   (six in parallel)
+Wave 1  ──────────────►  A  B  C  D  E  F  I   (seven in parallel)
                           │        │
 Wave 2  ──────────────►  G (needs A)   H (needs A, B)
                           │

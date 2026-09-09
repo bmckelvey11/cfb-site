@@ -199,3 +199,19 @@ file or directory). The Toolchain note now says exactly that.
 Loop summary: 3 rounds, 14 findings raised, 12 accepted in full, 2 accepted with narrowed scope,
 1 rejected with reason (per-fitter unit tests for E6-E14), 1 item deliberately left open as the
 user's call (the 3.2 constant, with T9 blocked until it is settled).
+
+---
+
+## Post-loop resolution — 2026-09-08
+
+The one item the loop deliberately left open is settled. **Risk 6, the `3.2` win-rate-per-point
+constant: kept for line shopping, still retired for the movement CLV claim** (user's decision).
+
+The constant was estimated on the line-shopping sample itself -- 2024-25, 3,574 sides -- so it is
+the in-sample conversion for that sample, and review section 1.5's objection was aimed at the
+"3-5x the bar" phrasing on movement bets, which sit on larger spreads where a point is worth
+less. Two different uses of one number; only one of them was wrong.
+
+Condition carried into the build: the S1 results section states that the value column inherits
+the constant's limits (in-sample, dominated by 3/7 crossings on small spreads). T9 is unblocked
+and becomes agent I in Wave 1 of `build-brief-2026-09-08.md`.

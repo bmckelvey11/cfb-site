@@ -1,5 +1,5 @@
 # Plan: harden the 2026-09-08 spread line-movement next-steps plan
-_Locked via claudex-loop — by Claude + mckel, 2026-09-08. Revised after Codex review rounds 1–2._
+_Locked via claudex-loop — by Claude + mckel, 2026-09-08. Revised after Codex review rounds 1–2; Risk 6 settled by the user 2026-09-08._
 
 **This plan does not replace `docs/superpowers/plans/2026-09-08-spread-next-steps.md`.** That
 file (962 lines, 14 tasks, Task 2 done) stays the executable artifact with the code and the
@@ -146,12 +146,16 @@ _Renumbered after round 1. Each carries the adopted resolution._
    understates the n a clustered design needs. **Adopted fix:** compute the MDE from the
    cluster SE (or a season-week bootstrap) and report it only once the cluster count clears the
    fallback; the reported n stays informational until then.
-6. **T9 reuses the constant the review retired.** Review §1.5 retired "3.2 win-rate points per
-   point of spread" as an in-sample line-shopping P2 constant; T9 Step 3's value column is
-   `3.2 * gain − 100*(breakeven(best) − breakeven(median))`. **Unresolved — the user's call.**
-   Either the constant is fit for converting *shopping* gains (it was estimated on exactly that
-   sample, which is an argument for it) and §1.5's retirement was about the *movement* CLV
-   claim only, or T9 needs a different conversion. The plan must say which.
+6. **T9 reuses the constant the review retired — settled 2026-09-08, the user's call: keep it
+   for shopping.** Review §1.5 retired "3.2 win-rate points per point of spread"; T9 Step 3's
+   value column is `3.2 * gain − 100*(breakeven(best) − breakeven(median))`. **Resolution:** the
+   constant was estimated on the line-shopping sample itself (2024–25, 3,574 sides), so it is
+   the in-sample conversion for *that* sample and is fit for converting shopping gains. §1.5's
+   retirement applies to the **movement** CLV claim only — the "3–5× the bar" phrasing, where
+   the bets sit disproportionately on large spreads and a point is worth less. The two uses are
+   not the same use. **Condition:** the S1 results section must state that the value column
+   inherits the constant's limits — in-sample, and dominated by 3/7 crossings on small spreads.
+   T9 is unblocked.
 7. **Two decision tables have undefined regions.** T4 Step 5 has actions for "≥ 15 of 20" and
    "< 10" but none for 10–14. T11 Step 2 row 1 requires "slope < 0.10 **and** CI excludes 0.20";
    under-0.10-with-a-wide-CI matches no row — the likely case, not a corner one. **Adopted fix:**
@@ -198,8 +202,9 @@ Before the tasks they touch run:
 - **Plan T7:** one capture per game per bucket, fixed game set (Risk 9).
 - **Plan T8:** health check gates the grade (Risk 8).
 - **Plan T4 and T11:** the undefined branches filled (Risk 7).
-- **Plan T9:** marked **blocked pending user decision** in the plan file itself, not only here —
-  an executor must not run it with the `3.2` question open (Risk 6).
+- **Plan T9:** unblocked (Risk 6, settled 2026-09-08). Record the resolution at the task
+  heading — the constant is kept for shopping, retired for movement CLV — and require the S1
+  results section to carry the in-sample caveat.
 - **Plan, new task:** walk-forward decontamination screen and an A3 rerun (Risk 4).
 - **Plan T12–T14 area:** the four scoped estimator tests, including the walk-forward
   drop-list test (Risk 12).
