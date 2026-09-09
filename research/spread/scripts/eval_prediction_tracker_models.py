@@ -1,5 +1,8 @@
 """Rank the Prediction Tracker models and build a walk-forward ensemble spread.
 
+Estimator core for the spread tree, imported by the live scripts; main() reproduces the
+archived margin-era tables (archive/spread-margin-era/).
+
 Implements archive/spread-margin-era/prediction-tracker-model-eval-plan.md. Read that first -- the estimand,
 the dual open/close benchmark, the pre-registration of E4, the volatility definition and
 the multiplicity budget are all fixed there, before any of this was fit.

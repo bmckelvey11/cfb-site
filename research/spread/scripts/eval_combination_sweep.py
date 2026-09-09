@@ -1,5 +1,8 @@
 """Market-anchored combination sweep -- E6 through E14.
 
+Estimator core for the spread tree, imported by the live scripts; main() reproduces the
+archived margin-era tables (archive/spread-margin-era/).
+
 Implements archive/spread-margin-era/prediction-tracker-model-eval-plan-addendum.md. Read that first: the
 repair/exploratory split, the hyperparameter grids, the nested selection rule, the
 stability gate and the multiplicity budget are all fixed there, before any of this ran.
