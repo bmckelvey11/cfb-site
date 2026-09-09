@@ -158,6 +158,7 @@ amendment exists because of something seen in an earlier result.**
 | A6 (below) | Walk-forward decontamination screen | A3's screen was fit on the full sample | No — a defect correction |
 | B2 (queued) | Slope decay across weekday captures | Registered as part of the version B design | No |
 | B3 (below) | The stopping rule | An adversarial review of B1's gate | No — no read informed it |
+| A7 (below) | Ridge grid widened to where the curve must turn over, plus the λ→R² curve itself | **A4 hit its own new edge: λ = 5e4 in 19 of 19 seasons, after A hit 1e4 in 19 of 20** | **Yes** |
 
 **One confirmatory family.** There is exactly one confirmatory hypothesis in this tree: **the
 version B E4 slope at the Monday anchor**. Every archive result (A1, A2, A3, A4, A5, A6) and all
@@ -291,3 +292,67 @@ the keep branch is expected to fire; the fine grid's purpose is to see whether t
 moves off the coarse grid's edge value (10⁴) now that finer steps exist nearby, and whether R²
 changes materially — not to re-litigate whether E6 clears E4, which A6 already shows on the
 coarse grid.
+
+## Amendment A7 — a ridge grid wide enough to be decisive (committed 2026-09-08, before the run)
+
+**Why a third widening is not just more of the same.** Version A ran λ ∈ {10 … 10⁴} and chose the
+top value, 10⁴, in 19 of 20 seasons. A2 widened to 10⁶ and over-shrank. A4 ran a finer grid to
+5×10⁴ on the walk-forward panel and chose *its* top value, 5×10⁴, in 19 of 19 seasons. Widening
+has now moved the edge twice without ever placing the choice in the interior, and E6 is currently
+served at a bound. Repeating the same move a third time, on its own, would be expected to produce
+the same outcome.
+
+**The mechanism this amendment tests.** The 1-SE rule selects the *most-shrunk* λ whose
+validation error is within one standard error of the best. If the validation curve is flat across
+a wide range of λ, that rule will run to the top of whatever grid it is given, no matter where the
+top is — the choice would then be an artifact of the grid bound, not evidence that the data want
+more shrinkage. The diagnostic that separates these two explanations is the **shape of the
+λ → R² curve**, which no run so far has reported. A7 reports it.
+
+**Why this grid must be decisive.** As λ → ∞ the ridge coefficients go to zero, E6's correction
+goes to zero, and E6 degenerates to R0, the recalibrated opener, whose R² of the move is ≈ 0.0005.
+E6 at λ = 5×10⁴ scores ≈ 0.20. The curve therefore *must* turn over somewhere above 5×10⁴, and a
+grid that reaches far enough brackets the turnover by construction. This is the first version of
+this question that cannot come back "hit the edge again" without also telling us something.
+
+**Grid, fixed here.** λ ∈ {10³, 3×10³, 10⁴, 3×10⁴, 10⁵, 3×10⁵, 10⁶, 3×10⁶, 10⁷, 3×10⁷, 10⁸,
+3×10⁸, 10⁹}. Same panel (A6 walk-forward), same support, same inference, same 1-SE selection as
+every prior ridge run — only the grid changes.
+
+**Runnable sanity check, before any decision is read.** R² at λ = 10⁹ must be within 0.01 of R0's
+R². If it is not, the ridge is not collapsing to the anchor as λ grows and the implementation is
+wrong; the run stops and nothing is decided from it.
+
+**Reported outputs.** For every λ: out-of-sample R² of the move, the validation error, and its
+standard error; the argmax λ and the 1-SE λ, separately, per season and modally; and the count of
+seasons whose 1-SE choice equals the grid's top value.
+
+**Decision rule, fixed before the run.** Let *L* be the modal 1-SE λ.
+
+1. **Identified** — *L* is in the grid interior and the validation curve rises by more than one
+   SE above it. The ridge is identified; serve E6 at *L*.
+2. **Flat** — *L* is interior but the curve stays within one SE across three or more decades of λ.
+   The 1-SE rule is acting as a tie-breaker, not selecting a value the data identify. **Retire E6
+   from the served slate**; `weekly_slate.py` serves E4 and the model median. Report the argmax λ
+   and its R² beside the decision.
+3. **Still at the edge** — *L* = 10⁹. Given the turnover argument this should be unreachable, so
+   it would indicate a defect rather than a finding. **Retire E6 from the served slate** and open
+   a defect investigation into the fitter.
+
+Branches 2 and 3 both retire E6 from serving. That is deliberate: a served parameter that is an
+artifact of where the grid stopped is not a defensible production setting, and A4 already
+established that E6's R² advantage over E4 does not depend on which of these branches obtains.
+
+**Expectations, recorded now.** The curve is flat from roughly 10³ to 10⁵ and declines
+appreciably beyond ≈ 10⁶. The argmax λ lands low, near 10³–10⁴, with R² within 0.01 of A4's
+0.2002. The 1-SE λ lands far above it, ≥ 10⁶. **Branch 2 fires** — the divergence between the
+argmax and the 1-SE choice is the diagnosis, and E6 leaves the served slate.
+
+**Scope.** Exploratory, like every archive amendment: the one confirmatory hypothesis remains the
+version B E4 slope at the Monday anchor. A7's output is an engineering decision about what
+`weekly_slate.py` serves. No p-value is attached to it and it licenses no claim that the ridge
+works. One run.
+
+**If serving changes**, the model set is versioned to 3 and every existing
+`movement_forward_log.csv` row is recomputed under it before any read quotes `pred_close`. **E4,
+the graded predictor, is unaffected in every branch.**

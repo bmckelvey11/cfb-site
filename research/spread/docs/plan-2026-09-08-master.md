@@ -195,9 +195,12 @@ fix being *claimed* and *verified*).
    what it was run to resolve.** λ = 5e4 was chosen in 19 of 19 seasons that produced a choice,
    and 5e4 is the *new* grid's top edge — the old edge was 1e4, so widening moved the edge
    instead of finding an interior optimum. A ridge whose shrinkage parameter runs to whatever
-   bound it is given is not well identified, and E6 is now served at such a bound. The honest
-   next step is a fresh pre-registration — a wider or unbounded grid, or a different estimator —
-   not another quiet widening, and not an override of a rule that was fixed before the run.
+   bound it is given is not well identified, and E6 is now served at such a bound. **Amendment A7
+   is registered** (2026-09-08, not yet run): a grid reaching λ = 10⁹, which must bracket the
+   turnover because ridge degenerates to the anchor as λ grows, plus the λ → R² curve itself —
+   the diagnostic that separates "the data want more shrinkage" from "the curve is flat and the
+   1-SE rule is a tie-breaker running to whatever bound it is given". Two of its three branches
+   retire E6 from the served slate.
 4. **A5 treats a walk-forward prediction as a fixed regressor**; its CI is conditional on the
    fitted predictor and must be labelled so.
 5. **The collector fix is claimed, not verified.** The Task Scheduler conditions live in the UI,
