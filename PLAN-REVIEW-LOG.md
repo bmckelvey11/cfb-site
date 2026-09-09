@@ -392,3 +392,32 @@ was rewritten and its behavior verified only against synthetic `:memory:` fixtur
 plan required. Applying it to `data/cfb.duckdb` remains a separate, explicit, user-initiated step —
 the same posture Act 3's shipped-but-unapplied prefix scheme was left in, which is part of why the
 scheme could still be swapped out for schema separation before that step was ever taken.
+
+---
+
+## Post-loop note — 2026-09-08: the naming world changed under this plan
+
+This loop argued the plan against a `stg` schema where GraphQL tables would carry a
+`gql_<snake_case>` prefix, applied by the sibling naming plan. That scheme was superseded on
+2026-09-01 by schema separation (`docs/adr/0002-graphql-stg-tables-in-separate-schema.md`):
+GraphQL-sourced tables live in a `stg_gql` schema under bare snake_case names, REST stays in
+`stg`, and `raw` keeps the `gql_` prefix so its GraphQL dumps do not collide with REST dumps.
+
+Verified against the live warehouse on 2026-09-08: `stg_gql` holds 38 bare-named tables, `stg`
+holds 124 with **zero** `gql_` prefixes, `raw` holds 116 of which 34 keep theirs. All 16 tables
+this plan names exist under their new names, and all 13 REST halves exist in `stg`.
+
+`PLAN.md` has been retargeted accordingly. Two consequences worth recording, because neither is
+a rename:
+
+1. **Step 0 was inoperable.** Its preflight asserted "every GraphQL entity resolves to its
+   `gql_` name", which is now false against the live database — the plan would have aborted on
+   its first line. The assertion is inverted, and gained a clause requiring `raw` to *still*
+   have its 34 prefixed tables, which catches a future migration that strips the prefix where it
+   is load-bearing.
+2. **Three concepts now exist in both schemas** — `draft_picks`, `calendar`, `predicted_points`.
+   Every join in the plan must schema-qualify both sides; a bare table name would resolve to the
+   wrong source or not at all. The Naming paragraph says so.
+
+The arguments in the rounds above stand on their own terms — none of them turned on the prefix.
+The loop's unresolved MAX_ROUNDS disagreements are unaffected.

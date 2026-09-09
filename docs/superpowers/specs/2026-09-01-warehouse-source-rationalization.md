@@ -157,7 +157,11 @@ Dropping before step 3 risks deleting a table that the scraper fix would have ma
 
 ## Out of scope
 
-- Table renaming to `gql_<snake_case>` — the sibling naming plan owns it. The two plans are independent; whichever lands second applies the other's names. This plan uses **current live names**.
+- Table renaming — already done, and not by the scheme this plan first assumed. The
+  `gql_<snake_case>` prefix was superseded by schema separation on 2026-09-01: GraphQL tables
+  live in `stg_gql` under bare snake_case, REST stays in `stg`, and `raw` keeps its `gql_`
+  prefix. Both migrations landed before this plan runs, so it uses **current live names**:
+  `stg_gql.<bare>` and `stg.<rest>`.
 - Column *casing* (984 camelCase columns) — deferred in the sibling spec, still deferred.
 - `core` layer changes. `core.fact_game` etc. are built downstream; rebuilding them is a follow-up once `stg` settles.
 

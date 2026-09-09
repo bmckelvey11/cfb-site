@@ -17,7 +17,13 @@
 - Do not edit `cfbd-python/` — vendored upstream.
 - Run all commands from repository root.
 - Default verification: `python -m pytest`. Test counts in this plan are **deltas** against whatever baseline is current, not absolutes.
-- This plan uses **current live table names** (`coachSeason`, `gameLines`, …). The sibling naming plan (`2026-08-31-warehouse-naming-rationalization.md`) renames these to `gql_<snake_case>`. The two are independent; whichever lands second applies the other's names. If naming landed first, map every `stg` name here through `GQL_ENTITY_TO_STG`.
+- Table renaming — already done, and not by the scheme this plan first assumed. The
+  `gql_<snake_case>` prefix was superseded by schema separation on 2026-09-01. Current live
+  **table** names: GraphQL-sourced tables are `stg_gql.<bare_snake_case>` (`stg_gql.coach_season`),
+  REST-sourced stay `stg.<snake_case>`, and `raw` keeps its `gql_` prefix (`raw.gql_coach_season`).
+  GraphQL **entity and field** names — `coachSeason`, `teamTalent`, `gameLines` — are an upstream
+  API contract and stay camelCase everywhere in this plan; they are not table names and must not
+  be swept into the schema rename. Both migrations landed before this plan runs.
 - Tasks 2, 6, 8, 9, 10 mutate the live warehouse or hit the live API. **None of them auto-run or auto-commit** — the user executes each explicitly.
 - No lookahead: pre-game features use only pre-kickoff information.
 
