@@ -140,3 +140,74 @@ ET of the game's kick week. Close = Action Network consensus (book 15), last ful
 tick before kickoff. Scores = CFBD via the archive build's name matching. Predictor graded =
 E4 (registered); E6 and the model median are reported beside it with no selection among them.
 Grader = `research/spread/scripts/eval_version_b.py`, committed with this amendment.
+
+## Amendment ledger and analysis families (committed 2026-09-08, before A6 and B3 run)
+
+Registered because the count of amendments is itself a forking-paths risk. Each amendment below
+was pre-registered before its own run, which is the right pattern; what was missing was any
+statement of which of them can support a confirmatory claim. **Motivation "data-driven" means the
+amendment exists because of something seen in an earlier result.**
+
+| amendment | what it changed | motivation | data-driven? |
+|---|---|---|---|
+| A2 | Ran E8–E13 and a wider ridge grid on the same target | The registered set was a subset of the library | No — the user's instruction of 2026-09-02, before A ran |
+| A3 | Dropped the top decile of market-proxying models before fitting | The 2026-09-08 audit's blocker finding | No — a defect correction, and it *lowered* every estimate |
+| B1 | Replaced B4's 300-game read with an MDE gate | The audit showed 300 games cannot decide B4 | No — a power calculation, no outcome seen |
+| A4 (queued) | Finer ridge grid | **E6 chose λ = 10⁴, the grid edge, in 19 of 20 seasons** | **Yes** |
+| A5 (queued) | Whether E4's disagreement with PT's `line` predicts the residual move | PT's `line` measured 0.69 off the close | Partly — the measurement prompted it, no slope was seen |
+| A6 (below) | Walk-forward decontamination screen | A3's screen was fit on the full sample | No — a defect correction |
+| B2 (queued) | Slope decay across weekday captures | Registered as part of the version B design | No |
+| B3 (below) | The stopping rule | An adversarial review of B1's gate | No — no read informed it |
+
+**One confirmatory family.** There is exactly one confirmatory hypothesis in this tree: **the
+version B E4 slope at the Monday anchor**. Every archive result (A1, A2, A3, A4, A5, A6) and all
+line-shopping work is **exploratory** and its section must say so. Holm applies within a family;
+no across-family correction is attempted, because with a single confirmatory hypothesis none is
+needed.
+
+**A4 is an engineering decision, not an inferential one.** It chooses which λ `weekly_slate.py`
+serves. It is reported without a p-value and licenses no claim that the ridge works. Its
+motivation is data-driven, which is exactly why it may not carry an inferential claim.
+
+## Amendment A6 — walk-forward decontamination screen (committed 2026-09-08, before the run)
+
+**Names and amends A3.** A3 computed `ρ_i = corr(f_i − open, close − open)` over all of
+2001–2025 and dropped the top decile before fitting. The screen therefore saw the evaluation
+seasons: the retained panel's identity was chosen with knowledge of its own test set, so A3's
+p-values are conditional on that screen. The direction of the bias on R² is conservative — the
+screen removes the *most* target-correlated columns — but "conservative" is not "fixed in
+advance", and until this amendment runs every citation of A3 must say **conditional on a
+full-sample screen**.
+
+**The run.** Recompute the drop list walk-forward: for evaluation season *s*, build it from
+seasons < *s* only. Rerun A and A2 on the reduced panel. Report, per method, R² on the full
+panel, under the full-sample screen, and under the walk-forward screen, plus both drop lists and
+their overlap.
+
+**Expectation, recorded before the run.** The walk-forward drop list overlaps the full-sample one
+substantially and E4's retention stays within a few points of 90%. Exploratory, one run.
+
+## Amendment B3 — the stopping rule, replacing B1's timing (committed 2026-09-08)
+
+**Names and replaces B1's "Rule, replacing B4's timing" paragraph only.** B1's power arithmetic,
+its anchor, close, score and predictor definitions all stand unchanged.
+
+B1 made the verdict fire when the observed MDE reached 0.2. That is a **data-dependent stopping
+time** — the MDE is estimated from the same data the slope is — and the weekly reads make it a
+sequential test in practice. B1's own power arithmetic also used the iid form
+`σ_resid/(σ_x √n)`, while `eval_version_b.py` falls back to HC1 below `MIN_WEEKS`; the
+`n_for_mde_0.2 ≈ 80` printed from the first read came from one week's un-clustered SE and is not
+cluster evidence.
+
+**The rule, in these words:**
+
+> No verdict before season end; at season end, confirmatory inference requires ≥ 8 week
+> clusters, and with fewer the read is reported as inconclusive.
+
+At season end with ≥ 8 clusters, B4's thresholds apply unchanged. The observed MDE is reported
+at every read and **triggers nothing**. Reads are not looks, and this rule — not discipline — is
+what makes that true.
+
+**MDE from the cluster SE.** The MDE and any `n_for_mde` figure are computed from the
+season-week cluster SE. While the HC1 fallback is active the grader emits them marked
+`se_kind: "hc1"` and informational; they may not be quoted as the n a clustered design needs.

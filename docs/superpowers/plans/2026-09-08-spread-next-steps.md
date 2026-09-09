@@ -499,6 +499,10 @@ Run: `python research/spread/scripts/model_publish_times.py`
 Add to `line-movement-results.md` a section **"When the constituents publish (from snapshots, <date>)"** with the printed pivot and one sentence per slate: "N of the top-20 movement forecasters were in the first Monday snapshot." Decision recorded there:
 
 - ≥ 15 of 20 present Monday → PT's Monday compile already carries the consensus; "earlier than PT" means scraping constituents Sunday night. Open a scoping note listing those models and their public URLs (PT's model list page names them).
+- 10–14 present Monday → the consensus is **materially incomplete but usable**. Record the count
+  per slate, keep the Monday anchor (changing it mid-season would break the registered version B
+  definition), and add the present-count as a reported column beside each weekly read so a later
+  reader can see whether a slate's read rested on a thin panel. Revisit only at season end.
 - < 10 present Monday → the consensus is not complete on Monday; amendment B2 (Task 7) must anchor on the first snapshot where ≥ 15 of 20 are present, and the "Monday" read is partly a "which models are in yet" read.
 
 - [ ] **Step 6: Commit**
@@ -510,7 +514,51 @@ git commit -m "feat(spread): model publication times from the snapshot stream"
 
 ---
 
+### Task 15: Amendment A6 — the walk-forward decontamination screen
+
+**Highest priority in Phase 1, and Task 5 depends on it.** A3's screen computed
+`ρ_i = corr(f_i − open, close − open)` over all of 2001–2025 and dropped the top decile before
+fitting, so it saw the evaluation seasons: the retained panel's identity was chosen with
+knowledge of its own test set. The in-code comment defending it is half right — the bias
+direction on R² is conservative, since the screen removes the *most* target-correlated columns —
+but conservative is not fixed-in-advance, and A3's p-values are conditional until this runs.
+
+**Files:**
+- Modify: `research/spread/scripts/eval_line_movement.py` (extract the screen; add `--decontaminate-wf`)
+- Create: `tests/test_spread_decontam.py`
+- Registered in: `research/spread/docs/prereg-line-movement.md` (amendment A6, already committed)
+
+- [ ] **Step 1: Write the failing test.** The drop list for a given evaluation season is
+      identical when rows from that season and later are deleted from the input, and no
+      evaluation-season row reaches the screen. That is the whole point of the change.
+- [ ] **Step 2: Extract the screen** into a function taking the seasons it may look at, and
+      compute it walk-forward: for evaluation season *s*, build the list from seasons < *s*.
+- [ ] **Step 3: Add `--decontaminate-wf`**, keeping `--decontaminate` working — A3 stays on the
+      record as run.
+- [ ] **Step 4: Run once**, with and without `--amend`. Outputs `pt_movement_decon_wf.json`,
+      `pt_movement_a2_decon_wf.json` and the matching `_preds` files.
+- [ ] **Step 5:** Leave the numbers in JSON. Wave 3 writes the prose — do not edit
+      `line-movement-results.md` here.
+- [ ] **Step 6: Commit** — `feat(spread): walk-forward decontamination screen (amendment A6)`
+
+Report per method: R² on the full panel, under the full-sample screen, and under the
+walk-forward screen, plus both drop lists and their overlap.
+
+---
+
 ### Task 5: Amendment A4 — a finer ridge grid, and whether to keep serving E6
+
+**Depends on Task 15.** A4 runs on the **walk-forward** decontaminated panel, not the
+full-sample one — running it on the old panel bakes A3's screen into a serving decision.
+
+**A4 is exploratory and its output is an engineering decision, not an inferential claim**
+(prereg, "Amendment ledger and analysis families"). It chooses which λ `weekly_slate.py` serves.
+Report its R² without a p-value; it licenses no claim that the ridge works.
+
+**If E6 is dropped from `MODEL_COLS`, the model set is versioned.** `MODEL_COLS` and `PARAMS`
+define `pred_close`; changing them mid-forward-test silently redefines the graded quantity. Add
+`model_set_version` to the forward log and to `version_b.json`, and recompute the existing
+`movement_forward_log.csv` rows under the new definition before any read quotes `pred_close`.
 
 E6 sits at the grid edge (λ = 10⁴) in 19 of 20 seasons; the wide grid over-shrank. Decide once
 whether ridge earns its place next to E4 on the decontaminated panel, then either keep it in
@@ -678,7 +726,15 @@ Thursday captures, on a fixed game set.
 - Test: `tests/test_spread_version_b.py` (add one case)
 
 **Interfaces:**
-- Produces: `capture_offsets(log: pd.DataFrame) -> pd.DataFrame` — every (game, snapshot) row with `hours_after_monday_et` and `offset_bucket ∈ {"mon", "tue", "wed", "thu+"}` (0–24, 24–48, 48–72, ≥ 72 h).
+- Produces: `capture_offsets(log: pd.DataFrame) -> pd.DataFrame` — **one row per game per
+  bucket**, the earliest capture inside that bucket, with `hours_after_monday_et` and
+  `offset_bucket ∈ {"mon", "tue", "wed", "thu+"}` (0–24, 24–48, 48–72, ≥ 72 h).
+
+**Fixed game set across buckets.** Returning every (game, snapshot) row would let one game
+contribute several rows to a bucket and would leave each bucket with a different game set, so
+the decay would be confounded with which games happen to be captured when. A game missing from
+any bucket is excluded from all of them, and the count that costs is reported. Resample by game
+**and** week.
 
 - [ ] **Step 1: Pre-register, commit before any in-season read**
 
@@ -784,11 +840,17 @@ In `collect_line_timing.main()`, replace the history branch with:
 
 ```python
     if args.mode in ("history", "both"):
+        # Monday routine: health FIRST and it gates the grade. The pull still runs on a stale
+        # stream -- backfilling histories is exactly what you want when collection has been
+        # broken -- but a read off a stale stream is worse than no read.
+        health = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("collector_health.py"))], check=False)
         history(args.season, weeks, force=args.force)
-        # Monday routine: health first (its exit code is informational here), then the
-        # version B read on whatever closes the backfill just made gradable.
-        for script in ("collector_health.py", "eval_version_b.py"):
-            subprocess.run([sys.executable, str(Path(__file__).with_name(script))], check=False)
+        if health.returncode == 0:
+            subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("eval_version_b.py"))], check=False)
+        else:
+            print(f"version B grade skipped: collector_health exited {health.returncode}")
 ```
 
 - [ ] **Step 2: Run the history mode by hand once to see the chain**
@@ -804,7 +866,7 @@ Expected: history summary, then the health line, then the version B tables, all 
 In `line-movement-results.md` § "Version B", add:
 
 ```markdown
-### Reads (one row per Monday; amendment B1 says none of these is a verdict)
+### Reads (one row per Monday; amendment B3 says none of these is a verdict)
 
 | date | n graded | weeks | E4 slope | 95% | sd(x) | MDE | n for MDE 0.2 | CLV \|x\|≥1 (n) | ATS \|x\|≥1 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -829,6 +891,13 @@ git commit -m "feat(spread): Monday routine -- backfill, health check, version B
 ---
 
 ### Task 9: Line-shopping amendment — outlier guard and price-adjusted value
+
+**The `3.2` constant is settled (user, 2026-09-08): keep it for shopping.** It was estimated on
+the line-shopping sample itself (2024–25, 3,574 sides), so it is the in-sample conversion for
+*that* sample. Review §1.5 retired it for the **movement** CLV claim — the "3–5× the bar"
+phrasing, where bets sit on larger spreads and a point is worth less. Two uses of one number;
+only one was wrong. **Condition:** the S1 results section states that the value column inherits
+the constant's limits — in-sample, dominated by 3/7 crossings on small spreads.
 
 `combining-predictions.md` §1 lists two defects that must be fixed before the book fair drives
 a live bet: no outlier guard in the backtest (the live slate has one), and price ignored. Both
@@ -898,10 +967,11 @@ git commit -m "feat(spread): amendment S1 -- outlier guard and priced value in t
 
 ---
 
-### Task 10: Verify "scoreboard = close" once 2026 closes exist (season end)
+### Task 10: Verify "scoreboard = close" once 2026 closes exist — **BLOCKED, external dependency**
 
-Blocked until the Action Network scoreboard for completed 2026 games is re-scraped, which is a
-`cfb_system_maker` scraper run, not this tree's. When it has run:
+**Not a task in this plan's queue.** It needs an Action Network scoreboard re-scrape owned by
+`cfb_system_maker`, and *nothing in this plan triggers it*. Do not schedule it into a wave; pick
+it up if and when that scrape happens. When it has run:
 
 - [ ] **Step 1:** For each 2026 event with both a history file and a scoreboard row, compare book 15's last pre-kick tick (`eval_version_b.close_from_history`) to `stg.an_market` book 15 line for that event. Twenty lines in a scratch script; report mean |Δ| and share exact.
 - [ ] **Step 2:** Record in `line-shopping-results.md` "Limits": either "scoreboard = close on X% of games" or the correction to apply.
@@ -909,7 +979,7 @@ Blocked until the Action Network scoreboard for completed 2026 games is re-scrap
 
 ---
 
-## Phase 3 — the decision (at the B1 gate or season end, whichever first)
+## Phase 3 — the decision (at season end; see amendment B3)
 
 ### Task 11: Read version B and act on the pre-registered table
 
@@ -920,13 +990,20 @@ Blocked until the Action Network scoreboard for completed 2026 games is re-scrap
 
 - [ ] **Step 1: Confirm the gate is met**
 
-`processed/version_b.json` → `slope.E4.mde_80 ≤ 0.2`, or the date is past the last regular-season Saturday. If neither, stop; there is no read.
+Amendment B3, in its exact words: **no verdict before season end; at season end, confirmatory
+inference requires ≥ 8 week clusters, and with fewer the read is reported as inconclusive.**
+
+So: the date is past the last regular-season Saturday **and** `processed/version_b.json` →
+`slope.E4.clusters ≥ 8`. If the date has not passed, stop — there is no read. If it has passed
+with fewer than 8 clusters, record the season as **inconclusive** and stop; do not apply the
+table. `mde_80` is reported and **triggers nothing** — it is not part of this gate.
 
 - [ ] **Step 2: Apply the table, fixed now**
 
 | E4 slope at Monday (B4) | CI | action |
 |---|---|---|
 | < 0.10 | excludes 0.20 | **Close** PT-timed spread work. `CLAUDE.md` says so. `weekly_slate.py` keeps running for the book fair and shopping only; the model columns stay as reference. |
+| < 0.10 | does **not** exclude 0.20 | **Inconclusive, and this is the likely outcome** — the season-end gate does not guarantee the precision B4 assumed. Record the slope and CI in `line-movement-results.md`, change nothing, and carry the forward log into next season. The tree neither closes nor produces a bet: an underpowered null is not evidence of absence. |
 | 0.10 – 0.30 | any | **Marginal.** Wire `combining-predictions.md` §3 with `γ = slope` for `|x| ≥ 2` only; track CLV per bet in `movement_forward_log.csv`; no stake beyond quarter-Kelly on the measured p. Re-read at season end. |
 | ≥ 0.30 | excludes 0.10 | **Bettable at Monday's number.** Wire §3 at `|x| ≥ 1`. If Task 4 found the leading constituents publish before PT, open the constituent-scraping task as the next tree. |
 | any | B2 shows "tue" slope < half of "mon" | Whatever the branch, the window is Monday only; the routine must bet from the first Monday snapshot, not the slate printed later in the week. |
@@ -941,6 +1018,26 @@ git commit -m "docs(spread): version B verdict"
 ---
 
 ## Hygiene (any time; each is its own small commit)
+
+### Task 12a: The four estimator tests
+
+The estimator core the whole tree rests on is thinly covered. Add to
+`tests/test_spread_estimators.py`:
+
+- [ ] `holm` on a known input, including ties and the monotonicity step.
+- [ ] `pick_1se` on a known curve — the chosen point is the most-shrunk parameter within one SE
+      of the best, and an edge hit is reported as an edge hit.
+- [ ] `wild_cluster_boot` calibration: over many independent null draws the p-values are
+      ~uniform. The existing test checks a single draw, which cannot detect a miscalibrated
+      bootstrap. Keep the draw count off the slow list — a few hundred with a fixed seed,
+      asserting the rejection rate at α = 0.1 is within binomial tolerance.
+- [ ] The walk-forward drop-list test from Task 15: the list for a given evaluation season is
+      unchanged when rows from that season and later are deleted, and no evaluation-season row
+      reaches the screen.
+
+**Not** per-fitter tests for E6–E14 — they are exercised end to end by the registered runs.
+
+---
 
 ### Task 12: Mark the estimator modules' `main()` as archived-era
 
