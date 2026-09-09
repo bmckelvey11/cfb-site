@@ -35,6 +35,13 @@ ODDS_WINDOW = (-135, 125)
 GAIN_THRESHOLDS = (0.5, 1.0)
 BREAKEVEN = 0.5238
 KEY_NUMBERS = (3, 7)
+# Amendment S1. Same guard weekly_slate.shop() applies live: a book more than this far from
+# the median of ALL books on the game is ignored, when >=3 books are posted and >=2 remain.
+OUTLIER_PTS = 2.5
+# Amendment S1. The win-rate-points-per-point figure measured in P2 on 2024-25 (3.16, rounded),
+# fixed by prereg-line-shopping.md and NOT re-estimated here. In-sample for that sample; see
+# the S1 results section caveat before reusing it anywhere else.
+VALUE_WIN_PER_POINT = 3.2
 OUT = cfb_paths.PROCESSED
 
 
@@ -114,13 +121,49 @@ def crosses_key(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return out
 
 
+def apply_outlier_guard(wide: pd.DataFrame) -> pd.DataFrame:
+    """Same guard weekly_slate.shop() applies live (amendment S1): within a game, a book more
+    than OUTLIER_PTS from the median of ALL books is dropped, but only when >=3 books are
+    posted and >=2 remain after dropping -- otherwise the row is left alone. Applied before
+    fair/hi/lo/book_hi/book_lo are computed, so the guard reaches every downstream figure."""
+    def guard(row: pd.Series) -> pd.Series:
+        v = row.dropna()
+        if len(v) >= 3:
+            kept = v[(v - v.median()).abs() <= OUTLIER_PTS]
+            if len(kept) >= 2:
+                v = kept
+        return row.where(row.index.isin(v.index))
+    return wide.apply(guard, axis=1)
+
+
+def breakeven(odds: float) -> float:
+    """Break-even win probability for American odds."""
+    return abs(odds) / (abs(odds) + 100) if odds < 0 else 100 / (odds + 100)
+
+
+def median_odds_for(values: pd.Series, odds: pd.Series) -> float:
+    """Odds at the book supplying the (post-guard) median number. When the guarded book count
+    is even, the median is the average of two books and no single book supplies it -- -110."""
+    v = values.dropna()
+    if len(v) == 0:
+        return np.nan
+    if len(v) % 2 == 0:
+        return -110.0
+    mid_book = v.sort_values().index[len(v) // 2]
+    o = odds.get(mid_book, np.nan)
+    return -110.0 if pd.isna(o) else float(o)
+
+
 def build_sides(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     real = d[d.book.isin(REAL_BOOKS)]
     wide = real.pivot_table(index="event_id", columns="book", values="s")
+    odds_wide = real.pivot_table(index="event_id", columns="book", values="odds")
     meta = real.drop_duplicates("event_id").set_index("event_id")[["season", "week", "hp", "ap"]]
     nb = wide.notna().sum(axis=1)
     keep = nb >= 2
-    wide, meta = wide[keep], meta.loc[wide[keep].index]
+    wide, odds_wide, meta = wide[keep], odds_wide[keep], meta.loc[wide[keep].index]
+    wide = apply_outlier_guard(wide)                    # amendment S1
+    odds_wide = odds_wide.where(wide.notna())            # guarded-out books lose their odds too
     games = pd.DataFrame({
         "season": meta.season, "week": meta.week, "n_books": nb[keep],
         "fair": wide.median(axis=1), "hi": wide.max(axis=1), "lo": wide.min(axis=1),
@@ -128,12 +171,17 @@ def build_sides(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         "margin": (meta.hp - meta.ap).astype(float),
     })
     games["range"] = games.hi - games.lo
+    games["median_odds"] = [median_odds_for(wide.loc[e], odds_wide.loc[e]) for e in wide.index]
+    games["best_home_odds"] = [odds_wide.at[e, b] if pd.notna(b) else np.nan
+                               for e, b in zip(games.index, games.book_hi)]
+    games["best_away_odds"] = [odds_wide.at[e, b] if pd.notna(b) else np.nan
+                               for e, b in zip(games.index, games.book_lo)]
     cons = d[d.book == CONSENSUS].drop_duplicates("event_id").set_index("event_id").s
     games["cons15"] = cons.reindex(games.index)
 
-    home = games.assign(side="home", best=games.hi, best_book=games.book_hi)
+    home = games.assign(side="home", best=games.hi, best_book=games.book_hi, best_odds=games.best_home_odds)
     home["gain"] = home.best - home.fair
-    away = games.assign(side="away", best=games.lo, best_book=games.book_lo)
+    away = games.assign(side="away", best=games.lo, best_book=games.book_lo, best_odds=games.best_away_odds)
     away["gain"] = away.fair - away.best
     sides = pd.concat([home, away]).reset_index()
     sides["win_fair"] = 0.0
@@ -145,6 +193,11 @@ def build_sides(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     sides["diff"] = sides.win_best - sides.win_fair
     sides["cluster"] = sides.season * 100 + sides.week
     sides["key_cross"] = crosses_key(sides.fair.to_numpy(), sides.best.to_numpy())
+    # amendment S1: price-adjusted value on one scale. Missing odds fall back to -110, matching
+    # the assumption already made throughout line-shopping-results.md.
+    be_best = sides.best_odds.fillna(-110.0).map(breakeven)
+    be_median = sides.median_odds.fillna(-110.0).map(breakeven)
+    sides["value"] = VALUE_WIN_PER_POINT * sides.gain - 100 * (be_best - be_median)
     return games, sides
 
 
@@ -219,6 +272,20 @@ def main() -> int:
         print(f"    at FAIR number: {fmt(fair_r)}")
         print(f"    at BEST number, pushes dropped (n={best_r['n']}): {fmt(best_r)}")
 
+    # S1 price-adjusted value. Uses VALUE_WIN_PER_POINT (3.2, fixed by prereg, in-sample --
+    # see the S1 caveat), not the per_pt figure measured fresh above.
+    out["S1"] = {}
+    print(f"\nS1 price-adjusted value (guard applied; value = {VALUE_WIN_PER_POINT} * gain "
+          f"- 100 * (breakeven(best) - breakeven(median)))")
+    for thr in GAIN_THRESHOLDS:
+        c = sides[sides.gain >= thr]
+        if len(c) == 0:
+            continue
+        out["S1"][str(thr)] = {"n_sides": int(len(c)), "value_mean": float(c.value.mean()),
+                               "value_le_0_share": float((c.value <= 0).mean())}
+        print(f"  gain >= {thr}: value mean {c.value.mean():+.2f}  "
+              f"share value<=0: {(c.value <= 0).mean():.1%}")
+
     # Secondary
     print("\nSecondary")
     kc = sides[pos].groupby("key_cross")["diff"].agg(["size", "mean"])
@@ -250,6 +317,18 @@ def _check() -> None:
     assert crosses_key(np.array([-2.5, -6.5, -10.0]), np.array([-3.5, -6.0, -12.0])).tolist() == [True, False, False]
     r = cluster_mean(np.array([1.0, 0.0, 1.0, 0.0]), np.array([1, 1, 2, 2]))
     assert abs(r["mean"] - 0.5) < 1e-12 and r["se"] == 0.0, "balanced clusters give zero cluster SE"
+    # amendment S1
+    assert abs(breakeven(-110) - 110 / 210) < 1e-12 and breakeven(100) == 0.5, "breakeven"
+    wide = pd.DataFrame({68: [-7.5], 69: [-7.0], 71: [18.0]}, index=[1])
+    guarded = apply_outlier_guard(wide)
+    assert pd.isna(guarded.loc[1, 71]) and guarded.loc[1, [68, 69]].tolist() == [-7.5, -7.0], \
+        "book 71's 18.0 is guarded out"                           # matches weekly_slate.shop()
+    assert guarded.loc[1].median() == -7.25
+    assert median_odds_for(pd.Series({68: -7.5, 69: -7.0}), pd.Series({68: -110, 69: -105})) == -110.0, \
+        "even book count -> no single book supplies the median"
+    vals = pd.Series({75: -8.0, 68: -7.5, 69: -7.0})
+    odds = pd.Series({75: -120, 68: -110, 69: -105})
+    assert median_odds_for(vals, odds) == -110.0, "odd count -> odds of the middle-valued book"
     print("checks pass\n")
 
 

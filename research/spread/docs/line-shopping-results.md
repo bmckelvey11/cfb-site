@@ -122,3 +122,86 @@ reading.
   number were within [−135, +125] by filter but were not priced into the gain.
 - Nothing here is a betting system. Every game contributes both sides. The number to carry
   forward is +1.26 [+0.94, +1.58], and the rule it supports is a habit, not a model.
+
+---
+
+## Amendment S1 — outlier guard and price-adjusted value
+
+Run 2026-09-08 by the same script, implementing `prereg-line-shopping.md` amendment S1,
+committed before this run. Same data, same season/book/odds/gain-threshold/cluster
+definitions; two pre-registered changes, both fixing defects `combining-predictions.md` §1
+flagged before the book fair drives a live bet.
+
+1. **Outlier guard.** Before `fair`, `hi`/`lo`, `book_hi`/`book_lo` are computed, a book more
+   than 2.5 points from the median of *all* real books on the game is dropped, when ≥ 3 books
+   are posted and ≥ 2 remain — the same rule and threshold `weekly_slate.shop()` already
+   applies live (`OUTLIER_PTS = 2.5`). Not a new number chosen for this run: it is the constant
+   already serving live traffic, applied retroactively to the backtest that lacked it.
+2. **Price-adjusted value.** `value = 3.2 × gain − 100 × (breakeven(best_odds) −
+   breakeven(median_odds))`, `breakeven(o) = |o| / (|o| + 100)` for negative odds,
+   `100 / (o + 100)` for positive. `median_odds` is the odds at the book supplying the
+   (post-guard) median number, or −110 when the median averages two books (an even guarded
+   count) — consistent with the −110 assumed throughout the rest of this file.
+
+### What the guard changes
+
+Book 71's mis-posts (18 against 7.5, 34 against 9.5, 0 against −20.5, …) are no longer
+eligible to be the "best" number, and no longer widen `range`. Games with range ≥ 3 drop from
+51 to **16**; every remaining one is an ordinary blowout-line spread (margins of 18–61
+points), not a mis-post — the 16 are listed in `line_shopping.json`'s `P1_tail`.
+
+| | as registered (no guard) | S1 (guarded) |
+|---|---|---|
+| P2 win(best) − win(fair), win-rate pts | +1.26 [+0.94, +1.58] | **+1.15 [+0.81, +1.49]** |
+| points gained, mean | 0.40 | 0.33 |
+| win-rate pts per point (measured fresh) | 3.16 | 3.43 |
+| range ≥ 3 games | 51 | 16 |
+| gain ≥ 1.0 sides | 500 (14.0%) | 464 (13.0%) |
+| gain ≥ 1.0, ATS at best (pushes dropped) | 52.80% [48.73, 56.87] | 51.72% [47.26, 56.18] |
+
+The guarded P2 figure (+1.15) lands exactly on the "tail excluded" post-hoc figure the base
+run already reported (+1.15 [+0.81, +1.50]) — the guard drops the same games that exclusion
+did. Pre-registered expectation was "about +1.1" — **matched**.
+
+### Price-adjusted value
+
+| gain ≥ | sides | value mean, win-rate pts | share with value ≤ 0 |
+|---|---|---|---|
+| 0.5 | 1,657 | **+2.16** | 9.8% |
+| 1.0 | 464 | **+3.63** | **1.1%** |
+
+Pre-registered expectation was "about 12% of sides have value ≤ 0" at gain ≥ 1, a post-hoc
+estimate off the odds distribution. Measured: **1.1%**, well under the guess (✗ against the
+number, direction is favorable — fewer sides get priced away than feared, not more). Most
+games carry three real books (77% of the 1,787), so `median_odds` is usually a real posted
+price rather than the −110 fallback, and real books' vig rarely strays far from −110 on either
+side; the fallback and the even-guarded-count case apply to a minority of games. The gain ≥ 1
+ATS-at-best point estimate (51.72%) stays inside the pre-registered [48, 57] band.
+
+### The 3.2 constant — what this section does and does not claim
+
+`value` uses **3.2**, the win-rate-points-per-point figure measured on the *original*,
+unguarded P2 run (2024–25, 3,574 game-sides) — not the 3.43 measured fresh in the guarded run
+above, and not re-estimated here. It is dominated by the 3/7 key-number crossings on small
+spreads: the base run's "Secondary" table shows crossing sides worth ~4.6 win-rate points per
+point of gain against ~1.9 for non-crossing sides. Keeping 3.2 here was a deliberate decision
+by the user on 2026-09-08, not an oversight — it is the in-sample conversion rate for *this*
+line-shopping sample, and this section's `value` column inherits that limit: in-sample,
+small-spread, key-number-dominated. **It is not the right conversion for the movement/CLV
+claim.** The 2026-09-08 tree audit §1.5 retired 3.2 there because movement bets sit on larger
+spreads, where a point is worth less than it is here; nothing in this section reopens that
+retirement or licenses reusing 3.2 outside line shopping.
+
+### Scorecard against amendment S1
+
+| expectation | outcome |
+|---|---|
+| P2 falls to about +1.1 | ✓ +1.15 |
+| gain ≥ 1, value ≤ 0 on ~12% of sides | ✗ 1.1% — far fewer priced-away sides than the post-hoc estimate suggested |
+| gain ≥ 1 ATS at best stays inside [48, 57] | ✓ 51.72 |
+
+One of three missed, and the miss runs in the direction of the price penalty being smaller
+than guessed, not larger. Nothing here changes "What this means for betting" above: shopping
+is still a small, mechanical, close-to-free gain, and pricing it shows that almost none of
+that gain is an illusion bought by paying more juice for the better number. The number to
+carry forward, guard applied, is **+1.15 [+0.81, +1.49]** win-rate points per game-side.
