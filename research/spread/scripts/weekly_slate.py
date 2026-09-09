@@ -648,10 +648,18 @@ def write_xlsx(t: pd.DataFrame, path: Path) -> None:
                           "Fair": r.fair_pt, "Gain": r.away_gain, "Key": bool(r.away_key), **per_book})
         shop = pd.DataFrame(sides).dropna(subset=["Gain"]).query("Gain >= 0.5") \
                  .sort_values(["Key", "Gain"], ascending=False)
+        # Agree: the shop row is on E4's side and the edge clears the forward test's threshold
+        edges = t.loc[t.side != "", ["side", "edge", "our_line"]].rename(columns={"side": "Team", "edge": "Edge"})
+        agree = shop.merge(edges, on="Team").query("Edge >= 1")
+        # our line from the picked side's perspective: home side -> our_line as is, road side -> negated
+        home_sides = set(t.loc[t.side == t.home, "side"])
+        agree["Our Line"] = [ol if team in home_sides else -ol for team, ol in zip(agree.Team, agree.our_line)]
+        agree = agree.drop(columns=["our_line"]).sort_values("Edge", ascending=False)
     with pd.ExcelWriter(path, engine="openpyxl") as xw:
         slate.to_excel(xw, sheet_name="Slate", index=False)
         if shop is not None:
             shop.to_excel(xw, sheet_name="Shop", index=False)
+            agree.to_excel(xw, sheet_name="Agree", index=False)
         models.to_excel(xw, sheet_name="Models (PT sign)", index=False)
         for ws in xw.sheets.values():
             ws.freeze_panes = "D2"
