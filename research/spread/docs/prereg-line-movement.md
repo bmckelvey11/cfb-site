@@ -159,6 +159,7 @@ amendment exists because of something seen in an earlier result.**
 | B2 (queued) | Slope decay across weekday captures | Registered as part of the version B design | No |
 | B3 (below) | The stopping rule | An adversarial review of B1's gate | No — no read informed it |
 | A7 (below) | Ridge grid widened to where the curve must turn over, plus the λ→R² curve itself | **A4 hit its own new edge: λ = 5e4 in 19 of 19 seasons, after A hit 1e4 in 19 of 20** | **Yes** |
+| T1 (below) | Version B restricted to games whose line opened late | **The timing measurement of 2026-09-09: 22% of late-opening games still had a quarter of the move left at Monday, against 0% for every other lead-time group** | **Yes — the subgroup was chosen after seeing it** |
 
 **One confirmatory family.** There is exactly one confirmatory hypothesis in this tree: **the
 version B E4 slope at the Monday anchor**. Every archive result (A1, A2, A3, A4, A5, A6) and all
@@ -356,3 +357,57 @@ works. One run.
 **If serving changes**, the model set is versioned to 3 and every existing
 `movement_forward_log.csv` row is recomputed under it before any read quotes `pred_close`. **E4,
 the graded predictor, is unaffected in every branch.**
+
+## Amendment T1 — the late-opening subgroup (committed 2026-09-09, before any test of it)
+
+**A new letter, because this is neither an archive question (A) nor the registered version B
+question (B) nor shopping (S). B4 and B5 are already outcome labels in the original
+pre-registration, so amendment numbering would collide; T is for timing.**
+
+**Motivation, and it is data-driven — say so plainly.** `eval_timing_decay.py`, run 2026-09-09 on
+189 games of Action Network tick history, measured when the consensus spread actually moves.
+Lines post a median 41 days before kickoff, and by Monday of game week the median game has
+completed **100%** of its entire open→close move; 90% are fully moved. That is version B's
+premise failing on its face. The one exception: among games whose line opened **inside three
+weeks** of kickoff, **22% still had at least a quarter of the move to come**, against 0% for both
+longer-lead groups.
+
+That subgroup was chosen after looking at the split. It therefore cannot be confirmed on the
+games that produced it, and this amendment exists to fix the test before the games that could
+confirm it are played.
+
+**Fixed now, before data.**
+
+- **Late-opening is `lead < 21 days`**, where lead is kickoff minus the first tick in
+  `stg.an_history_tick` for the consensus book (15), full-game spread, home side. The threshold is
+  fixed at 21 and may not be tuned. If it is ever changed, that is a new amendment with its own
+  expectation.
+- **Sample: forward only.** The 37 late-opening games in the 2026-09-09 measurement (weeks 1–3)
+  are **excluded**. The test runs on games from PT week 4 onward, whose lines had not opened when
+  this was written.
+- **Estimator: unchanged from version B.** Slope of `close − line_Monday` on `E4 − line_Monday`,
+  season-week cluster SE, anchored on the earliest snapshot at or after Monday 00:00 ET. E4
+  remains the graded predictor; nothing here re-opens that.
+- **Stopping rule: amendment B3 applies unchanged** — no verdict before season end, and at season
+  end confirmatory inference requires ≥ 8 week clusters *within the subgroup*, not overall. A
+  subgroup accumulates clusters more slowly than the whole slate, so an inconclusive read is the
+  likely outcome and is a legitimate result.
+- **Multiplicity.** This makes two confirmatory hypotheses in the tree: the registered version B
+  slope on all games, and this one on the subgroup. **Bonferroni across the two, α = 0.025 each.**
+  Decision 1 of the plan of record is amended accordingly: one confirmatory *family*, now with two
+  members and a stated correction, rather than one member.
+
+**Expectations, recorded now.** The late-opening slope exceeds the all-games slope — that is the
+whole hypothesis — but remains small: **0.10 to 0.35**, with an interval that probably includes
+zero at the sample this season can supply. I do **not** expect it to clear the bar for a bet. The
+honest prior is that this identifies where an effect could survive, not that one does.
+
+**Confound to measure and report, not to explain away.** Late-opening games are plausibly the
+lower-profile, thinner markets — exactly where a line moves more because it started worse, and
+where the price is also worse. So the amendment reports, beside the slope: the median number of
+books quoting each game, the median hold, and the ATS record at Monday's number. A subgroup that
+moves more because it is soft is not the same finding as a subgroup the panel predicts, and CLV
+alone cannot tell them apart.
+
+**Grader.** `eval_version_b.py --late-opening`, to be written before the first read that uses it,
+reusing the existing anchor, close and cluster machinery unchanged.
