@@ -39,6 +39,9 @@ includes zero, and no verdict is due before the MDE reaches 0.2.
 | `combining-predictions.md` | review | How E4 and the book fair combine into one fair spread and one bet decision. |
 | `prediction-tracker.md` | dataset | Column dictionary for the joined panel. |
 | `review-2026-09-08-tree-audit.md` | review | Full-tree audit; each finding carries its resolution date. |
+| `plan-2026-09-08-hardened.md` | plan | Contract around the next-steps plan: decisions, assumptions, risks, and the amendments the plan and prereg owe. |
+| `plan-review-log-2026-09-08.md` | dated record | The three-round adversarial argument (claudex-loop) that produced the hardened plan. |
+| `build-brief-2026-09-08.md` | plan | Parallel execution of the hardened plan: waves, file ownership, per-agent acceptance checks. |
 | `review-2026-09-02-composite-spread.md` | dated record | The pivot from margin to movement; §5–6 set the direction. Cites archived files. |
 | `session-guide-2026-09-02.md` | dated record | Narrative of the 2026-09-02 session. Paths and numbers are as of that day; see its banner. |
 
