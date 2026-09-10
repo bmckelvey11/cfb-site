@@ -45,6 +45,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 from cfb_paths import DATA_ROOT  # noqa: E402
+from cfb_system_maker.pff_schema import PFF_TABLES, column_type  # noqa: E402
 
 IN_DIR = DATA_ROOT / "raw" / "pff"
 OUT_DIR = DATA_ROOT / "processed" / "pff"
@@ -56,7 +57,9 @@ WEEKLY = re.compile(r"^(?P<stem>.+?)_ncaa_(?P<season>\d{4})(?:_(?:fbs|fcs))?"
 
 # Spine columns: they identify the row, so they never become metrics and never carry a
 # split prefix. `player_game_count` is 1 on every weekly row, so it is dropped outright.
-SPINE = {"player", "player_id", "position", "team_name", "franchise_id"}
+# `team` is `team_name` under another name: the JSON exports carry both. It is identity,
+# not a metric, and typing it by rule made it an INTEGER holding "KANSAS".
+SPINE = {"player", "player_id", "position", "team_name", "team", "franchise_id"}
 DROP = {"player_game_count"}
 
 DEPTH = ("behind_los", "short", "medium", "deep")
@@ -132,14 +135,9 @@ SOURCES = (
            grain="franchise"),
 )
 
-# Types are pinned by pattern, not enumerated per table: PFF declares a column `integer` on
-# a whole value and `number` otherwise, in the same column across two responses (320 such
-# columns in 2025), so nothing may be inferred from the data.
-DOUBLE = re.compile(r"(^grades_|_percent$|_rate$|^ypa$|_ypa$|^epa$|_epa$|^pbe$|^prp$|"
-                    r"_diff$|^qb_rating|_per_|^yards_per_|^avg_|^yco_attempt$|"
-                    r"^elusive_rating$|^pass_block_efficiency$)")
-VARCHAR = {"player", "position", "team_name", "split", "direction", "jersey_number",
-           "kind", "slug", "match"}
+# Types are pinned in cfb_system_maker/pff_schema.py, which the loader imports too: one
+# rule, two readers. PFF declares a column `integer` on a whole value and `number`
+# otherwise in the same column across two responses, so nothing may be inferred here.
 
 
 def split_of(column: str, source: Source) -> tuple[str, str] | None:
@@ -442,16 +440,6 @@ def write(rows: dict[str, list[dict]], metrics: dict[str, set[str]]) -> list[tup
     return written
 
 
-def duckdb_type(column: str) -> str:
-    if column in VARCHAR:
-        return "VARCHAR"
-    if column in ("season", "week", "player_id", "franchise_id"):
-        return "INTEGER"
-    if column == "pulled_at":
-        return "DATE"
-    return "DOUBLE" if DOUBLE.search(column) else "INTEGER"
-
-
 def validate(tables: set[str]) -> int:
     """Two checks, on the CSVs just written.
 
@@ -471,10 +459,13 @@ def validate(tables: set[str]) -> int:
     for table in sorted(tables):
         path = OUT_DIR / f"{table}.csv"
         header = next(csv.reader(path.open(encoding="utf-8")))
-        types = {c: duckdb_type(c) for c in header}
+        types = {c: column_type(c) for c in header}
         try:
-            n = con.execute("SELECT count(*) FROM read_csv(?, header = true, columns = ?, "
-                            "nullstr = '')", [str(path), types]).fetchone()[0]
+            # `SELECT count(*)` is projection-pushed down and converts no column, so a
+            # wrongly typed one passes. Materializing is what the loader does.
+            con.execute("CREATE OR REPLACE TEMP TABLE probe AS SELECT * FROM read_csv(?, "
+                        "header = true, columns = ?, nullstr = '')", [str(path), types])
+            n = con.execute("SELECT count(*) FROM probe").fetchone()[0]
         except duckdb.Error as exc:
             bad += 1
             print(f"  FAIL   {table:30s} types: {str(exc).splitlines()[0][:80]}")

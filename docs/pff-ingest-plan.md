@@ -5,8 +5,8 @@ to `done` with a date, and the worklog at the bottom gets an entry saying what w
 actually found. Nothing is deleted — a step that turns out to be wrong is struck with the
 reason, so the next pass does not re-open it.
 
-**Status 2026-09-08: S1 and S2 done, S6 held. 2025 is audited and clean; nothing is loaded
-yet.** 2025 is the reference season — the process gets proven and trimmed against it before
+**Status 2026-09-09: S1–S5 done, S6 held.** 2025 is audited, flattened, mapped to CFBD and
+loading into `stg.pff_*` — 21 tables, 1.20 M rows. 2025 is the reference season — the process gets proven and trimmed against it before
 a single backfill call is made, because a backfill pays every inefficiency eleven times.
 
 **Scope: `data/raw/pff/` only.** The other scrapers (CFBD, Action Network, Massey) already
@@ -26,7 +26,7 @@ wins on what is finished.
 | S2 | Settle point-in-time: per-week pulls vs dated snapshots | S3 | **done** — per week | 2026-09-08 |
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
-| S5 | `_PFF_TABLES` loader entries → `stg` | S6 | open | — |
+| S5 | loader entries → `stg` | S6 | **done** | 2026-09-09 |
 | S6 | Backfill 2014–2024, finish 2026 | — | **held** — gated on S3/S5/S7 | — |
 | S7 | Trim the pull plan using 2025 as the reference season | S6 | in progress | 2026-09-08 |
 | S8 | Decide the player tier: finish it or delete the smoke test | — | open | — |
@@ -157,12 +157,28 @@ Two rules exist to refuse rather than to match, and both earned it:
 `cfbd_team_id`, and the join is asserted at 100% in a test. ✅
 `tests/test_pff_flatten.py` asserts full coverage *and* distinctness.
 
-## S5 — Loader entries
+## S5 — Loader entries ✅ 2026-09-09
 
-A `_PFF_TABLES` tuple beside `_MASSEY_TABLES` in `duckdb_load.py`, straight to `stg`, no
-`raw` twin. The warehouse glob is not recursive and does not see `data/raw/pff/`, so
-nothing else in the loader changes. Pin the column list the way `_AN_TICK_COLUMNS` is
-pinned (f0c729b) — that is what finding 4 above buys.
+Straight to `stg`, no `raw` twin, the way Massey and the AN tick CSV already load. The
+warehouse glob is not recursive and does not see `data/raw/pff/`, so nothing else in the
+loader changes.
+
+**The pin is split in two, because `_AN_TICK_COLUMNS`'s shape does not scale.** That dict
+enumerates fifteen columns by hand and drifted once already; twenty-one tables of ~30
+columns is a second hand-typed copy waiting to do the same. So
+`cfb_system_maker/pff_schema.py` holds one rule that both readers import — the flattener
+that writes the CSVs and `_plan_loads` that loads them — with the *table list* pinned by
+hand (a table that stops being written fails loudly) and the *types* derived from the
+column name. `read_csv_auto` is never used: PFF declares one column `integer` on a whole
+value and `number` otherwise.
+
+`scripts/refresh_cfbd.py` reflattens PFF before the rebuild, beside the Action Network
+flatten and for the same reason — otherwise a rebuild faithfully reloads whatever CSVs
+were last written by hand and a week pulled since then stays invisible.
+
+`scripts/check_pff_pin.py` is the sibling check: all 21 tables present, every column's type
+matching the rule, and every mapped `cfbd_team_id` reaching `stg.teams` (265/265, verified
+against the live warehouse).
 
 **Done when:** a rebuild lands the PFF tables, `scripts/check_an_tick_pin.py`'s sibling
 check passes for PFF, and row counts match the processed CSVs.
@@ -370,3 +386,27 @@ Also repaired a self-inflicted one: an earlier patch wrote literal backspace byt
 strip silently stopped firing, and `bryant-university-bulldogs` fell through to the
 override list rather than matching by rule. Found by testing `norm` directly instead of
 trusting the match count, which had stayed plausible at 264/265.
+
+### 2026-09-09 — S5 done: 21 tables, 1.20 M rows into `stg`
+
+The pin got split rather than copied. `_AN_TICK_COLUMNS` enumerates fifteen columns by
+hand and drifted once; twenty-one tables of ~30 columns would have been that mistake at
+forty times the size. So `cfb_system_maker/pff_schema.py` holds one rule imported by both
+readers — `scripts/pff_flatten.py`, which writes the CSVs, and `_plan_loads`, which loads
+them — with the table list pinned by hand and the types derived from the column name.
+
+Two things only the load could have said:
+
+- **`team` is identity, not a metric.** The JSON exports carry it beside `team_name`.
+  Typed by rule it fell through to INTEGER, and DuckDB refused a file holding `"KANSAS"`.
+  It is spine now.
+- **`validate` was passing on files the loader then rejected.** `SELECT count(*)` over
+  `read_csv` is projection-pushed down and converts no column, so a wrongly typed one
+  never surfaced. It materializes into a temp table now, which is what the loader does.
+
+`scripts/refresh_cfbd.py` reflattens PFF before the rebuild, beside the Action Network
+flatten and for the same reason: without it a rebuild faithfully reloads whatever CSVs
+were last written by hand, and a week pulled since then stays invisible.
+`scripts/check_pff_pin.py` is the read-only sibling check — all 21 tables present, every
+column's type matching the rule, and every mapped `cfbd_team_id` reaching `stg.teams`
+(265/265 against the live warehouse).

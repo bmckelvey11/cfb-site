@@ -12,9 +12,11 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+from cfb_system_maker.pff_schema import PFF_TABLES, column_type  # noqa: E402
 from pff_flatten import (  # noqa: E402
-    DEPTH16, IN_DIR, OUT_DIR, RELABEL, SOURCES, Source, duckdb_type, split_of,
+    DEPTH16, IN_DIR, OUT_DIR, RELABEL, SOURCES, split_of,
 )
 
 SUMMARY = next(s for s in SOURCES if s.stem == "facet_passing_summary")
@@ -79,7 +81,7 @@ def test_depth_vocabulary_is_the_sixteen_pff_uses():
 ])
 def test_types_come_from_the_rule_not_the_data(column, expected):
     """PFF declares one column two ways across responses, so nothing may be inferred."""
-    assert duckdb_type(column) == expected
+    assert column_type(column) == expected
 
 
 def test_every_source_maps_to_exactly_one_table_and_declares_its_splits():
@@ -183,3 +185,37 @@ def test_every_fbs_franchise_maps_to_a_distinct_cfbd_team():
 
     ids = [r["cfbd_team_id"] for r in rows.values() if r["cfbd_team_id"]]
     assert len(set(ids)) == len(ids), "two PFF franchises claim one CFBD team"
+
+
+# ---------------------------------------------------------------- the loader wiring (S5)
+
+def test_the_pinned_table_list_matches_what_the_flattener_writes():
+    """`PFF_TABLES` is hand-pinned so a table that stops being written fails loudly."""
+    written = {s.table for s in SOURCES} | {"pff_franchise", "pff_player_season"}
+    assert set(PFF_TABLES) == written
+    assert len(PFF_TABLES) == len(set(PFF_TABLES))
+
+
+def test_team_is_spine_not_a_metric():
+    """The JSON exports carry `team` beside `team_name`; typed by rule it became an
+    INTEGER holding "KANSAS", and the loader refused the file."""
+    from pff_flatten import SPINE
+    assert {"team", "team_name"} <= SPINE
+    assert split_of("team", SUMMARY) is None
+
+
+@pytest.mark.skipif(not (OUT_DIR / "pff_passing.csv").exists(),
+                    reason="run scripts/pff_flatten.py first")
+def test_the_loader_plans_one_pinned_job_per_pff_table():
+    from cfb_system_maker.duckdb_load import _plan_loads
+
+    jobs = {j["name"]: j for j in _plan_loads(OUT_DIR.parent.parent, only=set(PFF_TABLES),
+                                              include_actionnetwork=False)}
+    assert set(jobs) == set(PFF_TABLES)
+    for name, job in jobs.items():
+        assert job["schema"] == "stg" and job["format"] == "csv"
+        assert job["columns"], f"{name} would be sniffed by read_csv_auto"
+        # the pin maps positionally, so it has to follow the header's order
+        with job["paths"][0].open(encoding="utf-8") as fh:
+            header = next(csv.reader(fh))
+        assert list(job["columns"]) == header

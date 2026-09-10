@@ -42,6 +42,10 @@ from cfb_system_maker.cfbd_client import find_cfbd_token  # noqa: E402
 from cfb_system_maker.duckdb_core import build_core  # noqa: E402
 from cfb_system_maker.duckdb_load import build_duckdb  # noqa: E402
 from cfb_system_maker.scrapers import scrape  # noqa: E402
+from pff_flatten import IN_DIR as PFF_IN_DIR  # noqa: E402
+from pff_flatten import dimensions as pff_dimensions  # noqa: E402
+from pff_flatten import flatten as pff_flatten  # noqa: E402
+from pff_flatten import write as pff_write  # noqa: E402
 
 DEFAULT_ONLY = {"games", "lines", "calendar", "conferences", "venues"}
 
@@ -72,6 +76,30 @@ def _flatten_actionnetwork() -> None:
     print(f"  {stats['files']:,} files, {len(rows):,} ticks -> {path.name}")
 
 
+def _flatten_pff() -> None:
+    """Regenerate the PFF CSVs the rebuild is about to load, for the same reason.
+
+    The PFF exports land in `data/raw/pff/` and reach the warehouse only through
+    `processed/pff/*.csv`. Without this step a rebuild reloads whatever the last
+    hand-run of the flattener wrote, and a week pulled since then stays invisible.
+
+    Never fatal, like the Action Network flatten: the rebuild is the expensive half.
+    """
+    print("=== flatten pff ===")
+    if not PFF_IN_DIR.is_dir():
+        print(f"  no pull in {PFF_IN_DIR}; nothing to flatten")
+        return
+    try:
+        rows, metrics, _dropped, names, people = pff_flatten(None)
+        pff_dimensions(rows, None, names, people)
+        written = pff_write(rows, metrics)
+    except Exception as exc:
+        print(f"  FAILED {type(exc).__name__}: {exc}", file=sys.stderr)
+        print("  rebuilding against the CSVs already on disk")
+        return
+    print(f"  {len(written)} tables, {sum(n for _, n, _ in written):,} rows")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--season", type=int, default=cfb_paths.current_season())
@@ -97,6 +125,7 @@ def main() -> int:
         return 1
 
     _flatten_actionnetwork()
+    _flatten_pff()
 
     print("=== rebuild cfb.duckdb ===")
     db_path, _ = build_duckdb(cfb_paths.DATA_ROOT, explode=True)

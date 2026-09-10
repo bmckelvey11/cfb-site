@@ -7,6 +7,7 @@ not break the load. Filename suffixes supply season/week columns.
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from typing import Any, Callable, Iterable
 import duckdb
 
 from cfb_system_maker.graphql_client import GQL_ENTITY_TO_RAW, GQL_ENTITY_TO_STG, GQL_RAW_TO_ENTITY
+from cfb_system_maker.pff_schema import PFF_TABLES, column_types as pff_column_types
 
 # Skip account-metering telemetry (docs/data-coverage.md).
 _SKIP_STEMS = frozenset({"user_info"})
@@ -1840,6 +1842,34 @@ def _plan_loads(
                     "paths": [tick_path],
                     "format": "csv",
                     "columns": _AN_TICK_COLUMNS,
+                }
+            )
+
+    # PFF, same deal again: `scripts/pff_flatten.py` unpivots the weekly leaderboard
+    # exports and maps every franchise to its CFBD team, so these arrive flat and load
+    # straight to `stg` with no raw twin. `data/raw/pff/` is not under the loader's glob --
+    # it is not recursive -- so the exports never mint tables on their own.
+    #
+    # The types are pinned for the reason `_AN_TICK_COLUMNS` is: `read_csv_auto` would
+    # type a column from whichever file it read first, and PFF declares one column
+    # `integer` on a whole value and `number` otherwise. Twenty-one tables of ~30 columns
+    # is too many to enumerate twice without drifting, so the table list is pinned here and
+    # the types come from the rule both sides import.
+    pff_dir = data_dir / "processed" / "pff"
+    if pff_dir.is_dir():
+        for name in PFF_TABLES:
+            path = pff_dir / f"{name}.csv"
+            if not path.exists() or (only is not None and name not in only):
+                continue
+            with path.open(encoding="utf-8", newline="") as handle:
+                header = next(csv.reader(handle), [])
+            jobs.append(
+                {
+                    "schema": "stg",
+                    "name": name,
+                    "paths": [path],
+                    "format": "csv",
+                    "columns": pff_column_types(header),
                 }
             )
 
