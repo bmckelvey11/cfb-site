@@ -65,8 +65,10 @@ Two corrections the data made to the framing:
   would serve all four.
 - **It does not measure a fifth would-be consumer.** `OA_ALIASES`/`oa_resolve`
   (`research/spread/scripts/weekly_slate.py:351`) maps the-odds-api names and was not
-  audited here; `docs/oddsapi-ingest.md` still treats that join as unsettled, and
-  `#oddsapi-warehouse-wiring` depends on it. Whether it also sits at zero gaps is open.
+  audited here. *(Answered separately the same day —
+  [`oddsapi-team-name-join-2026-09-10.md`](oddsapi-team-name-join-2026-09-10.md): 170 of
+  173 names resolve uniquely against `core.dim_team`, zero ambiguously, three need an
+  alias.)*
 - **It does not license matching on `alternateNames` in production.** The second pass uses
   aliases only to classify a residual. S4 found CFBD aliases carry three-letter
   abbreviations (`liu`, `cal`, `sou`) that collide across schools; a map that indexes them

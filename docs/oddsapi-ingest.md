@@ -96,11 +96,29 @@ shows up in the unpriced list with books actually posted for it.
 
 Odds API events carry their own `id`, `commence_time` (UTC ISO8601), and team
 names **including the mascot** — `"Miami Hurricanes"`, `"Florida A&M Rattlers"`.
-The warehouse's `stg.games` carries school only — `"Youngstown State"`,
-`"Ohio Dominican"`. Nothing joins to `game_id` until that gap is closed, and
-`normalize.py` does not close it (it normalizes CFBD payloads, not vendor names).
-Settle the mapping before designing a flatten, or the landed payloads become
-unusable later.
+The warehouse's `stg.games` carries school only. `normalize.py` does not close
+that gap (it normalizes CFBD payloads, not vendor names).
+
+**Measured 2026-09-10 and the gap is small** —
+[`oddsapi-team-name-join-2026-09-10.md`](oddsapi-team-name-join-2026-09-10.md),
+`python scripts/audit_oddsapi_team_names.py --list`. Of 173 distinct names in the
+snapshots on disk, 170 resolve to exactly one `core.dim_team` row under the same
+mascot strip `oa_resolve` uses, **none resolve ambiguously**, and 3 need an alias
+(`Appalachian State`→`App State`, `Southern Mississippi`→`Southern Miss`,
+`UMass`→`Massachusetts`). Accents and apostrophes have to be folded, not blanked:
+CFBD spells them `San José State` and `Hawai'i`.
+
+The FCS half of the original worry does not hold — 39 of the resolved names are
+FCS and all 39 land. The example above (`"Ohio Dominican"`) is misleading for a
+different reason: the-odds-api only lists games with posted markets, so a D2
+opponent never appears in a snapshot at all.
+
+**Still open before a flatten:** resolving a name to a `team_id` is one of three
+keys — pairing `(home_team_id, away_team_id, commence_time)` onto a `game_id`
+still has to survive kickoff drift and neutral sites, which is unmeasured. And a
+one-sided resolve does not inherit the protection the spread slate gets from
+merging on both teams, so a flatten should fail loudly on a name it cannot
+resolve rather than guessing.
 
 The quota fields (`requests_last`, `requests_used`, `requests_remaining`) are
 nullable: they mirror response headers, and a missing header lands as `null`.
