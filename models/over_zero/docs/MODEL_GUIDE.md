@@ -761,7 +761,8 @@ games, 2013–2025:
 | `c`, `m` | −0.067, +0.172 | B step 4 (probit) |
 
 These are **fitted outputs, not model constants** — they drift as seasons are
-added (§2 quotes 11.03 / 11.78 / −0.073 / +0.176 from an earlier fit). Read
+added, and earlier fits quoted elsewhere in this guide differ slightly
+(§2: 11.03 / 11.78 / −0.073 / +0.176; §4: σ_dog 11.06). Read
 the current values off the header `score_game.py` prints before hand-computing
 anything.
 
