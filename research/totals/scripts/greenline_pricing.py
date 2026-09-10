@@ -105,6 +105,49 @@ def sigma_law(rows: list[dict]) -> dict:
             "min": min(sigmas), "max": max(sigmas)}
 
 
+def skew(rows: list[dict]) -> dict:
+    """Split the implied sigma by which side of the line the projection falls on.
+
+    A symmetric distribution prices a 1.7-point disagreement the same in either
+    direction. Greenline does not, so the fitted sigma has to nearly double on the
+    over side to absorb it -- the signature of a right-skewed total, which is what
+    football scoring actually is: a floor at zero and a long high-scoring tail.
+    """
+    below, above = [], []
+    for x in rows:
+        line, proj, po = (num(x["market_over_under"]), num(x["greenline_total_projection"]),
+                          num(x["over_cover_probability"]))
+        if None in (line, proj, po) or not 0 < po < 1:
+            continue
+        d = proj - line
+        if abs(d) < 1e-9:
+            continue
+        (below if d < 0 else above).append((line, d, po, N.inv_cdf(po)))
+
+    def side(grp):
+        if not grp:
+            return None
+        return {"n": len(grp),
+                "abs_d": st.mean([abs(g[1]) for g in grp]),
+                "abs_z": st.mean([abs(g[3]) for g in grp]),
+                "sigma": st.mean([abs(g[1] / g[3]) for g in grp if abs(g[3]) > 1e-9]),
+                "z_per_pt": st.mean([abs(g[3]) for g in grp]) / st.mean([abs(g[1]) for g in grp])}
+
+    b, a = side(below), side(above)
+    out = {"below": b, "above": a}
+    if b and a and a["z_per_pt"]:
+        out["ratio"] = b["z_per_pt"] / a["z_per_pt"]
+    # Controlled comparison: same |d|, similar line, opposite direction.
+    pairs = []
+    for u in below:
+        for o in above:
+            if abs(abs(u[1]) - abs(o[1])) < 0.05 and abs(u[0] - o[0]) < 2.0:
+                pairs.append({"abs_d": abs(u[1]), "under_line": u[0], "under_p": 1 - u[2],
+                              "over_line": o[0], "over_p": o[2]})
+    out["pairs"] = pairs
+    return out
+
+
 def reproduce(rows: list[dict], a: float, b: float, offset: float) -> float:
     """Max points by which sigma = a + b*line fails to rebuild the projection."""
     worst = 0.0
@@ -182,6 +225,24 @@ def report(rows: list[dict], splits: list[dict] | None) -> None:
               f"vs {ROUNDING_HALF_WIDTH} rounding bound")
         print(f"  -> {'law is complete' if worst <= ROUNDING_HALF_WIDTH + 1e-9 else 'a per-game input remains beyond the line'}\n")
 
+    k = skew(rows)
+    print("SHAPE OF THE MODELLED TOTAL")
+    if not (k["below"] and k["above"]):
+        print("  need games on both sides of the line\n")
+    else:
+        for lab, side in (("projection BELOW line (under)", k["below"]),
+                          ("projection ABOVE line (over) ", k["above"])):
+            print(f"  {lab}: n={side['n']:2d}  mean |d|={side['abs_d']:.2f} pts  "
+                  f"fitted sigma={side['sigma']:6.2f}  edge={side['z_per_pt']:.4f} z/pt")
+        print(f"  -> an under is worth {k['ratio']:.2f}x the probability of an over of the same size")
+        print("     A symmetric distribution would give 1.00x. The gap is right-skew:")
+        print("     scoring has a floor at zero and a long high-scoring tail, so mass")
+        print("     below the projection is dense and mass above it is spread thin.")
+        for pr in k["pairs"][:3]:
+            print(f"     matched |d|={pr['abs_d']:.1f}: under p={pr['under_p']:.4f} "
+                  f"(line {pr['under_line']:.1f})  vs  over p={pr['over_p']:.4f} (line {pr['over_line']:.1f})")
+        print()
+
     L = lean(rows)
     print("WHERE THE PROJECTION SITS vs THE MARKET")
     print(f"  proj - market: mean={L['mean']:+.2f} median={L['median']:+.2f} sd={L['sd']:.2f} (n={L['n']})")
@@ -239,6 +300,16 @@ def self_check() -> None:
     assert sigma_law(rows + [flat])["n"] == s["n"]
 
     assert public_join(rows, [])["n"] == 0
+
+    # Symmetric synthetic data must price both directions alike: ratio ~ 1.00.
+    k = skew(rows)
+    assert k["below"] and k["above"], k
+    assert abs(k["ratio"] - 1.0) < 0.25, k["ratio"]
+    # A projection sitting exactly on the line is neither side and must be dropped.
+    flat = dict(rows[0], market_over_under="50.0", greenline_total_projection="50.0",
+                over_cover_probability="0.5", under_cover_probability="0.5")
+    k2 = skew(rows + [flat])
+    assert k2["below"]["n"] + k2["above"]["n"] == k["below"]["n"] + k["above"]["n"]
     print("self-check ok")
 
 
