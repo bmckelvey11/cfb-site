@@ -104,3 +104,34 @@ def test_json_only_names_facets_a_csv_glob_would_drop():
                                       "cols": None, "types": {}, "defect": None, "sha": "2"},
     }
     assert json_only(found) == ["facet-a"]
+
+
+# ------------------------------------------------------------------ the S7 pull-plan cuts
+
+def test_the_pull_plan_stays_trimmed():
+    """S7's three cuts, pinned so a later edit has to argue with a test.
+
+    Each is a measured decision recorded in docs/pff-ingest-plan.md, not a preference:
+    the eleven dropped reports are a column-for-column re-cut of the weekly leaderboards,
+    `team-rushing-direction` returns the same body for both `table` values, and
+    `facet-passing-detail` is the union of the other four passing facets and hangs.
+    """
+    from pull_pff_modeling import SKIP_FACETS, TEAM_REPORTS
+
+    assert set(TEAM_REPORTS) == {"offense", "passing", "passing-pressure", "receiving",
+                                 "pass-blocking", "run-blocking", "pass-rush", "special-teams"}
+    assert "facet-passing-detail" in SKIP_FACETS
+
+    source = (Path(__file__).resolve().parents[1] / "scripts" / "pull_pff_modeling.py"
+              ).read_text(encoding="utf-8")
+    assert source.count('"team-rushing-direction"') == 1, "planned once, not per `table` value"
+    assert '"table": "rows"' in source
+
+
+def test_the_audit_expects_exactly_what_the_puller_writes():
+    """The audit imports TEAM_REPORTS, so cut 1 follows it -- but the rushing-direction
+    filenames were hardcoded, and a stale pair there reports 136 phantom gaps a season."""
+    source = (Path(__file__).resolve().parents[1] / "scripts" / "audit_pff_pull.py"
+              ).read_text(encoding="utf-8")
+    assert '("rows", "totals")' not in source
+    assert "team_rushing_direction_{season}_{slug}_rows.json" in source

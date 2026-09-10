@@ -231,7 +231,7 @@ def team_coverage(season: int) -> dict[str, list[str]]:
         wanted = [f"team_schedule_{season}_{slug}.json", f"roster_{season}_{slug}.json",
                   f"team_summary_{season}_{fid}.json",
                   *(f"team_leaders_{season}_{slug}_{g}.json" for g in TEAM_LEADER_GROUPS),
-                  *(f"team_rushing_direction_{season}_{slug}_{p}.json" for p in ("rows", "totals")),
+                  f"team_rushing_direction_{season}_{slug}_rows.json",
                   *(f"team_report_{season}_{slug}_{r}.json" for r in TEAM_REPORTS)]
         absent = [w for w in wanted if w not in on_disk]
         if absent:

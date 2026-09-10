@@ -78,10 +78,17 @@ SKIP_FACETS = {"facet-passing-detail", "facet-receiving-coverage", "facet-defens
 TEAM_STATS_CATEGORIES = ("offense-overall-success", "offense-passing", "offense-rushing",
                          "defense-overall-success", "defense-passing", "defense-rushing",
                          "defense-opponent-tendencies")
-TEAM_REPORTS = ("offense", "passing", "passing-depth", "passing-pressure", "receiving",
-                "receiving-depth", "rushing", "blocking", "pass-blocking", "run-blocking",
-                "defense", "run-defense", "pass-rush", "coverage", "special-teams",
-                "kick-returns", "field-goals", "punting", "kickoffs")
+# Eight of the nineteen /v2 team reports, measured on 2025 by `scripts/pff_tier_overlap.py`
+# (S7 in docs/pff-ingest-plan.md). The other eleven -- blocking, coverage, defense,
+# field-goals, kick-returns, kickoffs, passing-depth, punting, receiving-depth, run-defense,
+# rushing -- are a re-cut of the weekly leaderboards, column for column, and cost 1,496 reads
+# a season to re-download something already on disk. These eight are kept because each
+# carries columns no leaderboard has: pass-rush 30 (the lhs_*/rhs_* directional splits),
+# offense 19, passing-pressure 12, pass-blocking 10, run-blocking 6, passing 4, receiving 1,
+# special-teams 1. Whether those columns earn 1,088 reads a season is S6's gate 3 -- a
+# modelling question, not a timing one -- so they stay until that is answered.
+TEAM_REPORTS = ("offense", "passing", "passing-pressure", "receiving",
+                "pass-blocking", "run-blocking", "pass-rush", "special-teams")
 TEAM_LEADER_GROUPS = ("receiving", "passing", "rushing", "defense")
 PLAYER_REPORTS = ("offense-summary", "offense-blocking", "offense-pass-blocking", "offense-run-blocking",
                   "passing-summary", "passing-concept", "passing-depth", "passing-pressure",
@@ -325,9 +332,12 @@ def main() -> None:
                 for group in TEAM_LEADER_GROUPS:
                     plan("team-leaders", {**base, "group": group},
                          team_dir / f"team_leaders_{season}_{slug}_{group}.json", season)
-                for table in ("rows", "totals"):
-                    plan("team-rushing-direction", {**base, "table": table},
-                         team_dir / f"team_rushing_direction_{season}_{slug}_{table}.json", season)
+                # PFF ignores `table`: the `rows` and `totals` responses are byte-identical
+                # for all 136 franchises, and the one body already holds both views -- `rows`
+                # is player-grain, `teamTotals` franchise-grain, same direction vocabulary.
+                # Pulling both bought 136 reads and 136 duplicate files a season for nothing.
+                plan("team-rushing-direction", {**base, "table": "rows"},
+                     team_dir / f"team_rushing_direction_{season}_{slug}_rows.json", season)
                 for report in TEAM_REPORTS:
                     plan("team-report", {**base, "report": report},
                          team_dir / f"team_report_{season}_{slug}_{report}.json", season)

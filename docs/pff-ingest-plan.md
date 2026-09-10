@@ -5,7 +5,7 @@ to `done` with a date, and the worklog at the bottom gets an entry saying what w
 actually found. Nothing is deleted — a step that turns out to be wrong is struck with the
 reason, so the next pass does not re-open it.
 
-**Status 2026-09-09: S1–S5 done, S6 held.** 2025 is audited, flattened, mapped to CFBD and
+**Status 2026-09-10: S1–S5 and S7 done, S6 held.** 2025 is audited, flattened, mapped to CFBD and
 loading into `stg.pff_*` — 21 tables, 1.20 M rows. 2025 is the reference season — the process gets proven and trimmed against it before
 a single backfill call is made, because a backfill pays every inefficiency eleven times.
 
@@ -28,7 +28,7 @@ wins on what is finished.
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
 | S5 | loader entries → `stg` | S6 | **done** | 2026-09-09 |
 | S6 | Backfill 2014–2024, finish 2026 | — | **held** — gated on S3/S5/S7 | — |
-| S7 | Trim the pull plan using 2025 as the reference season | S6 | in progress | 2026-09-08 |
+| S7 | Trim the pull plan using 2025 as the reference season | S6 | **done** | 2026-09-10 |
 | S8 | Decide the player tier: finish it or delete the smoke test | — | open | — |
 
 ## S1 — Audit the pull ✅ 2026-09-08
@@ -204,7 +204,7 @@ should not gain a new tier until S7 says which ones are worth pulling.
 **Done when:** `audit_pff_pull.py` reports every backfilled season clean, and the 2026
 weekly pull is on the same schedule as the Action Network history job.
 
-## S7 — Trim the pull plan, measured on 2025
+## S7 — Trim the pull plan, measured on 2025 ✅ 2026-09-10
 
 2025 is the only complete season, so it is where the cost of a pull gets measured and cut.
 All numbers below are from files on disk against the puller's own pacing constants
@@ -252,12 +252,43 @@ backfill.
 **3. `facet-passing-detail` stays out.** Already in `SKIP_FACETS` — the union of the other
 four passing facets, and it hangs. Confirm nothing re-adds it.
 
-**Together:** 79 → **62 min a season**, and a backfill from 14.5 h to ~11.4 h. Dropping the
-eight report types that carry unique columns as well would reach 38 min and 6.9 h — that is
-the payload question S6's gate 3 asks, and it needs a modelling answer, not a timing one.
+### Applied 2026-09-10 — measured, not estimated
 
-**Done when:** a 2025 re-pull makes ≥1,632 fewer calls, `audit_pff_pull.py` still reports
-the season clean, and the tier decision is recorded here.
+All three cuts are in `scripts/pull_pff_modeling.py`. The saving was re-measured with the
+puller's own planner rather than taken from the arithmetic above:
+
+```
+python scripts/pull_pff_modeling.py --seasons 2025 --team-reports --player-facets --force --dry-run
+```
+
+| | Reads | Exports | Wall clock |
+|---|---:|---:|---:|
+| Before | 3,997 | 609 | ~79 min |
+| After | 2,365 | 609 | ~61 min |
+| Delta | **−1,632** | — | **−18 min** |
+
+−1,632 is exactly 11 reports × 136 franchises (1,496) plus the 136 duplicate
+`team-rushing-direction` reads, so the cut landed where it was aimed and nowhere else. An
+eleven-season backfill goes from 14.5 h to **11.2 h**. `python scripts/audit_pff_pull.py
+--season 2025` is byte-identical to its pre-edit output and still exits 0 — the 2025 files
+already on disk are untouched, so the type-drift and duplicate-body findings for the
+dropped reports persist for that season as history, not as regressions.
+
+`tests/test_pff_audit.py` pins all three cuts plus the audit's matching filename, because
+the audit imports `TEAM_REPORTS` (so cut 1 follows it automatically) but hardcoded the
+`("rows", "totals")` pair — left stale, that alone reports 136 phantom gaps a season.
+
+**The tier decision: 11 dropped, 8 retained pending S6 gate 3.** The eight are kept only
+because each carries columns no leaderboard has (`pass-rush` 30, `offense` 19,
+`passing-pressure` 12, `pass-blocking` 10, `run-blocking` 6, `passing` 4, `receiving` 1,
+`special-teams` 1). Nothing in the warehouse reads them yet — see the worklog — so the
+question gate 3 has to answer is whether those columns are worth 1,088 reads a season.
+Answering it "no" would take a season to 38 min and the backfill to 6.9 h.
+
+**Done when:** ~~a 2025 re-pull makes ≥1,632 fewer calls~~ (planner delta verified at
+exactly 1,632; the metered re-pull itself is not required to prove it),
+`audit_pff_pull.py` still reports the season clean ✅, and the tier decision is recorded
+here ✅.
 
 ## S8 — The player tier
 
@@ -419,3 +450,32 @@ supplies them did not list it, so the initializer's `""` stood. Only three sourc
 it (`offense_summary`, `passing_detail`, `rushing_direction`), which is exactly the case
 the carry-forward exists for. Now 32.2% populated — the rest are players who appear only
 in sources PFF does not tag with a number, not a defect.
+
+### 2026-09-10 — S7 done: 79 → 61 min a season
+
+The three cuts are applied and the saving re-measured with the puller's own planner rather
+than trusted from the arithmetic: 3,997 → 2,365 reads for 2025, a delta of exactly 1,632 —
+11 reports × 136 franchises plus the 136 duplicate `team-rushing-direction` reads. An
+eleven-season backfill drops from 14.5 h to 11.2 h. The audit's 2025 output is
+byte-identical before and after, which is the check that matters: the cut removed calls,
+not coverage.
+
+**The finding that outlives this step: nothing in the warehouse reads a `team_report_*`
+file.** The flattener's registry is entirely `facet_*` and `signature_*` leaderboard
+exports, and every one of `pff-warehouse-schema.md`'s 19 target tables — including the
+single team table, which comes from `signature_pass_blocking_efficiency_line` — is sourced
+from a leaderboard. In the live tree the only readers of `team_report_*` are the puller
+that writes them, the audit that counts them, and `pff_tier_overlap.py`, which exists to
+measure them. So the whole per-team report tier is 2,584 reads a season feeding no loader
+by design, not merely none yet.
+
+That does **not** widen the cut here. S7 is a timing step and the eight retained reports
+are a payload question S6's gate 3 owns; this is evidence for that decision, recorded so
+gate 3 does not have to re-derive it. Dropping the remaining eight would take a season to
+38 min and the backfill to 6.9 h — the largest single lever left in the PFF pull.
+
+One trap worth naming for whoever answers gate 3: `audit_pff_pull.py` imports
+`TEAM_REPORTS`, so a cut there follows automatically, but the `team-rushing-direction`
+filenames were hardcoded as a `("rows", "totals")` pair. Left stale that reports 136
+phantom gaps a season — a defect that looks exactly like a failed pull. Pinned in
+`tests/test_pff_audit.py` now.
