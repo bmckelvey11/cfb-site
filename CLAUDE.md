@@ -11,6 +11,8 @@ human-facing product intent. None should duplicate another file's rules.
 
 - Any modelling, backtesting, or analysis that might be reproduced gets a reusable script, not a one-off. Write the script as part of the task.
 
+- Every analysis gets written up in a markdown file — not just chat. Lands in the owning unit's `docs/` (`research/spread/docs/`, `models/totals/docs/`, ...), else root `docs/`; name it `<topic>-<YYYY-MM-DD>.md` unless it updates an existing doc. Minimum: the question, the method, the data and date range used, the numbers, and what the result does *not* support. Point at the script that reproduces it. Applies to ad-hoc digging too — if it took real work to find out, the finding is written down.
+
 ## Units
 
 | Unit | Home | Instructions |
