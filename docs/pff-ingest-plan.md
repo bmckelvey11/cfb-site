@@ -27,7 +27,7 @@ wins on what is finished.
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
 | S5 | loader entries → `stg` | S6 | **done** | 2026-09-09 |
-| S6 | Backfill 2014–2024, finish 2026 | — | **held** — gated on S3/S5/S7 | — |
+| S6 | Backfill 2014–2024, finish 2026 | — | **held** — gate 1–2 met, gate 3 open | 2026-09-10 |
 | S7 | Trim the pull plan using 2025 as the reference season | S6 | **done** | 2026-09-10 |
 | S8 | Decide the player tier: finish it or delete the smoke test | — | **done** — deleted | 2026-09-10 |
 
@@ -183,19 +183,31 @@ against the live warehouse).
 **Done when:** a rebuild lands the PFF tables, `scripts/check_an_tick_pin.py`'s sibling
 check passes for PFF, and row counts match the processed CSVs.
 
-## S6 — Backfill and 2026 ⏸ held 2026-09-08
+## S6 — Backfill and 2026 ⏸ still held 2026-09-10 — gate 1–2 met, gate 3 open
 
 **Held deliberately. Nothing is pulled for 2014–2024 until the process is proven on 2025.**
-A backfill is 14.5 hours of metered calls at today's plan, and every unfixed inefficiency
-or schema mistake is paid eleven times over. 2025 is complete and audited, so it is the
-reference season: prove the shape, trim the plan, then scale.
+Every unfixed inefficiency or schema mistake is paid eleven times over, so 2025 — complete
+and audited — is the reference season: prove the shape, trim the plan, then scale.
+
+**Cost, restated after S7: 11.2 hours, not the 14.5 first recorded** (61 min a season ×
+11). Answering gate 3 "drop the eight as well" would take it to 6.9 h.
 
 **Gate — all three before a backfill starts:**
 
-1. S3 and S5 land: 2025 flattens and loads end to end, so the schema is known-good before
-   it is applied to eleven more seasons.
-2. S7 lands: the pull plan is trimmed against the 2025 measurements below.
-3. The payload question below is answered: which of the 19 team reports a backfill needs.
+1. ✅ **2026-09-10.** S3 and S5 landed: 2025 flattens and loads end to end, 21 tables and
+   1.20 M rows, so the schema is known-good before it is applied to eleven more seasons.
+2. ✅ **2026-09-10.** S7 landed: the pull plan is trimmed and the saving measured with the
+   puller's own planner, 3,997 → 2,365 reads a season.
+3. ⏳ **Open, and now the only gate.** The payload question: which of the team reports a
+   backfill needs. S7 cut the eleven that are a re-cut of the leaderboards and deliberately
+   left the other eight to this gate, since it is a modelling question. Two facts it should
+   weigh, both established 2026-09-10: nothing in the warehouse reads a `team_report_*`
+   file — every one of §3's 19 target tables is sourced from a leaderboard export — and the
+   eight cost 1,088 reads a season, which is the difference between 11.2 h and 6.9 h.
+
+**Also blocked on `#rotate-secrets-after-compromise`** regardless of gate 3: the 2026-09-09
+machine compromise means `PFF_API` is assumed disclosed, and eleven seasons of metered
+calls should not run on a credential in that state.
 
 2026 is a separate case and is *not* held — it is mid-season (207 files, one zero-byte,
 780 cells that fill as weeks are played) and its weekly pull should keep running. It just

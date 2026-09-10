@@ -135,3 +135,29 @@ def test_the_audit_expects_exactly_what_the_puller_writes():
               ).read_text(encoding="utf-8")
     assert '("rows", "totals")' not in source
     assert "team_rushing_direction_{season}_{slug}_rows.json" in source
+
+
+# ------------------------------------------------ the team-name audits (docs/*-2026-09-10)
+
+@pytest.mark.parametrize("raw,expected", [
+    ("San José State", "san jose state"),   # accent folded, not blanked to "san jos state"
+    ("Hawai'i", "hawaii"),                  # apostrophe deleted, not spaced to "hawai i"
+    ("Miami (OH)", "miami oh"),
+    ("Florida A&M Rattlers", "florida a m rattlers"),
+])
+def test_oddsapi_norm_folds_the_two_cfbd_spellings_that_bite(raw, expected):
+    """Both rules are CFBD's own spellings, and both were bugs in this audit's first pass
+    that presented as vendor gaps rather than as normalizer defects."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from audit_oddsapi_team_names import norm
+
+    assert norm(raw) == expected
+
+
+def test_the_team_name_audit_excludes_pff_all_star_franchises():
+    """PFF's 96 all-star franchises are not schools, so a CFBD team for them is not a thing
+    to be missing. Counting them reported four phantom gaps."""
+    source = (Path(__file__).resolve().parents[1] / "scripts" / "audit_team_name_maps.py"
+              ).read_text(encoding="utf-8")
+    assert "kind = 'allstar'" in source
+    assert "WHERE kind = 'team'" in source
