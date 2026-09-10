@@ -60,7 +60,16 @@ def leaderboard_columns(stem: str, season: int) -> set[str]:
             cols |= set(next(csv.reader(fh), []))
     for path in PFF_ROOT.glob(f"{stem}_ncaa_{season}*.json"):
         body = json.loads(path.read_text(encoding="utf-8"))
-        cols |= {snake(c["key"]) for c in body.get("columns", []) if isinstance(c, dict)}
+        declared = {snake(c["key"]) for c in body.get("columns", []) if isinstance(c, dict)}
+        # A leaderboard that only ever landed as JSON has no `columns` envelope at all --
+        # its shape is `{op_name: [row, ...]}`. Reading only `columns` scored those at zero
+        # columns, which made every column of the matching team report look unique. That is
+        # what wrongly kept `offense` off the S7 drop list (2026-09-10); see
+        # `audit_pff_pull.py`'s `[json only]` line for which leaderboards are affected.
+        for value in body.values():
+            if isinstance(value, list) and value and isinstance(value[0], dict):
+                declared |= {snake(k) for k in value[0]}
+        cols |= declared
     return cols
 
 

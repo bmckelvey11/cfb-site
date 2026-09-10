@@ -78,17 +78,23 @@ SKIP_FACETS = {"facet-passing-detail", "facet-receiving-coverage", "facet-defens
 TEAM_STATS_CATEGORIES = ("offense-overall-success", "offense-passing", "offense-rushing",
                          "defense-overall-success", "defense-passing", "defense-rushing",
                          "defense-opponent-tendencies")
-# Eight of the nineteen /v2 team reports, measured on 2025 by `scripts/pff_tier_overlap.py`
-# (S7 in docs/pff-ingest-plan.md). The other eleven -- blocking, coverage, defense,
-# field-goals, kick-returns, kickoffs, passing-depth, punting, receiving-depth, run-defense,
-# rushing -- are a re-cut of the weekly leaderboards, column for column, and cost 1,496 reads
-# a season to re-download something already on disk. These eight are kept because each
-# carries columns no leaderboard has: pass-rush 30 (the lhs_*/rhs_* directional splits),
-# offense 19, passing-pressure 12, pass-blocking 10, run-blocking 6, passing 4, receiving 1,
-# special-teams 1. Whether those columns earn 1,088 reads a season is S6's gate 3 -- a
-# modelling question, not a timing one -- so they stay until that is answered.
-TEAM_REPORTS = ("offense", "passing", "passing-pressure", "receiving",
-                "pass-blocking", "run-blocking", "pass-rush", "special-teams")
+# Six of the nineteen /v2 team reports, measured on 2025 by `scripts/pff_tier_overlap.py`
+# (S7 in docs/pff-ingest-plan.md). Thirteen are dropped because they add nothing:
+#
+#   - Twelve are a re-cut of the weekly leaderboards, column for column: blocking, coverage,
+#     defense, field-goals, kick-returns, kickoffs, offense, passing-depth, punting,
+#     receiving-depth, run-defense, rushing.
+#   - `run-blocking` is a subset of `pass-blocking`. Its six snap-count columns are the only
+#     ones no leaderboard has, and `pass-blocking` carries all six with identical values --
+#     19,206 cells across all 136 franchises, zero disagreements -- over a population 163
+#     players larger.
+#
+# The six kept each carry columns nothing else has: pass-rush 30 (the lhs_*/rhs_* directional
+# splits), passing-pressure 12, pass-blocking 10, passing 4, receiving 1, special-teams 1.
+# Whether those earn 816 reads a season is S6's gate 3 -- a modelling question, not a timing
+# one -- so they stay until that is answered.
+TEAM_REPORTS = ("passing", "passing-pressure", "receiving",
+                "pass-blocking", "pass-rush", "special-teams")
 TEAM_LEADER_GROUPS = ("receiving", "passing", "rushing", "defense")
 PLAYER_REPORTS = ("offense-summary", "offense-blocking", "offense-pass-blocking", "offense-run-blocking",
                   "passing-summary", "passing-concept", "passing-depth", "passing-pressure",

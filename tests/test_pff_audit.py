@@ -118,14 +118,28 @@ def test_the_pull_plan_stays_trimmed():
     """
     from pull_pff_modeling import SKIP_FACETS, TEAM_REPORTS
 
-    assert set(TEAM_REPORTS) == {"offense", "passing", "passing-pressure", "receiving",
-                                 "pass-blocking", "run-blocking", "pass-rush", "special-teams"}
+    assert set(TEAM_REPORTS) == {"passing", "passing-pressure", "receiving",
+                                 "pass-blocking", "pass-rush", "special-teams"}
+    # `offense` and `run-blocking` were kept by the first S7 pass and dropped on
+    # re-measurement the same day: `offense` because leaderboard columns were read only from
+    # a `columns` envelope its JSON-only leaderboard does not have, and `run-blocking`
+    # because `pass-blocking` carries its six snap-count columns with identical values.
+    assert "offense" not in TEAM_REPORTS and "run-blocking" not in TEAM_REPORTS
     assert "facet-passing-detail" in SKIP_FACETS
 
     source = (Path(__file__).resolve().parents[1] / "scripts" / "pull_pff_modeling.py"
               ).read_text(encoding="utf-8")
     assert source.count('"team-rushing-direction"') == 1, "planned once, not per `table` value"
     assert '"table": "rows"' in source
+
+
+def test_leaderboard_columns_reads_json_only_facets():
+    """A leaderboard that never landed as CSV has no `columns` envelope -- its shape is
+    `{op_name: [row, ...]}`. Reading only `columns` scored those at zero, which made every
+    column of the matching team report look unique and wrongly kept `offense` in the pull."""
+    source = (Path(__file__).resolve().parents[1] / "scripts" / "pff_tier_overlap.py"
+              ).read_text(encoding="utf-8")
+    assert "isinstance(value, list)" in source, "row-key fallback for JSON-only leaderboards"
 
 
 def test_the_audit_expects_exactly_what_the_puller_writes():

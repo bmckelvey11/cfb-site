@@ -189,8 +189,8 @@ check passes for PFF, and row counts match the processed CSVs.
 Every unfixed inefficiency or schema mistake is paid eleven times over, so 2025 — complete
 and audited — is the reference season: prove the shape, trim the plan, then scale.
 
-**Cost, restated after S7: 11.2 hours, not the 14.5 first recorded** (61 min a season ×
-11). Answering gate 3 "drop the eight as well" would take it to 6.9 h.
+**Cost, restated after S7: 10.6 hours, not the 14.5 first recorded** (58 min a season ×
+11). Answering gate 3 "drop the remaining six as well" would take it to 9.0 h.
 
 **Gate — all three before a backfill starts:**
 
@@ -199,11 +199,14 @@ and audited — is the reference season: prove the shape, trim the plan, then sc
 2. ✅ **2026-09-10.** S7 landed: the pull plan is trimmed and the saving measured with the
    puller's own planner, 3,997 → 2,365 reads a season.
 3. ⏳ **Open, and now the only gate.** The payload question: which of the team reports a
-   backfill needs. S7 cut the eleven that are a re-cut of the leaderboards and deliberately
-   left the other eight to this gate, since it is a modelling question. Two facts it should
-   weigh, both established 2026-09-10: nothing in the warehouse reads a `team_report_*`
-   file — every one of §3's 19 target tables is sourced from a leaderboard export — and the
-   eight cost 1,088 reads a season, which is the difference between 11.2 h and 6.9 h.
+   backfill needs. S7 cut thirteen — twelve that re-cut the leaderboards and `run-blocking`,
+   which `pass-blocking` strictly dominates — and deliberately left the other six to this
+   gate, since it is a modelling question rather than a provable redundancy. Two facts it
+   should weigh, both established 2026-09-10: nothing in the warehouse reads a
+   `team_report_*` file — every one of §3's 19 target tables is sourced from a leaderboard
+   export — and the six cost 816 reads a season, the difference between 10.6 h and 9.0 h.
+   Note the lever has shrunk: it was worth 3.7 h before the correction and is worth 1.6 h
+   now, because most of what looked like payload was duplication.
 
 **Also blocked on `#rotate-secrets-after-compromise`** regardless of gate 3: the 2026-09-09
 machine compromise means `PFF_API` is assumed disclosed, and eleven seasons of metered
@@ -237,22 +240,44 @@ the leaderboard; `team_abbreviation` is in the directory). Result:
 
 | | Reports | Reads/season |
 |---|---|---|
-| Fully covered by the leaderboard — droppable | 11 | 1,496 |
-| Carry columns the leaderboard lacks — keep | 8 | 1,088 |
+| Fully covered by the leaderboard — droppable | 12 | 1,632 |
+| Covered by a sibling report — droppable | 1 | 136 |
+| Carry columns nothing else has — keep | 6 | 816 |
 
-Droppable: `blocking`, `coverage`, `defense`, `field-goals`, `kick-returns`, `kickoffs`,
-`passing-depth`, `punting`, `receiving-depth`, `run-defense`, `rushing`. Where the two
-overlap, values agree exactly (checked on `grades_pass`, Alabama passing).
+Droppable as leaderboard re-cuts: `blocking`, `coverage`, `defense`, `field-goals`,
+`kick-returns`, `kickoffs`, `offense`, `passing-depth`, `punting`, `receiving-depth`,
+`run-defense`, `rushing`. Where the two overlap, values agree exactly (checked on
+`grades_pass`, Alabama passing).
+
+Droppable as a sibling's subset: `run-blocking`. See *The correction* below.
 
 Worth keeping, and why: `pass-rush` has 30 unique columns (the `lhs_*`/`rhs_*` directional
-splits), `offense` 19, `passing-pressure` 12 (`blitz_*` / `no_blitz_*` blocking grades),
-`pass-blocking` 10 and `run-blocking` 6 (`snap_counts_*` by line position), `passing` 4
+splits), `passing-pressure` 12 (`blitz_*` / `no_blitz_*` blocking grades), `pass-blocking`
+10 (`snap_counts_*` by line position, plus pressure/sack rates allowed), `passing` 4
 (`npa_epa`, `no_screen_epa` and their positive-EPA rates), `receiving` 1
-(`team_targets_percent`), `special-teams` 1 (`total_snaps`). Whether those are worth 1,088
+(`team_targets_percent`), `special-teams` 1 (`total_snaps`). Whether those are worth 816
 reads a season is a modelling question, not a plumbing one — but they are genuinely absent
-from the leaderboards, so dropping them is a data decision, not a free win.
+from everything else, so dropping them is a data decision, not a free win.
 
-Saving: **16 min a season, 3.0 h over an 11-season backfill.**
+Saving: **19 min a season, 3.5 h over an 11-season backfill.**
+
+### The correction — two more reports dropped, 2026-09-10
+
+The first pass of this step kept eight reports. Two of them did not deserve it, and both
+mistakes were invisible in the summary counts:
+
+**`offense` was never unique.** `pff_tier_overlap.py` read a leaderboard's columns only
+from a `columns` envelope. Three 2025 leaderboards never landed as CSV and their JSON has
+no such envelope — the shape is `{op_name: [row, ...]}` — so `facet_offense_summary` scored
+**zero** columns and all 19 of the `offense` report's columns looked unique. Reading the
+row keys instead: 28 columns on each side, and all 19 present on the leaderboard. The
+audit's own `[json only]` line named the affected files the whole time.
+
+**`run-blocking` is a subset of `pass-blocking`.** Its six `snap_counts_*` line-position
+columns are the only ones no leaderboard has, and `pass-blocking` carries all six —
+**19,206 cells across all 136 franchises, zero disagreements**, over a population 163
+players larger. Unlike the eight-vs-zero payload question, this is proven redundancy, so it
+is a timing decision and belongs in this step rather than in S6's gate 3.
 
 **2. `team-rushing-direction` is pulled twice for one answer.** PFF ignores the `table`
 parameter: `_rows.json` and `_totals.json` are byte-identical for all 136 franchises.
@@ -276,12 +301,13 @@ python scripts/pull_pff_modeling.py --seasons 2025 --team-reports --player-facet
 | | Reads | Exports | Wall clock |
 |---|---:|---:|---:|
 | Before | 3,997 | 609 | ~79 min |
-| After | 2,365 | 609 | ~61 min |
-| Delta | **−1,632** | — | **−18 min** |
+| After the first pass | 2,365 | 609 | ~61 min |
+| After the correction | 2,093 | 609 | ~58 min |
+| Delta | **−1,904** | — | **−21 min** |
 
-−1,632 is exactly 11 reports × 136 franchises (1,496) plus the 136 duplicate
+−1,904 is exactly 13 reports × 136 franchises (1,768) plus the 136 duplicate
 `team-rushing-direction` reads, so the cut landed where it was aimed and nowhere else. An
-eleven-season backfill goes from 14.5 h to **11.2 h**. `python scripts/audit_pff_pull.py
+eleven-season backfill goes from 14.5 h to **10.6 h**. `python scripts/audit_pff_pull.py
 --season 2025` is byte-identical to its pre-edit output and still exits 0 — the 2025 files
 already on disk are untouched, so the type-drift and duplicate-body findings for the
 dropped reports persist for that season as history, not as regressions.
@@ -290,12 +316,12 @@ dropped reports persist for that season as history, not as regressions.
 the audit imports `TEAM_REPORTS` (so cut 1 follows it automatically) but hardcoded the
 `("rows", "totals")` pair — left stale, that alone reports 136 phantom gaps a season.
 
-**The tier decision: 11 dropped, 8 retained pending S6 gate 3.** The eight are kept only
-because each carries columns no leaderboard has (`pass-rush` 30, `offense` 19,
-`passing-pressure` 12, `pass-blocking` 10, `run-blocking` 6, `passing` 4, `receiving` 1,
-`special-teams` 1). Nothing in the warehouse reads them yet — see the worklog — so the
-question gate 3 has to answer is whether those columns are worth 1,088 reads a season.
-Answering it "no" would take a season to 38 min and the backfill to 6.9 h.
+**The tier decision: 13 dropped, 6 retained pending S6 gate 3.** The six are kept only
+because each carries columns nothing else has (`pass-rush` 30, `passing-pressure` 12,
+`pass-blocking` 10, `passing` 4, `receiving` 1, `special-teams` 1). Nothing in the
+warehouse reads them yet — see the worklog — so the question gate 3 has to answer is
+whether those columns are worth 816 reads a season. Answering it "no" would take a season
+to 49 min and the backfill to 9.0 h.
 
 **Done when:** ~~a 2025 re-pull makes ≥1,632 fewer calls~~ (planner delta verified at
 exactly 1,632; the metered re-pull itself is not required to prove it),
@@ -515,3 +541,24 @@ against the flattener registry and the audit's expected coverage, not assumed --
 
 That leaves S6 as the only step not done or deliberately closed, and its gate (S3, S5, S7)
 is now fully satisfied.
+
+### 2026-09-10 — S7 corrected: two more reports dropped
+
+Asked what the eight retained reports actually hold, and the answer was that two of them
+hold nothing. Both errors were invisible in the summary counts and only showed up when the
+column lists were read out.
+
+`offense` was scored against a leaderboard that `pff_tier_overlap.py` had read as having
+zero columns: it took columns from a `columns` envelope, and the three leaderboards that
+never landed as CSV have no envelope — their JSON is `{op_name: [row, ...]}`. So all 19 of
+`offense`'s columns looked unique. They are all on `facet_offense_summary`; both sides have
+28 columns. The audit's `[json only]` line had been naming those files since S1.
+
+`run-blocking` was scored correctly and is still redundant, against a sibling rather than a
+leaderboard: `pass-blocking` carries all six of its `snap_counts_*` line-position columns,
+identical on 19,206 cells across all 136 franchises, over a population 163 players larger.
+
+Net: 13 of 19 team reports dropped rather than 11, a season goes 79 → 58 min, and an
+eleven-season backfill 14.5 → 10.6 h. The lesson worth keeping is that "N unique columns"
+is only as good as the comparison's ability to read both sides — a parser that silently
+returns an empty set makes everything look novel, and a count cannot show you that.
