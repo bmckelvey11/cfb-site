@@ -164,10 +164,27 @@ Small lookup tables. The win is tidiness, not data volume.
 
 ### Bucket B — REST is the *column* superset, GraphQL the *coverage* superset (2 pairs)
 
+**Re-measured 2026-09-10 after §4's repair** —
+[`docs/warehouse-containment-remeasure-2026-09-10.md`](../../warehouse-containment-remeasure-2026-09-10.md),
+`python scripts/audit_pair_columns.py --pair coach_season --verbose`. Both stay in Bucket B;
+both column diffs moved.
+
 | Pair | GQL-only | REST-only |
 |---|---|---|
-| `coach_season` / `coach_seasons` | **none** | **61 columns** incl. `coach_id`, `team_id`, `cfp_*`, `pollResume_*` |
-| `team_talent` / `talent` | **none** | `team` (1.00) |
+| `coach_season` / `coach_seasons` | `team_teamId` (0.980) — REST's `team_id` under another name | **57 columns**: `cfp_*`, `pollResume_*`, `recordSplits_*`, `teamMetrics_*` |
+| `team_talent` / `talent` | `team_teamId`, `team_school`, `team_conference` (0.997) | `team` (1.00), `season` (1.00) — the latter is GQL's `year` |
+
+Two changes worth carrying forward:
+
+- **`coach_season` now merges by join, not union.** `coach_id` moved from REST-exclusive to
+  *shared*, and `(coach_id, team_id, year)` is unique on both sides — 12,564 and 1,961 —
+  matching **1,961 of 1,961 REST rows, zero unmatched**. This is the outcome the caveat
+  below anticipated, now measured. `#core-merge-bucket-c` should assume a join here.
+- **`team_talent`'s column direction reversed.** GraphQL carries the FK; REST carries only a
+  school name. That made REST look droppable — GraphQL out-rows it, out-covers it, and holds
+  its identity columns — but **17 REST rows have no GraphQL twin** (Jacksonville, St. Francis
+  (PA), absent from `currentTeams`), so R6's containment half fails and the merge stays a
+  full outer union on the team-name key.
 
 The column direction is the **opposite** of the hypothesis — but that does not make the GraphQL
 side droppable, because it carries the years:
@@ -178,10 +195,13 @@ side droppable, because it carries the years:
 | `team_talent` / `talent` | 2,413 rows, **2015–2026** | 2,278 rows, 2015–2025 | 2026 |
 
 Both fail R6's distinct-key half. **So both merge, and neither is dropped** — the REST side
-supplies the identity columns the GraphQL side lost to §4's defect, the GraphQL side supplies
-the history. Bucket B is provisional in one direction only: §4's repair may add the FK columns
-that make the merge a clean join rather than a union, but it cannot make either side droppable.
-Re-measure at step 2 regardless.
+supplies the columns the GraphQL side lacks, the GraphQL side supplies the history.
+~~Bucket B is provisional in one direction only: §4's repair may add the FK columns that make
+the merge a clean join rather than a union, but it cannot make either side droppable.
+Re-measure at step 2 regardless.~~ **Re-measured 2026-09-10: both predictions held.** The
+repair added the FK columns and `coach_season`'s merge is a clean join; neither side became
+droppable. `team_talent` remains a union, blocked by 17 REST-only school-seasons rather than
+by missing columns.
 
 `recruit` / `recruits` was in this bucket in the 2026-09-08 draft, marked droppable with no
 provisional caveat and untouched by §4's defect. It is a Bucket C merge; see below.
