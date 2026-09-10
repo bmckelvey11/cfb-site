@@ -16,19 +16,62 @@ Delete from here once promoted.
 
 ## Projects
 
-*Orientation, not a queue — statuses go stale; the queue is [`TODO.md`](TODO.md).*
+*One bucket per project — jot under the one it belongs to. The blurb is
+orientation and goes stale; the tracked queue is [`TODO.md`](TODO.md).*
 
-| Project | Home | What it is | Where it stands |
-|---|---|---|---|
-| System maker | `cfb_system_maker/` | Python CLI + Flask UI for backtesting filter-based betting systems over CFBD games/lines | Shipped, in use. Open: delete saved systems from the web UI (`#system-maker-delete-saved-systems`) |
-| Warehouse | `cfb_system_maker/`, `scripts/` | DuckDB (`data/cfb.duckdb`) built from CFBD REST + GraphQL, Action Network, odds, PFF; `md:cfb` is a manual mirror | Live. Rationalization plan in flight — step 1 gated on a CFBD re-scrape (`coach_season`, `team_talent`) |
-| PFF ingest | `scripts/pull_pff_*.py`, `docs/pff-*.md` | Scrapers for PFF schedule, bet splits, Greenline picks; 70-endpoint reference | Schedule + splits public and working. Greenline needs a web session (Clerk JWT, 60s) — no headless path. Forward-only, 2025 absent upstream |
-| Totals model | `models/totals/` | Opening-total edge model + backtest harness | Clean-feature walk-forward graded; edge threshold frozen. Cite `ou_open`, 2022-25 prior-season folds — never the leaked-era 57% / +8.82% |
-| Greenline reverse-engineering | `research/totals/` | Recovering PFF's totals model from captured picks | Pricing layer solved (`greenline_pricing.py`): value = prob − 110/210, prob = Φ((proj−line)/σ), σ ∝ line. Underlying projection model still unknown |
-| Over-zero | `models/over_zero/` | Arscott / saturation / first-half floor-bias models + weekly slate and monitor | Running weekly. No pytest suite — verify scripts end-to-end against local data |
-| Over-zero site | `models/over_zero/site/` | Public slate site (nested repo) | Deploys via `git push sites` — needs the user's auth, so Claude commits and they push |
-| Spread research | `research/spread/` | Predicting where the closing spread goes from the Prediction Tracker panel; book fair + line shopping | Preregistered and decontaminated: the screened consensus anticipates ~15% of open→close at the opener. Prereg order is binding |
-| Ops / scheduling | `scripts/schedule_cfb_tasks.ps1`, `scripts/task_ledger.cmd` | Windows scheduled tasks for the daily pulls; S4U conversion to stop console popups + a CSV run ledger | Scripts written, not applied — blocked on the user running them (needs task-modify permission) |
+### System maker
+
+*`cfb_system_maker/` — CLI + Flask backtester. Open: delete saved systems from the web UI (`#system-maker-delete-saved-systems`).*
+
+- 
+
+### Warehouse
+
+*`cfb_system_maker/`, `scripts/` — DuckDB from CFBD REST+GraphQL, Action Network, odds, PFF. Rationalization step 1 gated on a CFBD re-scrape (`coach_season`, `team_talent`).*
+
+- 
+
+### PFF ingest
+
+*`scripts/pull_pff_*.py`, `docs/pff-*.md` — schedule + bet splits public; Greenline needs a web session (Clerk JWT, 60s). Forward-only, 2025 absent upstream.*
+
+- 
+
+### Totals model
+
+*`models/totals/` — opening-total edge model. Cite `ou_open`, 2022-25 prior-season folds; never the leaked-era 57% / +8.82%.*
+
+- 
+
+### Greenline reverse-engineering
+
+*`research/totals/` — pricing layer solved (`greenline_pricing.py`); the underlying projection model is still unknown.*
+
+- 
+
+### Over-zero
+
+*`models/over_zero/` — Arscott / saturation / first-half floor-bias + weekly slate and monitor. No pytest suite; verify end-to-end.*
+
+- 
+
+### Over-zero site
+
+*`models/over_zero/site/` — nested repo, deploys via `git push sites` (user's auth, so Claude commits and they push).*
+
+- 
+
+### Spread research
+
+*`research/spread/` — closing-spread prediction off the Prediction Tracker panel. ~15% of open→close anticipated at the opener. Prereg order binding.*
+
+- 
+
+### Ops / scheduling
+
+*`scripts/schedule_cfb_tasks.ps1`, `scripts/task_ledger.cmd` — S4U conversion + run ledger. Written, not applied (needs task-modify permission).*
+
+- 
 
 ---
 
