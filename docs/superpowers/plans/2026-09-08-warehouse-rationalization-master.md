@@ -79,11 +79,15 @@ correct and this plan does not touch it.**
 2. **`core.dim_team` has three consumers now, not one.** See §6.
 3. **Step 5's one-commit rewrite got bigger.** See §8.
 
-**One PFF column trips §5 and should not.** `stg.pff_player_season.jersey_number` is all-NULL
-across 30,716 rows, but it is not dead data — `scripts/pff_flatten.py:222` writes `""` into it
-unconditionally, so it is a flattener stub. Dropping it would lose to the next flatten. It is
-therefore exempt from §5's drop list, and the fix belongs to PFF's S3/S8, not here. §5 carries
-the exemption.
+**One PFF column tripped §5 and is now populated** *(resolved 2026-09-10)*.
+`stg.pff_player_season.jersey_number` was all-NULL across 30,716 rows — not dead data but a
+flattener omission. PFF supplies it in the JSON exports, and the fix was to add it to the
+carry-forward loop that already filled the two columns beside it. §5 records the outcome.
+
+The instructive part is how it was nearly got wrong: a first pass scanned the 648 PFF **CSVs**,
+found no jersey-like column among 1,844 header tokens, and concluded the field did not exist.
+`data/raw/pff/` also holds **4,221 JSON files**, which is where it lives. An absence measured
+over part of a source is not an absence.
 
 ## 2. The naming end state — one `stg`, nothing named after a transport
 
@@ -250,11 +254,17 @@ problems:
   **none of the three is all-NULL anywhere**. There is no loader change to make. See R3.
 - **4 are future-dated and must be kept** — `stg.lines_2026_week2_20260908` and its `__lines`
   child, `homeScore`/`awayScore`. Those games have not been played.
-- **1 is a flattener stub and is exempt** *(2026-09-09)* — `stg.pff_player_season.jersey_number`,
-  all-NULL over 30,716 rows because `scripts/pff_flatten.py:222` writes `""` into it
-  unconditionally. All-NULL here means "never populated by the writer," not "dead data," so
-  dropping it would simply lose to the next flatten. PFF's S3/S8 owns filling or removing it.
-  See §1b.
+- ~~**1 is a flattener stub and is exempt**~~ — **resolved 2026-09-10, by populating it.**
+  `stg.pff_player_season.jersey_number` was all-NULL over 30,716 rows because the flattener
+  seeded it as `""` and then omitted it from the carry-forward loop that fills `draft_season`
+  and `eligible_season` beside it. PFF does supply it — in the **JSON** exports
+  (`offense_summary`, `passing_detail`, `rushing_direction`), not the CSVs. Adding it to that
+  loop fills 9,887 of 30,716, the same 32% subset as `eligible_season`, since only those three
+  offense-side files carry it. Typed `VARCHAR` deliberately: 2,050 values have a leading zero
+  (`00`, `04`) and 706 are `D`-prefixed, so integer typing would destroy them.
+  `STUB_COLUMNS` in the verifier is now empty but kept — the next source to land a write-only
+  column needs the same exemption, and that is better than growing §5's drop list with columns
+  a writer would immediately recreate.
 - **7 are genuinely dead** and are the drop list:
 
 ```

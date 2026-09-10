@@ -69,12 +69,15 @@ ALL_NULL_REPORTED = 11
 FUTURE_DATED = re.compile(r"^lines_.*$")
 FUTURE_DATED_COLUMN = re.compile(r"^(home|away)Score$")
 
-# A writer that emits a column but never fills it. All-NULL here means "the flattener writes
-# `""`", not "the data is dead" -- dropping one loses to the next flatten, so it is the writer's
-# bug and belongs to the owning plan. See section 1b and section 5.
-STUB_COLUMNS = {
-    ("stg", "pff_player_season", "jersey_number"): "pff_flatten.py:222 writes '' -- PFF S3/S8",
-}
+# A writer that emits a column but never fills it. All-NULL here means "the writer emits an
+# empty string", not "the data is dead" -- dropping one loses to the next run, so it is the
+# writer's bug and belongs to the owning plan, not to section 5's drop list.
+#
+# Empty since 2026-09-10: `stg.pff_player_season.jersey_number` was the only entry, and it is
+# populated now (9,887 of 30,716) rather than exempt. The flattener collected the player
+# dimension but never carried the column down; PFF supplies it in the JSON exports, not the CSVs.
+# Kept as the mechanism, because the next source to land a write-only column will need it.
+STUB_COLUMNS: dict[tuple[str, str, str], str] = {}
 
 # Loader scaffolding, bound from the dump filename. Section 5 claims 308 all-NULL copies
 # of these survive into `stg`; R3 asks for them to stop being materialized there.
