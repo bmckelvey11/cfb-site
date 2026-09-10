@@ -5,7 +5,7 @@ to `done` with a date, and the worklog at the bottom gets an entry saying what w
 actually found. Nothing is deleted — a step that turns out to be wrong is struck with the
 reason, so the next pass does not re-open it.
 
-**Status 2026-09-10: S1–S5 and S7 done, S6 held.** 2025 is audited, flattened, mapped to CFBD and
+**Status 2026-09-10: S1–S5, S7 and S8 done, S6 held.** 2025 is audited, flattened, mapped to CFBD and
 loading into `stg.pff_*` — 21 tables, 1.20 M rows. 2025 is the reference season — the process gets proven and trimmed against it before
 a single backfill call is made, because a backfill pays every inefficiency eleven times.
 
@@ -29,7 +29,7 @@ wins on what is finished.
 | S5 | loader entries → `stg` | S6 | **done** | 2026-09-09 |
 | S6 | Backfill 2014–2024, finish 2026 | — | **held** — gated on S3/S5/S7 | — |
 | S7 | Trim the pull plan using 2025 as the reference season | S6 | **done** | 2026-09-10 |
-| S8 | Decide the player tier: finish it or delete the smoke test | — | open | — |
+| S8 | Decide the player tier: finish it or delete the smoke test | — | **done** — deleted | 2026-09-10 |
 
 ## S1 — Audit the pull ✅ 2026-09-08
 
@@ -290,14 +290,27 @@ exactly 1,632; the metered re-pull itself is not required to prove it),
 `audit_pff_pull.py` still reports the season clean ✅, and the tier decision is recorded
 here ✅.
 
-## S8 — The player tier
+## S8 — The player tier ✅ 2026-09-10 — deleted
 
-`data/raw/pff/player/` holds 22 files for a single id (198077, Keelon Russell) — a smoke
-test someone stopped after. Every graded FBS player is ~12k a season at 20 reads each, so
-the full tier is not a casual pull. Either scope it to a real id list (QBs? starters?) or
-delete the stub so it stops reading as partial coverage.
+`data/raw/pff/player/` held 22 files for a single id (198077, Keelon Russell) — a smoke
+test someone stopped after. **Deleted.** Nothing read them: the flattener's registry is
+leaderboard exports only, and `audit_pff_pull.py` counts the player tier without requiring
+it, so the audit for 2025 is unchanged apart from the tier disappearing (4,657 → 4,637
+files, zero defects, zero gaps, still exits 0).
 
-**Done when:** the directory holds either a deliberate cohort or nothing.
+The alternative was scoping a cohort, and there is nothing to scope it against yet: no
+model asks for player-grain PFF data, and every graded FBS player is ~12k a season at 20
+reads each. Twenty-two files for one quarterback was not coverage, it was a directory
+implying coverage that did not exist — which is the specific harm this step named.
+
+Re-pulling the same smoke test is one command and ~15 s of metered budget, so nothing is
+foreclosed:
+
+```bash
+python scripts/pull_pff_modeling.py --seasons 2025 --player-ids 198077
+```
+
+**Done when:** the directory holds either a deliberate cohort or nothing. ✅ nothing.
 
 ## Worklog
 
@@ -479,3 +492,14 @@ One trap worth naming for whoever answers gate 3: `audit_pff_pull.py` imports
 filenames were hardcoded as a `("rows", "totals")` pair. Left stale that reports 136
 phantom gaps a season — a defect that looks exactly like a failed pull. Pinned in
 `tests/test_pff_audit.py` now.
+
+### 2026-09-10 — S8 closed by deletion
+
+Deleted the 22-file player stub. The decision rule was which of the two branches could be
+reversed: deleting costs one command and ~15 s to restore, while defining a cohort commits
+the backfill to a shape no model has asked for. Nothing consumed the files -- checked
+against the flattener registry and the audit's expected coverage, not assumed -- and the
+2025 audit is byte-identical apart from the `player` tier leaving the file census.
+
+That leaves S6 as the only step not done or deliberately closed, and its gate (S3, S5, S7)
+is now fully satisfied.
