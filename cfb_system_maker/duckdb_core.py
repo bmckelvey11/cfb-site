@@ -58,6 +58,18 @@ def build_core(
         built.append("fact_game_team")
         if _build_fact_game_odds(con):
             built.append("fact_game_odds")
+        # Bucket C/B merges (rationalization plan step 3). Each is guarded and skipped when
+        # its sources are absent, so a partial warehouse still rebuilds.
+        if _build_dim_coach(con):
+            built += ["dim_coach", "coach_name_conflicts"]
+        if _build_dim_draft_pick(con):
+            built.append("dim_draft_pick")
+        if _build_dim_recruit(con):
+            built.append("dim_recruit")
+        if _build_fact_team_talent(con):
+            built.append("fact_team_talent")
+        if _build_fact_coach_season(con):
+            built += ["fact_coach_season", "coach_season_unmatched"]
         _add_phase_1_indexes(con)
         con.execute("CHECKPOINT")
         return built
@@ -632,6 +644,227 @@ def _build_fact_game_odds(con: duckdb.DuckDBPyConnection) -> bool:
         FROM paired WHERE rn = 1
         """
     )
+    return True
+
+
+# ------------------------------------------------------------------ Bucket C/B merges
+#
+# Section 3 of docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md: the two
+# transports are complementary rather than duplicates, so these are **full outer joins on the
+# key, one row per key**, with `_source` recording which side supplied it -- 'both', 'gql' or
+# 'rest'. A left join anchored on REST would silently truncate: GraphQL out-rows REST on
+# every pair (draft_picks 13,080 to 3,584, recruit 93,363 to 45,927).
+#
+# Deliberately not a UNION of both sides' rows. coach_season matches 1,961 of 1,961 REST
+# rows, and a union would carry every one of those twice.
+#
+# Every builder returns False when a source is missing rather than raising: build_core runs
+# on every refresh_cfbd pass, and a missing stg_gql table must not break the whole rebuild.
+
+
+def _has(con: duckdb.DuckDBPyConnection, schema: str, table: str) -> bool:
+    return bool(con.execute(
+        "SELECT count(*) FROM information_schema.tables "
+        "WHERE table_schema = ? AND table_name = ?", [schema, table]).fetchone()[0])
+
+
+def _build_dim_coach(con: duckdb.DuckDBPyConnection) -> bool:
+    """Coach identity, GraphQL only -- REST has no ``coachId`` (section 6).
+
+    Also builds ``core.coach_name_conflicts``: names carried by more than one id. The third
+    coach-season source resolves coaches *by name*, so a name in this table cannot be
+    resolved that way and its seasons land in ``core.coach_season_unmatched`` instead.
+    """
+    if not _has(con, "stg_gql", "coach"):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.dim_coach")
+    con.execute("""
+        CREATE TABLE core.dim_coach AS
+        SELECT "coachId" AS coach_id, "firstName" AS first_name, "lastName" AS last_name
+        FROM stg_gql.coach WHERE "coachId" IS NOT NULL
+    """)
+    con.execute("ALTER TABLE core.dim_coach ADD PRIMARY KEY (coach_id)")
+    con.execute("DROP TABLE IF EXISTS core.coach_name_conflicts")
+    con.execute("""
+        CREATE TABLE core.coach_name_conflicts AS
+        SELECT first_name, last_name, count(*) AS coach_count,
+               list(coach_id ORDER BY coach_id) AS coach_ids
+        FROM core.dim_coach GROUP BY 1, 2 HAVING count(*) > 1
+    """)
+    return True
+
+
+def _build_dim_draft_pick(con: duckdb.DuckDBPyConnection) -> bool:
+    """``(year, round, pick)`` -- unique on both sides, and REST is fully contained in GraphQL."""
+    if not (_has(con, "stg_gql", "draft_picks") and _has(con, "stg", "draft_picks")):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.dim_draft_pick")
+    con.execute("""
+        CREATE TABLE core.dim_draft_pick AS
+        SELECT
+          coalesce(g.year, r.year)   AS year,
+          coalesce(g.round, r.round) AS round,
+          coalesce(g.pick, r.pick)   AS pick,
+          coalesce(g.name, r.name)   AS name,
+          g.overall, g.grade, g."collegeTeamId" AS college_team_id,
+          g."nflTeamId" AS nfl_team_id, g."positionId" AS position_id,
+          r."collegeAthleteId" AS college_athlete_id, r."collegeTeam" AS college_team,
+          r."collegeConference" AS college_conference,
+          CASE WHEN g.year IS NOT NULL AND r.year IS NOT NULL THEN 'both'
+               WHEN g.year IS NOT NULL THEN 'gql' ELSE 'rest' END AS _source
+        FROM stg_gql.draft_picks g
+        FULL OUTER JOIN stg.draft_picks r
+          ON g.year = r.year AND g.round = r.round AND g.pick = r.pick
+    """)
+    return True
+
+
+def _build_dim_recruit(con: duckdb.DuckDBPyConnection) -> bool:
+    """``recruitId``. REST is fully contained; GraphQL adds 14 seasons (2000-2027 vs 2012-2025).
+
+    ``overallRank``/``positionRank`` are 0.00 filled on the GraphQL side across all 93,363
+    rows (section 5's drop list) and are deliberately not carried; REST's are.
+
+    **The key is typed differently on the two sides** -- ``UBIGINT`` on GraphQL, ``VARCHAR``
+    on REST -- so it is cast explicitly rather than left to coercion. All 45,927 REST values
+    are numeric and non-NULL, and containment still holds under the cast (checked
+    2026-09-10), but an implicit cast in a join is the kind of thing that works until one
+    non-numeric id arrives and then fails, or silently matches nothing.
+    """
+    if not (_has(con, "stg_gql", "recruit") and _has(con, "stg", "recruits")):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.dim_recruit")
+    con.execute("""
+        CREATE TABLE core.dim_recruit AS
+        WITH rest AS (
+          SELECT * REPLACE (TRY_CAST("recruitId" AS UBIGINT) AS "recruitId") FROM stg.recruits
+        )
+        SELECT
+          coalesce(g."recruitId", r."recruitId")     AS recruit_id,
+          coalesce(g.year, r.year)                   AS year,
+          coalesce(g.name, r.name)                   AS name,
+          coalesce(g.stars, r.stars)                 AS stars,
+          coalesce(g.rating, r.rating)               AS rating,
+          coalesce(g."recruitType", r."recruitType") AS recruit_type,
+          g.ranking AS gql_ranking,
+          r."athleteId" AS athlete_id, r."committedTo" AS committed_to, r.school,
+          r.city, r.country,
+          CASE WHEN g."recruitId" IS NOT NULL AND r."recruitId" IS NOT NULL THEN 'both'
+               WHEN g."recruitId" IS NOT NULL THEN 'gql' ELSE 'rest' END AS _source
+        FROM stg_gql.recruit g
+        FULL OUTER JOIN rest r ON g."recruitId" = r."recruitId"
+    """)
+    con.execute("ALTER TABLE core.dim_recruit ADD PRIMARY KEY (recruit_id)")
+    return True
+
+
+def _build_fact_team_talent(con: duckdb.DuckDBPyConnection) -> bool:
+    """``(season, school)``, not ``(teamId, season)``.
+
+    Section 6 expected the relation-key repair to make this a join on ``(teamId, season)``.
+    It half did: GraphQL now carries ``team_teamId``, but REST carries only a school *name*,
+    so the key stays the name. 17 REST rows have no GraphQL twin -- Jacksonville and
+    St. Francis (PA), absent from GraphQL's ``currentTeams`` source -- which is why REST is
+    still not droppable. See docs/warehouse-containment-remeasure-2026-09-10.md.
+    """
+    if not (_has(con, "stg_gql", "team_talent") and _has(con, "stg", "talent")):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.fact_team_talent")
+    con.execute("""
+        CREATE TABLE core.fact_team_talent AS
+        WITH rest AS (
+          -- `stg.talent` is NOT unique on its own key: 2,278 rows over 2,275 distinct
+          -- (season, team). The three repeats -- Sam Houston 2018, Bethune-Cookman 2023,
+          -- Bryant 2023 -- are byte-identical including the talent value, so DISTINCT is
+          -- lossless. Left in, the join fans them out and the table comes back three rows
+          -- long, which is how this was caught.
+          SELECT DISTINCT season, team, talent FROM stg.talent
+        )
+        SELECT
+          coalesce(g.year, r.season)         AS season,
+          coalesce(g."team_school", r.team)  AS school,
+          g."team_teamId"     AS team_id,
+          g."team_conference" AS conference,
+          coalesce(g.talent, r.talent) AS talent,
+          CASE WHEN g.year IS NOT NULL AND r.season IS NOT NULL THEN 'both'
+               WHEN g.year IS NOT NULL THEN 'gql' ELSE 'rest' END AS _source
+        FROM stg_gql.team_talent g
+        FULL OUTER JOIN rest r
+          ON g.year = r.season AND g."team_school" = r.team
+    """)
+    return True
+
+
+def _build_fact_coach_season(con: duckdb.DuckDBPyConnection) -> bool:
+    """``(coach_id, team_id, season)`` -- a clean join since the relation-key repair.
+
+    Measured 2026-09-10: the key is unique on both sides (12,564 and 1,961) and matches
+    1,961 of 1,961 REST rows with none unmatched, so this is a join, not a union.
+
+    ``core.coach_season_unmatched`` holds the rows of the *third* source,
+    ``stg.coaches__seasons``, that cannot be resolved to that key. Its bridge is
+    one-directional: it carries ``(name, seasons_school, seasons_year)``, and 118
+    school-seasons have two or three coaches, so a school-season does not identify a coach.
+    A row whose name resolves to more than one ``coach_id`` is preserved here rather than
+    guessed into the fact.
+    """
+    if not (_has(con, "stg_gql", "coach_season") and _has(con, "stg", "coach_seasons")):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.fact_coach_season")
+    con.execute("""
+        CREATE TABLE core.fact_coach_season AS
+        SELECT
+          coalesce(g."coach_id", r."coach_id")   AS coach_id,
+          coalesce(g."team_teamId", r."team_id") AS team_id,
+          coalesce(g.year, r.season)             AS season,
+          g."team_school"     AS school,
+          g."coach_firstName" AS first_name,
+          g."coach_lastName"  AS last_name,
+          coalesce(g.games, r.games)   AS games,
+          coalesce(g.wins, r.wins)     AS wins,
+          coalesce(g.losses, r.losses) AS losses,
+          coalesce(g.ties, r.ties)     AS ties,
+          coalesce(g."preseasonRank", r."preseasonRank")   AS preseason_rank,
+          coalesce(g."postseasonRank", r."postseasonRank") AS postseason_rank,
+          r."spOverall" AS sp_overall, r.srs, r."winPercentage" AS win_percentage,
+          CASE WHEN g.year IS NOT NULL AND r.season IS NOT NULL THEN 'both'
+               WHEN g.year IS NOT NULL THEN 'gql' ELSE 'rest' END AS _source
+        FROM stg_gql.coach_season g
+        FULL OUTER JOIN stg.coach_seasons r
+          ON g."coach_id" = r."coach_id" AND g."team_teamId" = r."team_id"
+         AND g.year = r.season
+    """)
+
+    if not (_has(con, "stg", "coaches__seasons") and _has(con, "core", "dim_team")):
+        return True
+    con.execute("DROP TABLE IF EXISTS core.coach_season_unmatched")
+    con.execute("""
+        CREATE TABLE core.coach_season_unmatched AS
+        WITH named AS (
+          SELECT s."firstName" AS first_name, s."lastName" AS last_name,
+                 s."seasons_year" AS season, s."seasons_school" AS school,
+                 (SELECT count(*) FROM core.dim_coach c
+                   WHERE c.first_name = s."firstName" AND c.last_name = s."lastName")
+                   AS coach_matches,
+                 (SELECT min(c.coach_id) FROM core.dim_coach c
+                   WHERE c.first_name = s."firstName" AND c.last_name = s."lastName")
+                   AS coach_id,
+                 (SELECT min(d.team_id) FROM core.dim_team d
+                   WHERE d.school = s."seasons_school") AS team_id
+          FROM stg."coaches__seasons" s
+        )
+        SELECT first_name, last_name, season, school, coach_id, team_id, coach_matches,
+               CASE WHEN coach_matches = 0 THEN 'no coach of that name'
+                    WHEN coach_matches > 1 THEN 'name maps to several coaches'
+                    WHEN team_id IS NULL   THEN 'school has no dim_team row'
+                    ELSE 'resolved but absent from the fact' END AS reason
+        FROM named
+        WHERE coach_matches <> 1 OR team_id IS NULL
+           OR NOT EXISTS (
+                SELECT 1 FROM core.fact_coach_season f
+                WHERE f.coach_id = named.coach_id AND f.team_id = named.team_id
+                  AND f.season = named.season)
+    """)
     return True
 
 
