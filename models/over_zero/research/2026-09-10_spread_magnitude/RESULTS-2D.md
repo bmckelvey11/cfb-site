@@ -134,6 +134,27 @@ beats the unrestricted rule on held-out ones.
 implemented, so it is what gets quoted here; the picked-forward family test below
 is supporting evidence for the *idea* of capping, not the rule itself.
 
+**What the cap moves.** Before/after on the same bets, with a season-cluster
+bootstrap (9,999 reps) on the difference:
+
+| window | n → capped | hit rate | Δ hit | ROI | Δ ROI | flat units |
+|---|---|---|---:|---|---:|---|
+| 2016–2025 | 234 → 196 | 64.53% → 67.35% | +2.82pp [+1.01, +4.23] | +23.19% → +28.57% | +5.38pp [+1.93, +8.07] | +54.27 → +56.00 |
+| 2018–2025 | 224 → 186 | 65.18% → 68.28% | +3.10pp [+1.54, +4.56] | +24.43% → +30.35% | +5.92pp [+2.94, +8.71] | +54.73 → +56.45 |
+| 2021–2025 | 186 → 158 | 62.90% → 66.46% | +3.55pp [+2.26, +4.71] | +20.09% → +26.87% | +6.78pp [+4.31, +8.98] | +37.36 → +42.45 |
+
+**Read those intervals narrowly.** The two samples are nested — the capped one is
+the uncapped one minus a slice — so this is arithmetic, not a test, and the
+bootstrap only says the arithmetic is stable when seasons are resampled. It cannot
+undo the fact that the cap was chosen knowing these seasons. The test is the
+kept-vs-dropped 2×2 below, and it is the underpowered one.
+
+**And note the units column.** Ten seasons of capping is worth **+1.73 units**
+(+54.27 → +56.00). The ROI gain is almost entirely denominator: 38 units of risk
+removed, ~0 profit forgone. On 2021–2025 the absolute gain is larger (+5.09) but
+still small. A +5 to +7pp ROI headline here means "less capital at risk for the
+same money," not "more money."
+
 Kept vs the disjoint slice the cap drops — the right 2×2, since "capped vs
 uncapped" compares a sample to itself minus a slice:
 

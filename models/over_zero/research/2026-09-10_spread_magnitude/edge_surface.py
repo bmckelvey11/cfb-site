@@ -207,6 +207,58 @@ def total_bands(d: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def cap_delta(d: pd.DataFrame, cap: float = 50.0, n_boot: int = 9999) -> pd.DataFrame:
+    """Headline before/after: what the cap moves, with a season-cluster bootstrap.
+
+    Read the interval for what it is. The two samples are nested, so this is not a
+    test of whether the cap helps -- `gate_inference` is that -- and the cap was
+    chosen knowing these seasons, which no bootstrap can undo. The CI answers only
+    "how stable is this arithmetic when seasons are resampled", which is worth
+    knowing and is not evidence the effect is real.
+
+    `flat_units` is the column that keeps the ROI honest: the gain shows up by
+    shrinking the denominator, not by winning more money.
+    """
+    rng = np.random.default_rng(0)
+    b = d[d.passes_filter == 1]
+
+    def hit_roi(x):
+        n = len(x)
+        w = int(x.over.sum())
+        return w / n, (w * BREAK_EVEN - (n - w)) / n
+
+    rows = []
+    for lab, first in (("2016-2025 (all)", 2016), ("2018-2025", 2018),
+                       ("2021-2025 (binding)", 2021)):
+        f = b[b.season >= first]
+        k = f[f.spread <= cap]
+        h0, r0 = hit_roi(f)
+        h1, r1 = hit_roi(k)
+        seasons = f.season.unique()
+        dh, dr = [], []
+        for _ in range(n_boot):
+            s = pd.concat([f[f.season == p]
+                           for p in rng.choice(seasons, len(seasons), replace=True)])
+            ks = s[s.spread <= cap]
+            if not len(ks):
+                continue
+            bh, br = hit_roi(ks)
+            ah, ar = hit_roi(s)
+            dh.append(bh - ah)
+            dr.append(br - ar)
+        rows.append({
+            "window": lab, "n": len(f), "n_capped": len(k),
+            "hit": h0, "hit_capped": h1, "d_hit_pp": (h1 - h0) * 100,
+            "d_hit_ci": f"[{np.percentile(dh, 2.5) * 100:+.2f}, "
+                        f"{np.percentile(dh, 97.5) * 100:+.2f}]",
+            "roi": r0, "roi_capped": r1, "d_roi_pp": (r1 - r0) * 100,
+            "d_roi_ci": f"[{np.percentile(dr, 2.5) * 100:+.2f}, "
+                        f"{np.percentile(dr, 97.5) * 100:+.2f}]",
+            "units": f.flat_units_pnl.sum(),
+            "units_capped": k.flat_units_pnl.sum()})
+    return pd.DataFrame(rows)
+
+
 def gate_inference(d: pd.DataFrame, cap: float = 50.0, first: int = 2018) -> None:
     """Kept vs dropped under a FIXED cap, with the test and the MDE beside it.
 
@@ -279,6 +331,11 @@ def main() -> int:
         print()
         print(f"--- fixed cap 50, kept vs dropped, {first}-2025 ---")
         gate_inference(d, first=first)
+
+    print()
+    print("--- what the cap moves (nested; see cap_delta docstring) ---")
+    print(cap_delta(d).to_string(index=False,
+                                 float_format=lambda v: f"{v:.4f}"))
     return 0
 
 
