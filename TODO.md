@@ -105,8 +105,10 @@ is a recent plan doc in this area; consider `/todo-from-doc` against it.)*
 
 ## 6. Ops / infra `#sec-ops` <!-- section: sec-ops -->
 
-*(empty. `.planning/` (GSD) is cross-referenced only, not merged here — see
+*(`.planning/` (GSD) is cross-referenced only, not merged here — see
 "What stays separate" in `docs/methodology/todo-system.md`.)*
+
+- [ ] `#rotate-secrets-after-compromise` **Rotate every API credential the repo uses** <!-- id: rotate-secrets-after-compromise --> — confirmed admin-level malware ran ~6 h on this machine on 2026-09-09, so every secret readable from disk or environment is assumed disclosed: `CFBD_API_KEY`, MotherDuck (`md:cfb`), Backblaze B2, pCloud, `PFF_API` and `ODDS_API` (both in `env.env`). Rotate at each provider, update `env.env` and any scheduled-task environment, then re-run one pull per source to confirm. **This blocks `#gql-relation-keys`, and through it the whole source-rationalization chain** (`#warehouse-remeasure-containment` → `#core-merge-bucket-c` → `#warehouse-drop-superseded` → `#stg-gql-collapse` → `#scraper-entry-cleanup`), plus `#pff-s6-backfill` — six P1/P2 items behind one rotation. Until it lands, treat any CFBD/MotherDuck/B2/pCloud auth failure as suspected rotation, not a code bug. User-run: needs provider logins. P1 @needs-user
 
 ---
 
