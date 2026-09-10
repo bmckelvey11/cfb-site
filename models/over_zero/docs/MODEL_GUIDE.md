@@ -176,7 +176,9 @@ probability column.**
 Only the two betting lines go in. No team ratings, no weather, no injuries —
 that's the point: this is a mispricing you can compute from the odds board
 itself. Every formula in this table is derived in
-[§11 Appendix](#11-appendix--the-mathematics).
+[§11 Appendix](#11-appendix--the-mathematics); for the same five steps run as
+arithmetic on one game, plus the refit procedure that produces the constants
+they need, see [§11.0](#110-calculating-a-game-step-by-step).
 
 ## 3. The evidence
 
@@ -735,6 +737,110 @@ formulas for readers who want to verify the model or re-derive it, in the
 order the pipeline runs them, with the code location for each. Notation:
 φ is the standard normal density ("bell curve height"), Φ is its cumulative
 distribution ("area to the left"), and Φ⁻¹ its inverse.
+
+### 11.0 Calculating a game, step by step
+
+Two different procedures hide under "calculating the model", and mixing them
+up is what makes it look complicated. **A** scores one game and is
+hand-computable in under a minute. **B** refits the constants A needs, and
+requires the full score/line history plus two maximum-likelihood fits. Do B
+once a year; do A every time a line moves.
+
+#### A. Score one game
+
+**Inputs:** the game spread `S` (favorite's margin, always used positive) and
+the game total `T` — the combined over/under, not a team total.
+
+**Constants, from the last refit** (procedure B). Fitted 2026-09-10 on 12,993
+games, 2013–2025:
+
+| Constant | Value | Produced by |
+|---|---|---|
+| `σ_dog` | 11.04 | B step 2 (Tobit, underdog role) |
+| `σ_fav` | 11.78 | B step 2 (Tobit, favorite role) |
+| `c`, `m` | −0.067, +0.172 | B step 4 (probit) |
+
+These are **fitted outputs, not model constants** — they drift as seasons are
+added (§2 quotes 11.03 / 11.78 / −0.073 / +0.176 from an earlier fit). Read
+the current values off the header `score_game.py` prints before hand-computing
+anything.
+
+**Step 1 — implied team points** (§11.1):
+
+```
+dogPointEst = (T − S) / 2        favPointEst = dogPointEst + S
+```
+
+**Step 2 — each team's floor effect** (§11.2), with `z = μ/σ`:
+
+```
+bias(μ, σ) = σ·φ(z) − μ·Φ(−z)
+```
+
+Use `σ_dog` for the underdog, `σ_fav` for the favorite.
+
+**Step 3 — the bias number:** `biasTotals = bias_dog + bias_fav`.
+
+**Step 4 — win probability** (§11.4), printed for reference only:
+`P(over) = Φ(c + m·biasTotals)`.
+
+**Step 5 — verdict:** bet the over iff `biasTotals > 1.75`, then apply every
+§5 filter (price −120 or better, full-game total, not a pick'em, major book or
+consensus, recompute on line moves). Below 1.75 the printed probability is
+miscalibrated upward — trust the verdict, not the probability (§3).
+
+**Worked: spread 38, total 51.**
+
+| Step | Underdog | Favorite |
+|---|---|---|
+| 1. implied points `μ` | (51 − 38)/2 = **6.50** | 6.50 + 38 = **44.50** |
+| 2a. `z = μ/σ` | 6.50 / 11.04 = 0.5888 | 44.50 / 11.78 = 3.7776 |
+| 2b. `σ·φ(z)` | 11.04 × 0.3355 = 3.7034 | 11.78 × 0.0003 = 0.0037 |
+| 2c. `μ·Φ(−z)` | 6.50 × 0.2780 = 1.8071 | 44.50 × 0.0001 = 0.0035 |
+| 2d. bias = 2b − 2c | **1.8964** | **0.0002** |
+
+`biasTotals = 1.8964 + 0.0002 = 1.8966` → `P(over) = Φ(−0.067 + 0.172 ×
+1.8966) = 60.23%` → **1.90 > 1.75, BET over.** Note the favorite contributes
+0.0002 of 1.90: at 44.5 expected points the floor is 3.8σ away and the
+formula has decayed to nothing. That is §4's point in one row.
+
+**The boundary case: spread 45, total 59.** dog = 7.00, `z` = 0.6341,
+bias_dog = 3.6023 − 1.8412 = **1.7611**, favorite adds 0.0000,
+`biasTotals` = 1.7612 — barely a bet. This is the arithmetic behind §4's
+finding that "bias > 1.75" and "underdog implied ≤ 7.00" select the identical
+set of games at the current σ.
+
+Check any of it:
+
+```bash
+python monitor/score_game.py 38 51  45 59
+```
+
+#### B. Refit the constants
+
+Needs every completed season's closing spread, closing total, and both final
+scores. Canonical implementation: `fit_train`
+([monitor/run_walkforward.py](../monitor/run_walkforward.py)), which is also
+the no-lookahead protocol the backtest uses — for test season *t* it sees only
+seasons `< t`.
+
+| Step | What | Code (`v2/models_v2.py` unless noted) |
+|---|---|---|
+| 1 | Load per-season lines + final scores | `load_raw_seasons` |
+| 2 | Tobit MLE of `points = α + β·impliedPoints + e`, left-censored at 0, run **twice** — once on underdogs, once on favorites — keeping σ from each (§11.3) | `tobit_left_censored_v2` |
+| 3 | Compute `biasTotals` for every historical game with those σs | `implied_team_points`, `censoring_bias` |
+| 4 | Probit of realized over/under outcomes on `biasTotals`, pushes dropped, season-clustered SEs → `c`, `m` (§11.4) | `probit_win_v2` |
+
+Steps 2 and 4 are the only estimation in the model; everything else is
+arithmetic. Rerun annually per §5's maintenance schedule, then re-record the
+constants above.
+
+**What this procedure does not give you.** It prices the **over on the
+full-game combined total** and nothing else. It is not validated for team
+totals or first-half totals, there is no under side (`saturation_bias/` is a
+negative result), and it assumes a closing-or-near-closing line — an early
+number scored on Monday is a different bet by Saturday. The `P(over)` column
+is not a calibrated probability below `biasTotals` ≈ 1.75.
 
 ### 11.1 Implied team points
 
