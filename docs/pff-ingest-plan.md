@@ -410,3 +410,12 @@ were last written by hand, and a week pulled since then stays invisible.
 `scripts/check_pff_pin.py` is the read-only sibling check — all 21 tables present, every
 column's type matching the rule, and every mapped `cfbd_team_id` reaching `stg.teams`
 (265/265 against the live warehouse).
+
+### 2026-09-10 — `jersey_number` was a stub
+
+`pff_player_season.jersey_number` was written empty on every row and never filled: the
+carry-forward loop that fills `draft_season` and `eligible_season` from whichever source
+supplies them did not list it, so the initializer's `""` stood. Only three sources carry
+it (`offense_summary`, `passing_detail`, `rushing_direction`), which is exactly the case
+the carry-forward exists for. Now 32.2% populated — the rest are players who appear only
+in sources PFF does not tag with a number, not a defect.

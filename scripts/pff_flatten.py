@@ -221,7 +221,10 @@ def flatten(seasons: set[int] | None) -> tuple[dict[str, list[dict]], dict[str, 
                         "franchise_id": key["franchise_id"], "player": str(record["player"]),
                         "position": clean(record.get("position")), "jersey_number": "",
                         "draft_season": "", "eligible_season": ""})
-                    for column in ("draft_season", "eligible_season"):
+                    # `jersey_number` rides the same carry-forward as the other two: only
+                    # offense_summary, passing_detail and rushing_direction supply it, so the
+                    # first row that has it wins and the rest leave it alone.
+                    for column in ("jersey_number", "draft_season", "eligible_season"):
                         if not person[column]:
                             person[column] = clean(record.get(column))
                 if source.nested_key:
