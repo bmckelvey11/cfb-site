@@ -167,9 +167,17 @@ def walk_forward_cap(d: pd.DataFrame, caps=(None, 50, 45, 40),
     print()
     print("    per-season cap chosen on prior seasons only:")
     print(pd.DataFrame(rows).to_string(index=False))
+    P = pd.concat(picked)
+    # Seasons where the picked cap was `none` contribute the SAME bets to both
+    # columns, so pooling them makes the two rules look more alike than they are
+    # and pads the kept side with games nothing could have been dropped from.
+    # The binding window is the like-for-like comparison.
+    bind = [r["season"] for r in rows if r["cap_picked"] != "none"]
     out = []
-    for lab, frame in (("picked forward", pd.concat(picked)),
-                       ("uncapped", b[b.season >= first])):
+    for lab, frame in (("picked fwd (all)", P),
+                       ("uncapped (all)", b[b.season >= first]),
+                       ("picked fwd (binding)", P[P.season.isin(bind)]),
+                       ("uncapped (binding)", b[b.season.isin(bind)])):
         n = len(frame)
         w = int(frame.over.sum())
         out.append({"rule": lab, "n": n, "record": f"{w}-{n - w}", "hit": w / n,
@@ -267,9 +275,10 @@ def main() -> int:
     print(walk_forward_cap(d).to_string(index=False,
                                         float_format=lambda v: f"{v:.4f}"))
 
-    print()
-    print("--- fixed cap 50, kept vs dropped, 2018-2025 ---")
-    gate_inference(d)
+    for first in (2018, 2021):
+        print()
+        print(f"--- fixed cap 50, kept vs dropped, {first}-2025 ---")
+        gate_inference(d, first=first)
     return 0
 
 

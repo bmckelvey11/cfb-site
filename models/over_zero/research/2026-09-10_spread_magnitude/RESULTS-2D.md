@@ -130,31 +130,50 @@ replicated out-of-period — plus the out-of-sample gate below. Not the cell mea
 Per `PLAN.md` §7, a cap is adopted only if a version of it fit on prior seasons
 beats the unrestricted rule on held-out ones.
 
-**Candidate family = spread caps {none, 50, 45, 40}, chosen on seasons < t, graded
-on t, pooled 2018–2025:**
+**The recommended rule is the fixed `spread <= 50` cap.** It is what gets
+implemented, so it is what gets quoted here; the picked-forward family test below
+is supporting evidence for the *idea* of capping, not the rule itself.
 
-| rule | n | record | hit rate | ROI |
-|---|---:|---:|---:|---:|
-| cap picked forward | 149 | 106–43 | **71.14%** | +35.81% |
-| uncapped | 224 | 146–78 | 65.18% | +24.43% |
+Kept vs the disjoint slice the cap drops — the right 2×2, since "capped vs
+uncapped" compares a sample to itself minus a slice:
 
-Kept vs the disjoint slice it drops: 106–43 vs 40–35, **Fisher two-sided p =
-0.011**, observed gap 17.8pp against an MDE of 16.1pp. Adequately powered and
-significant. The per-season choice was `none` through 2020, `50` for 2021–2023,
-`40` for 2024–2025.
+| window | group | n | record | hit rate | 95% CI | ROI | flat units |
+|---|---|---:|---:|---:|---|---:|---:|
+| 2018–2025 | kept (≤50) | 186 | 127–59 | 68.28% | [61.4, 74.7] | +30.35% | +56.45 |
+| | dropped (>50) | 38 | 19–19 | 50.00% | [34.6, 65.4] | −4.55% | −1.73 |
+| | uncapped | 224 | 146–78 | 65.18% | [58.8, 71.2] | +24.43% | +54.73 |
+| 2021–2025 | kept (≤50) | 158 | 105–53 | 66.46% | [58.9, 73.5] | +26.87% | +42.45 |
+| | dropped (>50) | 28 | 12–16 | 42.86% | [26.0, 61.1] | −18.18% | −5.09 |
+| | uncapped | 186 | 117–69 | 62.90% | [55.8, 69.6] | +20.09% | +37.36 |
 
-**Fixed cap at 50** — the implementable version — over the same 2018–2025 window:
+Fisher two-sided p = 0.040 (2018–2025) and 0.021 (2021–2025).
 
-| group | n | record | hit rate | 95% CI | ROI | flat units |
-|---|---:|---:|---:|---|---:|---:|
-| kept (≤50) | 186 | 127–59 | 68.28% | [61.4, 74.7] | +30.35% | +56.45 |
-| dropped (>50) | 38 | 19–19 | 50.00% | [34.6, 65.4] | −4.55% | −1.73 |
-| uncapped | 224 | 146–78 | 65.18% | [58.8, 71.2] | +24.43% | +54.73 |
+**But neither gap clears its own MDE.** 18.3pp against 22.7pp at n=38; 23.6pp
+against 26.4pp at n=28. Per `SKILL.md`'s interpretation rule that cuts both ways —
+these are *not* adequately powered tests, and their p-values should be read as
+suggestive rather than as establishing the effect.
 
-Fisher p = 0.040 — but the observed 18.3pp gap sits **below** the 22.7pp MDE at
-n=38. The fixed-50 comparison is at the edge of what this sample resolves; the
-picked-forward family test (more dropped bets, hence more power) is the stronger
-evidence. Both point the same way.
+**Supporting: the picked-forward family test.** Caps {none, 50, 45, 40} chosen on
+seasons < t, graded on t. The per-season choice was `none` through 2020, `50` for
+2021–2023, `40` for 2024–2025.
+
+| window | rule | n | record | hit rate | ROI |
+|---|---|---:|---:|---:|---:|
+| 2018–2025 | picked forward | 149 | 106–43 | 71.14% | +35.81% |
+| | uncapped | 224 | 146–78 | 65.18% | +24.43% |
+| 2021–2025 (binding) | picked forward | 111 | 77–34 | 69.37% | +32.43% |
+| | uncapped | 186 | 117–69 | 62.90% | +20.09% |
+
+The 2018–2025 row of that table **overstates the case and should not be quoted**:
+the cap picked for 2018–2020 was `none`, so those 38 bets are identical on both
+sides, padding the kept column with games from which nothing could be dropped. On
+the binding window alone — 2021–2025, the seasons where a cap actually bit — the
+kept-vs-dropped test is 77–34 vs 40–35, Fisher p = 0.031, gap 16.0pp against an
+MDE of 16.1pp. Right at the boundary, not past it.
+
+**Net: every framing points the same direction, every framing lands at or just
+inside its resolution limit.** That consistency across four independent cuts is
+the argument; no single one of them is a passing test on its own.
 
 **Total caps were tested as a second candidate family and rejected.** Walk-forward
 over {none, 65, 63, 60}: 66.36% vs 65.18% uncapped — no material gain. A
@@ -163,10 +182,15 @@ Total is redundant given spread inside the gated region, exactly as §1 predicts
 
 ## 6. Recommendation, and what would change it
 
-**Adopt `|spread| <= 50` alongside `bias > 1.75`.** Three independent legs support
-it: a favorite-leg sign flip that replicates out-of-period (§3), an out-of-sample
-gate that clears its own MDE (§5), and a market surface whose gain is concentrated
-in 40–50 rather than beyond it (§2).
+**Adopt `|spread| <= 50` alongside `bias > 1.75`** — as the better of two
+defensible choices, not as a result the data establishes. Three legs support it: a
+favorite-leg sign flip that replicates out-of-period (§3), a market surface whose
+gain is concentrated in 40–50 rather than beyond it (§2), and an out-of-sample
+gate that points the same way in every framing (§5) while clearing its MDE in
+none of them.
+
+The reason to act on evidence this thin is the payoff asymmetry in the next
+paragraph, not the strength of the test.
 
 **Do not gate on the posted total.** Two reasons, and the weaker one first: its
 coefficient is spec-dependent (§2), significant in spec B and not in spec A. The
@@ -175,11 +199,16 @@ collinear with spread, a walk-forward total cap gains nothing (66.4% vs 65.2%),
 and 13 of the 14 bets it would drop are already dropped by `spread <= 50`. Even
 taking spec B's coefficient at face value, there is no separable rule to write.
 
-**Size the decision honestly.** Over eight seasons the dropped bets returned
-**−1.73 units on 38 units risked**. They are not losers; they are non-earners. The
-cap is an *exposure-efficiency* change — it removes about a sixth of the volume at
-a near-zero expected cost — not a loss-avoidance one. If bet volume is worth more
-than ROI per bet, keeping them is defensible and cheap.
+**Size the decision honestly — this is why the call is easy despite the thin
+test.** Over 2018–2025 the bets the cap drops returned **−1.73 units on 38 units
+risked** (17% of volume); over 2021–2025, **−5.09 on 28** (15% of volume). They
+are not big losers; they are non-earners carrying full variance. So the cap is an
+*exposure-efficiency* change, not a loss-avoidance one, and the two ways of being
+wrong are not symmetric: capping when the effect is illusory forgoes ~15% of
+volume worth approximately zero, while not capping when it is real keeps paying
+that variance for nothing. Small upside, smaller downside — which is what makes a
+sub-MDE result actionable here and would not in a setting where the discarded
+slice was genuinely profitable.
 
 **This is a predictive rule, not a causal one.** Spread >50 is nearly synonymous
 with FBS-vs-FCS (Alabama State, Arkansas–Pine Bluff, The Citadel, Grambling,
