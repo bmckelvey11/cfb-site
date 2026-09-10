@@ -91,3 +91,63 @@ def test_every_merge_builder_is_guarded():
         block = source[source.index(f"def {fn}("):]
         block = block[:block.index("\ndef ", 1)]
         assert "_has(con," in block and "return False" in block, f"{fn} is unguarded"
+
+
+# ---------------------------------------------------------- merges into existing tables
+#
+# The five above build tables that did not exist, so a bad join is loud. These four merge
+# into tables `core` already had and consumers already query, so the failure is quiet: a
+# row count that moves. ADR-0001 is the rule -- fact_game gains columns, not rows.
+# Measured in docs/core-merge-bucket-c-2026-09-10.md.
+
+
+def test_fact_game_did_not_grow_to_hold_graphql_rows(con):
+    """GraphQL reaches back to 1869. Every one of its in-span games is already in
+    fact_game; the 78,030 older ones belong in fact_game_historical, not here."""
+    assert con.execute("""
+        SELECT count(*) FROM stg_gql.game g
+        LEFT JOIN core.fact_game f ON f.game_id = g."gameId"
+        WHERE f.game_id IS NULL
+          AND g.season >= (SELECT min(season) FROM core.dim_week)
+    """).fetchone()[0] == 0
+
+
+def test_fact_game_historical_stays_out_of_the_fact(con):
+    """Two tables holding the same game_id is how a double count starts."""
+    if not con.execute(
+        "SELECT count(*) FROM information_schema.tables "
+        "WHERE table_schema = 'core' AND table_name = 'fact_game_historical'"
+    ).fetchone()[0]:
+        pytest.skip("fact_game_historical not built in this warehouse")
+    overlap, span_max = con.execute("""
+        SELECT (SELECT count(*) FROM core.fact_game_historical h
+                 JOIN core.fact_game f ON f.game_id = h.game_id),
+               (SELECT max(season) FROM core.fact_game_historical)
+    """).fetchone()
+    assert overlap == 0, f"{overlap} games in both fact_game and fact_game_historical"
+    assert span_max < con.execute(
+        "SELECT min(season) FROM core.dim_week").fetchone()[0]
+
+
+def test_fact_game_conference_ids_match_the_graphql_fk(con):
+    """fact_game resolved a conference by *name*, and 44 dim_conference names are held by
+    more than one row -- so the lookup picked arbitrarily among them. 3,714 home and 3,985
+    away ids disagreed with GraphQL's FK while naming the same conference."""
+    assert con.execute("""
+        SELECT count(*) FROM core.fact_game f
+        JOIN stg_gql.game g ON g."gameId" = f.game_id
+        WHERE (f.home_conference_id IS NOT NULL AND g."homeConferenceId" IS NOT NULL
+               AND f.home_conference_id <> g."homeConferenceId")
+           OR (f.away_conference_id IS NOT NULL AND g."awayConferenceId" IS NOT NULL
+               AND f.away_conference_id <> g."awayConferenceId")
+    """).fetchone()[0] == 0
+
+
+def test_dim_conference_carries_division(con):
+    """The one GraphQL column worth taking, and what tells the four 'Big Sky' rows apart.
+    srName fills 1 of 256 and is deliberately not carried."""
+    cols = {r[0] for r in con.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = 'core' AND table_name = 'dim_conference'").fetchall()}
+    assert "division" in cols
+    assert "sr_name" not in cols and "srName" not in cols

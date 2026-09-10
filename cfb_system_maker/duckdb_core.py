@@ -70,6 +70,8 @@ def build_core(
             built.append("fact_team_talent")
         if _build_fact_coach_season(con):
             built += ["fact_coach_season", "coach_season_unmatched"]
+        if _build_fact_game_historical(con):
+            built.append("fact_game_historical")
         _add_phase_1_indexes(con)
         con.execute("CHECKPOINT")
         return built
@@ -143,6 +145,22 @@ def _build_dim_conference(con: duckdb.DuckDBPyConnection) -> None:
         WHERE conferenceId IS NOT NULL AND name IS NOT NULL
         """
     )
+    # GraphQL's only column REST lacks that is worth carrying. It is also what
+    # disambiguates the duplicate names -- four rows are named 'Big Sky', four
+    # 'Southland' -- which is why _build_fact_game below cannot resolve a conference
+    # by name. `srName` fills 1 of 256 rows and is deliberately not carried.
+    # Measured 2026-09-10: 256 of 256 ids match and no name disagrees, so this is a
+    # column-only join; the row count is unchanged either way (ADR-0001).
+    if _has(con, "stg_gql", "conference"):
+        con.execute("ALTER TABLE core.dim_conference ADD COLUMN division VARCHAR")
+        con.execute(
+            """
+            UPDATE core.dim_conference c
+            SET division = g.division
+            FROM stg_gql.conference g
+            WHERE g."conferenceId" = c.conference_id
+            """
+        )
     con.execute("ALTER TABLE core.dim_conference ADD PRIMARY KEY (conference_id)")
 
 
@@ -383,6 +401,25 @@ def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
     if batch:
         con.executemany(insert_sql, batch)
 
+    # `conf_by_name` above resolves a conference *name*, and dim_conference names are
+    # not unique, so the dict build picks arbitrarily among the same-named rows.
+    # GraphQL carries the FK outright. Measured 2026-09-10: 3,714 home and 3,985 away
+    # ids disagreed with it while resolving to the *same conference name* -- the map was
+    # non-injective, not wrong about the conference. coalesce keeps what we already had
+    # for the 4 games GraphQL has no row for.
+    #
+    # This *changes existing column values*, which ADR-0001 does not cover -- it governs
+    # rows vs columns. See docs/core-merge-bucket-c-2026-09-10.md.
+    if _has(con, "stg_gql", "game"):
+        con.execute(
+            """
+            UPDATE core.fact_game f
+            SET home_conference_id = coalesce(g."homeConferenceId", f.home_conference_id),
+                away_conference_id = coalesce(g."awayConferenceId", f.away_conference_id)
+            FROM stg_gql.game g
+            WHERE g."gameId" = f.game_id
+            """
+        )
     con.execute("ALTER TABLE core.fact_game ADD PRIMARY KEY (game_id)")
 
 
@@ -865,6 +902,47 @@ def _build_fact_coach_season(con: duckdb.DuckDBPyConnection) -> bool:
                 WHERE f.coach_id = named.coach_id AND f.team_id = named.team_id
                   AND f.season = named.season)
     """)
+    return True
+
+
+def _build_fact_game_historical(con: duckdb.DuckDBPyConnection) -> bool:
+    """GraphQL's games from *before* ``core``'s span, kept out of ``core.fact_game``.
+
+    ADR-0001: ``fact_game`` gains columns, not rows. GraphQL reaches back to 1869 and
+    ``core`` starts at ``min(core.dim_week.season)`` -- 2012, because that is where the
+    REST calendar that feeds ``dim_week`` starts. Letting those 78,030 games into the
+    fact would leave every one of them with no week to join to.
+
+    **This table is not classification-accurate for its own era.** ``homeClassification``
+    and the conference FKs are the values GraphQL reports today, and divisions,
+    conferences and classifications were reorganized repeatedly across the span. Use it
+    for identity and scores; do not use it to decide what division a 1930 team was in.
+    """
+    if not (_has(con, "stg_gql", "game") and _has(con, "core", "dim_week")):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.fact_game_historical")
+    con.execute(
+        """
+        CREATE TABLE core.fact_game_historical AS
+        SELECT
+          "gameId" AS game_id, season, week, "seasonType" AS season_type,
+          "startDate" AS start_date, status,
+          "venueId" AS venue_id, "neutralSite" AS neutral_site,
+          "conferenceGame" AS conference_game, attendance,
+          "homeTeamId" AS home_team_id, "awayTeamId" AS away_team_id,
+          "homeTeam" AS home_team, "awayTeam" AS away_team,
+          "homeConferenceId" AS home_conference_id,
+          "awayConferenceId" AS away_conference_id,
+          "homeConference" AS home_conference, "awayConference" AS away_conference,
+          "homeClassification" AS home_classification,
+          "awayClassification" AS away_classification,
+          "homePoints" AS home_points, "awayPoints" AS away_points
+        FROM stg_gql.game
+        WHERE season < (SELECT min(season) FROM core.dim_week)
+          AND "gameId" IS NOT NULL
+        """
+    )
+    con.execute("ALTER TABLE core.fact_game_historical ADD PRIMARY KEY (game_id)")
     return True
 
 
