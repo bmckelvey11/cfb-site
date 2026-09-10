@@ -68,6 +68,19 @@ GQL_RAW_TO_ENTITY: dict[str, str] = {raw: entity for entity, raw in GQL_ENTITY_T
 # not the whole related row. Selected AND sorted on, since a table like pollRank has only
 # (rank, points, firstPlaceVotes) as scalars and would otherwise paginate on heavy ties.
 GQL_RELATION_KEYS: dict[str, dict[str, list[str]]] = {
+    "coachSeason": {
+        # Without these the dump is 12,564 rows of (year, wins, losses, ties, games,
+        # preseasonRank, postseasonRank) with no coach and no team -- every row unjoinable,
+        # and sorted on small integers that tie in their thousands, so pagination could drop
+        # rows between pages. `coach.id` plus `team.teamId` is what makes the order total.
+        "coach": ["id", "firstName", "lastName"],
+        "team": ["teamId", "school", "conference"],
+    },
+    "teamTalent": {
+        # Same defect, worse: `talent` and `year` were the entire row, and the composite
+        # ordering on the two of them ties wherever two teams share a talent score.
+        "team": ["teamId", "school", "conference"],
+    },
     "pollRank": {
         # `pollType` separates the AP and Coaches polls, which otherwise produce
         # byte-identical rows whenever both rank a team the same in the same week.
