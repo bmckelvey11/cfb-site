@@ -19,6 +19,7 @@ import duckdb
 
 from cfb_system_maker.graphql_client import GQL_ENTITY_TO_RAW, GQL_ENTITY_TO_STG, GQL_RAW_TO_ENTITY
 from cfb_system_maker.pff_schema import PFF_TABLES, column_types as pff_column_types
+from cfb_system_maker.oddsapi_schema import OA_TABLES, column_types as oa_column_types
 
 # Skip account-metering telemetry (docs/data-coverage.md).
 _SKIP_STEMS = frozenset({"user_info"})
@@ -1870,6 +1871,31 @@ def _plan_loads(
                     "paths": [path],
                     "format": "csv",
                     "columns": pff_column_types(header),
+                }
+            )
+
+    # the-odds-api, the same shape again: `scripts/oddsapi_flatten.py` turns the snapshots
+    # in `data/ingest/oddsapi/` into two flat CSVs, and `cfb_paths` deliberately does not
+    # glob that directory, so the snapshots never mint tables on their own.
+    #
+    # Types pinned for a reason `read_csv_auto` cannot see: `line` is empty on every `h2h`
+    # row, so a snapshot carrying only moneylines would sniff it VARCHAR and the next load
+    # would refuse the file. The quota columns are nullable the same way.
+    oa_dir = data_dir / "processed" / "oddsapi"
+    if oa_dir.is_dir():
+        for name in OA_TABLES:
+            path = oa_dir / f"{name}.csv"
+            if not path.exists() or (only is not None and name not in only):
+                continue
+            with path.open(encoding="utf-8", newline="") as handle:
+                header = next(csv.reader(handle), [])
+            jobs.append(
+                {
+                    "schema": "stg",
+                    "name": name,
+                    "paths": [path],
+                    "format": "csv",
+                    "columns": oa_column_types(header),
                 }
             )
 

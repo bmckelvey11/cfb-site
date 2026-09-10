@@ -46,6 +46,8 @@ from pff_flatten import IN_DIR as PFF_IN_DIR  # noqa: E402
 from pff_flatten import dimensions as pff_dimensions  # noqa: E402
 from pff_flatten import flatten as pff_flatten  # noqa: E402
 from pff_flatten import write as pff_write  # noqa: E402
+from oddsapi_flatten import IN_DIR as OA_IN_DIR  # noqa: E402
+from oddsapi_flatten import main as oddsapi_flatten_main  # noqa: E402
 
 DEFAULT_ONLY = {"games", "lines", "calendar", "conferences", "venues"}
 
@@ -100,6 +102,29 @@ def _flatten_pff() -> None:
     print(f"  {len(written)} tables, {sum(n for _, n, _ in written):,} rows")
 
 
+def _flatten_oddsapi() -> None:
+    """Regenerate the the-odds-api CSVs the rebuild is about to load.
+
+    Same reason as the other two: without it a rebuild reloads whatever the last hand-run
+    wrote, and every snapshot the scheduled 6-hourly pull has landed since stays invisible.
+
+    Never fatal -- but an unresolved team name is reported loudly, because it means a
+    `stg.oa_odds_tick` row will reach `core.fact_game_odds` with a NULL `game_id`.
+    """
+    print("=== flatten oddsapi ===")
+    if not OA_IN_DIR.is_dir():
+        print(f"  no snapshots in {OA_IN_DIR}; nothing to flatten")
+        return
+    try:
+        rc = oddsapi_flatten_main([])
+    except Exception as exc:
+        print(f"  FAILED {type(exc).__name__}: {exc}", file=sys.stderr)
+        print("  rebuilding against the CSVs already on disk")
+        return
+    if rc:
+        print("  unresolved team names above will land as NULL game_id", file=sys.stderr)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--season", type=int, default=cfb_paths.current_season())
@@ -126,6 +151,7 @@ def main() -> int:
 
     _flatten_actionnetwork()
     _flatten_pff()
+    _flatten_oddsapi()
 
     print("=== rebuild cfb.duckdb ===")
     db_path, _ = build_duckdb(cfb_paths.DATA_ROOT, explode=True)

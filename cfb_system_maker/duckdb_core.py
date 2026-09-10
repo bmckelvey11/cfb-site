@@ -56,6 +56,8 @@ def build_core(
         built.append("dim_lines_provider")
         _build_fact_game_team(con)
         built.append("fact_game_team")
+        if _build_fact_game_odds(con):
+            built.append("fact_game_odds")
         _add_phase_1_indexes(con)
         con.execute("CHECKPOINT")
         return built
@@ -569,6 +571,68 @@ def _build_fact_game_team(con: duckdb.DuckDBPyConnection) -> None:
             batch.clear()
     if batch:
         con.executemany(insert_sql, batch)
+
+
+def _build_fact_game_odds(con: duckdb.DuckDBPyConnection) -> bool:
+    """the-odds-api ticks, resolved onto ``game_id``. Returns False if nothing is loaded.
+
+    The resolution lives here rather than in the flatten because ``refresh_cfbd.py`` runs
+    every flatten *before* the rebuild -- a flatten that joined games would read the
+    previous run's ``stg.games``, and this week's kickoffs are exactly what goes stale.
+
+    Names are **not** re-resolved here. ``oddsapi_flatten.py`` already wrote the CFBD school
+    string it matched into ``home_school``/``away_school``, so this joins on exact equality.
+    Re-implementing the mascot strip and the alias list in SQL would be a second copy of a
+    rule that lives in ``cfb_system_maker/oddsapi_schema.py``, and the two would drift -- the
+    SQL version would not know about the three aliases at all.
+
+    **Pair first, kickoff only to split.** Measured 2026-09-10 over the snapshots on disk
+    (docs/oddsapi-game-join-2026-09-10.md): the unordered team pair identifies the game for
+    98 of 98 events, none ambiguously, while ``commence_time`` disagrees with ``startDate``
+    by a full day on one -- the vendors hold different dates for it. A join keyed on kickoff
+    within any sub-24h tolerance would drop real games. The pair is not unique in 0.65% of
+    FBS pair-seasons since 2015, all conference-title or playoff rematches weeks apart, and
+    there the nearest kickoff picks correctly.
+
+    A name the flatten could not resolve leaves ``game_id`` NULL rather than guessing.
+    """
+    tables = {r[0] for r in con.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'stg'"
+    ).fetchall()}
+    if "oa_odds_tick" not in tables:
+        return False
+
+    con.execute("DROP TABLE IF EXISTS core.fact_game_odds")
+    con.execute(
+        """
+        CREATE TABLE core.fact_game_odds AS
+        WITH resolved AS (
+          SELECT t.*, h.team_id AS home_team_id, a.team_id AS away_team_id
+          FROM stg.oa_odds_tick t
+          LEFT JOIN core.dim_team h ON h.school = t.home_school
+          LEFT JOIN core.dim_team a ON a.school = t.away_school
+        ),
+        paired AS (
+          SELECT r.*, g."gameId" AS game_id, g."startDate" AS start_date,
+                 row_number() OVER (
+                   PARTITION BY r.pulled_at, r.event_id, r.book, r.market, r.side
+                   ORDER BY abs(epoch(r.commence_time) - epoch(g."startDate"))
+                 ) AS rn
+          FROM resolved r
+          LEFT JOIN stg.games g
+            ON least(g."homeTeamId", g."awayTeamId")
+                 = least(r.home_team_id, r.away_team_id)
+           AND greatest(g."homeTeamId", g."awayTeamId")
+                 = greatest(r.home_team_id, r.away_team_id)
+           AND g.season = CAST(strftime(r.commence_time, '%Y') AS INTEGER)
+        )
+        SELECT game_id, event_id, pulled_at, commence_time, start_date,
+               home_team_id, away_team_id, home_team, away_team, home_school, away_school,
+               book, book_title, last_update, market, side, outcome_name, line, odds
+        FROM paired WHERE rn = 1
+        """
+    )
+    return True
 
 
 def _add_phase_1_indexes(con: duckdb.DuckDBPyConnection) -> None:

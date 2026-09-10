@@ -92,6 +92,37 @@ Names join by stripping the mascot (`oa_resolve`): Odds API says `"Miami Hurrica
 `"Miami"`. Residual spellings live in `OA_ALIASES` and grow the way `ALIASES` did — when a game
 shows up in the unpriced list with books actually posted for it.
 
+## It loads — `stg.oa_odds_tick`, `stg.oa_snapshot`, `core.fact_game_odds` ✅ 2026-09-10
+
+`scripts/oddsapi_flatten.py` turns the snapshots into two flat CSVs under
+`data/processed/oddsapi/`, which load to `stg` under types pinned in
+`cfb_system_maker/oddsapi_schema.py` — the same shape PFF's ingest uses, and for
+the same reason: `line` is empty on every `h2h` row, so `read_csv_auto` would
+sniff it VARCHAR on a moneyline-only snapshot and refuse the next load.
+
+- **`stg.oa_odds_tick`** — one row per outcome per snapshot, `(pulled_at,
+  event_id, book, market, side)` with line and price. Long and narrow like
+  `stg.an_history_tick`; a wide row would need a column per book.
+- **`stg.oa_snapshot`** — one row per pull, carrying the nullable quota fields.
+  Per-snapshot metadata does not belong on twenty thousand tick rows.
+- **`core.fact_game_odds`** — the same ticks resolved onto `game_id`.
+
+**Why the resolution is in `core`, not the flatten.** `refresh_cfbd.py` runs every
+flatten *before* it rebuilds, so a flatten that joined games would read the
+previous run's `stg.games` — and this week's kickoffs are what goes stale. The
+flatten does resolve *names* (that needs no warehouse) and writes CFBD's own
+spelling into `home_school`/`away_school`, so `core` joins on exact equality
+rather than carrying a second copy of the mascot strip in SQL that would not know
+about `ALIASES`.
+
+**Every snapshot's rows are kept**, including ones identical to the pull before.
+Content dedupe would save 72% (18,776 outcome rows → 5,309 distinct quotes,
+measured 2026-09-10), but storing every sample keeps "observed unchanged at T"
+distinguishable from "not observed". Revisit if volume bites.
+
+An unresolved team name leaves `game_id` NULL rather than guessing, and the
+flatten exits 1 so a scheduled run surfaces it.
+
 ## Before this loads into the warehouse: the join key
 
 Odds API events carry their own `id`, `commence_time` (UTC ISO8601), and team
