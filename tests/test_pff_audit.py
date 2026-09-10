@@ -118,13 +118,11 @@ def test_the_pull_plan_stays_trimmed():
     """
     from pull_pff_modeling import SKIP_FACETS, TEAM_REPORTS
 
-    assert set(TEAM_REPORTS) == {"passing", "passing-pressure", "receiving",
-                                 "pass-blocking", "pass-rush", "special-teams"}
-    # `offense` and `run-blocking` were kept by the first S7 pass and dropped on
-    # re-measurement the same day: `offense` because leaderboard columns were read only from
-    # a `columns` envelope its JSON-only leaderboard does not have, and `run-blocking`
-    # because `pass-blocking` carries its six snap-count columns with identical values.
-    assert "offense" not in TEAM_REPORTS and "run-blocking" not in TEAM_REPORTS
+    # The whole per-team report tier is off: thirteen shown redundant against the
+    # leaderboards or a sibling report, and the last six dropped by decision on 2026-09-10
+    # answering S6 gate 3 -- no loader reads a `team_report_*` file. Empty, not deleted, so
+    # the audit still reads it and re-enabling one report is a one-line change.
+    assert TEAM_REPORTS == ()
     assert "facet-passing-detail" in SKIP_FACETS
 
     source = (Path(__file__).resolve().parents[1] / "scripts" / "pull_pff_modeling.py"

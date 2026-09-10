@@ -5,7 +5,7 @@ to `done` with a date, and the worklog at the bottom gets an entry saying what w
 actually found. Nothing is deleted — a step that turns out to be wrong is struck with the
 reason, so the next pass does not re-open it.
 
-**Status 2026-09-10: S1–S5, S7 and S8 done, S6 held.** 2025 is audited, flattened, mapped to CFBD and
+**Status 2026-09-10: S1–S5, S7 and S8 done. S6's gates are all met — it now waits only on the secrets rotation and a go.** 2025 is audited, flattened, mapped to CFBD and
 loading into `stg.pff_*` — 21 tables, 1.20 M rows. 2025 is the reference season — the process gets proven and trimmed against it before
 a single backfill call is made, because a backfill pays every inefficiency eleven times.
 
@@ -27,7 +27,7 @@ wins on what is finished.
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
 | S5 | loader entries → `stg` | S6 | **done** | 2026-09-09 |
-| S6 | Backfill 2014–2024, finish 2026 | — | **held** — gate 1–2 met, gate 3 open | 2026-09-10 |
+| S6 | Backfill 2014–2024, finish 2026 | — | **ready** — all gates met, awaiting key rotation + go | 2026-09-10 |
 | S7 | Trim the pull plan using 2025 as the reference season | S6 | **done** | 2026-09-10 |
 | S8 | Decide the player tier: finish it or delete the smoke test | — | **done** — deleted | 2026-09-10 |
 
@@ -183,14 +183,14 @@ against the live warehouse).
 **Done when:** a rebuild lands the PFF tables, `scripts/check_an_tick_pin.py`'s sibling
 check passes for PFF, and row counts match the processed CSVs.
 
-## S6 — Backfill and 2026 ⏸ still held 2026-09-10 — gate 1–2 met, gate 3 open
+## S6 — Backfill and 2026 ▶ gates met 2026-09-10 — awaiting key rotation + go
 
 **Held deliberately. Nothing is pulled for 2014–2024 until the process is proven on 2025.**
 Every unfixed inefficiency or schema mistake is paid eleven times over, so 2025 — complete
 and audited — is the reference season: prove the shape, trim the plan, then scale.
 
-**Cost, restated after S7: 10.6 hours, not the 14.5 first recorded** (58 min a season ×
-11). Answering gate 3 "drop the remaining six as well" would take it to 9.0 h.
+**Cost, final after S7 and gate 3: 9.0 hours, not the 14.5 first recorded** (49 min a
+season × 11). The whole per-team report tier is gone, which is where the saving came from.
 
 **Gate — all three before a backfill starts:**
 
@@ -198,19 +198,16 @@ and audited — is the reference season: prove the shape, trim the plan, then sc
    1.20 M rows, so the schema is known-good before it is applied to eleven more seasons.
 2. ✅ **2026-09-10.** S7 landed: the pull plan is trimmed and the saving measured with the
    puller's own planner, 3,997 → 2,365 reads a season.
-3. ⏳ **Open, and now the only gate.** The payload question: which of the team reports a
-   backfill needs. S7 cut thirteen — twelve that re-cut the leaderboards and `run-blocking`,
-   which `pass-blocking` strictly dominates — and deliberately left the other six to this
-   gate, since it is a modelling question rather than a provable redundancy. Two facts it
-   should weigh, both established 2026-09-10: nothing in the warehouse reads a
-   `team_report_*` file — every one of §3's 19 target tables is sourced from a leaderboard
-   export — and the six cost 816 reads a season, the difference between 10.6 h and 9.0 h.
-   Note the lever has shrunk: it was worth 3.7 h before the correction and is worth 1.6 h
-   now, because most of what looked like payload was duplication.
+3. ✅ **2026-09-10 — answered: none.** The payload question was which of the team reports a
+   backfill needs. S7 showed thirteen redundant; the last six were dropped by decision on
+   the fact that nothing consumes them — no loader reads a `team_report_*` file, and every
+   one of §3's 19 target tables is sourced from a leaderboard export. The tier was 816
+   reads a season feeding nothing. Reversible: `TEAM_REPORTS` is empty rather than deleted,
+   and restoring one report is a one-line change plus 136 reads for that season.
 
-**Also blocked on `#rotate-secrets-after-compromise`** regardless of gate 3: the 2026-09-09
-machine compromise means `PFF_API` is assumed disclosed, and eleven seasons of metered
-calls should not run on a credential in that state.
+**The one remaining blocker is `#rotate-secrets-after-compromise`.** The 2026-09-09 machine
+compromise means `PFF_API` is assumed disclosed, and eleven seasons of metered calls should
+not run on a credential in that state. After that it is a go/no-go on 9 hours.
 
 2026 is a separate case and is *not* held — it is mid-season (207 files, one zero-byte,
 780 cells that fill as weeks are played) and its weekly pull should keep running. It just
@@ -303,11 +300,12 @@ python scripts/pull_pff_modeling.py --seasons 2025 --team-reports --player-facet
 | Before | 3,997 | 609 | ~79 min |
 | After the first pass | 2,365 | 609 | ~61 min |
 | After the correction | 2,093 | 609 | ~58 min |
-| Delta | **−1,904** | — | **−21 min** |
+| After gate 3 answered | 1,277 | 609 | ~49 min |
+| Delta | **−2,720** | — | **−30 min** |
 
-−1,904 is exactly 13 reports × 136 franchises (1,768) plus the 136 duplicate
+−2,720 is exactly all 19 reports × 136 franchises (2,584) plus the 136 duplicate
 `team-rushing-direction` reads, so the cut landed where it was aimed and nowhere else. An
-eleven-season backfill goes from 14.5 h to **10.6 h**. `python scripts/audit_pff_pull.py
+eleven-season backfill goes from 14.5 h to **9.0 h**. `python scripts/audit_pff_pull.py
 --season 2025` is byte-identical to its pre-edit output and still exits 0 — the 2025 files
 already on disk are untouched, so the type-drift and duplicate-body findings for the
 dropped reports persist for that season as history, not as regressions.
@@ -316,12 +314,19 @@ dropped reports persist for that season as history, not as regressions.
 the audit imports `TEAM_REPORTS` (so cut 1 follows it automatically) but hardcoded the
 `("rows", "totals")` pair — left stale, that alone reports 136 phantom gaps a season.
 
-**The tier decision: 13 dropped, 6 retained pending S6 gate 3.** The six are kept only
-because each carries columns nothing else has (`pass-rush` 30, `passing-pressure` 12,
-`pass-blocking` 10, `passing` 4, `receiving` 1, `special-teams` 1). Nothing in the
-warehouse reads them yet — see the worklog — so the question gate 3 has to answer is
-whether those columns are worth 816 reads a season. Answering it "no" would take a season
-to 49 min and the backfill to 9.0 h.
+**The tier decision, final: all 19 dropped.** Thirteen were shown redundant — twelve a
+re-cut of the leaderboards, `run-blocking` a strict subset of `pass-blocking`. The last six
+did carry columns nothing else has (`pass-rush` 30, `passing-pressure` 12, `pass-blocking`
+10, `passing` 4, `receiving` 1, `special-teams` 1), and were dropped **by decision on
+2026-09-10, answering S6's gate 3**: no loader reads a `team_report_*` file and no target
+table in [`pff-warehouse-schema.md`](pff-warehouse-schema.md) is sourced from one, so the
+tier was 816 reads a season feeding nothing.
+
+`TEAM_REPORTS` is now empty rather than deleted, so the audit still reads it and putting a
+report back is a one-line change. Files already under `data/raw/pff/team/` are untouched;
+only future pulls stop. If a model later wants the directional pass-rush splits — the one
+genuinely distinctive block, 30 columns — restore `pass-rush` alone and re-pull that
+season for 136 reads.
 
 **Done when:** ~~a 2025 re-pull makes ≥1,632 fewer calls~~ (planner delta verified at
 exactly 1,632; the metered re-pull itself is not required to prove it),
@@ -562,3 +567,25 @@ Net: 13 of 19 team reports dropped rather than 11, a season goes 79 → 58 min, 
 eleven-season backfill 14.5 → 10.6 h. The lesson worth keeping is that "N unique columns"
 is only as good as the comparison's ability to read both sides — a parser that silently
 returns an empty set makes everything look novel, and a count cannot show you that.
+
+### 2026-09-10 — gate 3 answered: the whole team tier is dropped
+
+Decision: pull none of the nineteen per-team reports. Thirteen were already shown
+redundant; the last six went on the fact that nothing consumes them. No loader reads a
+`team_report_*` file, the flattener's registry is leaderboard exports end to end, and every
+target table in the schema doc is sourced from a leaderboard — so six reports carrying 58
+genuinely distinctive columns were still 816 reads a season feeding nothing.
+
+A season is now 1,277 reads and ~49 min, against 3,997 and ~79 min this morning: −2,720,
+which is all 19 reports × 136 franchises plus the 136 duplicate `team-rushing-direction`
+reads. An eleven-season backfill is **9.0 h**, down from the 14.5 h this file has carried
+since S6 was written.
+
+Made deliberately cheap to reverse, because "nothing reads it" is a statement about today.
+`TEAM_REPORTS` is an empty tuple rather than a deleted loop, files already on disk are
+untouched, and `pff_tier_overlap.py` still measures all nineteen off those files, so the
+evidence for the decision outlives the decision. If a model wants the `lhs_*`/`rhs_*`
+directional pass-rush splits — the one block with no substitute anywhere — restoring
+`pass-rush` costs one line and 136 reads a season.
+
+That closes S6's last gate. It now waits only on the secrets rotation and a go.

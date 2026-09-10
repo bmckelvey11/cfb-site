@@ -78,23 +78,22 @@ SKIP_FACETS = {"facet-passing-detail", "facet-receiving-coverage", "facet-defens
 TEAM_STATS_CATEGORIES = ("offense-overall-success", "offense-passing", "offense-rushing",
                          "defense-overall-success", "defense-passing", "defense-rushing",
                          "defense-opponent-tendencies")
-# Six of the nineteen /v2 team reports, measured on 2025 by `scripts/pff_tier_overlap.py`
-# (S7 in docs/pff-ingest-plan.md). Thirteen are dropped because they add nothing:
+# The /v2 per-team report tier, pulled no longer. Empty rather than deleted: the audit reads
+# this list to decide what coverage to expect, and re-enabling a report is one line here.
 #
-#   - Twelve are a re-cut of the weekly leaderboards, column for column: blocking, coverage,
-#     defense, field-goals, kick-returns, kickoffs, offense, passing-depth, punting,
-#     receiving-depth, run-defense, rushing.
-#   - `run-blocking` is a subset of `pass-blocking`. Its six snap-count columns are the only
-#     ones no leaderboard has, and `pass-blocking` carries all six with identical values --
-#     19,206 cells across all 136 franchises, zero disagreements -- over a population 163
-#     players larger.
+# Thirteen of the nineteen were shown redundant on 2025 by `scripts/pff_tier_overlap.py` --
+# twelve a column-for-column re-cut of the weekly leaderboards, and `run-blocking` a strict
+# subset of `pass-blocking` (identical on 19,206 cells across all 136 franchises).
 #
-# The six kept each carry columns nothing else has: pass-rush 30 (the lhs_*/rhs_* directional
-# splits), passing-pressure 12, pass-blocking 10, passing 4, receiving 1, special-teams 1.
-# Whether those earn 816 reads a season is S6's gate 3 -- a modelling question, not a timing
-# one -- so they stay until that is answered.
-TEAM_REPORTS = ("passing", "passing-pressure", "receiving",
-                "pass-blocking", "pass-rush", "special-teams")
+# The last six were dropped by decision on 2026-09-10, answering S6's gate 3. They did carry
+# columns nothing else has -- pass-rush 30 (the lhs_*/rhs_* directional splits),
+# passing-pressure 12, pass-blocking 10, passing 4, receiving 1, special-teams 1 -- but no
+# loader reads a `team_report_*` file and no target table in pff-warehouse-schema.md is
+# sourced from one, so the tier was 816 reads a season feeding nothing. If a model later
+# wants the directional pass-rush splits, put `pass-rush` back and re-pull that season.
+#
+# Existing files under data/raw/pff/team/ are untouched; this only stops future pulls.
+TEAM_REPORTS: tuple[str, ...] = ()
 TEAM_LEADER_GROUPS = ("receiving", "passing", "rushing", "defense")
 PLAYER_REPORTS = ("offense-summary", "offense-blocking", "offense-pass-blocking", "offense-run-blocking",
                   "passing-summary", "passing-concept", "passing-depth", "passing-pressure",
