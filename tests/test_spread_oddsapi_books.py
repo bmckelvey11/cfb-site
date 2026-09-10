@@ -140,10 +140,12 @@ def test_missing_snapshot_dir_is_not_fatal(tmp_path, monkeypatch):
 
 def test_shop_labels_the_best_book_by_name_not_by_feed_id():
     # shop() used to translate an Action Network id through REAL_BOOKS; with two feeds in one
-    # Series the key has to already be the printable name.
-    out = ws.shop({"Caesars": (-7.5, -110), "Bovada": (-7.0, -108), "BetUS": (-8.0, -105)})
+    # Series the key has to already be the printable name. Caesars prices into the median but
+    # cannot win either side: BETTABLE is the slip's book set, not the fair's.
+    out = ws.shop({"Caesars": (-7.5, -110), "DraftKings": (-7.0, -108), "FanDuel": (-8.0, -105)})
 
-    assert out["best_home_book"] == "Bovada" and out["best_away_book"] == "BetUS"
+    assert out["best_home_book"] == "DraftKings" and out["best_away_book"] == "FanDuel"
+    assert out["n_books"] == 3
 
 
 def test_shop_medians_and_bests_in_an_sign():
