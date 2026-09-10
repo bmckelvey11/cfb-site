@@ -33,7 +33,7 @@ sides are non-NULL, and fill rate on the GraphQL-exclusive columns. The gate is 
 | `conference` → `core.dim_conference` | taken | `division` |
 | `game` → `core.fact_game` | taken | conference-FK repair; 78,030 surplus rows → `core.fact_game_historical` |
 | `calendar` → `core.dim_week` | **no-op** | nothing |
-| `lines` → `core.fact_game_line` | **deferred** | not a merge — see below |
+| `lines` → `core.fact_game_line` | taken, as a union | +8,575 rows, +5 books, 0 existing values changed |
 
 ### `conference` — one column, and it explains a bug
 
@@ -88,29 +88,68 @@ taken: `dim_week` is what bounds `core`, `_build_fact_game` filters on
 78,030 rows through the back door — the thing ADR-0001 exists to prevent. Recorded as a
 no-op rather than skipped silently.
 
-### `lines` — not a merge, and deferred
+### `lines` — a union, because a repoint is lossy
 
-`stg_gql.game_lines` is not a GraphQL scrape. Its `line_source` column reads `cfbd` 37,048
-/ `actionnetwork` 8,656 / `cfbd+an` 1,599: it is **already** a merged table, carrying the
+`stg_gql.game_lines` is not a GraphQL scrape. Its `line_source` reads `cfbd` 37,048 /
+`actionnetwork` 8,656 / `cfbd+an` 1,599: it is **already** a merged tape carrying the
 ActionNetwork ingest. `core.fact_game_line` (39,006 rows, 12 providers) is built by
-unnesting REST `stg.lines` and is the CFBD-only subset of it.
+unnesting REST `stg.lines` and is the CFBD-only subset. Five books have never reached
+`core`: circa 1,950, fanduel 1,949, betmgm 1,898, bet365 453, pinnacle 143.
 
-The grain gate passes — `period='game'` is 47,303 rows, unique on
-`(gameId, linesProviderId)` — and five books are in `game_lines` and have **never** been in
-`core.fact_game_line`:
+The obvious move — repoint `_build_fact_game_line` at `game_lines WHERE period='game'` —
+was measured and **rejected**. §7's gate, run in both directions on
+`(game_id, provider_key)`:
 
-| provider | rows |
+| | rows |
 |---|---|
-| circa | 1,950 |
-| fanduel | 1,949 |
-| betmgm | 1,898 |
-| bet365 | 453 |
-| pinnacle | 143 |
+| matched | 38,728 |
+| core-only — a repoint would **drop** these | 278 |
+| gql-only | 8,575 |
 
-So the real task is not "merge a GraphQL source" but "repoint `_build_fact_game_line` from
-`stg.lines` to `game_lines` where `period='game'`" — a rewrite of a `core` table that feeds
-the spread model, adding roughly 8,300 rows and five new provider keys. Different shape of
-change, its own commit, its own measurement. Tracked as `#core-fact-game-line-repoint`.
+The 278 are all season 2026, on `draft kings` (159), `bovada` (87) and `draftkings` (32).
+Values on the matched grain move too, where both sides are populated and differ:
+
+| column | conflicts | gql fills a core NULL | of those, actually NaN | gql would lose a core value |
+|---|---|---|---|---|
+| `spread_close` | 160 | 72 | 65 | 0 |
+| `total_close` | 173 | 3,424 | 3,414 | 0 |
+| `moneyline_home` | 183 | 29 | — | 1 |
+| `moneyline_away` | 184 | 33 | — | 0 |
+| `spread_open` | 0 | 0 | 0 | 80 |
+| `total_open` | 0 | 0 | 0 | 71 |
+
+**`game_lines` spells a missing number NaN, not NULL.** The fourth column above is how
+that surfaced. `coalesce` treats NaN as a value, so the first build of this merge filled
+3,414 REST `total_close` NULLs and 65 `spread_close` NULLs with NaN — and a NaN compares
+false against everything, so it reads as populated and behaves as a hole. It was caught by
+the slow suite, which moved off its baseline to `assert nan == None`; the builder now nulls
+NaN out before the join. The real gain from those two columns is **10 and 7 rows**, not
+3,424 and 72. `tests/test_core_merges.py::test_no_nan_reached_the_line_table` pins it.
+
+So it was taken as a **full outer join on `(game_id, provider_key)` with
+`coalesce(rest, gql)`** — the same shape as every other merge in `duckdb_core.py`.
+Preferring the REST side on a conflict is not a coin flip: `core.fact_game_line` today
+*is* the CFBD values, so that branch changes nothing already in `core` and the merge is
+purely additive. The 700 conflicts are preserved in `core.fact_game_line_conflicts`
+(`game_id`, `provider_key`, `line_source`, `column_name`, `rest_value`, `gql_value`)
+rather than discarded, so the rule is inspectable and reversible.
+
+Result: 47,581 rows — 38,728 `both`, 8,575 `gql`, 278 `rest` — five new provider keys, and
+`total_close` NULLs on the pre-existing 39,006 rows down from 3,591 to 3,581.
+`core.dim_lines_provider` grows 12 → 17 as a consequence, since it is built from the tape.
+The value of this merge is the 8,575 rows and five books, not the NULL fills.
+
+**`has_line` on `core.fact_game` stays REST-defined.** It is computed by `_select_line`
+over `stg.lines` and drives `selected_spread`/`selected_total`, which the spread model
+reads; redefining it here would move the model's inputs. The consequence is named rather
+than hidden: 90 line rows on 16 games now sit under `has_line = false`, where that count
+used to be 0. After this merge `has_line` means "no REST line the selector accepted", not
+"no line row exists".
+
+`draft kings` and `draftkings` are the same book under two provider keys, on both sides
+(core 235 / 2,693; gql 76 / 2,931). A full outer preserves the split rather than fixing
+it — correct here, but it means a consumer filtering `provider_key = 'draftkings'`
+silently misses rows. Tracked separately as `#lines-provider-key-split`.
 
 ## Verification
 
@@ -119,7 +158,7 @@ is byte-identical before and after; `fact_game_historical` (78,030 rows, 1869–
 `game_id` overlap with `fact_game`) is the only addition. Fast suite: 887 passed.
 `-m slow tests/test_core_agreement.py`: the same two failures as the pre-change baseline,
 with identical assertion text — `coverage drift: csv_only=[] sql_only=[...] (0/39)` and
-`assert -57.5 == -55.5`. Both are the known `games.csv` staleness (CSV 2026-09-08 01:05 vs
+`assert -57.5 == -55.5`. That is the gate for the union: because it changes no existing value, the slow suite must **not** move — if it had, the join was wrong. Both failures are the known `games.csv` staleness (CSV 2026-09-08 01:05 vs
 `raw/games_2026.json` 2026-09-10 05:00), not caused by this change.
 
 ## What this does not support
@@ -137,7 +176,11 @@ with identical assertion text — `coverage drift: csv_only=[] sql_only=[...] (0
   unchanged.
 - **It does not license dropping anything.** No bucket moved to A;
   `#warehouse-drop-superseded` still targets only Bucket A's three REST tables.
-- **The `lines` numbers are a scoping measurement, not a validation.** They say five books
-  are missing from `core.fact_game_line`; they do not say the `game_lines` values for them
-  are correct, and they do not check spread sign convention, open-vs-close semantics, or
-  agreement with `stg.lines` on the 12 providers both hold.
+- **The union does not validate the 8,575 rows it added.** It establishes that they do not
+  collide with anything `core` already held. Nothing here checks the five new books' spread
+  sign convention against `GameRecord`'s home-relative one, or their open-vs-close
+  semantics. `formatted_spread` is NULL on every one of them.
+- **It does not say the REST side wins the 700 conflicts on the merits.** REST wins because
+  it is what `core` already held, which makes the merge additive. Which tape is *right* on a
+  2-point `spread_close` gap is unmeasured; `core.fact_game_line_conflicts` is where that
+  question lives.

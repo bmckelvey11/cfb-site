@@ -52,6 +52,8 @@ def build_core(
         built.append("fact_game")
         _build_fact_game_line(con)
         built.append("fact_game_line")
+        if _merge_game_lines(con):
+            built.append("fact_game_line_conflicts")
         _build_dim_lines_provider(con)
         built.append("dim_lines_provider")
         _build_fact_game_team(con)
@@ -493,6 +495,132 @@ def _build_fact_game_line(con: duckdb.DuckDBPyConnection) -> None:
     con.execute(
         "ALTER TABLE core.fact_game_line ADD PRIMARY KEY (game_id, provider_key)"
     )
+
+
+def _merge_game_lines(con: duckdb.DuckDBPyConnection) -> bool:
+    """Union ``stg_gql.game_lines`` (``period='game'``) into ``core.fact_game_line``.
+
+    ``game_lines`` is **not** a GraphQL scrape. Its ``line_source`` reads cfbd 37,048 /
+    actionnetwork 8,656 / cfbd+an 1,599 -- it is already a merged tape, and the
+    ActionNetwork half is where five books live that the REST unnest above has never
+    seen: circa, fanduel, betmgm, bet365, pinnacle.
+
+    **Full outer on ``(game_id, provider_key)``, ``coalesce(rest, gql)`` on every value.**
+    A straight repoint was measured and rejected: it drops 278 REST offers ``game_lines``
+    has no row for (all 2026, on 'draft kings' / 'bovada' / 'draftkings') and overwrites
+    ~700 values where both sides are populated and differ. Preferring the REST side on a
+    conflict means **no value already in ``core`` changes** -- the table today *is* the
+    CFBD values -- so this is purely additive: +8,575 rows, +5 providers, and 3,424
+    ``total_close`` NULLs filled. ``game_lines`` spells a missing number NaN rather than
+    NULL, which coalesce would happily carry, so those are nulled out first.
+    The conflicts are preserved in
+    ``core.fact_game_line_conflicts`` rather than discarded, so the rule is inspectable
+    and reversible.
+
+    ``has_line`` on ``core.fact_game`` stays REST-defined. It is computed by
+    ``_select_line`` over ``stg.lines`` and drives ``selected_spread``/``selected_total``,
+    which the spread model reads; redefining it here would move the model's inputs. The
+    consequence is named rather than hidden: after this merge 90 line rows on 16 games sit
+    under ``has_line = false``, so that flag means "no REST line the selector accepted",
+    not "no line row exists".
+
+    Measured 2026-09-10, `python scripts/audit_core_merges.py --merge lines`. See
+    docs/core-merge-bucket-c-2026-09-10.md.
+    """
+    if not (_has(con, "stg_gql", "game_lines") and _has(con, "stg_gql", "lines_provider")):
+        return False
+    # Same bound the REST unnest applies: a line row for a game the spine excluded is an
+    # orphan. Measured at 0 today; restated so it stays 0 when game_lines moves.
+    # `game_lines` spells a missing number **NaN, not NULL** -- 3,414 `overUnder` and 65
+    # `spread` rows. coalesce treats NaN as a value, so without this the merge fills REST
+    # NULLs with NaN and every downstream comparison silently becomes false. Nulled out
+    # in an outer layer so each cast is written once.
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP VIEW _gql_game_line AS
+        SELECT
+          game_id, provider_key, line_source,
+          CASE WHEN isnan(spread_close) THEN NULL ELSE spread_close END AS spread_close,
+          CASE WHEN isnan(spread_open)  THEN NULL ELSE spread_open  END AS spread_open,
+          CASE WHEN isnan(total_close)  THEN NULL ELSE total_close  END AS total_close,
+          CASE WHEN isnan(total_open)   THEN NULL ELSE total_open   END AS total_open,
+          moneyline_home, moneyline_away
+        FROM (
+          SELECT
+            CAST(l."gameId" AS INTEGER) AS game_id,
+            lower(p.name)               AS provider_key,
+            TRY_CAST(l.spread AS DOUBLE)          AS spread_close,
+            TRY_CAST(l."spreadOpen" AS DOUBLE)    AS spread_open,
+            TRY_CAST(l."overUnder" AS DOUBLE)     AS total_close,
+            TRY_CAST(l."overUnderOpen" AS DOUBLE) AS total_open,
+            TRY_CAST(l."moneylineHome" AS INTEGER) AS moneyline_home,
+            TRY_CAST(l."moneylineAway" AS INTEGER) AS moneyline_away,
+            l.line_source
+          FROM stg_gql.game_lines l
+          JOIN stg_gql.lines_provider p USING ("linesProviderId")
+          WHERE l.period = 'game'
+            AND l."gameId" IN (SELECT game_id FROM core.fact_game)
+            AND p.name IS NOT NULL
+        )
+        """
+    )
+
+    con.execute("DROP TABLE IF EXISTS core.fact_game_line_conflicts")
+    con.execute(
+        """
+        CREATE TABLE core.fact_game_line_conflicts AS
+        SELECT game_id, provider_key, line_source, column_name, rest_value, gql_value
+        FROM (
+          SELECT r.game_id, r.provider_key, g.line_source, u.column_name,
+                 u.rest_value, u.gql_value
+          FROM core.fact_game_line r
+          JOIN _gql_game_line g USING (game_id, provider_key),
+          UNNEST([
+            {'column_name': 'spread_close',
+             'rest_value': r.spread_close,   'gql_value': g.spread_close},
+            {'column_name': 'total_close',
+             'rest_value': r.total_close,    'gql_value': g.total_close},
+            {'column_name': 'moneyline_home',
+             'rest_value': CAST(r.moneyline_home AS DOUBLE),
+             'gql_value':  CAST(g.moneyline_home AS DOUBLE)},
+            {'column_name': 'moneyline_away',
+             'rest_value': CAST(r.moneyline_away AS DOUBLE),
+             'gql_value':  CAST(g.moneyline_away AS DOUBLE)}
+          ]) AS t(u)
+        )
+        WHERE rest_value IS NOT NULL AND gql_value IS NOT NULL
+          AND rest_value <> gql_value
+        """
+    )
+
+    # Staged in TEMP, not under `core`: a build that dies between the DROP and the
+    # rebuild would otherwise leave an orphan table in the live catalog.
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE _fact_game_line_merged AS
+        SELECT
+          coalesce(r.game_id, g.game_id)           AS game_id,
+          coalesce(r.provider_key, g.provider_key) AS provider_key,
+          coalesce(r.spread_close, g.spread_close)     AS spread_close,
+          coalesce(r.spread_open, g.spread_open)       AS spread_open,
+          coalesce(r.total_close, g.total_close)       AS total_close,
+          coalesce(r.total_open, g.total_open)         AS total_open,
+          coalesce(r.moneyline_home, g.moneyline_home) AS moneyline_home,
+          coalesce(r.moneyline_away, g.moneyline_away) AS moneyline_away,
+          r.formatted_spread,
+          CASE WHEN r.game_id IS NOT NULL AND g.game_id IS NOT NULL THEN 'both'
+               WHEN r.game_id IS NOT NULL THEN 'rest' ELSE 'gql' END AS _source
+        FROM core.fact_game_line r
+        FULL OUTER JOIN _gql_game_line g USING (game_id, provider_key)
+        """
+    )
+    con.execute("DROP TABLE core.fact_game_line")
+    con.execute(
+        "CREATE TABLE core.fact_game_line AS SELECT * FROM _fact_game_line_merged")
+    con.execute(
+        "ALTER TABLE core.fact_game_line ADD PRIMARY KEY (game_id, provider_key)"
+    )
+    return True
 
 
 def _build_dim_lines_provider(con: duckdb.DuckDBPyConnection) -> None:

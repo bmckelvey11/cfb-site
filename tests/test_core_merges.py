@@ -151,3 +151,40 @@ def test_dim_conference_carries_division(con):
         "WHERE table_schema = 'core' AND table_name = 'dim_conference'").fetchall()}
     assert "division" in cols
     assert "sr_name" not in cols and "srName" not in cols
+
+
+def test_the_line_merge_did_not_lose_a_rest_offer(con):
+    """A repoint at stg_gql.game_lines was rejected because it drops 278 REST offers
+    game_lines has no row for. The full outer is what keeps them; `_source = 'rest'`
+    going to zero means someone turned it back into a left join."""
+    if "_source" not in {r[0] for r in con.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'core' "
+        "AND table_name = 'fact_game_line'").fetchall()}:
+        pytest.skip("line merge not built in this warehouse")
+    sources = {r[0]: r[1] for r in con.execute(
+        "SELECT _source, count(*) FROM core.fact_game_line GROUP BY 1").fetchall()}
+    assert sources.get("rest", 0) > 0, f"REST-only line rows are gone: {sources}"
+    assert sources.get("gql", 0) > 0, f"no ActionNetwork books reached core: {sources}"
+
+
+def test_no_nan_reached_the_line_table(con):
+    """stg_gql.game_lines spells a missing number NaN, not NULL -- 3,414 `overUnder` and
+    65 `spread` rows. coalesce carries NaN happily, and a NaN in spread_close compares
+    false against everything, so it reads as a value and behaves as a hole. This is the
+    check that caught it: the slow agreement suite moved to `assert nan == None`."""
+    for col in ("spread_close", "spread_open", "total_close", "total_open"):
+        n = con.execute(
+            f"SELECT count(*) FROM core.fact_game_line WHERE isnan({col})").fetchone()[0]
+        assert n == 0, f"{n} NaN values in core.fact_game_line.{col}"
+
+
+def test_line_conflicts_are_preserved_not_discarded(con):
+    """REST wins a conflict because that is what `core` already held, which makes the
+    merge additive -- not because it is right on the merits. The table is where that
+    open question lives; an empty one means the evidence was thrown away."""
+    if not con.execute(
+        "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'core' "
+        "AND table_name = 'fact_game_line_conflicts'").fetchone()[0]:
+        pytest.skip("line merge not built in this warehouse")
+    assert con.execute(
+        "SELECT count(*) FROM core.fact_game_line_conflicts").fetchone()[0] > 0

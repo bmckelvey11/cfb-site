@@ -145,6 +145,45 @@ def audit_lines(con: duckdb.DuckDBPyConnection) -> None:
         GROUP BY 1 ORDER BY 2 DESC""").fetchall():
         print(f"      {name:34s} {n}")
 
+    # Section 7's gate: REST offers matching a period='game' row on (gameId, provider),
+    # **both directions**. `core-only` is what a straight repoint would silently drop.
+    con.execute("""
+        CREATE OR REPLACE TEMP VIEW _gl AS
+        SELECT l."gameId" AS game_id, lower(p.name) AS provider_key,
+               l.spread, l."spreadOpen" AS spread_open,
+               l."overUnder" AS total, l."overUnderOpen" AS total_open,
+               l."moneylineHome" AS ml_h, l."moneylineAway" AS ml_a, l.line_source
+        FROM stg_gql.game_lines l JOIN stg_gql.lines_provider p USING ("linesProviderId")
+        WHERE l.period = 'game'
+    """)
+    print("    matched              ", scalar(con,
+        "SELECT count(*) FROM core.fact_game_line c JOIN _gl g USING (game_id, provider_key)")[0])
+    print("    core-only            ", scalar(con, """
+        SELECT count(*) FROM core.fact_game_line c
+        LEFT JOIN _gl g USING (game_id, provider_key) WHERE g.game_id IS NULL""")[0],
+          " <- a repoint would DROP these")
+    print("    gql-only             ", scalar(con, """
+        SELECT count(*) FROM _gl g
+        LEFT JOIN core.fact_game_line c USING (game_id, provider_key)
+        WHERE c.game_id IS NULL""")[0])
+    print("    core-only by provider", con.execute("""
+        SELECT c.provider_key, count(*) FROM core.fact_game_line c
+        LEFT JOIN _gl g USING (game_id, provider_key)
+        WHERE g.game_id IS NULL GROUP BY 1 ORDER BY 2 DESC""").fetchall())
+    # A value that moves under a query already written is the quiet failure. `differ` here
+    # counts only rows where BOTH sides are non-NULL -- a real conflict, not a gain.
+    print("    value conflicts on the shared grain (both non-NULL, different):")
+    for core_col, gql_col in (("spread_close", "spread"), ("spread_open", "spread_open"),
+                              ("total_close", "total"), ("total_open", "total_open"),
+                              ("moneyline_home", "ml_h"), ("moneyline_away", "ml_a")):
+        conflict, gain, loss = scalar(con, f"""
+            SELECT count(*) FILTER (WHERE c.{core_col} IS NOT NULL AND g.{gql_col} IS NOT NULL
+                                      AND c.{core_col} <> g.{gql_col}),
+                   count(*) FILTER (WHERE c.{core_col} IS NULL AND g.{gql_col} IS NOT NULL),
+                   count(*) FILTER (WHERE c.{core_col} IS NOT NULL AND g.{gql_col} IS NULL)
+            FROM core.fact_game_line c JOIN _gl g USING (game_id, provider_key)""")
+        print(f"      {core_col:16s} conflict={conflict:6d}  gql-fills={gain:6d}  gql-loses={loss:6d}")
+
 
 MERGES = {
     "conference": audit_conference,
