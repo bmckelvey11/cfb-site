@@ -40,14 +40,36 @@ from pathlib import Path
 from statistics import NormalDist
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from cfb_paths import INGEST  # noqa: E402
+from cfb_paths import INGEST, PROCESSED  # noqa: E402
 
 N = NormalDist()
 GL_DIR = INGEST / "pff_scoreboard"
 OA_DIR = INGEST / "oddsapi"
+OZ_SLATE = PROCESSED / "over_zero" / "best_line_slate_latest.csv"
 BREAK_EVEN_110 = 110 / 210
 SIGMA_A, SIGMA_B = -4.60, 0.2782      # from greenline_pricing.py, under side
 KICK_TOLERANCE = timedelta(minutes=1)
+# PFF publishes 00:00 when a kickoff time is not set yet. Five of week 2's flags carried
+# it while the real kickoffs were 12-24 hours later, so those games join on names alone,
+# inside the surrounding day, and only when one candidate is a clear best.
+PLACEHOLDER_WINDOW = timedelta(hours=30)
+
+# Schools the two feeds name with no token in common. Applied to whole names, never to
+# single tokens: "Mississippi State" must not inherit Ole Miss's aliases.
+NAME_ALIASES = {
+    "ole miss": "mississippi rebels",
+    "ole miss rebels": "mississippi rebels",
+    "southern miss": "southern mississippi golden eagles",
+    "miami fl": "miami hurricanes",
+    "miami oh": "miami ohio redhawks",
+    "uconn": "connecticut huskies",
+    "umass": "massachusetts minutemen",
+    "nc state": "north carolina state wolfpack",
+}
+
+# Tokens too common to identify a school on their own. "Georgia State" and "Kansas State"
+# share only "state", and a wider kickoff window turns that into a false join.
+WEAK_TOKENS = {"state", "st", "university", "of", "the", "college", "a", "and", "at"}
 
 OA_BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betrivers": "BetRivers",
             "betmgm": "BetMGM", "bovada": "Bovada", "betus": "BetUS",
@@ -55,7 +77,14 @@ OA_BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betrivers": "BetR
 
 
 def toks(name: str) -> set[str]:
-    return set(re.sub(r"[^a-z0-9 ]", " ", str(name).lower()).split())
+    flat = re.sub(r"[^a-z0-9 ]", " ", str(name).lower())
+    flat = " ".join(flat.split())
+    return set(NAME_ALIASES.get(flat, flat).split())
+
+
+def strong(shared: set[str]) -> bool:
+    """An overlap of nothing but weak tokens is not evidence of the same school."""
+    return bool(shared - WEAK_TOKENS)
 
 
 def sigma(line: float) -> float:
@@ -112,17 +141,56 @@ def slug_names(matchup_path: str) -> tuple[str, str]:
     return away.replace("-", " "), home.replace("-", " ")
 
 
-def match(flag_kick: datetime, away: str, home: str, oa: list[dict]) -> dict | None:
+def match(flag_kick: datetime, away: str, home: str, oa: list[dict],
+          placeholder: bool = False) -> dict | None:
+    """Kickoff plus a shared token in BOTH names; ties are dropped, never guessed.
+
+    `placeholder` widens the kickoff window to the surrounding day for games whose
+    time PFF has not set. Both team names must still overlap, and one candidate must
+    still beat the rest outright -- a wider window makes the name test do more work,
+    it does not make it optional.
+    """
     a, h = toks(away), toks(home)
     if not (a and h):
         return None
+    window = PLACEHOLDER_WINDOW if placeholder else KICK_TOLERANCE
     hits = sorted(((len(h & e["home"]) + len(a & e["away"]), i)
                    for i, e in enumerate(oa)
-                   if abs(e["kick"] - flag_kick) <= KICK_TOLERANCE
-                   and (h & e["home"]) and (a & e["away"])), reverse=True)
+                   if abs(e["kick"] - flag_kick) <= window
+                   and strong(h & e["home"]) and strong(a & e["away"])), reverse=True)
     if not hits or (len(hits) > 1 and hits[0][0] == hits[1][0]):
         return None
     return oa[hits[0][1]]
+
+
+def is_placeholder(kickoff: str) -> bool:
+    """PFF writes midnight when a kickoff time is still to be announced."""
+    return kickoff.endswith("T00:00") or kickoff.endswith("T00:00:00")
+
+
+def over_zero_overs() -> list[dict]:
+    """Games the over-zero model wants the OVER on -- the opposite side of the same total.
+
+    Arscott censoring bias fires on big-spread, low-total games (a huge dog's bad
+    days truncate at zero, so the real combined score beats the posted number).
+    Greenline's unders sit mostly on competitive matchups, so the two rarely name
+    the same game -- but when they do, one of them is wrong and neither is worth
+    betting into the other.
+    """
+    if not OZ_SLATE.exists():
+        return []
+    out = []
+    for x in csv.DictReader(OZ_SLATE.open(encoding="utf-8")):
+        if x.get("pick") != "OVER":
+            continue
+        try:
+            kick = datetime.fromisoformat(x["kick"])
+        except ValueError:
+            continue
+        out.append({"kick": kick, "home": toks(x["home"]), "away": toks(x["away"]),
+                    "label": f"{x['away']} @ {x['home']}", "bias": float(x["bias_best"]),
+                    "total": x["best_total"], "book": x["best_book"]})
+    return out
 
 
 def self_check() -> None:
@@ -155,6 +223,36 @@ def self_check() -> None:
     assert match(ko + timedelta(hours=1), "rutgers scarlet knights", "boston college eagles", oa) is None
     # Two equally good candidates are dropped, never guessed between.
     assert match(ko, "rutgers scarlet knights", "boston college eagles", oa + oa) is None
+
+    # The conflict filter reuses match(), so it must survive the shorter names the
+    # over-zero slate uses ("Ole Miss", not "ole miss rebels").
+    oz = [{"kick": ko, "home": toks("Ole Miss"), "away": toks("Charlotte"),
+           "label": "Charlotte @ Ole Miss", "bias": 1.89, "total": "60.5", "book": "BetMGM"}]
+    assert match(ko, "charlotte 49ers", "ole miss rebels", oz) is not None
+    assert match(ko, "rutgers scarlet knights", "boston college eagles", oz) is None
+
+    # Ole Miss and Mississippi share no token, so the alias has to bridge them --
+    # without pulling Mississippi State across with it.
+    assert toks("Ole Miss") & toks("mississippi rebels")
+    assert not (toks("mississippi state bulldogs") & toks("Ole Miss")) - {"mississippi"}
+    assert "ole" not in toks("mississippi state bulldogs")
+
+    # A placeholder kickoff joins on names inside the surrounding day...
+    late = [{"kick": ko + timedelta(hours=18), "home": toks("Ohio Bobcats"),
+             "away": toks("Jacksonville State Gamecocks"), "home_name": "", "away_name": "",
+             "totals": {"DraftKings": (50.5, -115)}}]
+    assert match(ko, "jacksonville state gamecocks", "ohio bobcats", late) is None
+    assert match(ko, "jacksonville state gamecocks", "ohio bobcats", late, True) is not None
+    # ...but a wider window never lets a tie through.
+    assert match(ko, "jacksonville state gamecocks", "ohio bobcats", late + late, True) is None
+    # ...and a weak partial must lose outright to the real game, not tie with it.
+    noise = late + [{"kick": ko + timedelta(hours=12), "home": toks("Kansas State Wildcats"),
+                     "away": toks("Washington State Cougars"), "home_name": "", "away_name": "",
+                     "totals": {}}]
+    assert match(ko, "georgia state panthers", "kennesaw state owls", noise, True) is None
+
+    assert is_placeholder("2026-09-12T00:00") and is_placeholder("2026-09-12T00:00:00")
+    assert not is_placeholder("2026-09-12T19:45")
     print("self-check ok")
 
 
@@ -164,6 +262,8 @@ def main() -> None:
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--week", default="2")
     ap.add_argument("--book", default="DraftKings")
+    ap.add_argument("--keep-over-zero", action="store_true",
+                    help="keep unders the over-zero model wants the OVER on (dropped by default)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
 
@@ -188,7 +288,7 @@ def main() -> None:
         g = sched.get(fl["game_id"])
         away, home = slug_names(g.get("matchup_path", "")) if g else ("", "")
         kick = datetime.fromisoformat(fl["kickoff"]).replace(tzinfo=timezone(timedelta(hours=-4)))
-        e = match(kick.astimezone(timezone.utc), away, home, oa)
+        e = match(kick.astimezone(timezone.utc), away, home, oa, is_placeholder(fl["kickoff"]))
         if e is None:
             unmatched.append(fl)
             continue
@@ -202,12 +302,32 @@ def main() -> None:
                     "pff_edge": float(fl["value"]),
                     "diff": bline - float(fl["line"])})
 
+    oz = [] if args.keep_over_zero else over_zero_overs()
+    conflicts = []
+    if oz:
+        kept = []
+        for r in out:
+            kick = datetime.fromisoformat(r["kickoff"]).replace(
+                tzinfo=timezone(timedelta(hours=-4))).astimezone(timezone.utc)
+            hit = match(kick, *slug_names(sched.get(r["game_id"], {}).get("matchup_path", "")),
+                        oz, is_placeholder(r["kickoff"]))
+            (conflicts.append((r, hit)) if hit else kept.append(r))
+        out = kept
+
     out.sort(key=lambda r: -r["book_edge"])
     print(f"{'game':<14} {'PFF':>6} {'DK':>6} {'move':>5} {'odds':>6} {'PFF ed':>7} {'DK ed':>7}  band")
     for r in out:
         print(f"{r['away']+' @ '+r['home']:<14} {float(r['line']):6.1f} {r['book_line']:6.1f} "
               f"{r['diff']:+5.1f} {r['book_odds']:+6d} {r['pff_edge']*100:+6.2f}% "
               f"{r['book_edge']*100:+6.2f}%  {r['band']}")
+
+    if conflicts:
+        print(f"\ndropped {len(conflicts)} -- over-zero wants the OVER on the same total:")
+        for r, hit in conflicts:
+            print(f"  {r['away']} @ {r['home']}: Greenline under {r['book_line']} "
+                  f"({r['book_edge']*100:+.2f}%) vs over-zero OVER bias {hit['bias']:.2f}")
+    elif oz:
+        print(f"\nno conflicts with the {len(oz)} over-zero OVER picks this week")
 
     live = [r for r in out if r["book_edge"] > 0]
     print(f"\n{len(out)} matched at {args.book}; {len(live)} still positive after repricing")
