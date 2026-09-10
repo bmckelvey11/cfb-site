@@ -181,11 +181,13 @@ def write(ticks: list[dict], snapshots: list[dict]) -> list[tuple[str, int]]:
     return written
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    # `argv` exists so `refresh_cfbd._flatten_oddsapi` can call this in-process. Without it
+    # `parse_args()` reads refresh_cfbd's own argv and chokes on its flags.
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--in-dir", type=Path, default=IN_DIR)
     ap.add_argument("--list-unresolved", action="store_true")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     paths = sorted(args.in_dir.glob("odds_*.json"))
     if not paths:

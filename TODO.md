@@ -39,7 +39,7 @@ Soft cap ~8 open items here; `todo_sweep.py check` warns past that.)*
 [`docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md`](docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md)
 §8 and run **in order** — each is gated on the one above. Step 0 (preflight)
 is green: `python scripts/verify_warehouse_plan.py` exits 0. Everything from
-`#gql-relation-keys` down is blocked until that one item lands.*
+- [x] ~~`#gql-relation-keys` **Give `coachSeason` and `teamTalent` relation keys, then re-scrape**~~ <!-- id: gql-relation-keys --> — done 2026-09-10 (`7d1751a`): added both to `GQL_RELATION_KEYS` (`coach` → id/firstName/lastName, `team` → teamId/school/conference; the GraphQL types are `CoachSeason`/`TeamTalent`, not the root field names) and re-scraped on the rotated key. `stg_gql.coach_season` now carries `coach_id`/`team_teamId`, `stg_gql.team_talent` carries `team_teamId` — both joinable. **Row counts unchanged** (12,564 / 2,413), so the old dumps were not short after all; the defect was joinability, not completeness. 252 coach_season and 8 team_talent rows have no team in `currentTeams` — real, not a mapping failure. Write-up: [`docs/gql-relation-keys-2026-09-10.md`](docs/gql-relation-keys-2026-09-10.md), which also records that `duckdb --only` rebuilds rather than adds. Unblocks the chain.
 
 ### Source rationalization — the gated chain
 

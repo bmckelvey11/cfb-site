@@ -141,3 +141,19 @@ def test_game_resolution_is_not_duplicated_in_sql():
     block = block[:block.index("def _add_phase_1_indexes(")]
     assert "h.school = t.home_school" in block
     assert "regexp_replace" not in block, "mascot strip belongs in oddsapi_schema, not SQL"
+
+
+def test_main_accepts_an_argv_list():
+    """`refresh_cfbd._flatten_oddsapi` calls this in-process. A no-arg `main()` raised
+    TypeError there and the refresh silently fell back to the CSVs already on disk -- the
+    rebuild looked fine because they happened to be fresh."""
+    import inspect
+    from oddsapi_flatten import main
+
+    assert "argv" in inspect.signature(main).parameters
+
+
+def test_the_refresh_hook_calls_the_flatten_with_argv():
+    source = (REPO_ROOT / "scripts" / "refresh_cfbd.py").read_text(encoding="utf-8")
+    assert "_flatten_oddsapi()" in source, "the rebuild has to regenerate these CSVs"
+    assert "oddsapi_flatten_main([])" in source
