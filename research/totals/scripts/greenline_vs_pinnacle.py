@@ -42,6 +42,9 @@ from match_greenline_books import (  # noqa: E402
 )
 
 PIN_DIR = INGEST / "oddspapi"
+# How far from its own typical shade a projection may sit before it stops looking like
+# the model's usual lean and starts looking like a mistake on that one game.
+MAX_GAP_SD = 2.5
 
 
 def american(price: str | None) -> int | None:
@@ -142,6 +145,8 @@ def main() -> None:
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--week", default="2")
     ap.add_argument("--book", default="DraftKings", help="retail book to show beside Pinnacle")
+    ap.add_argument("--reference", choices=("pff", "pinnacle"), default="pff",
+                    help="whose number is treated as the true mean when pricing the bet")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
 
@@ -194,6 +199,13 @@ def main() -> None:
             "book_line": (be or {}).get("totals", {}).get(args.book, (None, None))[0],
             "book_odds": (be or {}).get("totals", {}).get(args.book, (None, None))[1],
             "edge_vs_pin": edge_at(pe["line"], proj, pe["under"]),
+            # Pinnacle as the true mean: PFF's projection drops out entirely and the
+            # bet is worth only what the book's number beats Pinnacle's fair one by.
+            "edge_pin_ref": (
+                edge_at(be["totals"][args.book][0], fair_line(pe["line"], pe["over"],
+                                                              pe["under"], sig),
+                        be["totals"][args.book][1])
+                if be and args.book in be.get("totals", {}) else None),
         })
 
     if not rows:
@@ -220,6 +232,26 @@ def main() -> None:
                   f"median {st.median(sub):+.2f}  below Pinnacle {sum(1 for v in sub if v<0)}/{len(sub)}")
     live = [r for r in rows if r["edge_vs_pin"] > 0]
     print(f"  still positive priced at Pinnacle's own number and juice: {len(live)}/{len(rows)}")
+
+    ref = [r for r in rows if r["band"] == "under"]
+    if ref:
+        gaps = [r["proj"] - r["pin_fair"] for r in ref]
+        med, sd = st.median(gaps), st.pstdev(gaps)
+        print(f"\nSANITY CHECK -- is any projection wildly off Pinnacle? (n={len(ref)} unders)")
+        print(f"  proj - Pinnacle fair: median {med:+.2f}  sd {sd:.2f}  "
+              f"range {min(gaps):+.2f}..{max(gaps):+.2f}")
+        print("  A consistent shade is the model. One game far from the rest is a mistake.")
+        odd = [r for r in ref if abs((r["proj"] - r["pin_fair"]) - med) > MAX_GAP_SD * sd]
+        if odd:
+            print(f"  {len(odd)} beyond {MAX_GAP_SD} sd of the usual shade -- suspect:")
+            for r in sorted(odd, key=lambda r: r["proj"] - r["pin_fair"]):
+                print(f"    {r['game']:<14} proj {r['proj']:.1f} vs Pinnacle fair "
+                      f"{r['pin_fair']:.2f}  ({r['proj']-r['pin_fair']:+.2f})")
+        else:
+            print(f"  none beyond {MAX_GAP_SD} sd -- no projection is out of line with Pinnacle")
+        far = [r for r in ref if r["edge_pin_ref"] is not None and r["edge_pin_ref"] <= 0]
+        print(f"  for reference only: {len(far)}/{len(ref)} would be negative if Pinnacle's")
+        print("  fair total, not PFF's projection, were treated as the true mean.")
 
     dk = [r for r in rows if r["book_line"] is not None]
     if dk:
