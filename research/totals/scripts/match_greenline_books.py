@@ -262,6 +262,8 @@ def main() -> None:
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--week", default="2")
     ap.add_argument("--book", default="DraftKings")
+    ap.add_argument("--min-edge", type=float, default=0.0,
+                    help="drop flags below this repriced edge, as a percent (e.g. 3)")
     ap.add_argument("--keep-over-zero", action="store_true",
                     help="keep unders the over-zero model wants the OVER on (dropped by default)")
     ap.add_argument("--self-check", action="store_true")
@@ -315,6 +317,15 @@ def main() -> None:
         out = kept
 
     out.sort(key=lambda r: -r["book_edge"])
+
+    cut = args.min_edge / 100.0
+    if cut > 0:
+        thin = [r for r in out if r["book_edge"] < cut]
+        out = [r for r in out if r["book_edge"] >= cut]
+        print(f"\ndropped {len(thin)} below the {args.min_edge:g}% cutoff"
+              + (": " + ", ".join(f"{r['away']}@{r['home']} {r['book_edge']*100:+.2f}%"
+                                  for r in sorted(thin, key=lambda r: -r["book_edge"])) if thin else ""))
+
     print(f"{'game':<14} {'PFF':>6} {'DK':>6} {'move':>5} {'odds':>6} {'PFF ed':>7} {'DK ed':>7}  band")
     for r in out:
         print(f"{r['away']+' @ '+r['home']:<14} {float(r['line']):6.1f} {r['book_line']:6.1f} "
