@@ -1559,16 +1559,29 @@ def _explode_an_scoreboard(
 
     Generic explode keeps one row per weekly file with a STRUCT[] of every
     game plus 20 ``league_*`` columns. Nested book maps stay JSON.
+
+    **One source file per statement.** The whole-corpus form -- one CREATE TABLE AS over
+    every weekly payload -- needs more than 3.7 GB to unnest 132 MB of scoreboard JSON:
+    each game's blob (its ``markets`` carry the full tick history) is re-extracted some
+    forty times, and with the payloads all in one vector every extraction is materialised
+    for every game at once. Under the 4 GB loader limit that is
+    ``OutOfMemoryException: could not allocate block of size 4.2 MiB (3.7 GiB/3.7 GiB
+    used)``, deterministically, in 2.3 s -- the 2026-09-11 rebuilds lost this table and
+    its three children to it. A weekly file is at most 4.5 MB, so one file per statement
+    bounds the working set to a few hundred MB regardless of how many weeks are on disk.
     """
     try:
         cols = {row[0] for row in con.execute(f"DESCRIBE {source}").fetchall()}
         season_type = (
             "t.season_type" if "season_type" in cols else "NULL::VARCHAR AS season_type"
         )
-        con.execute(f"DROP TABLE IF EXISTS {target}")
-        con.execute(
-            f"""
-            CREATE TABLE {target} AS
+        files = [
+            row[0]
+            for row in con.execute(
+                f"SELECT DISTINCT source_file FROM {source} ORDER BY 1"
+            ).fetchall()
+        ]
+        select_sql = f"""
             SELECT
               COALESCE(
                 TRY_CAST(json_extract(g, '$.id') AS BIGINT),
@@ -1653,8 +1666,12 @@ def _explode_an_scoreboard(
                 json_transform(json_extract(t.payload, '$.games'), '["JSON"]')
               ) AS u(g)
             WHERE json_extract(t.payload, '$.games') IS NOT NULL
+              AND t.source_file = ?
             """
-        )
+        con.execute(f"DROP TABLE IF EXISTS {target}")
+        con.execute(f"CREATE TABLE {target} AS {select_sql} LIMIT 0", [""])
+        for source_file in files:
+            con.execute(f"INSERT INTO {target} {select_sql}", [source_file])
         return _finish_stg_table(con, "stg", dest, target)
     except Exception as exc:
         return _explode_failed(con, "stg", target, dest, exc)
