@@ -1120,7 +1120,7 @@ def test_massey_csvs_load_into_stg_with_a_real_date(tmp_path):
     )
     # explode=True on purpose: massey_* are the first stg tables that never came
     # from a raw payload, so promote_timestamp_columns / explode_stg_lists /
-    # drop_dead_spine_columns meet a shape they have not seen before. massey_teams
+    # drop_dead_columns meet a shape they have not seen before. massey_teams
     # has no season/week at all, and date is already DATE.
     db_path, reports = build_duckdb(
         tmp_path, include_actionnetwork=False, explode=True

@@ -43,11 +43,21 @@ COLLIDERS = ["calendar", "draft_picks", "predicted_points"]
 GQL_PREFIXED = re.compile(r"^gql_")
 CAMEL_CASE = re.compile(r"[A-Z]")
 
-# Section 5's drop list, as revised 2026-09-09. Transcribed rather than derived: the point is
-# to fail when the plan and the warehouse disagree, which a self-deriving list cannot do.
-# The 2026-09-08 list held three `stg.plays` columns carrying 6.4M values and three
-# `actionnetwork_scoreboard__*` tables the AN rename had already replaced.
-DEAD_CLAIMED = [
+# Section 5's drop list, **dropped 2026-09-10** (`#warehouse-drop-superseded`). The check
+# below is therefore inverted from what it was: these columns must now be ABSENT, and one
+# that reappears means the sweep that removes them has stopped running.
+#
+# Six are swept after every load by `duckdb_load._DEAD_COLUMNS`, because the generic explode
+# recreates them from a payload key the source never fills. The seventh,
+# `stg.an_team.overtime_losses`, was written by name in `_AN_TEAM_SQL` and was fixed there
+# instead -- ActionNetwork emits `standings.overtime_losses` on all 10,868 rows and it is
+# null on every one, a field of its shared multi-sport schema college football never fills.
+#
+# Still transcribed rather than derived: the point is to fail when the plan and the
+# warehouse disagree, which a self-deriving list cannot do. The 2026-09-08 list held three
+# `stg.plays` columns carrying 6.4M values and three `actionnetwork_scoreboard__*` tables
+# the AN rename had already replaced.
+DROPPED_COLUMNS = [
     ("stg", "an_team", "overtime_losses"),
     ("stg", "team_stats", "statValue_anyof_schema_1_validator"),
     ("stg", "team_stats__statValue_any_of_schemas", "statValue_anyof_schema_1_validator"),
@@ -104,6 +114,10 @@ MERGE_KEYS = [
 ]
 
 # Section 3's pairs, for --coverage. (concept, gql table, rest table).
+# `draft_positions` and `draft_teams` were dropped 2026-09-10 and now report MISSING on the
+# REST side, which is the intended reading rather than a fault: both are Bucket A, both
+# passed R6, and `duckdb_load._SUPERSEDED_REST` stops the explode from rebuilding them.
+# They stay in this list so the coverage report keeps showing the GraphQL survivor.
 PAIRS = [
     ("draft_position", "draft_position", "draft_positions"),
     ("draft_team", "draft_team", "draft_teams"),
@@ -220,28 +234,34 @@ def check_dead_columns(con) -> list[str]:
     for key in sorted(census):
         print(f"      {key[0]}.{key[1]}.{key[2]}  rows={census[key]}")
 
-    print(f"  plan's {len(DEAD_CLAIMED)}-column drop list, checked:")
-    for schema, table, col in DEAD_CLAIMED:
+    print(f"  plan's {len(DROPPED_COLUMNS)}-column drop list, checked (must be absent):")
+    for schema, table, col in DROPPED_COLUMNS:
         exists = con.execute(
             "SELECT COUNT(*) FROM information_schema.columns "
             "WHERE table_schema = ? AND table_name = ? AND column_name = ?",
             [schema, table, col],
         ).fetchone()[0]
         if not exists:
-            fails.append(f"{schema}.{table}.{col} no longer exists")
-            print(f"    [GONE] {schema}.{table}.{col}")
+            print(f"    [gone] {schema}.{table}.{col}")
             continue
+        # It came back. Which half of the drop regressed depends on whether it has data:
+        # populated means the source started filling it and the drop was wrong; all-NULL
+        # means the sweep or the `_AN_TEAM_SQL` edit stopped taking effect.
         rows, filled = _filled(con, schema, table)
         non_null = filled[col]
         if non_null:
             fails.append(
-                f"{schema}.{table}.{col} holds {non_null} populated values -- do not drop"
+                f"{schema}.{table}.{col} is back and holds {non_null} populated values "
+                f"-- the source now fills it; restore the column and re-take the R6 verdict"
             )
             print(f"    [LIVE] {schema}.{table}.{col}  rows={rows} non-null={non_null}")
         else:
-            print(f"    [dead] {schema}.{table}.{col}  rows={rows}")
+            fails.append(
+                f"{schema}.{table}.{col} is back and all-NULL -- the sweep is not running"
+            )
+            print(f"    [BACK] {schema}.{table}.{col}  rows={rows}")
 
-    claimed = {tuple(entry) for entry in DEAD_CLAIMED}
+    claimed = {tuple(entry) for entry in DROPPED_COLUMNS}
     unlisted = sorted(k for k in census if k not in claimed and k[2] not in SPINE)
     # Future-dated scores are all-NULL on purpose -- those games have not been played. How many
     # there are changes weekly, so assert the shape and not the count.

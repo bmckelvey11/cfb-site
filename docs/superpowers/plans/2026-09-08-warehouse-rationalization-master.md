@@ -152,15 +152,32 @@ fail it — the GraphQL side carries 12 to 126 more seasons. Only Bucket A is dr
 `season`, and every GraphQL table spells it `year`. Use
 `scripts/verify_warehouse_plan.py --coverage`.
 
-### Bucket A — GraphQL is the superset; the REST side is droppable (3 pairs)
+### Bucket A — GraphQL is the superset; the REST side is droppable (~~3~~ **2** pairs)
 
-| Pair | GQL-only (fill) | REST-only |
-|---|---|---|
-| `draft_position` / `draft_positions` | `draftPositionId` (1.00) | none |
-| `draft_team` / `draft_teams` | `draftTeamId` (1.00), `mascot` (0.97), `shortDisplayName` (1.00) | none |
-| `predicted_points` / `predicted_points` | `distance` (1.00), `down` (1.00) | none |
+**Re-measured and acted on 2026-09-10** —
+[`docs/warehouse-drop-superseded-2026-09-10.md`](../../warehouse-drop-superseded-2026-09-10.md).
+Two passed R6 and are dropped; `predicted_points` does not and stays.
+
+| Pair | GQL-only (fill) | REST-only | R6 | Status |
+|---|---|---|---|---|
+| `draft_position` / `draft_positions` | `draftPositionId` (1.00) | none | 29/29 keys, 0 REST-only | **dropped** |
+| `draft_team` / `draft_teams` | `draftTeamId` (1.00), `mascot` (0.97), `shortDisplayName` (1.00) | none | 32/32 on `(location, displayName)` | **dropped** |
+| `predicted_points` / `predicted_points` | `distance` (1.00), `down` (1.00) | none | **fails** | **kept** |
 
 Small lookup tables. The win is tidiness, not data volume.
+
+`draft_team` passed only on values, not column names: `nickname` exists on both sides and
+means different things — REST's `Bengals` against GraphQL's `Cincinnati` — with REST's
+value carried by GraphQL's `mascot`. A false *shared*, the mirror of §4's false *exclusive*.
+
+`predicted_points` fails R6's containment half and cannot be repaired. REST's rows lose
+`down`/`distance` **at the API** — `raw/predicted_points.json` is a flat list of
+`{predictedPoints, yardLine}` — so its 10,140 rows cannot be aligned to GraphQL's 19,800-cell
+grid, and only 13% match on `yardLine` within 0.005 (REST is rounded to 2 decimals).
+
+The drop is implemented as a loader skip (`duckdb_load._SUPERSEDED_REST`), not a
+`DROP TABLE`: `stg` is rebuilt from `raw` on every refresh and `raw` is out of scope (§12).
+Removing the scraper entries is `#scraper-entry-cleanup`.
 
 ### Bucket B — REST is the *column* superset, GraphQL the *coverage* superset (2 pairs)
 
@@ -285,7 +302,14 @@ problems:
   `STUB_COLUMNS` in the verifier is now empty but kept — the next source to land a write-only
   column needs the same exemption, and that is better than growing §5's drop list with columns
   a writer would immediately recreate.
-- **7 are genuinely dead** and are the drop list:
+- **7 are genuinely dead** and were the drop list. **Dropped 2026-09-10** — six are swept
+  after every load by `duckdb_load._DEAD_COLUMNS` (the payload carries the key and the
+  source never fills it, so there is no writer to edit), and the seventh,
+  `stg.an_team.overtime_losses`, was written by name in `_AN_TEAM_SQL` and was fixed there
+  instead: ActionNetwork emits `standings.overtime_losses` on all 10,868 scoreboard rows
+  and it is null on every one, a field of its shared multi-sport schema college football
+  never fills. `verify_warehouse_plan.py`'s check is now inverted — these must be **absent**,
+  and one that reappears is a regression.
 
 ```
 stg.an_team.overtime_losses

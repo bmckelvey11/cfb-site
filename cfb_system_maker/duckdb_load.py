@@ -482,6 +482,32 @@ def build_duckdb(
 _STRUCTURE_SAMPLE_ROWS = 5000
 _RAW_SPINE = ("season", "week", "season_type")
 
+# Section 5's drop list, minus `stg.an_team.overtime_losses`, which is written by name in
+# `_AN_TEAM_SQL` and is fixed there instead. These six arrive through the generic explode,
+# so there is no writer to edit -- the payload carries the key and the source never fills
+# it. Swept after every load rather than dropped once, because the next explode recreates
+# them. Fail-closed: a column that has gone live is kept and reported, never dropped.
+# Proof that each is dead: `python scripts/verify_warehouse_plan.py`.
+_DEAD_COLUMNS = (
+    ("stg", "team_stats", "statValue_anyof_schema_1_validator"),
+    ("stg", "team_stats__statValue_any_of_schemas", "statValue_anyof_schema_1_validator"),
+    ("stg_gql", "game_weather", "windGust"),
+    ("stg_gql", "poll_type", "abbreviation"),
+    ("stg_gql", "recruit", "overallRank"),
+    ("stg_gql", "recruit", "positionRank"),
+)
+
+# Bucket A of the rationalization plan: GraphQL holds every populated column and at least
+# as many distinct keys, so the REST side is superseded. Skipped at explode time rather
+# than dropped, because `raw` is out of scope (plan section 12) and the next explode would
+# rebuild anything dropped from `stg`. Removing the scraper entries is `#scraper-entry-cleanup`.
+#
+# `predicted_points` is **not** here. Its REST rows lose `down`/`distance` at the API --
+# `raw/predicted_points.json` is a flat list of `{predictedPoints, yardLine}` -- so they
+# cannot be aligned to GraphQL's grid and R6's containment half cannot be proved either
+# way. See docs/warehouse-drop-superseded-2026-09-10.md.
+_SUPERSEDED_REST = frozenset({"draft_positions", "draft_teams"})
+
 
 def explode_payloads(
     db: str | Path | duckdb.DuckDBPyConnection,
@@ -518,6 +544,8 @@ def explode_payloads(
         for schema, name in sources:
             if only is not None and name not in only:
                 continue
+            if schema == "raw" and name in _SUPERSEDED_REST:
+                continue
             dest_schema, dest = stg_destination(name)
             report = _explode_table(con, schema, name, dest_schema, dest)
             reports.append(report)
@@ -538,7 +566,7 @@ def explode_payloads(
         for report in promote_timestamp_columns(con, progress=progress):
             reports.append(report)
         con.execute("CHECKPOINT")
-        for report in drop_dead_spine_columns(con, progress=progress):
+        for report in drop_dead_columns(con, progress=progress):
             reports.append(report)
         con.execute("CHECKPOINT")
     finally:
@@ -839,12 +867,12 @@ def promote_timestamp_columns(
     return reports
 
 
-def drop_dead_spine_columns(
+def drop_dead_columns(
     db: str | Path | duckdb.DuckDBPyConnection,
     *,
     progress: Callable[[TableLoad], None] | None = None,
 ) -> list[TableLoad]:
-    """Drop ``stg.*`` spine columns that are 100% NULL.
+    """Drop ``stg.*`` columns that are 100% NULL: the spine three, plus ``_DEAD_COLUMNS``.
 
     ``season``/``week``/``season_type`` are derived from the source *filename*.
     A dataset scraped as one whole-corpus file has no season in its name, so the
@@ -855,17 +883,27 @@ def drop_dead_spine_columns(
 
     ``raw`` is left alone -- there the spine columns are load provenance, not a
     query surface. Idempotent: a dropped column no longer matches.
+
+    ``_DEAD_COLUMNS`` is section 5's drop list and is named rather than derived: a
+    self-deriving sweep would silently take a column the moment a source stopped filling
+    it. Both halves share the same fail-closed guard -- a column holding any value is
+    kept and reported, never dropped -- which is what makes the list safe to re-run
+    after a re-scrape rather than a decision taken once.
     """
     owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
     con = duckdb.connect(str(db)) if owns_connection else db
     reports: list[TableLoad] = []
     try:
+        named = ", ".join(
+            "('%s', '%s', '%s')" % entry for entry in _DEAD_COLUMNS
+        )
         candidates = con.execute(
             f"""
             SELECT table_schema, table_name, column_name
             FROM information_schema.columns
             WHERE table_schema IN ('stg', 'stg_gql')
-              AND column_name IN ({", ".join("'%s'" % c for c in _RAW_SPINE)})
+              AND (column_name IN ({", ".join("'%s'" % c for c in _RAW_SPINE)})
+                   OR (table_schema, table_name, column_name) IN ({named}))
             ORDER BY table_schema, table_name, column_name
             """
         ).fetchall()
@@ -1570,9 +1608,10 @@ _AN_TEAM_SQL = """
               TRY_CAST(json_extract(x, '$.standings.loss') AS INTEGER) AS losses,
               TRY_CAST(json_extract(x, '$.standings.ties') AS INTEGER) AS ties,
               TRY_CAST(json_extract(x, '$.standings.draw') AS INTEGER) AS draws,
-              TRY_CAST(
-                json_extract(x, '$.standings.overtime_losses') AS INTEGER
-              ) AS overtime_losses,
+              -- `standings.overtime_losses` is dropped, not missed. ActionNetwork emits
+              -- the key on all 10,868 scoreboard rows and it is null on every one: it is
+              -- a field of AN's shared multi-sport schema that college football never
+              -- fills. Selecting it recreated an all-NULL column on every load.
               t._source_file
             FROM stg.an_scoreboard AS t,
               UNNEST(json_transform(t.teams, '["JSON"]')) AS u(x)

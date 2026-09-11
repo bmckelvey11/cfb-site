@@ -17,6 +17,15 @@ near-misses: exclusive columns on opposite sides that share a token, which is wh
 match usually hides. Like `audit_canonical_sources.py`, this supplies evidence and
 deliberately does not pick a winner.
 
+**The key fails in both directions and only one of them is visible here.** A false
+*exclusive* -- same concept under two names -- is what near-misses are for
+(`team_teamId` vs `team_id`). A false **shared** is the opposite and nothing below can see
+it: `draft_team.nickname` exists on both sides, and holds the team's nickname on REST
+(`Bengals`) and the location repeated on GraphQL (`Cincinnati`), with REST's value living
+in GraphQL's `mascot`. That pair reads as shared and is not. Before a same-name column
+counts toward R6's "survivor holds every populated column", read the values.
+See docs/warehouse-drop-superseded-2026-09-10.md.
+
 Fill rate is non-NULL over total rows. A column at 0.00 is a drop-list candidate (section
 5), not evidence of exclusivity.
 
