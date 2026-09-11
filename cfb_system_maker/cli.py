@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 from cfb_paths import DATA_ROOT
@@ -107,26 +108,49 @@ def _fetch(args: argparse.Namespace) -> int:
     return 0
 
 
-def _build(args: argparse.Namespace) -> int:
-    rebuilt_seasons = set(args.seasons)
+def rebuild_processed_games(
+    data_dir: str | Path,
+    seasons: Iterable[int],
+    *,
+    provider: str = "consensus",
+) -> tuple[int, int, int]:
+    """Rebuild ``processed/games.csv`` for ``seasons`` from the raw dumps.
+
+    Returns ``(rebuilt, kept, total)``. Every season not named is carried through
+    untouched -- that per-season replacement is the contract, not a detail: the raw dumps
+    only ever hold the seasons someone scraped, and a full overwrite would silently drop
+    the history.
+
+    Factored out of the ``build`` subcommand so `scripts/refresh_cfbd.py` can call it.
+    It could not before, and the CSV drifted behind the warehouse by however long since
+    someone last ran `build` by hand -- see `#refresh-rebuilds-games-csv`.
+    """
+    rebuilt_seasons = set(seasons)
     records = []
-    for season in args.seasons:
-        games = load_raw_json(args.data_dir, "games", season)
-        lines = load_raw_json(args.data_dir, "lines", season)
-        records.extend(normalize_games(games, lines, provider=args.provider))
+    for season in sorted(rebuilt_seasons):
+        games = load_raw_json(data_dir, "games", season)
+        lines = load_raw_json(data_dir, "lines", season)
+        records.extend(normalize_games(games, lines, provider=provider))
 
     try:
-        existing = load_processed_games(args.data_dir)
+        existing = load_processed_games(data_dir)
     except FileNotFoundError:
         existing = []
     kept = [g for g in existing if g.season not in rebuilt_seasons]
 
     merged = kept + records
-    save_processed_games(args.data_dir, merged)
+    save_processed_games(data_dir, merged)
+    return len(records), len(kept), len(merged)
+
+
+def _build(args: argparse.Namespace) -> int:
+    rebuilt, kept, total = rebuild_processed_games(
+        args.data_dir, args.seasons, provider=args.provider
+    )
     print(
-        f"Built {len(records)} game(s) for season(s) {sorted(rebuilt_seasons)}; "
-        f"kept {len(kept)} existing game(s) from other seasons "
-        f"(games.csv now has {len(merged)} total)."
+        f"Built {rebuilt} game(s) for season(s) {sorted(set(args.seasons))}; "
+        f"kept {kept} existing game(s) from other seasons "
+        f"(games.csv now has {total} total)."
     )
     return 0
 

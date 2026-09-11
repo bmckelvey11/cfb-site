@@ -443,13 +443,21 @@ def _build_fact_game_line(con: duckdb.DuckDBPyConnection) -> None:
           total_open DOUBLE,
           moneyline_home INTEGER,
           moneyline_away INTEGER,
-          formatted_spread VARCHAR
+          formatted_spread VARCHAR,
+          -- Every row here is REST until `_merge_game_lines` runs and rewrites the table.
+          -- Declared unconditionally so the column does not depend on whether an optional
+          -- source was present: a table with two possible shapes is a trap for any
+          -- consumer that selects `_source` and only sometimes finds it.
+          _source VARCHAR NOT NULL DEFAULT 'rest'
         )
         """
     )
 
     insert_sql = """
-        INSERT INTO core.fact_game_line VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO core.fact_game_line (
+          game_id, provider_key, spread_close, spread_open, total_close, total_open,
+          moneyline_home, moneyline_away, formatted_spread
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     batch: list[list[Any]] = []
     seen: set[tuple[int, str]] = set()

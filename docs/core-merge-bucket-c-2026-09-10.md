@@ -146,6 +146,26 @@ than hidden: 90 line rows on 16 games now sit under `has_line = false`, where th
 used to be 0. After this merge `has_line` means "no REST line the selector accepted", not
 "no line row exists".
 
+**Two consequences surfaced once `games.csv` was rebuilt** (`#refresh-rebuilds-games-csv`);
+the stale CSV had been hiding both.
+
+`core.fact_game_line` no longer restates the REST tape exactly — by design. Game 401868326
+(2026 wk2, Troy–Alabama State) has CFBD carrying DraftKings with a **null** spread and total;
+the AN tape has −23.0 and 51.5, and `coalesce` fills them. That is the merge working. It means
+the agreement test can no longer assert plain equality against `games.csv`, which is REST-only
+by construction. It now pins the permitted divergence instead — where the two differ, the REST
+value must be NULL *and* the row must not be `_source = 'rest'` — which still fails loudly if a
+REST value is ever overwritten rather than a hole filled
+(`tests/test_core_agreement.py::_agrees_or_is_a_filled_hole`). One game qualifies today.
+
+That same game is the one place two `core` tables disagree: `fact_game.has_line` is true,
+`fact_game.selected_spread` is **NULL**, and `fact_game_line.spread_close` is −23.0 for the
+same provider. It follows from `has_line` staying REST-defined, above, and is **not fixed** —
+fixing it means moving `selected_spread`, which is the spread model's input. It is 1 of 13
+games where `has_line` is true and `selected_spread` is NULL; the other 12 predate the union
+and have no line-table spread either. A consumer reading one table and not the other sees
+different answers for this one game.
+
 `draft kings` and `draftkings` are the same book under two provider keys, on both sides
 (core 235 / 2,693; gql 76 / 2,931). A full outer preserves the split rather than fixing
 it — correct here, but it means a consumer filtering `provider_key = 'draftkings'`

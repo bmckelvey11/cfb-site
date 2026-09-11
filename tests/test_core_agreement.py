@@ -600,6 +600,29 @@ def test_cli_core_only(tmp_path: Path):
     assert {"consensus", "teamrankings", "bovada"} <= providers
 
 
+def _agrees_or_is_a_filled_hole(core_value, rest_value, source, label: str) -> None:
+    """`core.fact_game_line` must restate the REST tape, or fill a hole REST left.
+
+    `games.csv` is REST-only by construction -- `normalize_games` reads the raw REST dump.
+    Since the ActionNetwork union (`duckdb_core._merge_game_lines`), `core.fact_game_line`
+    is deliberately a superset: REST wins every conflict, and the other tape fills values
+    REST does not carry. Plain equality would forbid the fills; skipping whenever the CSV
+    is NULL would stop noticing if a REST value were ever overwritten.
+
+    This pins the exact set of permitted divergences instead: the REST tape had nothing
+    there, **and** the row is not REST-only. Currently one game qualifies -- 401868326,
+    where CFBD carries DraftKings with a null spread and null total and the AN tape has
+    -23.0 and 51.5. See docs/core-merge-bucket-c-2026-09-10.md.
+    """
+    if core_value == rest_value:
+        return
+    assert rest_value is None, (
+        f"{label}: core has {core_value}, the REST tape has {rest_value} -- "
+        f"a REST value was overwritten, not a hole filled"
+    )
+    assert source != "rest", f"{label}: a REST-only row disagrees with the REST tape"
+
+
 @pytest.mark.slow
 def test_live_warehouse_agreement_1_2_7():
     """Against $CFB_DATA_ROOT when core.fact_game already built.
@@ -709,14 +732,15 @@ def test_live_warehouse_agreement_4_5_6():
         provider_key = (game.provider or "").strip().lower()
         row = con.execute(
             """
-            SELECT spread_close, spread_open
+            SELECT spread_close, spread_open, _source
             FROM core.fact_game_line
             WHERE game_id = ? AND provider_key = ?
             """,
             [game.game_id, provider_key],
         ).fetchone()
         assert row is not None, f"missing line row {game.game_id}/{provider_key}"
-        assert row[0] == game.spread
+        _agrees_or_is_a_filled_hole(row[0], game.spread, row[2],
+                                    f"{game.game_id}/{provider_key} spread_close")
         assert row[1] == moves["spread_open"]
         total_provider = con.execute(
             """
@@ -726,14 +750,15 @@ def test_live_warehouse_agreement_4_5_6():
         ).fetchone()[0]
         total_row = con.execute(
             """
-            SELECT total_close, total_open
+            SELECT total_close, total_open, _source
             FROM core.fact_game_line
             WHERE game_id = ? AND provider_key = ?
             """,
             [game.game_id, total_provider],
         ).fetchone()
         assert total_row is not None, f"missing total book {game.game_id}/{total_provider}"
-        assert total_row[0] == game.total
+        _agrees_or_is_a_filled_hole(total_row[0], game.total, total_row[2],
+                                    f"{game.game_id}/{total_provider} total_close")
         assert total_row[1] == moves["total_open"]
         checked_lines += 1
     assert checked_lines >= 20

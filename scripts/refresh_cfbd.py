@@ -39,6 +39,7 @@ from actionnetwork_flatten import collect as an_collect  # noqa: E402
 from actionnetwork_flatten import write as an_write  # noqa: E402
 from check_an_tick_pin import check as an_tick_check  # noqa: E402
 from cfb_system_maker.cfbd_client import find_cfbd_token  # noqa: E402
+from cfb_system_maker.cli import rebuild_processed_games  # noqa: E402
 from cfb_system_maker.duckdb_core import build_core  # noqa: E402
 from cfb_system_maker.duckdb_load import build_duckdb  # noqa: E402
 from cfb_system_maker.scrapers import scrape  # noqa: E402
@@ -102,6 +103,35 @@ def _flatten_pff() -> None:
     print(f"  {len(written)} tables, {sum(n for _, n, _ in written):,} rows")
 
 
+def _rebuild_games_csv(season: int) -> None:
+    """Regenerate ``processed/games.csv`` for the season just scraped.
+
+    The scrape overwrites ``raw/games_<season>.json`` and ``raw/lines_<season>.json`` and
+    nothing here rebuilt the CSV from them, so it drifted behind the warehouse by however
+    long since someone last ran ``python -m cfb_system_maker build`` by hand. On
+    2026-09-10 it was two days behind -- CSV 09-08 01:05 against the JSON at 09-10 05:00 --
+    and both standing ``-m slow tests/test_core_agreement.py`` failures traced to it, since
+    those tests compare the CSV against the warehouse. They had been read as regressions
+    twice. Only one was pure staleness: rebuilding cleared the coverage drift outright and
+    turned the other into a single real divergence, which the AN line union had caused and
+    the stale CSV had been hiding.
+
+    Only this season is rebuilt; every other season's rows are carried through, the same
+    contract the ``build`` subcommand has.
+
+    Never fatal, like the flattens above: the rebuild is the expensive half and a CSV that
+    failed to write is worth finishing the run to report.
+    """
+    print("=== rebuild processed/games.csv ===")
+    try:
+        rebuilt, kept, total = rebuild_processed_games(cfb_paths.DATA_ROOT, [season])
+    except Exception as exc:
+        print(f"  FAILED {type(exc).__name__}: {exc}")
+        return
+    print(f"  {rebuilt:,} game(s) for {season}, {kept:,} kept from other seasons "
+          f"-> {total:,} total")
+
+
 def _flatten_oddsapi() -> None:
     """Regenerate the the-odds-api CSVs the rebuild is about to load.
 
@@ -152,6 +182,7 @@ def main() -> int:
     _flatten_actionnetwork()
     _flatten_pff()
     _flatten_oddsapi()
+    _rebuild_games_csv(args.season)
 
     print("=== rebuild cfb.duckdb ===")
     db_path, _ = build_duckdb(cfb_paths.DATA_ROOT, explode=True)

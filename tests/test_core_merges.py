@@ -188,3 +188,15 @@ def test_line_conflicts_are_preserved_not_discarded(con):
         pytest.skip("line merge not built in this warehouse")
     assert con.execute(
         "SELECT count(*) FROM core.fact_game_line_conflicts").fetchone()[0] > 0
+
+
+def test_source_exists_even_without_the_actionnetwork_tape(con):
+    """`_source` is declared by `_build_fact_game_line` with a 'rest' default, not added by
+    `_merge_game_lines`. A table whose columns depend on whether an optional source was
+    present is a trap: a consumer selects `_source`, finds it on the live warehouse, and
+    gets a Binder Error on any build without `stg.game_lines`. That is exactly how it was
+    found -- a fixture-built test broke while the live one passed."""
+    source = (REPO_ROOT / "cfb_system_maker" / "duckdb_core.py").read_text(encoding="utf-8")
+    create = source[source.index("CREATE TABLE core.fact_game_line ("):]
+    create = create[:create.index('"""')]
+    assert "_source VARCHAR NOT NULL DEFAULT 'rest'" in create
