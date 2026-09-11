@@ -5,12 +5,12 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
 
   open_pt      PT's recorded opener (often a months-old look-ahead number for early weeks)
   line_pt      the market line at the moment PT compiled the snapshot
-  book_fair    median home spread across real books RIGHT NOW, after the outlier guard: the
-               five Action Network books (Caesars, DraftKings, FanDuel, BetRivers, BetMGM)
-               plus the five offshore books only the-odds-api carries (BetOnline.ag, Bovada,
-               LowVig.ag, BetUS, MyBookie.ag) plus Pinnacle from oddspapi. One vote per book --
-               AN wins every overlap because its quote is live. Amendments S2 and S3 of
-               prereg-line-shopping.md; tagged `book_set_version` 3 on every forward-log row
+  book_fair    median home spread across real books, after the outlier guard: the nine
+               the-odds-api books (DraftKings, FanDuel, BetRivers, BetMGM, BetOnline.ag,
+               Bovada, LowVig.ag, BetUS, MyBookie.ag) plus Pinnacle from oddspapi, as of the
+               latest snapshot (up to six hours old). One vote per book. Action Network no
+               longer prices anything here -- amendment S4 of prereg-line-shopping.md;
+               tagged `book_set_version` 4 on every forward-log row
   <Book>_home / <Book>_odds   each book's posted home spread (PT sign) and its odds
   consensus    the model consensus: mean of the top-20 models by prior MOVEMENT skill
   E4 .. E14    each movement model's predicted CLOSE, fit on the whole archive with the
@@ -101,27 +101,19 @@ MODEL_COLS = ["E4", "E7", "E8", "E9", "E10", "E11", "E12", "E14"]   # feeds pred
 REPORTED_COLS = MODEL_COLS + ["E6"]
 MODEL_SET_VERSION = 3   # 2026-09-09: E6 retired from the slate (amendment A7, flat branch)
 
-# Action Network book ids, names from AN's own /web/v1/books (2026-09-08). Until then this map
-# said Pinnacle/FanDuel/BetMGM/Caesars/Bet365 -- every label was wrong; the ids were right.
-REAL_BOOKS = {"49": "Caesars", "68": "DraftKings", "69": "FanDuel", "71": "BetRivers", "75": "BetMGM"}
-
-# the-odds-api book keys -> the same display names, so quotes from both feeds land in one
-# Series keyed by BOOK IDENTITY. Without that, DraftKings/FanDuel/BetRivers/BetMGM arrive twice
-# and vote twice in the median -- a consensus weighted by which books happen to be on two
-# feeds. Action Network wins every overlap: it is fetched live at slate time where the
-# the-odds-api snapshot is up to six hours old, and `book_fair` claims to be the number RIGHT NOW.
+# the-odds-api book keys -> display names. Since amendment S4 (2026-09-11) this snapshot plus
+# Pinnacle IS the book set: Action Network prices nothing here any more. Its scoreboard is
+# still called once per slate, for the event id -- see live_books. Five of the nine are
+# offshore; they are real venues and OUTLIER_PTS still guards the median, but regulated-only
+# is a one-line change here if that turns out to be the wrong call.
 OA_BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betrivers": "BetRivers",
             "betmgm": "BetMGM", "betonlineag": "BetOnline.ag", "bovada": "Bovada",
             "lowvig": "LowVig.ag", "betus": "BetUS", "mybookieag": "MyBookie.ag"}
-# What promotion actually added: the five the-odds-api books Action Network does not carry.
-# All five are offshore. They are real venues and OUTLIER_PTS still guards the median, but
-# regulated-only is a one-line change here if that turns out to be the wrong call.
-OA_ONLY_BOOKS = tuple(n for n in OA_BOOKS.values() if n not in REAL_BOOKS.values())
 # Amendment S3 (2026-09-09): Pinnacle, from the oddspapi snapshot (pinnacle_lines), votes too.
 # One book, one vote, same as the rest; it is the sharpest book but the median does not know
 # that. Its quote is up to 24h old (daily pull); the outlier guard is what stops a stale number
 # on a moved line from dragging the fair.
-BOOKS = tuple(REAL_BOOKS.values()) + OA_ONLY_BOOKS + ("Pinnacle",)
+BOOKS = tuple(OA_BOOKS.values()) + ("Pinnacle",)
 # Where a bet can actually be placed. Every book in BOOKS votes in the fair; only these can
 # supply best_home/best_away, side_line/side_book, and the SHOP/AGREE rows. The fair is the
 # market's number and does not care about accounts; the slip does.
@@ -132,10 +124,13 @@ BETTABLE = ("DraftKings", "FanDuel")
 #   1 = Action Network alone (rows through 2026-09-09)
 #   2 = Action Network + the five the-odds-api books above (2026-09-09, same day)
 #   3 = version 2 + Pinnacle via oddspapi (2026-09-09 on; amendment S3)
+#   4 = the-odds-api's nine books + Pinnacle; Action Network no longer votes (2026-09-11 on;
+#       amendment S4). Caesars leaves the set; the four shared books are now priced from the
+#       snapshot rather than live.
 # Earlier rows cannot be recomputed under a later version -- no snapshot from the added feed
 # exists for those moments -- so each break is permanent and version B must either restrict to
 # one era or model the shift.
-BOOK_SET_VERSION = 3
+BOOK_SET_VERSION = 4
 OUTLIER_PTS = 2.5          # a book > this far from the median of all books is ignored (n >= 3)
 ODDS_WINDOW = (-135, 125)
 KEY_NUMBERS = (3, 7)
@@ -219,7 +214,11 @@ def norm(name: str) -> str:
 
 
 def live_books(now: datetime) -> pd.DataFrame:
-    """Per-book home spreads for games kicking off in the next eight days, from Action Network."""
+    """Event ids and join keys for games kicking off in the next eight days, from the Action
+    Network scoreboard. No prices since amendment S4 -- the fair is the-odds-api's. This call
+    survives only so the forward log carries the `event_id` that `eval_version_b.py` keys the
+    consensus close on; it retires with `CFB-AN-History` (docs/line-timing-collector.md, Sunset).
+    """
     lo, hi = now - timedelta(days=1), now + timedelta(days=8)
     # AN's week numbering does not match PT's; scan a few weeks and filter by kickoff.
     wk_guess = max(1, int((now - datetime(now.year, 8, 25, tzinfo=timezone.utc)).days // 7) + 1)
@@ -238,19 +237,10 @@ def live_books(now: datetime) -> pd.DataFrame:
             teams = {t["id"]: t for t in g.get("teams", [])}
             home = teams.get(g["home_team_id"], {})
             road = teams.get(g["away_team_id"], {})
-            quotes = {}
-            for book, b in (g.get("markets") or {}).items():
-                if book not in REAL_BOOKS:
-                    continue
-                for s in (b.get("event") or {}).get("spread", []) or []:
-                    if (s.get("side") == "home" and not s.get("is_live") and not s.get("is_alt_market")
-                            and s.get("value") is not None and s.get("odds") is not None
-                            and ODDS_WINDOW[0] <= s["odds"] <= ODDS_WINDOW[1]):
-                        quotes[REAL_BOOKS[book]] = (float(s["value"]), int(s["odds"]))
             rows.append({"event_id": g["id"], "kick": ko, "an_home": home.get("display_name"),
                          "an_road": road.get("display_name"),
                          "key": norm(home.get("display_name", "")),
-                         "rkey": norm(road.get("display_name", "")), "quotes": quotes})
+                         "rkey": norm(road.get("display_name", ""))})
         time.sleep(0.5)
     return pd.DataFrame(rows).drop_duplicates("event_id")
 
@@ -283,26 +273,20 @@ def shop(quotes: dict) -> dict:
 # ---------------------------------------------------------------- the-odds-api (observation)
 
 OA_SNAP_DIR = cfb_paths.INGEST / "oddsapi"
-# Books the-odds-api returns for `regions=us`. The four that overlap Action Network's set
-# (DraftKings, FanDuel, BetRivers, BetMGM) plus five offshore books AN does not carry; it has
-# no Caesars, which AN does. So `oa_fair` is a DIFFERENT book set from `book_fair`, not a
-# second opinion on the same one -- that is the point of keeping it beside rather than inside.
+# `oa_fair` is the-odds-api's own median, kept beside `book_fair` since S2 as the agreement
+# check. Under S4 the only difference between the two is Pinnacle's vote.
 OA_MIN_BOOKS = 2
 
 
 def oddsapi_books(now: datetime) -> pd.DataFrame:
-    """Per-book home spreads from the latest the-odds-api snapshot. OBSERVATION ONLY.
+    """Per-book home spreads from the latest the-odds-api snapshot.
 
-    These columns never feed `book_fair`, `move_vs_fair`, `side`, or `edge`. `book_fair` is the
-    quantity version B grades, and the forward log is its dataset; widening the book set mid-test
-    would silently redefine what was graded, exactly as `MODEL_SET_VERSION` guards against on the
-    predictor side. Promoting this source into `book_fair` is a deliberate, version-tagged
-    decision, not a side effect of having the data.
+    Since amendment S2 these books vote in `book_fair`; since S4 they and Pinnacle are the whole
+    set. Any change to that set is a version-tagged amendment, not a side effect of having data.
 
-    Read from disk, not live: `CFB-Odds-Snapshot` pulls every 6 hours (see
-    `docs/oddsapi-ingest.md`) and a slate run costs no credits this way. That makes every number
-    here AS OF `oa_as_of`, up to six hours stale -- which is why the best-number columns are
-    named `oa_*` and not merged into the shoppable ones.
+    Read from disk, not live: `CFB-Odds-Snapshot` pulls every 6 hours plus Saturdays (see
+    `docs/oddsapi-ingest.md`) and a slate run costs no credits this way. Every number here is
+    AS OF `oa_as_of`, up to six hours stale; the `oa_*` columns carry that stamp.
     """
     snaps = sorted(OA_SNAP_DIR.glob("odds_americanfootball_ncaaf_*.json"))
     if not snaps:
@@ -516,16 +500,13 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
         pin_qs = [{"Pinnacle": (-h, int(o))} if np.isfinite(h) else {}
                   for h, o in zip(t.Pinnacle_home, t.Pinnacle_odds.fillna(0))]
 
-        an_qs = [q if isinstance(q, dict) else {} for q in t.quotes]
         oa_qs = [q if isinstance(q, dict) else {} for q in t.oa_quotes]
-        # Action Network wins every overlapping book: its quote is live, the snapshot's is up
-        # to six hours old. Promotion therefore ADDS the five offshore books AN does not carry
-        # rather than reshuffling the four it already had.
-        qs = [{**o, **p, **a} for o, p, a in zip(oa_qs, pin_qs, an_qs)]
+        # the-odds-api and Pinnacle share no book, so this is a plain union (amendment S4).
+        qs = [{**o, **p} for o, p in zip(oa_qs, pin_qs)]
         s = pd.DataFrame([shop(q) for q in qs])
-        # the-odds-api on its own, kept beside the promoted number as the agreement check
+        # the-odds-api on its own, kept beside the full set as the agreement check
         s_oa = pd.DataFrame([oa_shop(q) for q in oa_qs])
-        t = pd.concat([t.drop(columns=["quotes", "oa_quotes"]), s, s_oa], axis=1)
+        t = pd.concat([t.drop(columns=["oa_quotes"]), s, s_oa], axis=1)
         for name in BOOKS:                             # every book's own number, PT sign
             t[f"{name}_home"] = [-q[name][0] if name in q else np.nan for q in qs]
             t[f"{name}_odds"] = [q[name][1] if name in q else np.nan for q in qs]
@@ -774,7 +755,8 @@ def append_forward_log(t: pd.DataFrame) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--snapshot", type=Path, default=None)
-    ap.add_argument("--no-books", action="store_true", help="skip the live Action Network fetch")
+    ap.add_argument("--no-books", action="store_true",
+                    help="skip the book feeds and the Action Network event-id lookup")
     ap.add_argument("--book", default=None,
                     help="show the side's number and price at this one book: " + ", ".join(BOOKS))
     ap.add_argument("--recompute-forward-log", action="store_true",

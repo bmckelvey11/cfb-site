@@ -116,21 +116,28 @@ def test_an_unmapped_book_does_not_vote(tmp_path, monkeypatch):
     assert ws.oddsapi_books(NOW).oa_quotes.iloc[0] == {"DraftKings": (-7.5, -110)}
 
 
-def test_overlapping_books_are_deduped_with_action_network_winning():
-    """The promoted median must count each BOOK once, whichever feeds carried it.
+def test_action_network_no_longer_votes():
+    """Amendment S4: the fair is the-odds-api's books plus Pinnacle; Caesars left with AN."""
+    assert ws.BOOK_SET_VERSION == 4
+    assert set(ws.BOOKS) == set(ws.OA_BOOKS.values()) | {"Pinnacle"}
+    assert "Caesars" not in ws.BOOKS
 
-    Four of Action Network's five books are also on the-odds-api. Merging without dedup gives
-    DraftKings, FanDuel, BetRivers and BetMGM two votes each -- a consensus weighted by feed
-    coverage. AN wins the overlap because its quote is live where the snapshot is up to 6h old.
-    """
-    an = {"DraftKings": (-7.0, -110), "Caesars": (-7.5, -110)}
-    oa = {"DraftKings": (-6.0, -110), "Bovada": (-8.0, -110)}   # stale DK quote
 
-    combined = {**oa, **an}
+def test_live_books_carries_join_keys_and_no_prices(monkeypatch):
+    """The AN scoreboard is still read for the event id version B keys its close on -- nothing else."""
+    payload = {"games": [{"id": 7, "start_time": "2026-09-12T23:00:00Z",
+                          "home_team_id": 1, "away_team_id": 2,
+                          "teams": [{"id": 1, "display_name": "Marshall"},
+                                    {"id": 2, "display_name": "Middle Tenn"}],
+                          "markets": {"68": {"event": {"spread": [
+                              {"side": "home", "value": -7.5, "odds": -110}]}}}}]}
+    monkeypatch.setattr(ws.clt, "_get", lambda url, params=None, **kw: json.dumps(payload).encode())
+    monkeypatch.setattr(ws.time, "sleep", lambda s: None)
 
-    assert len(combined) == 3                       # not 4: DraftKings counted once
-    assert combined["DraftKings"] == (-7.0, -110)   # the live AN quote, not the stale one
-    assert ws.shop(combined)["n_books"] == 3
+    books = ws.live_books(NOW)
+
+    assert list(books.event_id) == [7] and books.key.iloc[0] == "marshall"
+    assert "quotes" not in books.columns
 
 
 def test_missing_snapshot_dir_is_not_fatal(tmp_path, monkeypatch):

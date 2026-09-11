@@ -98,6 +98,50 @@ mis-oriented side), it is fixed, recorded here, and the run repeated once.
 
 ---
 
+## Amendment S4 — the-odds-api and Pinnacle are the whole live fair (committed 2026-09-11)
+
+**Names and replaces S3's live fair set.** The backtest set R stands unchanged, for S2's reason:
+every number in `line-shopping-results.md` was computed under R from the Action Network
+archive, and that archive is still on disk.
+
+**Motivation.** The Action Network scrape is being retired
+([`docs/odds-sources-an-vs-apis-2026-09-11.md`](../../../docs/odds-sources-an-vs-apis-2026-09-11.md),
+*Decision*): the bulk scrape stops now, and the per-game history task stops after the 2026
+season. The live fair therefore has to stand without AN's five books. Nothing in a result
+motivated this; a source is going away.
+
+**Fixed now.**
+
+- **Live fair set, from 2026-09-11:** the nine the-odds-api books — DraftKings, FanDuel,
+  BetRivers, BetMGM, BetOnline.ag, Bovada, LowVig.ag, BetUS, MyBookie.ag — **∪** Pinnacle from
+  oddspapi. `OA_BOOKS` and `BOOKS` in `weekly_slate.py` are the list. **Caesars leaves the
+  set**: no other feed carries it. The four books R shared with the-odds-api stay, priced from
+  the snapshot rather than live.
+- **Staleness.** Every the-odds-api quote is as of the latest `CFB-Odds-Snapshot` pull, up to six
+  hours old (every two hours on Saturday afternoons from this date); Pinnacle's is up to 24
+  hours old. Nothing in the fair is live any more. Amendment S1's outlier guard (2.5 points from
+  the all-book median) is unchanged and is what keeps a stale number on a moved line out.
+- **≥ 2 books still required.**
+- **The Action Network scoreboard is still called once per slate, for the event id only** —
+  `live_books` returns no prices. The forward log needs that id because version B's close is
+  keyed on it (below). That call retires with `CFB-AN-History`.
+- **Tagged.** `BOOK_SET_VERSION` = 4 on every `movement_forward_log.csv` row from here on.
+  Version-3 rows (2026-09-09 to 2026-09-11) stand as written and cannot be recomputed — AN's
+  live quotes at those moments were not stored. Any read pooling eras must say so.
+- **Scope.** This changes `book_fair`, `side`, `side_line`, `edge` and the printed bet set.
+  **Version B is untouched**: its anchor is Prediction Tracker's line and its close is Action
+  Network's consensus book 15 from `history_event_<id>.json`, which `CFB-AN-History` keeps
+  pulling through the 2026 season. The close definition changes only when that task is cut, and
+  that will be its own amendment to `prereg-line-movement.md`.
+
+**Measured on commit, 2026 week 3, 49 games, snapshot `ncaapredictions_20260910T163007Z`,
+version-3 and version-4 slates built minutes apart from the same the-odds-api and oddspapi
+snapshots.** Books per game 11 → 10 (Caesars out). `book_fair` moved on 8 of 49 games, median
+0.00, mean +0.005, max 0.50 points — every move a quarter or half point, the size of one book
+leaving an even-count median. E4's side flipped on 2 games; the edge ≥ 1 bet set went 24 → 23.
+Reproduce: build both versions with `weekly_slate.build(snapshot, with_books=True)` and diff
+`book_fair`.
+
 ## Amendment S3 — Pinnacle in the live fair (committed 2026-09-09)
 
 **Names and extends S2's live fair set.** The backtest set R stands unchanged, for S2's reason:
