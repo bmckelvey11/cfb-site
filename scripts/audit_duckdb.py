@@ -3,7 +3,7 @@ key-type consistency, grain duplicates, coverage holes, dead columns, orphan key
 
 Read-only. Writes a markdown report to stdout (or --out).
 
-    python scripts/audit_duckdb.py --out docs/duckdb-audit-2026-09-02.md
+    python scripts/audit_duckdb.py --out archive/docs/duckdb-audit-2026-09-02.md
 """
 
 from __future__ import annotations

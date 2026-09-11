@@ -30,7 +30,7 @@ those can be fixed by code and a rebuild rather than by deleting someone's data.
   and `core`, JSON-typed `stg` columns, 14 join-integrity rules, `games.csv` vs
   `core.fact_game`, and a schema snapshot diffed against the previous run's snapshot in
   `data/audit/`).
-- Prior work this builds on, not repeats: `docs/duckdb-audit-2026-09-02.md` (S1–S9 and the
+- Prior work this builds on, not repeats: `archive/docs/duckdb-audit-2026-09-02.md` (S1–S9 and the
   remediation plan), `cfb_system_maker/docs/refresh-break-2026-09-11.md` (the 05:00 failure),
   `docs/graphql-dump-staleness-2026-09-11.md`.
 

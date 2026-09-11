@@ -1,6 +1,6 @@
 # DuckDB audit remediation plan — 2026-09-02
 
-Plan for the findings in [`duckdb-audit-2026-09-02.md`](duckdb-audit-2026-09-02.md).
+Plan for the findings in [`duckdb-audit-2026-09-02.md`](../archive/docs/duckdb-audit-2026-09-02.md).
 Ordered by **what breaks next**, not by audit severity.
 
 **Status 2026-09-02: steps 1–5 done and verified against the live warehouse.** Sign-off was

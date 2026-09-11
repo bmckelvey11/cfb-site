@@ -225,7 +225,7 @@ message and exit code 1 if `{db}` does not already exist.
 
 ### `_post_wk` files do not parse — postseason rows go missing from a season filter
 
-**Closed 2026-09-02 by [`duckdb-audit-2026-09-02.md`](duckdb-audit-2026-09-02.md) S6:** does not reproduce in the live warehouse. Of 319 `season`/`year` columns checked, only
+**Closed 2026-09-02 by [`duckdb-audit-2026-09-02.md`](../archive/docs/duckdb-audit-2026-09-02.md) S6:** does not reproduce in the live warehouse. Of 319 `season`/`year` columns checked, only
 `gamePlayerStat` is partially NULL (998 of 5,541,660 rows, 0.02%), and those rows trace to
 a stale unpartitioned `data/graphql/gamePlayerStat.json`, not to postseason stem parsing.
 Kept below for history.

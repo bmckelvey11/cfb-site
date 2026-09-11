@@ -4,7 +4,7 @@
 *and* everything else that ever landed on disk. ``build_duckdb`` globs
 ``raw/*.json``, so any stray file became a permanent table -- a hand-saved PFF
 export minted 4 tables, and seven dated line snapshots minted 11 more (see
-``docs/duckdb-audit-2026-09-02.md`` S7).
+``archive/docs/duckdb-audit-2026-09-02.md`` S7).
 
 After this split:
 

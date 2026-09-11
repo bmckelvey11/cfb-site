@@ -1,7 +1,7 @@
 """Bring the live warehouse to match the code without a 4.9 GB rebuild.
 
 Two changes land here, both of which a full ``duckdb --explode`` would produce
-from scratch (see ``docs/warehouse-schema-recommendation.md`` §7 and §8):
+from scratch (see ``archive/docs/warehouse-schema-recommendation.md`` §7 and §8):
 
 1. **Action Network** -- rename the three roots ``actionnetwork_*`` -> ``an_*``
    in ``raw`` and ``stg``, drop the ten generic

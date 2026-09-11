@@ -7,7 +7,7 @@ Evidence is the live warehouse (301 tables) plus every `<schema>.<table>` litera
 Prior decisions cited, not restated: [ADR 0002](adr/0002-graphql-stg-tables-in-separate-schema.md),
 [naming rationalization](superpowers/specs/2026-08-31-warehouse-naming-rationalization.md),
 [source rationalization](superpowers/specs/2026-09-01-warehouse-source-rationalization.md),
-[audit](duckdb-audit-2026-09-02.md).
+[audit](../archive/docs/duckdb-audit-2026-09-02.md).
 
 ## Recommendation in one line
 
