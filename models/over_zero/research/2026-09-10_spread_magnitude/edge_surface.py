@@ -288,6 +288,129 @@ def gate_inference(d: pd.DataFrame, cap: float = 50.0, first: int = 2018) -> Non
           f"observed gap {abs(kept.over.mean() - dropped.over.mean()) * 100:.1f}pp")
 
 
+CAP_GRID = np.arange(34, 63, 1.0)
+# Fine bands, NOT pre-registered: PLAN.md 5 fixed 30-40/40-50/>50, and these 5-point
+# slices were cut afterwards, once the coarse >50 band came back ambiguous. They are
+# reported as exploratory. What they buy is real -- the coarse band pooled 50-55 with
+# a 6-0 noise cell above 55 -- but a reader has to be able to see they came second.
+FINE_BANDS = [(35, 40), (40, 45), (45, 50), (50, 55), (55, 62)]
+
+
+def _objective(x: pd.DataFrame, obj: str) -> float:
+    """Total flat units, or ROI per bet. They do not agree, and that is the point.
+
+    ROI per bet is DEGENERATE as a cap objective: tightening the cap can only raise
+    it, because the marginal bets a tighter cap removes are the ones nearest
+    break-even. Maximizing it is a definition, not a discovery. Units is the
+    objective a bankroll actually has.
+    """
+    n = len(x)
+    w = int(x.over.sum())
+    return (x.flat_units_pnl.sum() if obj == "units"
+            else (w * BREAK_EVEN - (n - w)) / n)
+
+
+def best_cap(f: pd.DataFrame, obj: str, min_n: int = 20) -> float | None:
+    best, best_v = None, -np.inf
+    for c in CAP_GRID:
+        x = f[f.spread <= c]
+        if len(x) < min_n:
+            continue
+        v = _objective(x, obj)
+        if v > best_v:
+            best, best_v = c, v
+    return best
+
+
+def cap_grid(d: pd.DataFrame) -> pd.DataFrame:
+    """In-sample profile of every cap. The winner here is the selection estimate."""
+    b = d[d.passes_filter == 1]
+    rows = []
+    for c in CAP_GRID:
+        x = b[b.spread <= c]
+        if len(x) < 20:
+            continue
+        n = len(x)
+        w = int(x.over.sum())
+        rows.append({"cap": c, "n": n, "record": f"{w}-{n - w}", "hit": w / n,
+                     "roi": (w * BREAK_EVEN - (n - w)) / n,
+                     "units": x.flat_units_pnl.sum()})
+    return pd.DataFrame(rows)
+
+
+def argmax_bootstrap(d: pd.DataFrame, obj: str = "units", n_boot: int = 2000) -> None:
+    """How well determined is the argmax? Resample seasons and re-optimize.
+
+    A point estimate of an optimum means nothing without this. If the argmax moves
+    across most of the grid under resampling, there is no optimum to find and the
+    honest output is a bound, not a number.
+    """
+    rng = np.random.default_rng(0)
+    b = d[d.passes_filter == 1]
+    seasons = b.season.unique()
+    picks = []
+    for _ in range(n_boot):
+        s = pd.concat([b[b.season == p]
+                       for p in rng.choice(seasons, len(seasons), replace=True)])
+        c = best_cap(s, obj)
+        if c is not None:
+            picks.append(c)
+    picks = np.array(picks)
+    counts = pd.Series(picks).value_counts().sort_index()
+    print(f"    objective={obj}: full-sample argmax {best_cap(b, obj):g}, "
+          f"resample 2.5-97.5 pct [{np.percentile(picks, 2.5):g}, "
+          f"{np.percentile(picks, 97.5):g}]")
+    print("      modes: " + ", ".join(f"{k:g}x{v}" for k, v in counts.items()
+                                      if v >= n_boot * 0.02))
+
+
+def optimizer_vs_fixed(d: pd.DataFrame, fixed: float = 50.0,
+                       first: int = 2019) -> pd.DataFrame:
+    """Let the cap be FITTED on prior seasons, then grade it forward.
+
+    The comparison is against a cap nobody fitted. If a fitted cap loses to a round
+    number out of sample, the lesson is about the fitting, not about the number --
+    `fixed` came from this same data too and is not being validated here.
+    """
+    b = d[d.passes_filter == 1]
+    years = [s for s in sorted(b.season.unique()) if s >= first]
+    rows = []
+    for obj in ("units", "roi"):
+        picked, chosen = [], []
+        for t in years:
+            c = best_cap(b[b.season < t], obj)
+            cur = b[b.season == t]
+            picked.append(cur if c is None else cur[cur.spread <= c])
+            chosen.append(f"{t}:{c:g}" if c is not None else f"{t}:none")
+        print(f"    cap fitted forward on {obj}: " + " ".join(chosen))
+        rows.append(("cap fitted fwd (%s)" % obj, pd.concat(picked)))
+    u = b[b.season >= first]
+    rows += [(f"fixed cap {fixed:g}", u[u.spread <= fixed]), ("no cap", u)]
+    out = []
+    for lab, f in rows:
+        n = len(f)
+        w = int(f.over.sum())
+        out.append({"rule": lab, "n": n, "record": f"{w}-{n - w}", "hit": w / n,
+                    "roi": (w * BREAK_EVEN - (n - w)) / n,
+                    "units": f.flat_units_pnl.sum()})
+    return pd.DataFrame(out)
+
+
+def fine_bands(d: pd.DataFrame) -> pd.DataFrame:
+    """5-point bands across the turn, all graded games. Exploratory -- see FINE_BANDS."""
+    rows = []
+    for lo, hi in FINE_BANDS:
+        x = d[(d.spread > lo) & (d.spread <= hi)]
+        r = {"band": f"{lo}-{hi}", "n": len(x)}
+        if len(x) >= 10:
+            for col in ("total_err", "fav_err", "dog_err"):
+                e, clo, chi = boot_mean(x[col].to_numpy(), x.season.to_numpy())
+                r[col] = e
+                r[col + "_ci"] = f"[{clo:+.1f},{chi:+.1f}]"
+        rows.append(r)
+    return pd.DataFrame(rows)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--bets", default=str(BETS))
@@ -336,6 +459,21 @@ def main() -> int:
     print("--- what the cap moves (nested; see cap_delta docstring) ---")
     print(cap_delta(d).to_string(index=False,
                                  float_format=lambda v: f"{v:.4f}"))
+
+    print()
+    print("--- is there an optimal cap? in-sample profile ---")
+    print(cap_grid(d).to_string(index=False, float_format=lambda v: f"{v:.4f}"))
+    print()
+    print("--- argmax under season resampling ---")
+    for obj in ("units", "roi"):
+        argmax_bootstrap(d, obj)
+    print()
+    print("--- a FITTED cap vs a round number, graded forward ---")
+    print(optimizer_vs_fixed(d).to_string(index=False,
+                                          float_format=lambda v: f"{v:.4f}"))
+    print()
+    print("--- fine bands across the turn (EXPLORATORY, not pre-registered) ---")
+    print(fine_bands(d).to_string(index=False, float_format=lambda v: f"{v:+.2f}"))
     return 0
 
 

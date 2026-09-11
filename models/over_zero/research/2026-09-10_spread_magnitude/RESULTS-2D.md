@@ -261,6 +261,111 @@ FBS-vs-FCS, and two of them the top picks by bias. Under this recommendation tho
 three come off the board. **No code was changed and no board was re-run** — the
 cap is a rule change, and that is the user's call, not this analysis's.
 
+## 8. Is 50 the *optimal* cap? — added 2026-09-11
+
+Asked directly after §6. Short answer: **the optimum is not identified as a point.
+What is identified is a floor — do not cap below 50.** Four lines converge there,
+and the evidence for the cap is stronger than §5 had it.
+
+### 8a. The in-sample search, and why its winner is meaningless
+
+Grid over caps 34–62 on the 234 bets. Two objectives, two different answers:
+
+| objective | argmax | value at argmax | n kept |
+|---|---:|---:|---:|
+| ROI per bet | **38** | +43.18% | 48 |
+| total flat units | **50** | +56.00 | 196 |
+
+**ROI per bet is degenerate as a cap objective.** Tightening can only raise it,
+because the bets a tighter cap removes are the ones nearest break-even. Its argmax
+of 38 keeps 48 of 234 bets — that is not an optimum, it is the definition of the
+statistic. Total units is the objective a bankroll actually has, and it says 50.
+The two objectives disagreeing by 12 points of spread *is itself* the finding that
+kills naive optimization here.
+
+The units profile is also sawtoothed — 43: +27.4, 45: +36.7, 48: +40.1, 50: +56.0,
+51: +49.7 — which is what noise looks like, not a peak.
+
+### 8b. The argmax is not stable
+
+2,000 season-resamples, re-optimizing each time:
+
+| objective | full-sample argmax | resample 2.5–97.5 pct | modes |
+|---|---:|---|---|
+| units | 50 | **[50, 62]** | 50 (58%), 62 = no cap (31%) |
+| ROI | 38 | [36, 50] | 38 (75%) |
+
+On the units objective the data cannot distinguish "cap at 50" from "do not cap at
+all" — those are the two modes. But note the lower bound: **across 2,000
+resamples the units-optimal cap never lands below 50.** That is the floor. The
+open question is whether to cap, not how tight.
+
+### 8c. A fitted cap loses to a round number, out of sample
+
+Cap fitted on seasons < *t*, graded on *t*, pooled 2019–2025:
+
+| rule | n | record | hit rate | ROI | flat units |
+|---|---:|---:|---:|---:|---:|
+| cap fitted forward (units) | 208 | 134–74 | 64.42% | +22.99% | +47.82 |
+| cap fitted forward (ROI) | 101 | 74–27 | 73.27% | +39.87% | +40.27 |
+| **fixed cap 50** | 175 | 119–56 | **68.00%** | **+29.82%** | **+52.18** |
+| no cap | 208 | 134–74 | 64.42% | +22.99% | +47.82 |
+
+The units optimizer picks `none` every single year — it never caps, so it is
+identical to no cap. The ROI optimizer tightens to 38 by 2023 and ends with the
+best hit rate on the board (73.27%) while making **less money than not capping at
+all** (40.27 units vs 47.82): it bought rate by discarding half the volume.
+
+Fixed 50 beats both.
+
+**What this does and does not establish.** It does *not* validate 50 — 50 came
+from this same data and is not being held out. What it establishes is that
+**fitting** the cap does worse than a mechanism-motivated round number. That is a
+claim about the optimizers, and it is the one the design supports.
+
+### 8d. The mechanism turns right at 50 — the strongest single number here
+
+5-point bands, all 10,255 graded games, season-cluster bootstrap:
+
+| band | n | total_err | 95% CI | fav_err | 95% CI | dog_err | 95% CI |
+|---|---:|---:|---|---:|---|---:|---|
+| 35–40 | 227 | +2.07 | [−0.3, +4.5] | +1.92 | [−0.4, +4.3] | +0.15 | [−0.8, +1.1] |
+| 40–45 | 126 | +2.67 | [+1.0, +4.4] | +1.62 | [−0.2, +3.4] | +1.05 | [+0.1, +2.0] |
+| **45–50** | 78 | **+4.29** | **[+2.2, +6.4]** | +2.35 | [+0.2, +4.5] | +1.94 | [+0.3, +3.5] |
+| **50–55** | 35 | −2.14 | [−7.2, +2.9] | **−4.20** | **[−7.7, −0.7]** | +2.06 | [−0.4, +4.5] |
+| 55–62 | 6 | — | — | — | — | — | — |
+
+45–50 is the **best band in the entire sample**. In 50–55 the favorite error is
+−4.20 with an interval that **excludes zero** — the first time this effect clears
+its own uncertainty anywhere in this analysis. The dog leg goes on rising (+2.06)
+straight through the turn, exactly as §3 said.
+
+**This slice is exploratory and was not pre-registered.** `PLAN.md` §5 fixed the
+bands at 30–40 / 40–50 / >50; these 5-point bands were cut afterwards, once the
+coarse >50 band came back ambiguous ([−5.65, +0.78]). What the finer cut reveals is
+why it was ambiguous: the coarse band pooled 50–55 with a 6-game cell above 55 that
+happened to go 6–0. Legitimate, and second.
+
+### 8e. How precisely is the boundary located?
+
+Not precisely. Exact-spread cells near the line hold 1–17 games each; the sharp
+drop between cap 50 and cap 51 rests on ~10 bets at spread 50.5. **The boundary is
+resolvable to a band, not to a number.** Anything in 48–52 is consistent with this
+data; 50 is the round number inside that range and the one the fine bands break at.
+
+### 8f. Answer
+
+**Cap at 50.** Not because a search found it — the searches either refuse to cap
+or overtighten to 38 and lose money — but because it is the floor every resampled
+optimization respects, the boundary where the favorite leg goes significantly
+negative, and the only cap that beats both fitted alternatives on held-out seasons.
+
+§6's recommendation stands, and its evidential basis is stronger than when it was
+written: §6 rested on payoff asymmetry over a sub-MDE test, while §8d gives an
+interval that excludes zero and §8c gives an out-of-sample win over the fitted
+alternatives. The pre-registration caveat in §6 is unchanged, and §8d adds one of
+its own.
+
 ---
 `docs/backtest_bets.csv`, 10,255 graded games / 234 bets, 2016–2025 | −110 flat |
 season-clustered wild bootstrap, 9,999 reps | plan pre-committed in `PLAN.md` |
