@@ -18,23 +18,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cfb_paths import DB_PATH  # noqa: E402
 
 # Schemas the warehouse plan (docs/duckdb-warehouse-plan.md) says should exist.
-EXPECTED_SCHEMAS = ["raw", "stg", "stg_gql", "core", "meta"]
+EXPECTED_SCHEMAS = ["raw", "stg", "core", "meta"]
 
 # Declared grains. Sources: docs/duckdb-core-ddl.md, docs/graphql-schema-draft.md,
 # docs/schema-audit.md.
 # Column names reflect the 2026-08-31 naming rationalization (id -> gameId/teamId/...,
-# GraphQL staging moved to stg_gql), not the pre-rationalization names in the docs.
+# GraphQL staging collapsed into stg), not the pre-rationalization names in the docs.
 DECLARED_GRAINS = [
     ("stg.games", ["gameId"]),
-    ("stg_gql.game", ["gameId"]),
+    ("stg.game", ["gameId"]),
     ("stg.teams", ["teamId", "season"]),
     ("stg.venues", ["venueId"]),
     ("stg.conferences", ["conferenceId", "season"]),
-    ("stg_gql.calendar", ["season", "week", "seasonType"]),
+    ("stg.calendar_gql", ["season", "week", "seasonType"]),
     # Docs declare (gameId, linesProviderId); actual grain needs `period` too.
-    ("stg_gql.game_lines", ["gameId", "linesProviderId"]),
-    ("stg_gql.game_lines", ["gameId", "linesProviderId", "period"]),
-    ("stg_gql.current_teams", ["teamId"]),
+    ("stg.game_lines", ["gameId", "linesProviderId"]),
+    ("stg.game_lines", ["gameId", "linesProviderId", "period"]),
+    ("stg.current_teams", ["teamId"]),
     ("stg.lines", ["gameId"]),
 ]
 
@@ -168,7 +168,7 @@ def check_season(con, args):
         select table_schema sch, table_name tbl, column_name col
         from information_schema.columns
         where lower(column_name) in ('season','year')
-          and table_schema in ('raw','stg','stg_gql')
+          and table_schema in ('raw','stg')
     """)
     rows = []
     for _, r in df.iterrows():
@@ -269,7 +269,7 @@ def check_orphans(con, args):
     df = q(con, """select table_schema s, table_name t, column_name c
                    from information_schema.columns
                    where lower(column_name) in ('gameid','game_id')
-                     and table_schema in ('stg','stg_gql')""")
+                     and table_schema = 'stg'""")
     out.append("| table | col | rows | orphan game ids | orphan rows |")
     out.append("|---|---|---:|---:|---:|")
     for _, r in df.iterrows():
@@ -307,7 +307,7 @@ def check_twin_columns(con, args):
             join information_schema.columns b
               on a.table_schema=b.table_schema and a.table_name=b.table_name
             where lower(a.column_name)=lower('%s') and lower(b.column_name)=lower('%s')
-              and a.table_schema in ('stg','stg_gql')
+              and a.table_schema = 'stg'
             order by 1,2
         """ % (part, payload))
         for _, r in df.iterrows():
@@ -351,8 +351,8 @@ def main():
     p.add_argument("--max-rows", type=int, default=200_000,
                    help="dead-column scan skips tables above this row count")
     p.add_argument("--coverage-tables",
-                   default="stg.games,stg_gql.game,stg.lines,stg_gql.game_lines,"
-                           "stg_gql.calendar,stg.plays,stg.drives,"
+                   default="stg.games,stg.game,stg.lines,stg.game_lines,"
+                           "stg.calendar_gql,stg.plays,stg.drives,"
                            "stg.an_scoreboard")
     a = p.parse_args()
     a.coverage_tables = [t.strip() for t in a.coverage_tables.split(",") if t.strip()]

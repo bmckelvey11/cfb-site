@@ -7,7 +7,7 @@ estimator are fixed ahead of the data. Reads only files the collector already wr
            game's kick week -- "Monday's line" in the pre-registration
   close    Action Network consensus (book 15), last full-game spread tick before kickoff,
            from raw/actionnetwork/history_event_<id>.json (pulled Mondays by CFB-AN-History)
-  scores   CFBD, stg_gql.game, through the same name matching the archive build uses
+  scores   CFBD, stg.game, through the same name matching the archive build uses
 
 Everything in PT sign: POSITIVE = home favoured. y = close - line_Monday; x = pred - line_Monday.
 
@@ -148,7 +148,7 @@ def close_from_history(event_id: float, kick: datetime) -> float:
 def fetch_scores(con, seasons):
     """{(season, {home, away}): (cfbd_home, home_points, away_points)} from core.fact_game.
 
-    core.fact_game is what CFB-CFBD-Daily rebuilds; stg_gql.game is refreshed only by the
+    core.fact_game is what CFB-CFBD-Daily rebuilds; stg.game is refreshed only by the
     GraphQL pull and lagged a full week of scores in 2026.
     """
     rows = con.execute(

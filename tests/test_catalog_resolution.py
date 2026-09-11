@@ -2,8 +2,8 @@
 
 Two renames in one migration broke two consumers silently and the suite stayed
 green through both (see ``docs/warehouse-schema-recommendation.md`` §0):
-``stg.calendar`` -> ``stg_gql.calendar`` killed the nightly ``build_core``, and
-``stg.gql_game`` -> ``stg_gql.game`` killed the prediction tracker. Neither had a
+``stg.calendar`` -> ``stg.calendar_gql`` killed the nightly ``build_core``, and
+``stg.gql_game`` -> ``stg.game`` killed the prediction tracker. Neither had a
 test, because tests that build their own fixtures cannot notice that the live
 catalog moved.
 
@@ -25,14 +25,16 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 ROOTS = ("cfb_system_maker", "models", "research", "scripts")
 
-# Longest alternative first: `stg` would otherwise win against `stg_gql`.
+# `stg_gql` is gone (ADR-0003); dropping it from the alternation means a literal
+# naming it now resolves as `stg_gql.<x>` matching nothing, which is the point --
+# a stale reference must fail, not be quietly skipped.
 # The lookbehind rejects `.meta.json` -- a file suffix, not a schema.
-REF = re.compile(r"(?<![\w.])(stg_gql|stg|raw|core|meta)\.([A-Za-z_][A-Za-z0-9_]*)")
+REF = re.compile(r"(?<![\w.])(stg|raw|core|meta)\.([A-Za-z_][A-Za-z0-9_]*)")
 
 # References that are correct but cannot resolve against the local file.
 ALLOW = {
     ("meta", "warehouse_version"): "created on MotherDuck by promote_to_motherduck",
-    ("stg_gql", "game_lines__backfill"): "transient; built and dropped inside one load",
+    ("stg", "game_lines__backfill"): "transient; built and dropped inside one load",
 }
 
 

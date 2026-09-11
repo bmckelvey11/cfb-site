@@ -116,11 +116,25 @@ stg.calendar_gql      stg.calendar                  # 2 of 3
 stg.predicted_points                                # 3rd needs no tag — Bucket A drops REST
 ```
 
-**The suffixes are temporary by construction, and this plan is what removes them.** All three
+~~**The suffixes are temporary by construction, and this plan is what removes them.** All three
 colliders are exactly the tables that stop existing in duplicate: `predicted_points` drops its
 REST side (Bucket A), `draft_picks` and `calendar` merge into `core` (Bucket C). When
 rationalization completes the suffix count is zero and no name in the schema refers to a
-transport.
+transport.~~
+
+**Corrected 2026-09-10 — the three suffixes are permanent.** Wrong on all three counts.
+`predicted_points` failed R6 and kept its REST side (its rows lose `down`/`distance` at the
+API). And **merging a pair into `core` never retires its `stg` sources, because `core` is built
+*from* them** — `_build_dim_draft_pick` reads `stg.draft_picks` and `stg.draft_picks_gql` on
+every `build_core`. That was a reasoning error rather than a measurement that moved; nothing
+this plan could do would ever have made those two go away. The collapse was carried out anyway,
+because the argument above never rested on the prediction: 38 transport-tagged names became 3.
+See [`docs/stg-gql-collapse-2026-09-10.md`](../../stg-gql-collapse-2026-09-10.md) and ADR-0003's
+amendment.
+
+**Landed 2026-09-10.** Target naming as specified, plus `predicted_points_gql`, which this
+section assumed would need no tag. `stg.gameMedia` → `stg.game_media` and
+`stg.gamePlayerStat` → `stg.game_player_stat` rode along.
 
 **Two hard conditions.** The collapse renames the qualified name of all 38 tables, and code
 references them about 50 times (measured 2026-09-09, excluding worktrees and docs:

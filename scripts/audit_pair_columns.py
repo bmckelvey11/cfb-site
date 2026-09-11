@@ -91,16 +91,16 @@ def main() -> int:
     print(f"{'concept':18s} {'gql-only':>9s} {'rest-only':>10s} {'shared':>7s}   "
           f"(populated exclusives in brackets)")
     for concept, gql, rest in pairs:
-        gcols = [c for c in columns(con, "stg_gql", gql) if c not in BOOKKEEPING]
+        gcols = [c for c in columns(con, "stg", gql) if c not in BOOKKEEPING]
         rcols = [c for c in columns(con, "stg", rest) if c not in BOOKKEEPING]
         if not gcols or not rcols:
-            print(f"{concept:18s} MISSING (stg_gql.{gql}={len(gcols)}, stg.{rest}={len(rcols)})")
+            print(f"{concept:18s} MISSING (stg.{gql}={len(gcols)}, stg.{rest}={len(rcols)})")
             continue
 
         gkeys, rkeys = {loose(c) for c in gcols}, {loose(c) for c in rcols}
         gonly = [c for c in gcols if loose(c) not in rkeys]
         ronly = [c for c in rcols if loose(c) not in gkeys]
-        gfill, rfill = fills(con, "stg_gql", gql, gonly), fills(con, "stg", rest, ronly)
+        gfill, rfill = fills(con, "stg", gql, gonly), fills(con, "stg", rest, ronly)
         gpop = [c for c in gonly if gfill[c] > 0]
         rpop = [c for c in ronly if rfill[c] > 0]
         print(f"{concept:18s} {len(gonly):9d} {len(ronly):10d} "
@@ -116,7 +116,7 @@ def main() -> int:
                 gt = {t for t in loose(g).replace("id", " id ").split() if len(t) > 3}
                 for r in ronly:
                     if gt & {t for t in loose(r).replace("id", " id ").split() if len(t) > 3}:
-                        print(f"    near-miss  stg_gql.{g}  ~  stg.{r}")
+                        print(f"    near-miss  stg.{g}  ~  stg.{r}")
     return 0
 
 

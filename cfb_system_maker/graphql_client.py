@@ -48,8 +48,17 @@ def _snake(name: str) -> str:
 # `stg.calendar` (REST, 258 rows) and `stg.calendar_gql` (GraphQL, 424 rows) to swap
 # provenance across a rebuild with nothing recording which was which.
 #
-# GQL_ENTITY_TO_STG: bare `stg_gql` destination. GraphQL lives in its own schema, so
-# no prefix is needed to stay disjoint from REST's `stg` destinations.
+# GQL_ENTITY_TO_STG: destination in `stg`, suffixed `_gql` for exactly the three names
+# REST also uses. There is no `stg_gql` schema any more (ADR-0003, collapsed 2026-09-10):
+# a schema tagging all 38 tables to disambiguate 3 was the disproportionate remedy, and
+# 28 of them have no counterpart of any spelling to be disambiguated from.
+#
+# **The three suffixes are permanent, not temporary.** The plan predicted they would go to
+# zero -- `predicted_points` dropping its REST side under Bucket A, `draft_picks` and
+# `calendar` "merging into core". Neither happens: `predicted_points` failed R6 (its REST
+# rows lose down/distance at the API), and merging a pair into `core` never retires its
+# `stg` sources, because `core` is built *from* them -- `_build_dim_draft_pick` reads both
+# sides on every `build_core`. See docs/stg-gql-collapse-2026-09-10.md.
 #
 # GQL_ENTITY_TO_RAW: `raw` destination, decoupled from the above on purpose. `raw`
 # mixes REST and GraphQL dumps in one schema (no `raw_gql`), so it keeps the `gql_`
@@ -57,7 +66,16 @@ def _snake(name: str) -> str:
 # (`draft_picks`, `predicted_points`, `calendar` all collide once GraphQL is bare).
 #
 # The keys are the upstream API contract and must not be renamed.
-GQL_ENTITY_TO_STG: dict[str, str] = {entity: _snake(entity) for entity in GQL_DEFAULT_TABLES}
+# The bare names REST already owns in `stg`. Checked against the snake-cased entity name,
+# not the entity, so a future entity that snakes onto a REST name is caught by the
+# `test_gql_destinations_never_collide_with_rest_destinations_in_the_same_schema` pin
+# rather than silently overwriting it.
+GQL_STG_COLLIDERS = frozenset({"calendar", "draft_picks", "predicted_points"})
+GQL_ENTITY_TO_STG: dict[str, str] = {
+    entity: (_snake(entity) + "_gql" if _snake(entity) in GQL_STG_COLLIDERS
+             else _snake(entity))
+    for entity in GQL_DEFAULT_TABLES
+}
 GQL_ENTITY_TO_RAW: dict[str, str] = {
     entity: "gql_" + _snake(entity) for entity in GQL_DEFAULT_TABLES
 }

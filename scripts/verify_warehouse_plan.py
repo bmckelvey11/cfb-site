@@ -35,7 +35,12 @@ from cfb_system_maker.graphql_client import (  # noqa: E402
 # asserted is what section 2's argument actually rests on: the GraphQL entities are all
 # present under both spellings, nothing outside those three names collides, and the two
 # completed migrations have not regressed.
-REPORTED_COUNTS = {"raw": 116, "stg": 124, "stg_gql": 38}  # measured 2026-09-09
+REPORTED_COUNTS = {"raw": 116, "stg": 183}  # 2026-09-10, after the stg_gql collapse
+# The three bare names REST owns, which GraphQL therefore lands under a `_gql` suffix.
+# Before the collapse this was a list of tables present in *both* schemas; now it is the
+# list of suffixes that must exist, and `stg_gql` must not. The plan predicted this would
+# reach zero -- it does not, permanently: `predicted_points` failed R6 and merging a pair
+# into `core` never retires its `stg` sources. See docs/stg-gql-collapse-2026-09-10.md.
 COLLIDERS = ["calendar", "draft_picks", "predicted_points"]
 
 # A `stg` table whose name still carries the transport, or its casing, means the naming
@@ -61,10 +66,10 @@ DROPPED_COLUMNS = [
     ("stg", "an_team", "overtime_losses"),
     ("stg", "team_stats", "statValue_anyof_schema_1_validator"),
     ("stg", "team_stats__statValue_any_of_schemas", "statValue_anyof_schema_1_validator"),
-    ("stg_gql", "game_weather", "windGust"),
-    ("stg_gql", "poll_type", "abbreviation"),
-    ("stg_gql", "recruit", "overallRank"),
-    ("stg_gql", "recruit", "positionRank"),
+    ("stg", "game_weather", "windGust"),
+    ("stg", "poll_type", "abbreviation"),
+    ("stg", "recruit", "overallRank"),
+    ("stg", "recruit", "positionRank"),
 ]
 
 # Section 5's headline count, printed for comparison but never a failure: it moves every time a
@@ -98,17 +103,17 @@ SPINE = ("season", "week", "season_type")
 MERGE_KEYS = [
     (
         "calendar",
-        ("stg_gql", "calendar", ("year", "week", "seasonType")),
+        ("stg", "calendar_gql", ("year", "week", "seasonType")),
         ("stg", "calendar", ("season", "week", "seasonType")),
     ),
     (
         "draft_picks",
-        ("stg_gql", "draft_picks", ("year", "round", "pick")),
+        ("stg", "draft_picks_gql", ("year", "round", "pick")),
         ("stg", "draft_picks", ("year", "round", "pick")),
     ),
     (
         "game_lines",
-        ("stg_gql", "game_lines", ("gameId", "linesProviderId", "period")),
+        ("stg", "game_lines", ("gameId", "linesProviderId", "period")),
         None,
     ),
 ]
@@ -121,16 +126,16 @@ MERGE_KEYS = [
 PAIRS = [
     ("draft_position", "draft_position", "draft_positions"),
     ("draft_team", "draft_team", "draft_teams"),
-    ("predicted_points", "predicted_points", "predicted_points"),
+    ("predicted_points", "predicted_points_gql", "predicted_points"),
     ("coach_season", "coach_season", "coach_seasons"),
     ("talent", "team_talent", "talent"),
     ("recruit", "recruit", "recruits"),
     ("game", "game", "games"),
-    ("draft_picks", "draft_picks", "draft_picks"),
+    ("draft_picks", "draft_picks_gql", "draft_picks"),
     ("coach", "coach", "coaches"),
     ("conference", "conference", "conferences"),
     ("recruiting_team", "recruiting_team", "recruiting_teams"),
-    ("calendar", "calendar", "calendar"),
+    ("calendar", "calendar_gql", "calendar"),
 ]
 
 
@@ -167,14 +172,14 @@ def check_structure(con) -> list[str]:
         got = len(tables[schema])
         note = ""
         if schema in REPORTED_COUNTS:
-            note = f" (was {REPORTED_COUNTS[schema]} on 2026-09-09; counts move with the data)"
+            note = f" (was {REPORTED_COUNTS[schema]} on 2026-09-10; counts move with the data)"
         print(f"  [--  ] {schema:8} {got} tables{note}")
 
     # Every GraphQL entity must have landed under both spellings. This is what the old
     # `stg_gql == 38` / `raw gql_ == 34` counts were reaching for, said precisely: extra
-    # `stg_gql` tables are explode children and are fine, a *missing* entity is not.
+    # tables are explode children and are fine, a *missing* entity is not.
     for label, mapping, schema in (
-        ("stg_gql", GQL_ENTITY_TO_STG, "stg_gql"),
+        ("stg gql", GQL_ENTITY_TO_STG, "stg"),
         ("raw gql_", GQL_ENTITY_TO_RAW, "raw"),
     ):
         missing = sorted(set(mapping.values()) - tables.get(schema, set()))
@@ -183,11 +188,21 @@ def check_structure(con) -> list[str]:
         print(f"  [{'ok' if not missing else 'FAIL':4}] {label:8} all {len(mapping)} "
               f"entities present")
 
-    colliders = sorted(tables.get("stg", set()) & tables.get("stg_gql", set()))
-    ok = colliders == COLLIDERS
-    if not ok:
-        fails.append(f"colliders: {colliders}, plan says {COLLIDERS}")
-    print(f"  [{'ok' if ok else 'FAIL':4}] colliders       {colliders}")
+    # Inverted by the collapse: the schema must be gone, and each collider must be present
+    # under *both* the bare REST name and the suffixed GraphQL one. A missing suffix means
+    # a GraphQL table overwrote its REST twin -- the exact failure the separate schema was
+    # introduced to prevent, so it is the one thing worth asserting hardest.
+    if "stg_gql" in tables:
+        fails.append(f"stg_gql still exists with {len(tables['stg_gql'])} tables")
+    print(f"  [{'ok' if 'stg_gql' not in tables else 'FAIL':4}] no stg_gql      "
+          f"{len(tables.get('stg_gql', ()))} tables")
+
+    stg = tables.get("stg", set())
+    unpaired = sorted(n for n in COLLIDERS if not (n in stg and f"{n}_gql" in stg))
+    if unpaired:
+        fails.append(f"collider(s) missing a side in stg: {unpaired}")
+    print(f"  [{'ok' if not unpaired else 'FAIL':4}] colliders       "
+          f"{[f'{n} + {n}_gql' for n in COLLIDERS]}")
 
     # Postconditions of the two migrations section 1 says are done.
     stray = sorted(t for t in tables.get("stg", set()) if GQL_PREFIXED.match(t))
@@ -195,18 +210,13 @@ def check_structure(con) -> list[str]:
         fails.append(f"stg still holds gql_-prefixed tables: {stray}")
     print(f"  [{'ok' if not stray else 'FAIL':4}] no gql_ in stg  {len(stray)} found")
 
-    # Reported, not asserted. 15 camelCase table names survive (2026-09-09). Twelve are explode
-    # children named after the camelCase JSON key they unnest, and renaming those means changing
-    # how `explode_payloads` derives child names -- out of scope per section 12. The other two,
-    # `gameMedia` and `gamePlayerStat`, are root tables that section 8 step 5 snake-cases along
-    # with the collapse. Failing step 0 on any of it would block the rationalization on
-    # unrelated renames.
-    camel = sorted(
-        f"{s}.{t}"
-        for s in ("stg", "stg_gql")
-        for t in tables.get(s, set())
-        if CAMEL_CASE.search(t)
-    )
+    # Reported, not asserted. The two *root* camelCase names, `gameMedia` and
+    # `gamePlayerStat`, were snake-cased 2026-09-10 with the collapse. What survives is
+    # explode *children* named after the camelCase JSON key they unnest
+    # (`games__awayLineScores`), and renaming those means changing how `explode_payloads`
+    # derives child names -- out of scope per section 12, tracked as
+    # `#stg-camelcase-children`. Failing step 0 on it would block nothing useful.
+    camel = sorted(f"stg.{t}" for t in tables.get("stg", set()) if CAMEL_CASE.search(t))
     print(f"  [--  ] camelCase names {len(camel)} (step 0's prose says 0 -- see --camel)")
     return fails
 
@@ -215,7 +225,7 @@ def check_dead_columns(con) -> list[str]:
     """Census every all-NULL column, then score the plan's drop list against it."""
     tables = con.execute(
         "SELECT table_schema, table_name FROM information_schema.tables "
-        "WHERE table_schema IN ('stg', 'stg_gql') ORDER BY 1, 2"
+        "WHERE table_schema = 'stg' ORDER BY 1, 2"
     ).fetchall()
     census: dict[tuple[str, str, str], int] = {}
     for schema, table in tables:
@@ -228,7 +238,7 @@ def check_dead_columns(con) -> list[str]:
     spine_dead = [key for key in census if key[2] in SPINE]
     if spine_dead:
         fails.append(f"loader spine is all-NULL somewhere: {spine_dead} -- R3 has regressed")
-    print(f"  all-NULL columns in stg + stg_gql: {len(census)} "
+    print(f"  all-NULL columns in stg: {len(census)} "
           f"(plan section 5 reported {ALL_NULL_REPORTED}; this count moves with the data)")
     print(f"    of which loader spine {SPINE}: {len(spine_dead)} (plan says 0)")
     for key in sorted(census):
@@ -317,7 +327,7 @@ def report_coverage(con) -> None:
     print("|---|---|---|---|---|")
     for concept, gql, rest in PAIRS:
         cells = []
-        for schema, table in (("stg_gql", gql), ("stg", rest)):
+        for schema, table in (("stg", gql), ("stg", rest)):
             cols = _columns(con, schema, table)
             if not cols:
                 cells.append(("MISSING", ""))
@@ -340,23 +350,22 @@ def _selftest() -> int:
 
     con = duckdb.connect(":memory:")
     con.execute("CREATE SCHEMA stg")
-    con.execute("CREATE SCHEMA stg_gql")
     # Quoted, never `stg.t`: tests/test_catalog_resolution.py reads every `<schema>.<table>`
     # literal in scripts/ as a live warehouse reference, and these fixtures are not one.
     con.execute('CREATE TABLE "stg"."t" AS SELECT 1 AS a, NULL::INTEGER AS b')
-    con.execute('CREATE TABLE "stg_gql"."k" AS SELECT * FROM (VALUES (1,1),(1,2)) v(year, week)')
-    con.execute('CREATE TABLE "stg_gql"."dup" AS SELECT * FROM (VALUES (1,1),(1,1)) v(year, week)')
+    con.execute('CREATE TABLE "stg"."k" AS SELECT * FROM (VALUES (1,1),(1,2)) v(year, week)')
+    con.execute('CREATE TABLE "stg"."dup" AS SELECT * FROM (VALUES (1,1),(1,1)) v(year, week)')
 
     rows, filled = _filled(con, "stg", "t")
     assert rows == 1 and filled == {"a": 1, "b": 0}, filled
 
     saved = MERGE_KEYS
     try:
-        MERGE_KEYS = [("uniq", ("stg_gql", "k", ("year", "week")), None)]
+        MERGE_KEYS = [("uniq", ("stg", "k", ("year", "week")), None)]
         assert check_merge_keys(con) == []
-        MERGE_KEYS = [("dup", ("stg_gql", "dup", ("year", "week")), None)]
+        MERGE_KEYS = [("dup", ("stg", "dup", ("year", "week")), None)]
         assert len(check_merge_keys(con)) == 1
-        MERGE_KEYS = [("absent", ("stg_gql", "k", ("nope",)), None)]
+        MERGE_KEYS = [("absent", ("stg", "k", ("nope",)), None)]
         assert len(check_merge_keys(con)) == 1
     finally:
         MERGE_KEYS = saved
@@ -374,15 +383,17 @@ def _selftest_structure() -> int:
     rather than asserted.
     """
     con = duckdb.connect(":memory:")
-    for schema in ("raw", "stg", "stg_gql"):
+    for schema in ("raw", "stg"):
         con.execute(f"CREATE SCHEMA {schema}")
 
     def make(schema: str, name: str) -> None:
         con.execute(f'CREATE TABLE "{schema}"."{name}" (x INTEGER)')
 
     for entity, name in GQL_ENTITY_TO_STG.items():
-        make("stg_gql", name)
+        make("stg", name)
         make("raw", GQL_ENTITY_TO_RAW[entity])
+    # The bare REST side of each collider. Its `_gql` twin is already made above, from
+    # GQL_ENTITY_TO_STG, which is what carries the suffix.
     for name in COLLIDERS:
         make("stg", name)
 
@@ -399,11 +410,19 @@ def _selftest_structure() -> int:
     assert any("gql_-prefixed" in f for f in check_structure(con))
     con.execute('DROP TABLE "stg"."gql_leftover"')
 
-    make("stg", "athlete")  # a fourth collider
-    assert any("colliders" in f for f in check_structure(con))
-    con.execute('DROP TABLE "stg"."athlete"')
+    # A collider that lost its bare REST side is a GraphQL table having overwritten it.
+    con.execute(f'DROP TABLE "stg"."{COLLIDERS[0]}"')
+    assert any("missing a side" in f for f in check_structure(con))
+    make("stg", COLLIDERS[0])
 
-    con.execute(f'DROP TABLE "stg_gql"."{COLLIDERS[0]}"')
+    # The schema coming back is the collapse undone.
+    con.execute("CREATE SCHEMA stg_gql")
+    con.execute('CREATE TABLE "stg_gql"."game" (x INTEGER)')
+    assert any("stg_gql still exists" in f for f in check_structure(con))
+    con.execute('DROP TABLE "stg_gql"."game"')
+    con.execute("DROP SCHEMA stg_gql")
+
+    con.execute(f'DROP TABLE "stg"."{COLLIDERS[0]}_gql"')
     assert any("missing" in f for f in check_structure(con))
     return 0
 
@@ -425,7 +444,7 @@ def main() -> int:
     if args.camel:
         for schema, table in con.execute(
             "SELECT table_schema, table_name FROM information_schema.tables "
-            "WHERE table_schema IN ('stg', 'stg_gql') ORDER BY 1, 2"
+            "WHERE table_schema = 'stg' ORDER BY 1, 2"
         ).fetchall():
             if CAMEL_CASE.search(table):
                 print(f"{schema}.{table}")

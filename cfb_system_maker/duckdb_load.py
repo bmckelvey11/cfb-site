@@ -172,14 +172,20 @@ _EXTRA_ID_RENAMES = {
 def stg_id_renames(table: str, *, schema: str) -> dict[str, str]:
     """Map current column names → names that match what the id actually is.
 
-    `schema` picks which id-rename spelling applies: only `stg_gql` tables reverse-
-    resolve through `GQL_ENTITY_TO_STG` to a GraphQL entity name. A `stg` (REST) table
-    that happens to share a bare name with a GraphQL entity (`draft_picks`,
-    `predicted_points`, `calendar`) must not pick up the GraphQL entity's id rename.
+    A GraphQL table reverse-resolves through `GQL_ENTITY_TO_STG` to its entity name and
+    takes that entity's id rename. A REST table does not, and the two used to be told
+    apart by `schema`. Since the collapse (ADR-0003) both live in `stg`, so the *name*
+    is what distinguishes them -- which works only because `GQL_ENTITY_TO_STG` now carries
+    the `_gql` suffix on exactly the three bare names REST also owns (`draft_picks`,
+    `predicted_points`, `calendar`). `stg.draft_picks` finds no entity and keeps its own
+    id; `stg.draft_picks_gql` resolves to `draftPicks` and takes that entity's rename.
+
+    `schema` is kept in the signature: callers pass it, `raw` must never resolve this way,
+    and a future third staging schema would need it again.
     """
     base = table[:-4] if table.endswith("_ngt") else table
     source_name = base
-    if schema == "stg_gql":
+    if schema == "stg":
         source_name = next(
             (entity for entity, destination in GQL_ENTITY_TO_STG.items() if destination == base),
             base,
@@ -491,10 +497,10 @@ _RAW_SPINE = ("season", "week", "season_type")
 _DEAD_COLUMNS = (
     ("stg", "team_stats", "statValue_anyof_schema_1_validator"),
     ("stg", "team_stats__statValue_any_of_schemas", "statValue_anyof_schema_1_validator"),
-    ("stg_gql", "game_weather", "windGust"),
-    ("stg_gql", "poll_type", "abbreviation"),
-    ("stg_gql", "recruit", "overallRank"),
-    ("stg_gql", "recruit", "positionRank"),
+    ("stg", "game_weather", "windGust"),
+    ("stg", "poll_type", "abbreviation"),
+    ("stg", "recruit", "overallRank"),
+    ("stg", "recruit", "positionRank"),
 )
 
 # Bucket A of the rationalization plan: GraphQL holds every populated column and at least
@@ -528,7 +534,6 @@ def explode_payloads(
         con.execute("SET preserve_insertion_order = false")
         con.execute("SET threads = 1")
         con.execute("CREATE SCHEMA IF NOT EXISTS stg")
-        con.execute("CREATE SCHEMA IF NOT EXISTS stg_gql")
         sources = con.execute(
             """
             SELECT table_schema, table_name
@@ -597,7 +602,7 @@ _AN_SCHOOL_ALIAS = {
 def backfill_gamelines_from_actionnetwork(
     db: str | Path | duckdb.DuckDBPyConnection,
 ) -> TableLoad | None:
-    """Merge Action Network period + extra-book lines into ``stg_gql.game_lines``.
+    """Merge Action Network period + extra-book lines into ``stg.game_lines``.
 
     CFBD ``gameLines`` is full-game only. AN history is 1H/1Q; scoreboard
     ``markets`` is full-game per book. Existing CFBD numbers win; AN fills
@@ -612,23 +617,17 @@ def backfill_gamelines_from_actionnetwork(
                 "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
             ).fetchall()
         }
-        gql_tables = {
-            row[0]
-            for row in con.execute(
-                "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg_gql'"
-            ).fetchall()
-        }
         if not (
-            "game_lines" in gql_tables
+            "game_lines" in stg_tables
             and "games" in stg_tables
             and "an_market" in stg_tables
         ):
             return None
-        return _backfill_gamelines(con, stg_tables, gql_tables)
+        return _backfill_gamelines(con, stg_tables, stg_tables)
     except Exception as exc:
         detail = str(exc).split("\n", 1)[0]
         return TableLoad(
-            "stg_gql", "game_lines", 0, 0, error=f"{type(exc).__name__}: {detail}"
+            "stg", "game_lines", 0, 0, error=f"{type(exc).__name__}: {detail}"
         )
     finally:
         if owns_connection:
@@ -641,7 +640,7 @@ def _backfill_gamelines(
     game_cols = {row[0] for row in con.execute("DESCRIBE stg.games").fetchall()}
     game_id = "gameId" if "gameId" in game_cols else "id"
     gl_types = {
-        row[0]: row[1] for row in con.execute("DESCRIBE stg_gql.game_lines").fetchall()
+        row[0]: row[1] for row in con.execute("DESCRIBE stg.game_lines").fetchall()
     }
     gid_type = gl_types.get("gameId", "BIGINT")
     prov_type = gl_types.get("linesProviderId", "BIGINT")
@@ -677,10 +676,10 @@ def _backfill_gamelines(
         """
     )
 
-    con.execute("DROP TABLE IF EXISTS stg_gql.game_lines__backfill")
+    con.execute("DROP TABLE IF EXISTS stg.game_lines__backfill")
     con.execute(
         f"""
-        CREATE TABLE stg_gql.game_lines__backfill AS
+        CREATE TABLE stg.game_lines__backfill AS
         WITH map AS (
           SELECT
             sb.event_id,
@@ -741,7 +740,7 @@ def _backfill_gamelines(
             moneylineHome,
             moneylineAway,
             _source_file
-          FROM stg_gql.game_lines
+          FROM stg.game_lines
         )
         SELECT
           COALESCE(c.gameId, a.gameId) AS gameId,
@@ -766,12 +765,12 @@ def _backfill_gamelines(
          AND c.period = a.period
         """
     )
-    con.execute("DROP TABLE stg_gql.game_lines")
-    con.execute("ALTER TABLE stg_gql.game_lines__backfill RENAME TO game_lines")
+    con.execute("DROP TABLE stg.game_lines")
+    con.execute("ALTER TABLE stg.game_lines__backfill RENAME TO game_lines")
 
     if has_provider:
         prov_cols = {
-            row[0] for row in con.execute("DESCRIBE stg_gql.lines_provider").fetchall()
+            row[0] for row in con.execute("DESCRIBE stg.lines_provider").fetchall()
         }
         pid_col = "linesProviderId" if "linesProviderId" in prov_cols else "id"
         name_rows = ", ".join(
@@ -780,14 +779,14 @@ def _backfill_gamelines(
         )
         con.execute(
             f"""
-            INSERT INTO stg_gql.lines_provider ({_ident(pid_col)}, name, _source_file)
+            INSERT INTO stg.lines_provider ({_ident(pid_col)}, name, _source_file)
             SELECT v.id, v.name, v.src
             FROM (VALUES {name_rows}) v(id, name, src)
-            WHERE v.id NOT IN (SELECT {_ident(pid_col)} FROM stg_gql.lines_provider)
+            WHERE v.id NOT IN (SELECT {_ident(pid_col)} FROM stg.lines_provider)
             """
         )
 
-    return _finish_stg_table(con, "stg_gql", "game_lines", _qualify("stg_gql", "game_lines"))
+    return _finish_stg_table(con, "stg", "game_lines", _qualify("stg", "game_lines"))
 
 # Kickoff strings land in three shapes: REST "2023-09-02 16:00:00+00:00",
 # GraphQL naive "2023-09-02T16:00:00", Action Network "...T23:30:00.000Z".
@@ -826,7 +825,7 @@ def promote_timestamp_columns(
             """
             SELECT table_schema, table_name, column_name
             FROM information_schema.columns
-            WHERE table_schema IN ('stg', 'stg_gql')
+            WHERE table_schema = 'stg'
               AND data_type = 'VARCHAR'
               AND (lower(column_name) LIKE '%date%' OR lower(column_name) LIKE '%time%')
             ORDER BY table_schema, table_name, column_name
@@ -901,7 +900,7 @@ def drop_dead_columns(
             f"""
             SELECT table_schema, table_name, column_name
             FROM information_schema.columns
-            WHERE table_schema IN ('stg', 'stg_gql')
+            WHERE table_schema = 'stg'
               AND (column_name IN ({", ".join("'%s'" % c for c in _RAW_SPINE)})
                    OR (table_schema, table_name, column_name) IN ({named}))
             ORDER BY table_schema, table_name, column_name
@@ -953,7 +952,7 @@ def flatten_stg_nested(
             """
             SELECT table_schema, table_name
             FROM information_schema.tables
-            WHERE table_schema IN ('stg', 'stg_gql')
+            WHERE table_schema = 'stg'
             ORDER BY table_schema, table_name
             """
         ).fetchall()
@@ -973,7 +972,7 @@ def flatten_stg_nested(
 
 _EXPLODE_MAX_DEPTH = 6
 _CHILD_SEP = "__"
-_STG_SCHEMAS = ("stg", "stg_gql")
+_STG_SCHEMAS = ("stg",)
 
 
 def explode_stg_lists(
@@ -1205,18 +1204,38 @@ def _json_keys_are_numeric(
     return bool(row and row[0])
 
 
+# Two GraphQL entities bypass `GQL_ENTITY_TO_RAW` and land in `raw` under their camelCase
+# entity name: `gamePlayerStat` has a hand-written pull (its scalar columns do not identify
+# a row) and `gameMedia` is reachable only through a relation. `raw` keeps the upstream
+# spelling -- it is out of scope (plan section 12) and `parse_dump_stem` parses
+# `gamePlayerStat_2012` as a stem -- but `stg` does not (ADR-0003).
+#
+# This is deliberately a two-entry map and not a general camelCase rule. The 10 remaining
+# camelCase names in `stg` are explode *children* (`games__awayLineScores`,
+# `advanced_box_score__teams_cumulativePpa`), which need a change to how child names are
+# derived, not a lookup -- that is `#stg-camelcase-children`.
+_REST_STG_RENAMES = {
+    "gameMedia": "game_media",
+    "gamePlayerStat": "game_player_stat",
+}
+
+
 def stg_destination(name: str) -> tuple[str, str]:
-    """``(schema, name)`` in `stg`/`stg_gql` for a raw table name.
+    """``("stg", name)`` for a raw table name. There is no second staging schema.
 
     Pure function of the raw table name alone. A GraphQL raw table (named through
     `GQL_ENTITY_TO_RAW`, e.g. `gql_game`) resolves through `GQL_RAW_TO_ENTITY` back to
-    its entity, then through `GQL_ENTITY_TO_STG` to its bare `stg_gql` destination.
-    Anything else is a REST raw table name and passes through unchanged into `stg`.
+    its entity, then through `GQL_ENTITY_TO_STG` to its `stg` destination -- which carries
+    a `_gql` suffix for exactly the three names REST also uses. Anything else is a REST
+    raw table name and passes through into `stg`, snake-cased if `_REST_STG_RENAMES`
+    covers it.
+
+    `raw` still separates the two transports by a `gql_` prefix; only `stg` is collapsed.
     """
     entity = GQL_RAW_TO_ENTITY.get(name)
     if entity is None:
-        return "stg", name
-    return "stg_gql", GQL_ENTITY_TO_STG[entity]
+        return "stg", _REST_STG_RENAMES.get(name, name)
+    return "stg", GQL_ENTITY_TO_STG[entity]
 
 
 def _null_typed_paths(structure: str) -> list[str]:

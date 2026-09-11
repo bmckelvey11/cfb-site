@@ -17,10 +17,24 @@ from cfb_system_maker.duckdb_load import (
 )
 
 
-def test_stg_destination_resolves_graphql_raw_names_to_stg_gql():
-    assert stg_destination("gql_calendar") == ("stg_gql", "calendar")
-    assert stg_destination("gql_game_lines") == ("stg_gql", "game_lines")
-    assert stg_destination("gql_draft_picks") == ("stg_gql", "draft_picks")
+def test_stg_destination_suffixes_only_the_names_rest_also_owns():
+    """One staging schema (ADR-0003), so the `_gql` suffix is the whole disambiguator --
+    and it must appear on exactly the three colliders and nowhere else, or a GraphQL
+    table silently overwrites its REST twin."""
+    assert stg_destination("gql_game_lines") == ("stg", "game_lines")
+    assert stg_destination("gql_calendar") == ("stg", "calendar_gql")
+    assert stg_destination("gql_draft_picks") == ("stg", "draft_picks_gql")
+    assert stg_destination("gql_predicted_points") == ("stg", "predicted_points_gql")
+    assert stg_destination("calendar") == ("stg", "calendar")
+    assert stg_destination("draft_picks") == ("stg", "draft_picks")
+
+
+def test_stg_destination_snake_cases_the_two_camelcase_roots():
+    """`gameMedia` and `gamePlayerStat` bypass GQL_ENTITY_TO_RAW and land in `raw` under
+    their entity spelling. `raw` keeps it -- `parse_dump_stem` parses
+    `gamePlayerStat_2012` -- and `stg` does not."""
+    assert stg_destination("gameMedia") == ("stg", "game_media")
+    assert stg_destination("gamePlayerStat") == ("stg", "game_player_stat")
 
 
 def test_stg_destination_passes_rest_names_through_to_stg():
@@ -227,7 +241,7 @@ def test_explode_payloads_writes_stg_columns(tmp_path):
     reports = explode_payloads(db_path)
     by_key = {(r.schema, r.name): r for r in reports if r.error is None}
     assert by_key[("stg", "games")].rows == 2
-    assert by_key[("stg_gql", "game")].rows == 1
+    assert by_key[("stg", "game")].rows == 1
 
     import duckdb
 
@@ -235,13 +249,13 @@ def test_explode_payloads_writes_stg_columns(tmp_path):
     homes = con.execute("SELECT homeTeam FROM stg.games ORDER BY gameId").fetchall()
     assert homes == [("A",), ("B",)]
     assert con.execute("SELECT COUNT(*) FROM raw.games").fetchone()[0] == 2
-    assert con.execute("SELECT gameId FROM stg_gql.game").fetchone()[0] == 9
+    assert con.execute("SELECT gameId FROM stg.game").fetchone()[0] == 9
     cols = {row[0] for row in con.execute("DESCRIBE stg.games").fetchall()}
     assert "_season" not in cols and "_week" not in cols
     assert "_source_file" in cols
 
 
-def test_flatten_struct_columns_renames_and_reorders_in_the_stg_gql_schema(tmp_path):
+def test_flatten_struct_columns_renames_and_reorders_a_graphql_table(tmp_path):
     """`_flatten_struct_columns` (pre-existing, schema-parameterized) has two internal
     calls to `_rename_stg_table_ids`/`_reorder_stg_table` that must thread its own
     `schema` argument through rather than the old 2-arg form. A payload nested one
@@ -249,17 +263,17 @@ def test_flatten_struct_columns_renames_and_reorders_in_the_stg_gql_schema(tmp_p
     `unnest(..., recursive := true)` already flattens simple nested objects before
     `_flatten_struct_columns` ever sees a STRUCT column, so this constructs a STRUCT
     column directly the way `test_flatten_stg_nested_rewrites_existing_struct_columns`
-    does, but in `stg_gql` to prove the schema argument is actually used."""
+    does, on a GraphQL-side table."""
     import duckdb
 
     from cfb_system_maker.duckdb_load import _flatten_struct_columns
 
     db_path = tmp_path / "cfb.duckdb"
     con = duckdb.connect(str(db_path))
-    con.execute("CREATE SCHEMA stg_gql")
+    con.execute("CREATE SCHEMA stg")
     con.execute(
         """
-        CREATE TABLE stg_gql.game AS
+        CREATE TABLE stg.game AS
         SELECT
           9 AS id,
           2023 AS season,
@@ -267,10 +281,10 @@ def test_flatten_struct_columns_renames_and_reorders_in_the_stg_gql_schema(tmp_p
         """
     )
 
-    report = _flatten_struct_columns(con, "stg_gql", "game")
+    report = _flatten_struct_columns(con, "stg", "game")
     assert report is not None and report.error is None
 
-    cols = [row[0] for row in con.execute("DESCRIBE stg_gql.game").fetchall()]
+    cols = [row[0] for row in con.execute("DESCRIBE stg.game").fetchall()]
     assert "venue" not in cols
     assert "venue_id" in cols and "venue_name" in cols
     assert cols[0] == "gameId"
@@ -617,20 +631,20 @@ def test_stg_id_renames_matches_what_the_value_is():
 
 
 def test_stg_id_renames_resolves_gql_destinations_back_to_their_entity():
-    """`_BARE_ID_RENAME` is keyed by GraphQL entity name, not by the stg_gql destination.
-    Without the reverse lookup, a bare `game` in stg_gql misses the table and keeps a
+    """`_BARE_ID_RENAME` is keyed by GraphQL entity name, not by the `stg` destination.
+    Without the reverse lookup, a bare `game` misses the table and keeps a
     bare `id` column instead of `gameId` — silently, since nothing else asserts on it."""
-    assert stg_id_renames("game", schema="stg_gql") == {"id": "gameId"}
-    assert stg_id_renames("coach", schema="stg_gql") == {"id": "coachId"}
-    assert stg_id_renames("lines_provider", schema="stg_gql") == {"id": "linesProviderId"}
-    assert stg_id_renames("historical_team", schema="stg_gql") == {"id": "teamId"}
+    assert stg_id_renames("game", schema="stg") == {"id": "gameId"}
+    assert stg_id_renames("coach", schema="stg") == {"id": "coachId"}
+    assert stg_id_renames("lines_provider", schema="stg") == {"id": "linesProviderId"}
+    assert stg_id_renames("historical_team", schema="stg") == {"id": "teamId"}
 
 
 def test_stg_id_renames_does_not_apply_graphql_renames_to_rest_tables_in_stg():
     # A bare name that exists in both schemas (draft_picks, predicted_points, calendar)
     # must not pick up a GraphQL-entity id rename when it's actually the REST table.
     assert stg_id_renames("draft_picks", schema="stg") == {}
-    assert stg_id_renames("draft_picks", schema="stg_gql") == {}
+    assert stg_id_renames("draft_picks", schema="stg") == {}
     assert stg_id_renames("games", schema="stg") == {
         "id": "gameId",
         "homeId": "homeTeamId",
@@ -682,18 +696,17 @@ def test_rename_stg_id_columns_rewrites_bare_id_and_skips_existing_dest(tmp_path
     assert line_cols == {"id", "gameId"}
 
 
-def test_explode_stg_lists_explodes_both_stg_and_stg_gql():
+def test_explode_stg_lists_explodes_parent_and_child():
     import duckdb
 
     con = duckdb.connect(":memory:")
     con.execute("CREATE SCHEMA stg")
-    con.execute("CREATE SCHEMA stg_gql")
     con.execute("CREATE TABLE stg.games AS SELECT 1 AS gameId, [1, 2]::INTEGER[] AS scores")
-    con.execute("CREATE TABLE stg_gql.game AS SELECT 1 AS gameId, [3, 4]::INTEGER[] AS scores")
+    con.execute("CREATE TABLE stg.game AS SELECT 1 AS gameId, [3, 4]::INTEGER[] AS scores")
     reports = explode_stg_lists(con)
     by_key = {(r.schema, r.name): r for r in reports}
     assert by_key[("stg", "games__scores")].rows == 2
-    assert by_key[("stg_gql", "game__scores")].rows == 2
+    assert by_key[("stg", "game__scores")].rows == 2
 
 
 def test_reorder_stg_columns_reorders_both_schemas():
@@ -701,12 +714,11 @@ def test_reorder_stg_columns_reorders_both_schemas():
 
     con = duckdb.connect(":memory:")
     con.execute("CREATE SCHEMA stg")
-    con.execute("CREATE SCHEMA stg_gql")
     con.execute("CREATE TABLE stg.games AS SELECT 'x' AS extra, 1 AS gameId")
-    con.execute("CREATE TABLE stg_gql.game AS SELECT 'x' AS extra, 1 AS gameId")
+    con.execute("CREATE TABLE stg.game AS SELECT 'x' AS extra, 1 AS gameId")
     reorder_stg_columns(con)
     stg_cols = [r[0] for r in con.execute("DESCRIBE stg.games").fetchall()]
-    gql_cols = [r[0] for r in con.execute("DESCRIBE stg_gql.game").fetchall()]
+    gql_cols = [r[0] for r in con.execute("DESCRIBE stg.game").fetchall()]
     assert stg_cols[0] == "gameId"
     assert gql_cols[0] == "gameId"
 
@@ -868,7 +880,6 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     db_path = tmp_path / "cfb.duckdb"
     con = duckdb.connect(str(db_path))
     con.execute("CREATE SCHEMA stg")
-    con.execute("CREATE SCHEMA stg_gql")
     con.execute(
         """
         CREATE TABLE stg.games (
@@ -880,7 +891,7 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     con.execute("INSERT INTO stg.games VALUES (99, 2025, 1, 'Alpha', 'Beta')")
     con.execute(
         """
-        CREATE TABLE stg_gql.game_lines (
+        CREATE TABLE stg.game_lines (
           gameId INTEGER, linesProviderId INTEGER,
           moneylineAway INTEGER, moneylineHome INTEGER,
           overUnder DOUBLE, overUnderOpen DOUBLE,
@@ -890,19 +901,19 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     )
     con.execute(
         """
-        INSERT INTO stg_gql.game_lines VALUES
+        INSERT INTO stg.game_lines VALUES
           (99, 888888, NULL, NULL, 45.5, NULL, -7.0, -6.5, 'cfbd.json')
         """
     )
     con.execute(
         """
-        CREATE TABLE stg_gql.lines_provider (
+        CREATE TABLE stg.lines_provider (
           id INTEGER, name VARCHAR, _source_file VARCHAR
         )
         """
     )
     con.execute(
-        "INSERT INTO stg_gql.lines_provider VALUES (888888, 'DraftKings', 'cfbd.json')"
+        "INSERT INTO stg.lines_provider VALUES (888888, 'DraftKings', 'cfbd.json')"
     )
     con.execute(
         """
@@ -986,12 +997,12 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     assert report is not None and report.error is None
 
     con = duckdb.connect(str(db_path), read_only=True)
-    cols = {row[0] for row in con.execute("DESCRIBE stg_gql.game_lines").fetchall()}
+    cols = {row[0] for row in con.execute("DESCRIBE stg.game_lines").fetchall()}
     assert "period" in cols and "line_source" in cols
     fg = con.execute(
         """
         SELECT spread, spreadOpen, overUnder, moneylineHome, moneylineAway, period
-        FROM stg_gql.game_lines
+        FROM stg.game_lines
         WHERE gameId = 99 AND linesProviderId = 888888 AND period = 'game'
         """
     ).fetchone()
@@ -999,14 +1010,14 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     half = con.execute(
         """
         SELECT spread, overUnder, period, line_source
-        FROM stg_gql.game_lines
+        FROM stg.game_lines
         WHERE gameId = 99 AND period = 'firsthalf'
         """
     ).fetchone()
     assert half[0] == -3.5 and half[1] == 24.5 and half[3] == "actionnetwork"
     names = {
         row[0]
-        for row in con.execute("SELECT name FROM stg_gql.lines_provider").fetchall()
+        for row in con.execute("SELECT name FROM stg.lines_provider").fetchall()
     }
     assert "DraftKings" in names and "FanDuel" in names
 

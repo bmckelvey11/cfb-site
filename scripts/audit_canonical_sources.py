@@ -15,23 +15,24 @@ import duckdb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# (concept, gql_table, rest_table) — gql_table is bare (lives in stg_gql), rest_table
+# (concept, gql_table, rest_table) — both live in `stg` since the collapse (ADR-0003);
+# gql_table carries a `_gql` suffix for exactly the three names REST also owns. rest_table
 # lives in stg. A concept whose two spellings collide once bare (draft_pick) still has
 # distinct entries here because the two tables live in different schemas.
 PAIRS = [
     ("game", "game", "games"),
     ("coach", "coach", "coaches"),
     ("conference", "conference", "conferences"),
-    ("draft_pick", "draft_picks", "draft_picks"),
+    ("draft_pick", "draft_picks_gql", "draft_picks"),
     ("draft_position", "draft_position", "draft_positions"),
     ("draft_team", "draft_team", "draft_teams"),
     ("recruit", "recruit", "recruits"),
     ("recruiting_team", "recruiting_team", "recruiting_teams"),
     ("coach_season", "coach_season", "coach_seasons"),
-    ("predicted_points", "predicted_points", "predicted_points"),
+    ("predicted_points", "predicted_points_gql", "predicted_points"),
     ("talent", "team_talent", "talent"),
     ("lines", "game_lines", "lines"),
-    ("calendar", "calendar", "calendar"),
+    ("calendar", "calendar_gql", "calendar"),
 ]
 
 
@@ -71,16 +72,16 @@ def _null_rate(
 def concept_metrics(
     con: duckdb.DuckDBPyConnection, gql_table: str, rest_table: str
 ) -> dict:
-    gcols = _cols(con, "stg_gql", gql_table)
+    gcols = _cols(con, "stg", gql_table)
     rcols = _cols(con, "stg", rest_table)
     return {
-        "gql_rows": con.execute(f'SELECT COUNT(*) FROM "stg_gql"."{gql_table}"').fetchone()[0],
+        "gql_rows": con.execute(f'SELECT COUNT(*) FROM "stg"."{gql_table}"').fetchone()[0],
         "rest_rows": con.execute(f'SELECT COUNT(*) FROM "stg"."{rest_table}"').fetchone()[0],
         "gql_cols": len(gcols),
         "rest_cols": len(rcols),
-        "gql_seasons": _seasons(con, "stg_gql", gql_table, gcols),
+        "gql_seasons": _seasons(con, "stg", gql_table, gcols),
         "rest_seasons": _seasons(con, "stg", rest_table, rcols),
-        "gql_null_rate": _null_rate(con, "stg_gql", gql_table, gcols),
+        "gql_null_rate": _null_rate(con, "stg", gql_table, gcols),
         "rest_null_rate": _null_rate(con, "stg", rest_table, rcols),
     }
 
@@ -93,7 +94,7 @@ def main() -> int:
     gql_present = {
         row[0]
         for row in con.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'stg_gql'"
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'stg'"
         ).fetchall()
     }
     rest_present = {

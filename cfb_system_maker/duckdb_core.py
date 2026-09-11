@@ -85,7 +85,7 @@ def _build_dim_week(con: duckdb.DuckDBPyConnection) -> None:
     """Week spine, sourced from ``raw.calendar``'s JSON payload.
 
     Not ``stg.calendar``: the REST calendar is never exploded into ``stg``, and
-    the only staged calendar (``stg_gql.calendar``) keeps its season in ``year``
+    the only staged calendar (``stg.calendar_gql``) keeps its season in ``year``
     with the ``season`` column entirely NULL. ``raw.calendar``'s payload carries
     ``season``/``seasonType``/``week``/``startDate``/``endDate`` outright, so read
     it with ``json_extract`` the way ``_build_dim_team`` reads ``raw.teams``.
@@ -153,13 +153,13 @@ def _build_dim_conference(con: duckdb.DuckDBPyConnection) -> None:
     # by name. `srName` fills 1 of 256 rows and is deliberately not carried.
     # Measured 2026-09-10: 256 of 256 ids match and no name disagrees, so this is a
     # column-only join; the row count is unchanged either way (ADR-0001).
-    if _has(con, "stg_gql", "conference"):
+    if _has(con, "stg", "conference"):
         con.execute("ALTER TABLE core.dim_conference ADD COLUMN division VARCHAR")
         con.execute(
             """
             UPDATE core.dim_conference c
             SET division = g.division
-            FROM stg_gql.conference g
+            FROM stg.conference g
             WHERE g."conferenceId" = c.conference_id
             """
         )
@@ -412,13 +412,13 @@ def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
     #
     # This *changes existing column values*, which ADR-0001 does not cover -- it governs
     # rows vs columns. See docs/core-merge-bucket-c-2026-09-10.md.
-    if _has(con, "stg_gql", "game"):
+    if _has(con, "stg", "game"):
         con.execute(
             """
             UPDATE core.fact_game f
             SET home_conference_id = coalesce(g."homeConferenceId", f.home_conference_id),
                 away_conference_id = coalesce(g."awayConferenceId", f.away_conference_id)
-            FROM stg_gql.game g
+            FROM stg.game g
             WHERE g."gameId" = f.game_id
             """
         )
@@ -498,7 +498,7 @@ def _build_fact_game_line(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def _merge_game_lines(con: duckdb.DuckDBPyConnection) -> bool:
-    """Union ``stg_gql.game_lines`` (``period='game'``) into ``core.fact_game_line``.
+    """Union ``stg.game_lines`` (``period='game'``) into ``core.fact_game_line``.
 
     ``game_lines`` is **not** a GraphQL scrape. Its ``line_source`` reads cfbd 37,048 /
     actionnetwork 8,656 / cfbd+an 1,599 -- it is already a merged tape, and the
@@ -527,7 +527,7 @@ def _merge_game_lines(con: duckdb.DuckDBPyConnection) -> bool:
     Measured 2026-09-10, `python scripts/audit_core_merges.py --merge lines`. See
     docs/core-merge-bucket-c-2026-09-10.md.
     """
-    if not (_has(con, "stg_gql", "game_lines") and _has(con, "stg_gql", "lines_provider")):
+    if not (_has(con, "stg", "game_lines") and _has(con, "stg", "lines_provider")):
         return False
     # Same bound the REST unnest applies: a line row for a game the spine excluded is an
     # orphan. Measured at 0 today; restated so it stays 0 when game_lines moves.
@@ -556,8 +556,8 @@ def _merge_game_lines(con: duckdb.DuckDBPyConnection) -> bool:
             TRY_CAST(l."moneylineHome" AS INTEGER) AS moneyline_home,
             TRY_CAST(l."moneylineAway" AS INTEGER) AS moneyline_away,
             l.line_source
-          FROM stg_gql.game_lines l
-          JOIN stg_gql.lines_provider p USING ("linesProviderId")
+          FROM stg.game_lines l
+          JOIN stg.lines_provider p USING ("linesProviderId")
           WHERE l.period = 'game'
             AND l."gameId" IN (SELECT game_id FROM core.fact_game)
             AND p.name IS NOT NULL
@@ -824,7 +824,7 @@ def _build_fact_game_odds(con: duckdb.DuckDBPyConnection) -> bool:
 # rows, and a union would carry every one of those twice.
 #
 # Every builder returns False when a source is missing rather than raising: build_core runs
-# on every refresh_cfbd pass, and a missing stg_gql table must not break the whole rebuild.
+# on every refresh_cfbd pass, and a missing GraphQL-side table must not break the whole rebuild.
 
 
 def _has(con: duckdb.DuckDBPyConnection, schema: str, table: str) -> bool:
@@ -840,13 +840,13 @@ def _build_dim_coach(con: duckdb.DuckDBPyConnection) -> bool:
     coach-season source resolves coaches *by name*, so a name in this table cannot be
     resolved that way and its seasons land in ``core.coach_season_unmatched`` instead.
     """
-    if not _has(con, "stg_gql", "coach"):
+    if not _has(con, "stg", "coach"):
         return False
     con.execute("DROP TABLE IF EXISTS core.dim_coach")
     con.execute("""
         CREATE TABLE core.dim_coach AS
         SELECT "coachId" AS coach_id, "firstName" AS first_name, "lastName" AS last_name
-        FROM stg_gql.coach WHERE "coachId" IS NOT NULL
+        FROM stg.coach WHERE "coachId" IS NOT NULL
     """)
     con.execute("ALTER TABLE core.dim_coach ADD PRIMARY KEY (coach_id)")
     con.execute("DROP TABLE IF EXISTS core.coach_name_conflicts")
@@ -861,7 +861,7 @@ def _build_dim_coach(con: duckdb.DuckDBPyConnection) -> bool:
 
 def _build_dim_draft_pick(con: duckdb.DuckDBPyConnection) -> bool:
     """``(year, round, pick)`` -- unique on both sides, and REST is fully contained in GraphQL."""
-    if not (_has(con, "stg_gql", "draft_picks") and _has(con, "stg", "draft_picks")):
+    if not (_has(con, "stg", "draft_picks_gql") and _has(con, "stg", "draft_picks")):
         return False
     con.execute("DROP TABLE IF EXISTS core.dim_draft_pick")
     con.execute("""
@@ -877,7 +877,7 @@ def _build_dim_draft_pick(con: duckdb.DuckDBPyConnection) -> bool:
           r."collegeConference" AS college_conference,
           CASE WHEN g.year IS NOT NULL AND r.year IS NOT NULL THEN 'both'
                WHEN g.year IS NOT NULL THEN 'gql' ELSE 'rest' END AS _source
-        FROM stg_gql.draft_picks g
+        FROM stg.draft_picks_gql g
         FULL OUTER JOIN stg.draft_picks r
           ON g.year = r.year AND g.round = r.round AND g.pick = r.pick
     """)
@@ -896,7 +896,7 @@ def _build_dim_recruit(con: duckdb.DuckDBPyConnection) -> bool:
     2026-09-10), but an implicit cast in a join is the kind of thing that works until one
     non-numeric id arrives and then fails, or silently matches nothing.
     """
-    if not (_has(con, "stg_gql", "recruit") and _has(con, "stg", "recruits")):
+    if not (_has(con, "stg", "recruit") and _has(con, "stg", "recruits")):
         return False
     con.execute("DROP TABLE IF EXISTS core.dim_recruit")
     con.execute("""
@@ -916,7 +916,7 @@ def _build_dim_recruit(con: duckdb.DuckDBPyConnection) -> bool:
           r.city, r.country,
           CASE WHEN g."recruitId" IS NOT NULL AND r."recruitId" IS NOT NULL THEN 'both'
                WHEN g."recruitId" IS NOT NULL THEN 'gql' ELSE 'rest' END AS _source
-        FROM stg_gql.recruit g
+        FROM stg.recruit g
         FULL OUTER JOIN rest r ON g."recruitId" = r."recruitId"
     """)
     con.execute("ALTER TABLE core.dim_recruit ADD PRIMARY KEY (recruit_id)")
@@ -932,7 +932,7 @@ def _build_fact_team_talent(con: duckdb.DuckDBPyConnection) -> bool:
     St. Francis (PA), absent from GraphQL's ``currentTeams`` source -- which is why REST is
     still not droppable. See docs/warehouse-containment-remeasure-2026-09-10.md.
     """
-    if not (_has(con, "stg_gql", "team_talent") and _has(con, "stg", "talent")):
+    if not (_has(con, "stg", "team_talent") and _has(con, "stg", "talent")):
         return False
     con.execute("DROP TABLE IF EXISTS core.fact_team_talent")
     con.execute("""
@@ -953,7 +953,7 @@ def _build_fact_team_talent(con: duckdb.DuckDBPyConnection) -> bool:
           coalesce(g.talent, r.talent) AS talent,
           CASE WHEN g.year IS NOT NULL AND r.season IS NOT NULL THEN 'both'
                WHEN g.year IS NOT NULL THEN 'gql' ELSE 'rest' END AS _source
-        FROM stg_gql.team_talent g
+        FROM stg.team_talent g
         FULL OUTER JOIN rest r
           ON g.year = r.season AND g."team_school" = r.team
     """)
@@ -973,7 +973,7 @@ def _build_fact_coach_season(con: duckdb.DuckDBPyConnection) -> bool:
     A row whose name resolves to more than one ``coach_id`` is preserved here rather than
     guessed into the fact.
     """
-    if not (_has(con, "stg_gql", "coach_season") and _has(con, "stg", "coach_seasons")):
+    if not (_has(con, "stg", "coach_season") and _has(con, "stg", "coach_seasons")):
         return False
     con.execute("DROP TABLE IF EXISTS core.fact_coach_season")
     con.execute("""
@@ -994,7 +994,7 @@ def _build_fact_coach_season(con: duckdb.DuckDBPyConnection) -> bool:
           r."spOverall" AS sp_overall, r.srs, r."winPercentage" AS win_percentage,
           CASE WHEN g.year IS NOT NULL AND r.season IS NOT NULL THEN 'both'
                WHEN g.year IS NOT NULL THEN 'gql' ELSE 'rest' END AS _source
-        FROM stg_gql.coach_season g
+        FROM stg.coach_season g
         FULL OUTER JOIN stg.coach_seasons r
           ON g."coach_id" = r."coach_id" AND g."team_teamId" = r."team_id"
          AND g.year = r.season
@@ -1046,7 +1046,7 @@ def _build_fact_game_historical(con: duckdb.DuckDBPyConnection) -> bool:
     conferences and classifications were reorganized repeatedly across the span. Use it
     for identity and scores; do not use it to decide what division a 1930 team was in.
     """
-    if not (_has(con, "stg_gql", "game") and _has(con, "core", "dim_week")):
+    if not (_has(con, "stg", "game") and _has(con, "core", "dim_week")):
         return False
     con.execute("DROP TABLE IF EXISTS core.fact_game_historical")
     con.execute(
@@ -1065,7 +1065,7 @@ def _build_fact_game_historical(con: duckdb.DuckDBPyConnection) -> bool:
           "homeClassification" AS home_classification,
           "awayClassification" AS away_classification,
           "homePoints" AS home_points, "awayPoints" AS away_points
-        FROM stg_gql.game
+        FROM stg.game
         WHERE season < (SELECT min(season) FROM core.dim_week)
           AND "gameId" IS NOT NULL
         """

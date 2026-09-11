@@ -7,7 +7,6 @@ from cfb_system_maker.duckdb_load import drop_dead_columns
 def _con():
     con = duckdb.connect(":memory:")
     con.execute("CREATE SCHEMA stg")
-    con.execute("CREATE SCHEMA stg_gql")
     con.execute("CREATE SCHEMA raw")
     return con
 
@@ -75,14 +74,14 @@ def test_raw_spine_columns_are_left_alone():
     assert "season" in _columns(con, "raw", "calendar")
 
 
-def test_stg_gql_is_covered_and_rerun_is_idempotent():
+def test_every_stg_table_is_covered_and_rerun_is_idempotent():
     con = _con()
     con.execute(
-        "CREATE TABLE stg_gql.calendar AS SELECT CAST(NULL AS INTEGER) AS season,"
+        "CREATE TABLE stg.calendar_gql AS SELECT CAST(NULL AS INTEGER) AS season,"
         " 2002 AS year, 1 AS week"
     )
     assert len(drop_dead_columns(con)) == 1
-    assert _columns(con, "stg_gql", "calendar") == {"year", "week"}
+    assert _columns(con, "stg", "calendar_gql") == {"year", "week"}
     assert drop_dead_columns(con) == []
 
 
@@ -102,19 +101,19 @@ def test_empty_table_drops_its_spine_columns():
 
 
 def test_drops_a_named_dead_column():
-    """`stg_gql.recruit.overallRank` is 0.00 filled across all 93,363 rows -- the payload
+    """`stg.recruit.overallRank` is 0.00 filled across all 93,363 rows -- the payload
     carries the key and the source never fills it, so there is no writer to fix."""
     con = _con()
     con.execute(
         """
-        CREATE TABLE stg_gql.recruit AS SELECT * FROM (VALUES
+        CREATE TABLE stg.recruit AS SELECT * FROM (VALUES
           (1, 'A', CAST(NULL AS DOUBLE), CAST(NULL AS DOUBLE)),
           (2, 'B', CAST(NULL AS DOUBLE), CAST(NULL AS DOUBLE))
         ) t(recruitId, name, overallRank, positionRank)
         """
     )
     drop_dead_columns(con)
-    assert _columns(con, "stg_gql", "recruit") == {"recruitId", "name"}
+    assert _columns(con, "stg", "recruit") == {"recruitId", "name"}
 
 
 def test_a_named_dead_column_that_went_live_is_kept():
@@ -124,23 +123,23 @@ def test_a_named_dead_column_that_went_live_is_kept():
     con = _con()
     con.execute(
         """
-        CREATE TABLE stg_gql.recruit AS SELECT * FROM (VALUES
+        CREATE TABLE stg.recruit AS SELECT * FROM (VALUES
           (1, 'A', 12.0, CAST(NULL AS DOUBLE)),
           (2, 'B', CAST(NULL AS DOUBLE), CAST(NULL AS DOUBLE))
         ) t(recruitId, name, overallRank, positionRank)
         """
     )
     drop_dead_columns(con)
-    assert "overallRank" in _columns(con, "stg_gql", "recruit")
-    assert "positionRank" not in _columns(con, "stg_gql", "recruit")
+    assert "overallRank" in _columns(con, "stg", "recruit")
+    assert "positionRank" not in _columns(con, "stg", "recruit")
 
 
 def test_the_named_list_is_table_scoped_not_column_scoped():
-    """`abbreviation` is dead on stg_gql.poll_type and alive on core-bound tables like
+    """`abbreviation` is dead on stg.poll_type and alive on core-bound tables like
     stg.conferences. A name-only match would take both."""
     con = _con()
     con.execute(
-        "CREATE TABLE stg_gql.poll_type AS SELECT 1 AS pollTypeId,"
+        "CREATE TABLE stg.poll_type AS SELECT 1 AS pollTypeId,"
         " CAST(NULL AS VARCHAR) AS abbreviation"
     )
     con.execute(
@@ -148,7 +147,7 @@ def test_the_named_list_is_table_scoped_not_column_scoped():
         " CAST(NULL AS VARCHAR) AS abbreviation"
     )
     drop_dead_columns(con)
-    assert _columns(con, "stg_gql", "poll_type") == {"pollTypeId"}
+    assert _columns(con, "stg", "poll_type") == {"pollTypeId"}
     assert "abbreviation" in _columns(con, "stg", "conferences")
 
 

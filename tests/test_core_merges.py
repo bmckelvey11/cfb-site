@@ -83,7 +83,7 @@ def test_coach_season_unmatched_exists_even_when_empty(con):
 
 
 def test_every_merge_builder_is_guarded():
-    """build_core runs on every refresh. A builder that raises on a missing stg_gql table
+    """build_core runs on every refresh. A builder that raises on a missing GraphQL-side table
     takes the whole rebuild down with it."""
     source = (REPO_ROOT / "cfb_system_maker" / "duckdb_core.py").read_text(encoding="utf-8")
     for fn in ("_build_dim_coach", "_build_dim_draft_pick", "_build_dim_recruit",
@@ -105,7 +105,7 @@ def test_fact_game_did_not_grow_to_hold_graphql_rows(con):
     """GraphQL reaches back to 1869. Every one of its in-span games is already in
     fact_game; the 78,030 older ones belong in fact_game_historical, not here."""
     assert con.execute("""
-        SELECT count(*) FROM stg_gql.game g
+        SELECT count(*) FROM stg.game g
         LEFT JOIN core.fact_game f ON f.game_id = g."gameId"
         WHERE f.game_id IS NULL
           AND g.season >= (SELECT min(season) FROM core.dim_week)
@@ -135,7 +135,7 @@ def test_fact_game_conference_ids_match_the_graphql_fk(con):
     away ids disagreed with GraphQL's FK while naming the same conference."""
     assert con.execute("""
         SELECT count(*) FROM core.fact_game f
-        JOIN stg_gql.game g ON g."gameId" = f.game_id
+        JOIN stg.game g ON g."gameId" = f.game_id
         WHERE (f.home_conference_id IS NOT NULL AND g."homeConferenceId" IS NOT NULL
                AND f.home_conference_id <> g."homeConferenceId")
            OR (f.away_conference_id IS NOT NULL AND g."awayConferenceId" IS NOT NULL
@@ -154,7 +154,7 @@ def test_dim_conference_carries_division(con):
 
 
 def test_the_line_merge_did_not_lose_a_rest_offer(con):
-    """A repoint at stg_gql.game_lines was rejected because it drops 278 REST offers
+    """A repoint at stg.game_lines was rejected because it drops 278 REST offers
     game_lines has no row for. The full outer is what keeps them; `_source = 'rest'`
     going to zero means someone turned it back into a left join."""
     if "_source" not in {r[0] for r in con.execute(
@@ -168,7 +168,7 @@ def test_the_line_merge_did_not_lose_a_rest_offer(con):
 
 
 def test_no_nan_reached_the_line_table(con):
-    """stg_gql.game_lines spells a missing number NaN, not NULL -- 3,414 `overUnder` and
+    """stg.game_lines spells a missing number NaN, not NULL -- 3,414 `overUnder` and
     65 `spread` rows. coalesce carries NaN happily, and a NaN in spread_close compares
     false against everything, so it reads as a value and behaves as a hole. This is the
     check that caught it: the slow agreement suite moved to `assert nan == None`."""

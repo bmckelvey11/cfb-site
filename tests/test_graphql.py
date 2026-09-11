@@ -19,7 +19,8 @@ def test_gql_entity_to_stg_is_total_and_injective():
 
 
 def test_gql_destinations_are_bare_snake_case():
-    # stg_gql destinations carry no gql_ prefix — the schema is the disambiguator now.
+    # stg destinations carry no gql_ prefix — a `_gql` suffix on the three colliding
+    # bare names is the disambiguator (ADR-0003).
     for entity, dest in GQL_ENTITY_TO_STG.items():
         assert not dest.startswith("gql_"), f"{entity} -> {dest} still carries gql_ prefix"
         assert re.fullmatch(r"[a-z0-9_]+", dest), f"{entity} -> {dest} is not snake_case"
@@ -30,11 +31,21 @@ def test_gql_destinations_match_spec_examples():
     assert GQL_ENTITY_TO_STG["gameLines"] == "game_lines"
     assert GQL_ENTITY_TO_STG["adjustedPlayerMetrics"] == "adjusted_player_metrics"
     assert GQL_ENTITY_TO_STG["playerStatCategory"] == "player_stat_category"
-    assert GQL_ENTITY_TO_STG["calendar"] == "calendar"
+
+
+def test_only_the_three_rest_colliders_carry_the_gql_suffix():
+    """The suffix is the entire disambiguator now that there is one staging schema. One
+    too few and a GraphQL table overwrites its REST twin; one too many and a consumer
+    reads a name that was never supposed to move."""
+    from cfb_system_maker.graphql_client import GQL_STG_COLLIDERS
+
+    suffixed = {d for d in GQL_ENTITY_TO_STG.values() if d.endswith("_gql")}
+    assert suffixed == {f"{name}_gql" for name in GQL_STG_COLLIDERS}
+    assert suffixed == {"calendar_gql", "draft_picks_gql", "predicted_points_gql"}
 
 
 def test_gql_entity_to_raw_is_total_injective_and_prefixed():
-    # raw naming must stay decoupled from the stg_gql scheme: same shape the old
+    # raw naming must stay decoupled from the stg scheme: same shape the old
     # (prefixed) GQL_ENTITY_TO_STG had, so raw tables keep colliding with nothing.
     assert set(GQL_ENTITY_TO_RAW) == set(GQL_DEFAULT_TABLES)
     assert len(set(GQL_ENTITY_TO_RAW.values())) == len(GQL_ENTITY_TO_RAW)
@@ -44,7 +55,7 @@ def test_gql_entity_to_raw_is_total_injective_and_prefixed():
 
 def test_gql_entity_to_raw_matches_shipped_prefix_scheme():
     # These are the exact values the (unapplied) gql_ prefix build shipped for `stg`.
-    # raw keeps them verbatim even though stg_gql no longer does.
+    # raw keeps them verbatim even though stg no longer does.
     assert GQL_ENTITY_TO_RAW["game"] == "gql_game"
     assert GQL_ENTITY_TO_RAW["gameLines"] == "gql_game_lines"
     assert GQL_ENTITY_TO_RAW["draftPicks"] == "gql_draft_picks"
