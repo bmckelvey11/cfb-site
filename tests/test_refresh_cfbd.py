@@ -99,3 +99,96 @@ def test_pin_check_fails_loudly_without_claiming_the_warehouse_is_broken(tmp_pat
     # check() writes its stale-CSV hint for a command-line reader; this path
     # reflattened first, so the log has to say the hint does not apply here.
     assert "staleness is not the cause" in out
+
+
+# ------------------------------------------------------------------ graphql dump re-pull
+
+from cfb_system_maker.graphql_client import GqlReport  # noqa: E402
+
+
+def _gql_env(tmp_path, monkeypatch, existing_rows):
+    """A live `data/graphql/game.json` with `existing_rows` rows, and a staging root."""
+    import cfb_paths
+
+    live = tmp_path / "graphql"
+    live.mkdir()
+    (live / "game.json").write_text(
+        "[" + ", ".join('{"id": %d}' % i for i in range(existing_rows)) + "]",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cfb_paths, "DATA_ROOT", tmp_path)
+    monkeypatch.setattr(rc.cfb_paths, "DATA_ROOT", tmp_path)
+    monkeypatch.setattr(rc, "_GQL_REFRESH_TABLES", ("game",))
+    return live / "game.json"
+
+
+def _fake_scrape(rows):
+    """Stand in for `graphql_scrape`: writes `rows` rows where the real one would."""
+
+    def scrape(*, tables, data_dir, token):
+        staged = Path(data_dir) / "graphql"
+        staged.mkdir(parents=True, exist_ok=True)
+        (staged / f"{tables[0]}.json").write_text(
+            "[" + ", ".join('{"id": %d}' % i for i in range(rows)) + "]",
+            encoding="utf-8",
+        )
+        return [GqlReport(tables[0], rows, 1)]
+
+    return scrape
+
+
+def test_short_pull_keeps_the_dump_already_on_disk(tmp_path, monkeypatch, capsys):
+    """The failure the guard exists for is the quiet one.
+
+    A pull that raises is already safe -- `_write` runs only after `_paginate` returns, so
+    the staged file never appears. A pull that returns 5,000 rows instead of 112,675 and
+    reports success is the one that would replace `game.json` with a truncated copy, and
+    nothing downstream would say so: the rebuild would load it, `core` would shrink, and the
+    next audit would read it as CFBD losing rows rather than as a bad read.
+    """
+    live = _gql_env(tmp_path, monkeypatch, existing_rows=1000)
+    monkeypatch.setattr(rc, "graphql_scrape", _fake_scrape(500))
+
+    rc._pull_graphql("token")
+
+    assert rc._json_rows(live) == 1000, "a short pull must not replace the live dump"
+    assert "SHORT READ" in capsys.readouterr().err
+    assert not (tmp_path / ".graphql-pull" / "graphql" / "game.json").exists(), \
+        "the rejected pull is cleaned up, not left to be mistaken for a good one"
+
+
+def test_a_full_pull_replaces_the_dump(tmp_path, monkeypatch):
+    """The ordinary path: both tables are append-mostly, so the count grows."""
+    live = _gql_env(tmp_path, monkeypatch, existing_rows=1000)
+    monkeypatch.setattr(rc, "graphql_scrape", _fake_scrape(1003))
+
+    rc._pull_graphql("token")
+
+    assert rc._json_rows(live) == 1003
+
+
+def test_a_small_real_shrink_is_allowed_through(tmp_path, monkeypatch):
+    """CFBD does remove rows -- it dropped game 401866625 outright on 2026-09-11. The guard
+    is sized to let that through and stop a truncation, so it must not fire on a few rows."""
+    live = _gql_env(tmp_path, monkeypatch, existing_rows=1000)
+    monkeypatch.setattr(rc, "graphql_scrape", _fake_scrape(996))
+
+    rc._pull_graphql("token")
+
+    assert rc._json_rows(live) == 996
+
+
+def test_pull_never_passes_seasons(monkeypatch):
+    """`graphql_scrape` turns `seasons=` into a `where` clause but `_write` replaces the
+    whole file, so a season-scoped pull truncates `game.json` from 1869-2026 to one season.
+    Pinned because the argument is right there and looks like an optimisation."""
+    seen = {}
+
+    def spy(*, tables, data_dir, token, **kwargs):
+        seen.update(kwargs)
+        return [GqlReport(tables[0], 0, 0, error="stop")]
+
+    monkeypatch.setattr(rc, "graphql_scrape", spy)
+    monkeypatch.setattr(rc, "_GQL_REFRESH_TABLES", ("game",))
+    rc._pull_graphql("token")
+    assert "seasons" not in seen

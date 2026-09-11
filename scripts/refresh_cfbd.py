@@ -2,7 +2,8 @@
 
 Force-rescrapes the current season's endpoints that actually change during the
 season (games, lines, calendar, conferences, venues -- everything `build_core`'s
-Phase 1 tables need), reflattens the Action Network tick CSV so the movement
+Phase 1 tables need), re-pulls the two GraphQL dumps whose staleness reaches a
+`core` value, reflattens the Action Network tick CSV so the movement
 scraped since the last run is visible, then does a full rebuild of `cfb.duckdb`
 from data/raw + data/graphql + data/processed (that rebuild is a cheap, atomic
 full-reload -- see `duckdb_load.build_duckdb` -- so there is no incremental-load
@@ -42,6 +43,7 @@ from cfb_system_maker.cfbd_client import find_cfbd_token  # noqa: E402
 from cfb_system_maker.cli import rebuild_processed_games  # noqa: E402
 from cfb_system_maker.duckdb_core import build_core  # noqa: E402
 from cfb_system_maker.duckdb_load import build_duckdb  # noqa: E402
+from cfb_system_maker.graphql_client import graphql_scrape  # noqa: E402
 from cfb_system_maker.scrapers import scrape  # noqa: E402
 from pff_flatten import IN_DIR as PFF_IN_DIR  # noqa: E402
 from pff_flatten import dimensions as pff_dimensions  # noqa: E402
@@ -51,6 +53,86 @@ from oddsapi_flatten import IN_DIR as OA_IN_DIR  # noqa: E402
 from oddsapi_flatten import main as oddsapi_flatten_main  # noqa: E402
 
 DEFAULT_ONLY = {"games", "lines", "calendar", "conferences", "venues"}
+
+# The two GraphQL dumps measured as materially behind on 2026-09-11, and the only two whose
+# staleness has a path to a `core` value. The other 48 are pulled by hand; see
+# docs/graphql-dump-staleness-2026-09-11.md for why each stays off this list.
+_GQL_REFRESH_TABLES = ("game", "gameLines")
+
+# A pull that comes back smaller than this fraction of what is already on disk is treated as
+# a short read and discarded. Both tables are append-mostly -- the 2026-09-11 pulls grew
+# 112,672 -> 112,675 and 38,647 -> 39,008 -- so real shrinkage is a few rows, never 5%.
+_GQL_MIN_RETAINED = 0.95
+
+
+def _json_rows(path: Path) -> int | None:
+    """Row count of a dump already on disk, or None if it is absent or unreadable."""
+    if not path.is_file():
+        return None
+    try:
+        return duckdb.sql(
+            "SELECT count(*) FROM read_json_auto(?)", params=[str(path)]
+        ).fetchone()[0]
+    except duckdb.Error:
+        return None
+
+
+def _pull_graphql(token: str) -> None:
+    """Re-pull the GraphQL dumps the rebuild is about to load.
+
+    Same reason as the flattens below, and the same shape of bug: `refresh_cfbd.py` scraped
+    REST and rebuilt the warehouse without ever re-pulling `data/graphql/*.json`, so every
+    rebuild reloaded whatever those files held the last time someone pulled them by hand. On
+    2026-09-11 `game.json` was 14 days old and measurably behind -- it lacked 4 in-span REST
+    games and still called 415 finished games `scheduled` -- while `gameLines.json` lacked
+    1,682 REST-lined games. A full pull took both gaps to zero.
+
+    **Never pass `seasons=`.** `graphql_scrape` turns it into a `where` clause but
+    `_write` replaces the whole file, so a season-scoped pull would truncate `game.json`
+    from 1869-2026 down to the one season asked for. Same trap as `duckdb --only`.
+
+    The pull is staged in a sibling directory and swapped in with `Path.replace`, mirroring
+    `build_duckdb`'s `.building` idiom: the live dump is never the thing being written, so a
+    crash mid-pull cannot leave a half-file behind.
+
+    Two different failures, and the guard only covers one of them. A pull that *raises* is
+    already safe -- `graphql_scrape` catches per table and `_write` runs only after
+    `_paginate` returns, so the staged file simply never appears. What the count check
+    catches is the quiet one: a short read that returns 5,000 rows instead of 112,675 and
+    reports success, which would otherwise replace the dump with a truncated copy.
+
+    Never fatal, like the flattens: the rebuild is the expensive half.
+    """
+    print("=== pull graphql dumps ===")
+    live_dir = cfb_paths.DATA_ROOT / "graphql"
+    stage_root = cfb_paths.DATA_ROOT / ".graphql-pull"
+    for table in _GQL_REFRESH_TABLES:
+        live = live_dir / f"{table}.json"
+        before = _json_rows(live)
+        try:
+            reports = graphql_scrape(
+                tables=[table], data_dir=stage_root, token=token
+            )
+        except Exception as exc:
+            print(f"  {table:16} FAILED {type(exc).__name__}: {exc}", file=sys.stderr)
+            continue
+        report = reports[0]
+        if report.error is not None:
+            print(f"  {table:16} FAILED {report.error}", file=sys.stderr)
+            continue
+        staged = stage_root / "graphql" / f"{table}.json"
+        if not staged.is_file():
+            print(f"  {table:16} FAILED pull reported ok but wrote no file", file=sys.stderr)
+            continue
+        if before is not None and report.rows < before * _GQL_MIN_RETAINED:
+            print(f"  {table:16} SHORT READ {report.rows:,} rows against {before:,} on "
+                  f"disk; keeping the existing dump", file=sys.stderr)
+            staged.unlink()
+            continue
+        live.parent.mkdir(parents=True, exist_ok=True)
+        staged.replace(live)
+        delta = "" if before is None else f" ({report.rows - before:+,})"
+        print(f"  {table:16} {report.rows:,} rows, {report.pages} page(s){delta}")
 
 
 def _flatten_actionnetwork() -> None:
@@ -179,13 +261,31 @@ def main() -> int:
         print(f"{len(failed)} endpoint(s) failed; aborting before duckdb rebuild.")
         return 1
 
+    # After the abort above: a dead REST endpoint must not cost a 4-minute GraphQL pull
+    # that gets thrown away. Before the flattens and the CSV rebuild, so the ordering reads
+    # as "refresh every source, then derive from them".
+    _pull_graphql(token)
+
     _flatten_actionnetwork()
     _flatten_pff()
     _flatten_oddsapi()
     _rebuild_games_csv(args.season)
 
     print("=== rebuild cfb.duckdb ===")
-    db_path, _ = build_duckdb(cfb_paths.DATA_ROOT, explode=True)
+    db_path, loads = build_duckdb(cfb_paths.DATA_ROOT, explode=True)
+    # `build_duckdb` reports a failed table rather than raising, and the explode reports
+    # the same way. Discarding this list made both silent: on 2026-09-11 a rebuild produced
+    # a `stg` with no `an_*` tables at all, `build_core` then died in `_merge_game_lines`
+    # on the `period` column the ActionNetwork backfill would have created, and the only
+    # trace was the crash 200 lines later. `meta.load_report` does not cover the gap either
+    # -- `_write_meta` runs *before* the explode, so it structurally cannot hold an explode
+    # error. Printing here is the only place they surface.
+    broken = [r for r in loads if r.error is not None]
+    for r in broken:
+        print(f"  LOAD ERROR {r.schema}.{r.name}: {r.error}", file=sys.stderr)
+    if broken:
+        print(f"  {len(broken)} table(s) failed to load; core may be incomplete",
+              file=sys.stderr)
     built = build_core(db_path)
     print(f"Rebuilt {db_path} (core: {', '.join(built)})")
 
