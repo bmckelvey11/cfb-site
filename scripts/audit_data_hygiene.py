@@ -64,11 +64,17 @@ DATA_ROOT_OWNED = {
 
 # Empty `[]` payloads that are documented data floors (docs/data-coverage.md, "Empty
 # files are floors, not failures"). Anything empty outside this map is flagged.
-KNOWN_FLOORS: dict[str, range] = {
+# Two kinds of floor. Historical: the upstream has no rows for those seasons and never
+# will. Current-season pending: `elo` and `talent` for the season in progress are published
+# by CFBD partway through it, so an empty 2026 file is a not-yet, not a hole -- re-scrape
+# them later in the season and drop the 2026 entries once they fill.
+KNOWN_FLOORS: dict[str, "range | set[int]"] = {
     "transfer_portal": range(2012, 2021),
     "teams_ats": range(2012, 2019),
     "kicker_paar": range(2012, 2016),
-    "talent": range(2012, 2015),
+    "talent": {*range(2012, 2015), 2026},  # 2026 pending, see above
+    "elo": {2026},  # 2026 pending, see above
+    "srs_expanded": {2020},  # COVID season is empty upstream (docs/data-coverage.md)
     "returning_production": range(2012, 2014),
     "adjusted_player_passing": range(2012, 2013),
     "adjusted_player_rushing": range(2012, 2013),

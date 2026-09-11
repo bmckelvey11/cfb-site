@@ -50,7 +50,12 @@ def test_classify_empty_knows_the_documented_floors():
     assert classify_empty("transfer_portal", 2015) == "floor"
     assert classify_empty("transfer_portal", 2021) == "unexpected"
     assert classify_empty("win_probability", 2013) == "floor"
-    assert classify_empty("elo", 2026) == "unexpected"
+    assert classify_empty("srs_expanded", 2020) == "floor"
+    assert classify_empty("srs_expanded", 2019) == "unexpected"
+    assert classify_empty("elo", 2026) == "floor"
+    assert classify_empty("talent", 2026) == "floor"
+    assert classify_empty("talent", 2025) == "unexpected"
+    assert classify_empty("elo", 2027) == "unexpected"  # only the pending season is a floor
     assert classify_empty("games", None) == "unexpected"
 
 

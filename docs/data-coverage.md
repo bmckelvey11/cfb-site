@@ -421,6 +421,8 @@ silent error:
 | `returning_production` | 2012-2013 |
 | `adjusted_player_passing`, `adjusted_player_rushing`, `player_usage`, `ppa_players_season`, `player_success_season`, `pregame_win_prob` | 2012 |
 | `win_probability` (PER_GAME) | 2012-2013 |
+| `srs_expanded` | 2020 (COVID season; see "Season floors" above) |
+| `elo`, `talent` | **2026, pending** — CFBD publishes the in-progress season partway through it; re-scrape later in the season and remove this row once they fill |
 
 `ppa_players_games` and `player_success_game` are each missing all 15 weeks of
 2012 for the same reason (no file is written for an empty week), so their
