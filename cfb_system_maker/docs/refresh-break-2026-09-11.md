@@ -66,8 +66,17 @@ and the reason was discarded.
 `d03fb4c` already added the diagnostic for exactly this — `refresh_cfbd.py:283-287`
 prints `LOAD ERROR <schema>.<name>` for every failed report — but it landed *after* the
 05:00 run, whose traceback line numbers (`refresh_cfbd.py:189`, `:226`) match the older,
-shorter file. **The next rebuild is the one that will print the reason.** Nothing else
-surfaces it.
+shorter file. **The first post-`d03fb4c` rebuild is the one that prints the reason.**
+Nothing else surfaces it; the supervised ~06:05 run is that rebuild.
+
+Tracked as `#rebuild-dropped-an-tables` (P1) in `TODO.md`, deliberately left open rather
+than guessed at.
+
+Two theories were raised and both are dead. A fixed `.building` temp path colliding with
+a concurrent rebuild does not explain it — the 05:00 run was alone, and there was no
+04:00 scheduled run for it to race. `5897917` closed that hazard on its own merits
+(`build_duckdb` now takes an exclusive lock and raises `RebuildInProgress`), not as this
+diagnosis.
 
 ## Fix shape
 
@@ -85,12 +94,28 @@ Two defects, independent, both worth closing:
 
 Neither addresses why the explode failed — that needs the rebuild's output.
 
+## The failure would have stood for 23 hours
+
+`CFB-CFBD-Daily` is a **daily** trigger, not hourly — `MSFT_TaskDailyTrigger
+@2026-08-31T05:00:00`, `rep:(none)`, next run 2026-09-12T05:00. So nothing scheduled was
+going to rebuild the warehouse before the following morning, and nothing scheduled was
+going to produce the `LOAD ERROR` line either: the 05:00 run predates `d03fb4c`, and the
+next one is a day away. A supervised `refresh_cfbd.py` at ~06:05 is what actually
+produced the first post-`d03fb4c` run.
+
+Worth stating because it changes what the column guard is for. If that run comes back
+clean, the explode failure was transient — and the guard in `_merge_game_lines` is then
+not a belt-and-braces addition but the only thing standing between a transient upstream
+gap and a warehouse that loses 14 `core` tables until someone notices by hand.
+
 ## Also noticed
 
-`C:` is at **98% (27 GB free)** with two stale 5 GB warehouse copies next to the live
+`C:` was at **98% (27 GB free)**, with two stale 5 GB warehouse copies beside the live
 one — `cfb.duckdb.bak-2026-09-01` and `cfb.duckdb.premigrate` (2026-09-02). A rebuild
-writes a ~5 GB `.building` file before the atomic replace, so headroom matters here.
-Not implicated in this failure; flagged because it is close to being implicated in one.
+writes a ~5 GB `.building` file before the atomic replace, so the headroom mattered.
+Never implicated in this failure; flagged because it was close to being implicated in
+one. **Resolved the same morning** — the user authorized deleting both, leaving
+`data/cfb.duckdb` as the only copy and 37 GB free.
 
 ---
 Investigated 2026-09-11. Evidence: `data/logs/cfbd_refresh.log` (05:00 block),
