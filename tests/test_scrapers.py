@@ -118,12 +118,18 @@ def test_registry_is_complete_and_unique():
     names = [e.name for e in ENDPOINTS]
     assert len(set(names)) == len(names)
 
-    # 78 base entries, one per CFBD spec path, plus 9 `_ngt` variants that reuse a
-    # base endpoint's method with `excludeGarbageTime` on. Counting them together
-    # would hide a real duplicate spec path behind the variants.
+    # 76 base entries, plus 9 `_ngt` variants that reuse a base endpoint's method with
+    # `excludeGarbageTime` on. Counting them together would hide a real duplicate spec
+    # path behind the variants.
+    #
+    # It was 78 and one per CFBD spec path. `draft_positions` and `draft_teams` are the
+    # two paths deliberately not registered: GraphQL supersedes them under R6 and the
+    # REST pulls were duplicates (docs/warehouse-drop-superseded-2026-09-10.md). If this
+    # count rises to 78 again, check it is a new spec path and not those two coming back.
     base = [e for e in ENDPOINTS if not e.name.endswith("_ngt")]
     variants = [e for e in ENDPOINTS if e.name.endswith("_ngt")]
-    assert len(base) == 78
+    assert len(base) == 76
+    assert not {"draft_positions", "draft_teams"} & set(names)
     assert len(variants) == 9
 
     # Every variant shadows a registered base endpoint and differs only by the flag.

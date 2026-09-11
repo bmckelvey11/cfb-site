@@ -61,8 +61,11 @@ ENDPOINTS: list[Endpoint] = [
     Endpoint("conference_changes", "ConferencesApi", "get_team_conference_changes", SEASON),
     # Draft
     Endpoint("draft_picks", "DraftApi", "get_draft_picks", SEASON),
-    Endpoint("draft_positions", "DraftApi", "get_draft_positions", ONCE),
-    Endpoint("draft_teams", "DraftApi", "get_draft_teams", ONCE),
+    # `draft_positions` and `draft_teams` were retired 2026-09-10: GraphQL's `draftPosition`
+    # and `draftTeam` hold every populated column and at least as many distinct keys (R6),
+    # so the REST pulls were duplicates. Do not re-add without re-taking that verdict --
+    # docs/warehouse-drop-superseded-2026-09-10.md. `duckdb_load._SUPERSEDED_REST` still
+    # skips the dumps this already wrote, because `raw` is never deleted.
     # Drives
     Endpoint("drives", "DrivesApi", "get_drives", SEASON),
     # Games
