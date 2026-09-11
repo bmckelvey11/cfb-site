@@ -1227,3 +1227,43 @@ def test_tick_csv_is_skipped_with_the_rest_of_actionnetwork(tmp_path):
     _write_tick_csv(tmp_path)
     _, reports = build_duckdb(tmp_path, include_actionnetwork=False)
     assert "an_history_tick" not in {r.name for r in reports}
+
+
+def test_actionnetwork_book_ids_are_offset_out_of_cfbds_range():
+    """An AN book id used bare sits inside CFBD's live provider range (38-1004): FanDuel
+    68, BetMGM 69, Bet365 75 and Pinnacle 49 all collide with plausible future CFBD ids.
+    If CFBD issued 68 to a different book, the explode would rebuild stg.lines_provider
+    with that name, the AN insert would skip (the id exists), and ~5,300 FanDuel rows
+    would silently join to the wrong book.
+
+    The two ids in `_AN_BOOK_PROVIDER` are exempt because they are CFBD's own -- including
+    888888, which CFBD really does use for a second DraftKings row alongside 100
+    "Draft Kings". Nothing here invents an id for a book CFBD already knows.
+    """
+    from cfb_system_maker.duckdb_load import (
+        _AN_BOOK_PROVIDER,
+        _AN_ID_OFFSET,
+        _AN_PROVIDER_NAMES,
+        _an_provider_id,
+    )
+
+    for book_id in _AN_PROVIDER_NAMES:
+        assert _an_provider_id(book_id) == book_id + _AN_ID_OFFSET
+        assert _an_provider_id(book_id) > 1_000_000, "still reachable by a CFBD id"
+    for book_id, cfbd_id in _AN_BOOK_PROVIDER.items():
+        assert _an_provider_id(book_id) == cfbd_id, "a known CFBD id must not be offset"
+    assert not (set(_AN_PROVIDER_NAMES) & set(_AN_BOOK_PROVIDER)), (
+        "a book cannot both have a CFBD id and be minted one"
+    )
+
+
+def test_the_backfill_never_emits_a_bare_actionnetwork_book_id():
+    """`ELSE book_id` was the leak: any AN book outside `_AN_BOOK_PROVIDER` went into
+    CFBD's id namespace unchanged. Read from the source because the SQL is built by
+    f-string and there is no cheap way to execute it in isolation."""
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "cfb_system_maker"
+              / "duckdb_load.py").read_text(encoding="utf-8")
+    assert "ELSE book_id + {_AN_ID_OFFSET} END" in source
+    assert "ELSE book_id END" not in source

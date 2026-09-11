@@ -586,7 +586,21 @@ def explode_payloads(
 
 
 # Action Network book_id → CFBD linesProvider.id when the book already exists.
+# ActionNetwork book id -> the CFBD provider id for the same book. Both targets are
+# **CFBD's own** ids, including 888888: CFBD's `linesProvider` table really does carry
+# DraftKings twice, as 100 "Draft Kings" and 888888 "DraftKings", which is the same vendor
+# duplicate its REST `lines` payload emits. `normalize.PROVIDER_ALIASES` reconciles the two
+# names downstream; nothing here invents an id.
 _AN_BOOK_PROVIDER = {15: 888888, 71: 38}  # DraftKings, Caesars
+
+# Books CFBD has no provider id for at all. Their ids are ours to mint, and an AN book id
+# used bare would sit inside CFBD's live range (38-1004): FanDuel 68, BetMGM 69, Bet365 75
+# and Pinnacle 49 all collide with plausible future CFBD ids. If CFBD ever issued 68 to a
+# different book, the explode would rebuild `stg.lines_provider` with that name, the insert
+# below would skip (the id exists), and ~5,300 FanDuel rows would silently join to the
+# wrong book. So they are offset into a range CFBD cannot reach -- it already uses 999999,
+# hence seven digits rather than six.
+_AN_ID_OFFSET = 9_000_000
 _AN_PROVIDER_NAMES = {
     30: "Circa",
     49: "Pinnacle",
@@ -594,6 +608,12 @@ _AN_PROVIDER_NAMES = {
     69: "BetMGM",
     75: "Bet365",
 }
+
+
+def _an_provider_id(book_id: int) -> int:
+    """The provider id an ActionNetwork book lands under in `stg.lines_provider`."""
+    mapped = _AN_BOOK_PROVIDER.get(book_id)
+    return mapped if mapped is not None else book_id + _AN_ID_OFFSET
 _AN_SCHOOL_ALIAS = {
     "Miami (FL)": "Miami",
     "San Jose State": "San José State",
@@ -661,6 +681,9 @@ def _backfill_gamelines(
         f"WHEN '{src.replace(chr(39), chr(39) + chr(39))}' THEN '{dst.replace(chr(39), chr(39) + chr(39))}'"
         for src, dst in _AN_SCHOOL_ALIAS.items()
     )
+    # Every AN book id is rewritten: the ones CFBD knows map to its id, the rest are
+    # offset out of CFBD's range. `ELSE book_id` would leak a bare AN id into CFBD's
+    # namespace, which is the collision `_AN_ID_OFFSET` exists to prevent.
     book_sql = " ".join(
         f"WHEN {an_id} THEN {cfbd_id}" for an_id, cfbd_id in _AN_BOOK_PROVIDER.items()
     )
@@ -720,7 +743,7 @@ def _backfill_gamelines(
           SELECT
             CAST(m.game_id AS {gid_type}) AS gameId,
             CAST(
-              (CASE book_id {book_sql} ELSE book_id END) AS {prov_type}
+              (CASE book_id {book_sql} ELSE book_id + {_AN_ID_OFFSET} END) AS {prov_type}
             ) AS linesProviderId,
             CASE
               WHEN period IN ('event', 'game') THEN 'game'
@@ -785,7 +808,8 @@ def _backfill_gamelines(
         }
         pid_col = "linesProviderId" if "linesProviderId" in prov_cols else "id"
         name_rows = ", ".join(
-            f"({pid}, '{name.replace(chr(39), chr(39) + chr(39))}', 'actionnetwork')"
+            f"({_an_provider_id(pid)}, "
+            f"'{name.replace(chr(39), chr(39) + chr(39))}', 'actionnetwork')"
             for pid, name in _AN_PROVIDER_NAMES.items()
         )
         con.execute(
