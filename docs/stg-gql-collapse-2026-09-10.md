@@ -112,6 +112,21 @@ entities present in `stg`, all three colliders paired, and `camelCase names 10` 
 `--selftest` passes, including new guards that the schema coming back and a collider losing a
 side both fail. 896 fast tests pass; the slow suite is unchanged from its standing baseline.
 
+**The load path was verified separately, because nothing above executes it.** `build_core`
+only *reads* `stg`; `collapse_stg_gql.py` only moved tables. The collapse changed
+`stg_destination`, `explode_payloads`, `_STG_SCHEMAS`, `_finish_stg_table`'s call and
+`_backfill_gamelines`'s signature — none of which runs until the next refresh, and a rebuild
+has silently dropped a table here before. So `explode_payloads` was re-run on a scratch copy
+over a set covering each shape: a collider (`gql_calendar` → `calendar_gql`), a child-bearing
+table (`gql_game` → `game` + `game__awayLineScores`), both camelCase roots, and
+`gql_game_lines` so the backfill fires. All 14 watched tables rebuilt at identical counts, no
+load errors, no `stg_gql` table recreated, the camelCase roots stayed snake-cased, and neither
+the superseded tables nor the dead columns came back.
+
+`_backfill_gamelines` took a second `gql_tables` set and used it for exactly one lookup
+(`"lines_provider" in gql_tables`). Passing the same set twice post-collapse would have worked
+while reading as if the two still meant different things, so the parameter is gone.
+
 ## What this does not support
 
 - **It does not claim the suffix is a good name.** It is the cost of one staging schema, paid
@@ -126,6 +141,10 @@ side both fail. 896 fast tests pass; the slow suite is unchanged from its standi
   not create.** It is resumable for its own output — a destination that exists while the source
   is gone is a completed move — but a destination that exists while the source *also* does is
   reported as an error rather than guessed at.
+- **The mirror is not migrated.** `md:cfb` still holds a pre-collapse `stg_gql`, and dropping
+  it from `DEFAULT_SCHEMAS` means the next promote will neither overwrite nor remove it — a
+  stale schema answering queries silently, which is ADR-0002's original failure mode relocated.
+  Tracked as `#motherduck-drop-stale-stg-gql`; the drop is the user's to run.
 - **Row counts matching is not the same as data matching.** `CREATE TABLE AS SELECT *` preserves
   values and the copy is row-count-checked against its source before the drop, but nothing here
   re-validates column types or content beyond that.

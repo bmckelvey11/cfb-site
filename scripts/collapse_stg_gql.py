@@ -166,12 +166,25 @@ def main(argv: list[str] | None = None) -> int:
     con = duckdb.connect(str(args.db), read_only=not args.apply)
     try:
         moves = plan_moves(con)
+        reports = apply_moves(con, moves, apply=args.apply) if moves else []
+        if args.apply:
+            # Unconditional, not inside the `moves` branch: a prior run that moved every
+            # table left the empty schema behind, and an empty `stg_gql` reads as "the
+            # collapse half-ran". Dropped only when empty -- a table still in it is a move
+            # that failed, and that must stay visible.
+            left = con.execute(
+                "SELECT count(*) FROM duckdb_tables() WHERE schema_name = 'stg_gql'"
+            ).fetchone()[0]
+            if not left and con.execute(
+                "SELECT count(*) FROM information_schema.schemata"
+                " WHERE schema_name = 'stg_gql'"
+            ).fetchone()[0]:
+                con.execute("DROP SCHEMA stg_gql")
+                print("dropped the now-empty stg_gql schema")
+            con.execute("CHECKPOINT")
         if not moves:
             print("nothing to move -- stg_gql is already collapsed")
             return 0
-        reports = apply_moves(con, moves, apply=args.apply)
-        if args.apply:
-            con.execute("CHECKPOINT")
     finally:
         con.close()
 

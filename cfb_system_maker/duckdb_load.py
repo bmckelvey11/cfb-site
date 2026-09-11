@@ -623,7 +623,7 @@ def backfill_gamelines_from_actionnetwork(
             and "an_market" in stg_tables
         ):
             return None
-        return _backfill_gamelines(con, stg_tables, stg_tables)
+        return _backfill_gamelines(con, stg_tables)
     except Exception as exc:
         detail = str(exc).split("\n", 1)[0]
         return TableLoad(
@@ -635,8 +635,14 @@ def backfill_gamelines_from_actionnetwork(
 
 
 def _backfill_gamelines(
-    con: duckdb.DuckDBPyConnection, stg_tables: set[str], gql_tables: set[str]
+    con: duckdb.DuckDBPyConnection, stg_tables: set[str]
 ) -> TableLoad:
+    """One table set since the collapse: `lines_provider` and `an_history` are both in `stg`.
+
+    This took a second `gql_tables` set when GraphQL staged into `stg_gql`, and used it for
+    exactly one lookup. Passing the same set twice would have worked and read as if the two
+    still meant different things.
+    """
     game_cols = {row[0] for row in con.execute("DESCRIBE stg.games").fetchall()}
     game_id = "gameId" if "gameId" in game_cols else "id"
     gl_types = {
@@ -645,7 +651,7 @@ def _backfill_gamelines(
     gid_type = gl_types.get("gameId", "BIGINT")
     prov_type = gl_types.get("linesProviderId", "BIGINT")
     has_history = "an_history" in stg_tables
-    has_provider = "lines_provider" in gql_tables
+    has_provider = "lines_provider" in stg_tables
     alias_sql = " ".join(
         f"WHEN '{src.replace(chr(39), chr(39) + chr(39))}' THEN '{dst.replace(chr(39), chr(39) + chr(39))}'"
         for src, dst in _AN_SCHOOL_ALIAS.items()
