@@ -633,6 +633,11 @@ def explode_payloads(
             con.execute("CHECKPOINT")
         for report in explode_an_children(con, progress=progress):
             reports.append(report)
+        # Before the backfill: it COALESCEs the CFBD value over the AN one, and a NaN
+        # on the CFBD side would win that coalesce and block the fill.
+        for report in null_nan_values(con, progress=progress):
+            reports.append(report)
+        con.execute("CHECKPOINT")
         extra = backfill_gamelines_from_actionnetwork(con)
         if extra is not None:
             reports.append(extra)
@@ -1036,6 +1041,99 @@ def drop_dead_columns(
                 )
             else:
                 report = TableLoad(schema, label, 1, 0)
+            reports.append(report)
+            if progress is not None:
+                progress(report)
+    finally:
+        if owns_connection:
+            con.close()
+    return reports
+
+
+# The two spellings a GraphQL "missing number" arrives in, and why one pass covers both.
+# CFBD's Hasura layer serialises a NaN as the JSON *string* "NaN". `json_group_structure`
+# then sees a key that is DOUBLE on most rows and VARCHAR on a few and types it JSON, so
+# the exploded column is neither numeric nor NULL -- `stg.game_lines.spread` (65 rows) and
+# `overUnder` (3,414) came out JSON on 2026-09-11, and `stg.ratings.spOffense`/`spOverall`
+# the same way on 2 rows each. A downstream `TRY_CAST(... AS DOUBLE)` turns that string
+# into a real NaN, which is the second spelling: `coalesce` treats NaN as populated, so
+# the ActionNetwork backfill's `COALESCE(c.spread, a.spread)` never fills it and every
+# comparison against it is silently false. `duckdb_core._merge_game_lines` guards its own
+# reads with `isnan`; nothing reading `stg` directly does. Nulling at the source, before
+# the backfill widens `game_lines`, is what lets the AN tape fill those rows and lets the
+# 19 direct readers of `stg.game_lines` compare without a cast.
+_JSON_NUMBER_TYPES = ("DOUBLE", "UBIGINT", "BIGINT", "NULL")
+_NAN_JSON_STRING = '"NaN"'
+
+
+def null_nan_values(
+    db: str | Path | duckdb.DuckDBPyConnection,
+    *,
+    progress: Callable[[TableLoad], None] | None = None,
+) -> list[TableLoad]:
+    """Retype ``stg`` JSON columns that are numbers-or-``"NaN"`` to DOUBLE, NaN -> NULL.
+
+    Two cases, one rule. A JSON-typed column whose every non-null value is a JSON
+    number or the string ``"NaN"`` becomes DOUBLE with the NaNs nulled -- a column that
+    holds anything else (an object, a real string) is a genuine mixed payload and is left
+    alone. A column already DOUBLE/FLOAT has any NaN it carries set to NULL.
+
+    Fail-closed and idempotent: a column that does not match is untouched, and a second
+    run finds nothing to do. Reports one ``TableLoad`` per column changed, ``rows`` being
+    the NaNs nulled, so a rebuild's log shows what was rewritten.
+    """
+    owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
+    con = duckdb.connect(str(db)) if owns_connection else db
+    reports: list[TableLoad] = []
+    try:
+        columns = con.execute(
+            """
+            SELECT table_name, column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = 'stg'
+              AND data_type IN ('JSON', 'DOUBLE', 'FLOAT', 'REAL')
+            ORDER BY table_name, column_name
+            """
+        ).fetchall()
+        number_types = ", ".join(f"'{t}'" for t in _JSON_NUMBER_TYPES)
+        for table, column, dtype in columns:
+            target = _qualify("stg", table)
+            col = _ident(column)
+            label = f"{table}.{column}"
+            try:
+                if dtype == "JSON":
+                    is_nan = f"CAST({col} AS VARCHAR) = '{_NAN_JSON_STRING}'"
+                    other, nans = con.execute(
+                        f"""
+                        SELECT
+                          count(*) FILTER (
+                            WHERE json_type({col}) NOT IN ({number_types}) AND NOT ({is_nan})
+                          ),
+                          count(*) FILTER (WHERE {is_nan})
+                        FROM {target}
+                        WHERE {col} IS NOT NULL
+                        """
+                    ).fetchone()
+                    if other or not nans:
+                        continue
+                    con.execute(
+                        f"""
+                        ALTER TABLE {target} ALTER COLUMN {col} SET DATA TYPE DOUBLE
+                        USING (CASE WHEN {is_nan} THEN NULL ELSE TRY_CAST({col} AS DOUBLE) END)
+                        """
+                    )
+                else:
+                    (nans,) = con.execute(
+                        f"SELECT count(*) FILTER (WHERE isnan({col})) FROM {target}"
+                    ).fetchone()
+                    if not nans:
+                        continue
+                    con.execute(f"UPDATE {target} SET {col} = NULL WHERE isnan({col})")
+            except Exception as exc:
+                detail = str(exc).splitlines()[0] if str(exc) else ""
+                report = TableLoad("stg", label, 0, 0, error=f"{type(exc).__name__}: {detail}")
+            else:
+                report = TableLoad("stg", label, 1, int(nans))
             reports.append(report)
             if progress is not None:
                 progress(report)
