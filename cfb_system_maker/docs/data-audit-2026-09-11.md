@@ -99,6 +99,13 @@ duplicates (expected) and the three empty payloads, which still want a floor ent
 rebuild, which no longer sees their inputs. Logs in `raw/` and `raw/actionnetwork_odds.csv`
 were left where they are.
 
+**10:36 refresh (exit 0, 18 min):** the six tables whose inputs were removed are gone
+(`raw`/`stg` `lines_2026_week1_20260903`, `lines_2026_week2_20260908`, and the season-less
+`gamePlayerStat` shadow); `stg.game_player_stat` has 0 season-NULL rows of 5,540,662;
+`meta.load_report` 0 errors; 312 tables. Full audit: **0 FAIL, 4 WARN, 10 INFO** — the two
+`latest` pointer duplicates, the six genuinely mixed-type `an_scoreboard` payload columns,
+and a `schema-drift` WARN that is exactly those six removals against the 09:13 snapshot.
+
 The 08:29 baseline run: **6 FAIL, 21 WARN, 10 INFO**; the 6 FAILs are finding 1.
 Everything below is a WARN or INFO and is a decision for the owner, because each is a
 deletion or a move inside the data root.
