@@ -86,7 +86,18 @@ including a `gameLines.json` dump end to end. Side effect: the four `LOAD ERROR
 stg.game_lines__spread ... scalar JSON; nothing to explode` lines disappear from the
 refresh log, since the list-explode no longer meets a scalar JSON column.
 
-### 3. Hygiene findings the script reports (nothing deleted or moved — proposed actions)
+### 3. Hygiene findings the script reports — proposed actions, applied 2026-09-11 09:41
+
+**Applied after owner sign-off (09:41 local):** `backups/` (9.6 GB), `processed/feature_backups/`
+(122 MB), the five data-root scratch files, `graphql/gamePlayerStat.json` and
+`processed/cfb.db` deleted; `raw/lines_2026_week1_20260903.json` and
+`raw/lines_2026_week2_20260908.json` moved to `ingest/snapshots/`. Folder audit afterwards:
+**0 FAIL, 5 WARN, 4 INFO** (was 16 WARN) — the five left are the two `latest` pointer
+duplicates (expected) and the three empty payloads, which still want a floor entry in
+`docs/data-coverage.md`. The four `lines_2026_week*` orphan tables and the 998 season-less
+`stg.game_player_stat` rows stay in the live warehouse until the next `refresh_cfbd.py`
+rebuild, which no longer sees their inputs. Logs in `raw/` and `raw/actionnetwork_odds.csv`
+were left where they are.
 
 The 08:29 baseline run: **6 FAIL, 21 WARN, 10 INFO**; the 6 FAILs are finding 1.
 Everything below is a WARN or INFO and is a decision for the owner, because each is a
