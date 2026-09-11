@@ -17,7 +17,12 @@ from typing import Any, Callable, Iterable
 
 import duckdb
 
-from cfb_system_maker.graphql_client import GQL_ENTITY_TO_RAW, GQL_ENTITY_TO_STG, GQL_RAW_TO_ENTITY
+from cfb_system_maker.graphql_client import (
+    GQL_ENTITY_TO_RAW,
+    GQL_ENTITY_TO_STG,
+    GQL_RAW_TO_ENTITY,
+    _snake,
+)
 from cfb_system_maker.pff_schema import PFF_TABLES, column_types as pff_column_types
 from cfb_system_maker.oddsapi_schema import OA_TABLES, column_types as oa_column_types
 
@@ -496,7 +501,7 @@ _RAW_SPINE = ("season", "week", "season_type")
 # Proof that each is dead: `python scripts/verify_warehouse_plan.py`.
 _DEAD_COLUMNS = (
     ("stg", "team_stats", "statValue_anyof_schema_1_validator"),
-    ("stg", "team_stats__statValue_any_of_schemas", "statValue_anyof_schema_1_validator"),
+    ("stg", "team_stats__stat_value_any_of_schemas", "statValue_anyof_schema_1_validator"),
     ("stg", "game_weather", "windGust"),
     ("stg", "poll_type", "abbreviation"),
     ("stg", "recruit", "overallRank"),
@@ -1066,7 +1071,13 @@ def _explode_nested_columns(
             nested.append((row[0], kind))
     siblings = [col for col, _ in nested]
     for col, kind in nested:
-        dest = f"{table}{_CHILD_SEP}{col}"
+        # Snake-cased, because this name is one the loader *invents* -- the column it is
+        # built from keeps CFBD's own spelling, and `stg` preserves vendor field names
+        # throughout (`gameId`, `homeTeam`). A table name is the repo's to choose, so
+        # `games.awayLineScores` becomes `stg.games__away_line_scores` while the column
+        # inside it stays `awayLineScores`. That line is deliberate: snake-casing the
+        # columns too would mean renaming every camelCase field in the warehouse.
+        dest = f"{table}{_CHILD_SEP}{_snake(col)}"
         report = _explode_nested_column(con, schema, table, col, kind, dest, siblings)
         reports.append(report)
         if progress is not None:
@@ -1217,8 +1228,8 @@ def _json_keys_are_numeric(
 # `gamePlayerStat_2012` as a stem -- but `stg` does not (ADR-0003).
 #
 # This is deliberately a two-entry map and not a general camelCase rule. The 10 remaining
-# camelCase names in `stg` are explode *children* (`games__awayLineScores`,
-# `advanced_box_score__teams_cumulativePpa`), which need a change to how child names are
+# camelCase names in `stg` are explode *children* (`games__away_line_scores`,
+# `advanced_box_score__teams_cumulative_ppa`), which need a change to how child names are
 # derived, not a lookup -- that is `#stg-camelcase-children`.
 _REST_STG_RENAMES = {
     "gameMedia": "game_media",

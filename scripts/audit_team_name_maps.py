@@ -66,7 +66,7 @@ def unresolvable(con: duckdb.DuckDBPyConnection, names: list[str]) -> list[str]:
     return [r[0] for r in con.execute("""
         SELECT n.name FROM (SELECT unnest(?::VARCHAR[]) AS name) n
         LEFT JOIN core.dim_team d ON d.school = n.name
-        LEFT JOIN stg."teams__alternateNames" a ON a.alternateNames = n.name
+        LEFT JOIN stg."teams__alternate_names" a ON a.alternateNames = n.name
         WHERE d.team_id IS NULL AND a."teamId" IS NULL
         ORDER BY 1
     """, [names]).fetchall()]

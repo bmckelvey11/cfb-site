@@ -65,7 +65,7 @@ CAMEL_CASE = re.compile(r"[A-Z]")
 DROPPED_COLUMNS = [
     ("stg", "an_team", "overtime_losses"),
     ("stg", "team_stats", "statValue_anyof_schema_1_validator"),
-    ("stg", "team_stats__statValue_any_of_schemas", "statValue_anyof_schema_1_validator"),
+    ("stg", "team_stats__stat_value_any_of_schemas", "statValue_anyof_schema_1_validator"),
     ("stg", "game_weather", "windGust"),
     ("stg", "poll_type", "abbreviation"),
     ("stg", "recruit", "overallRank"),
@@ -210,12 +210,12 @@ def check_structure(con) -> list[str]:
         fails.append(f"stg still holds gql_-prefixed tables: {stray}")
     print(f"  [{'ok' if not stray else 'FAIL':4}] no gql_ in stg  {len(stray)} found")
 
-    # Reported, not asserted. The two *root* camelCase names, `gameMedia` and
-    # `gamePlayerStat`, were snake-cased 2026-09-10 with the collapse. What survives is
-    # explode *children* named after the camelCase JSON key they unnest
-    # (`games__awayLineScores`), and renaming those means changing how `explode_payloads`
-    # derives child names -- out of scope per section 12, tracked as
-    # `#stg-camelcase-children`. Failing step 0 on it would block nothing useful.
+    # Reported, not asserted -- and now 0. The two *root* camelCase names, `gameMedia` and
+    # `gamePlayerStat`, were snake-cased 2026-09-10 with the collapse, and the 13 explode
+    # *children* followed the same day once `_explode_nested_columns` started snake-casing
+    # the name it invents (`#stg-camelcase-children`). Still printed rather than asserted:
+    # a new source landing a camelCase nested key is a data event, not a defect, and it
+    # self-corrects on the next explode.
     camel = sorted(f"stg.{t}" for t in tables.get("stg", set()) if CAMEL_CASE.search(t))
     print(f"  [--  ] camelCase names {len(camel)} (step 0's prose says 0 -- see --camel)")
     return fails

@@ -47,7 +47,7 @@ def test_child_count_matches_summed_list_length(con):
     expected = con.execute(
         'SELECT sum(coalesce(len("recruitIds"), 0)) FROM stg.roster'
     ).fetchone()[0]
-    assert _rows(con, "roster__recruitIds") == expected
+    assert _rows(con, "roster__recruit_ids") == expected
 
 
 def test_nested_lists_recurse_one_table_per_level(con):
@@ -87,7 +87,11 @@ def test_json_array_and_object_and_scalar(con):
     )
     reports = explode_stg_lists(con)
     errors = {r.name: r.error for r in reports if r.error}
-    assert "an__spOffense" in errors, "scalar JSON is reported, not exploded"
+    # `an__sp_offense`, not `an__spOffense`: the child table name is one the loader
+    # invents, so it follows repo convention, while the column it was built from keeps
+    # CFBD's spelling. Snake-casing the columns too would mean renaming every camelCase
+    # field in `stg`.
+    assert "an__sp_offense" in errors, "scalar JSON is reported, not exploded"
     assert _rows(con, "an__ranks") == 3
     assert _rows(con, "an__last_play") == 2
     assert con.execute(
@@ -122,3 +126,28 @@ def test_only_leaves_other_tables_children_alone(con):
     explode_stg_lists(con, only={"redo"})
     assert _rows(con, "keep__a") == 2
     assert _rows(con, "redo__a") == 3
+
+
+def test_child_table_names_are_snake_cased(con):
+    """The loader invents `<parent>__<column>`, and used to paste the column in verbatim --
+    `stg.games__awayLineScores`, `stg.teams__alternateNames`. 13 tables carried camelCase
+    that way. The column keeps the vendor spelling; only the invented half changes."""
+    con.execute(
+        """
+        CREATE TABLE stg.parent AS SELECT * FROM (VALUES
+          (1, [{'x': 1}], [{'y': 2}])
+        ) t(gameId, awayLineScores, teams_cumulativePpa)
+        """
+    )
+    explode_stg_lists(con)
+    children = {
+        r[0]
+        for r in con.execute(
+            "SELECT table_name FROM duckdb_tables()"
+            " WHERE schema_name = 'stg' AND starts_with(table_name, 'parent__')"
+        ).fetchall()
+    }
+    assert children == {"parent__away_line_scores", "parent__teams_cumulative_ppa"}
+    # The parent's own column names are untouched -- `stg` preserves vendor field names.
+    parent_cols = {r[0] for r in con.execute("DESCRIBE stg.parent").fetchall()}
+    assert "gameId" in parent_cols
