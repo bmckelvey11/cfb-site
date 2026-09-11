@@ -234,3 +234,59 @@ def test_the_alias_is_one_rule_not_two(con):
 
     assert _provider_key("Draft Kings") == provider_key("Draft Kings") == "draftkings"
     assert PROVIDER_ALIASES == {"draft kings": "draftkings"}
+
+
+# ------------------------------------------------------------ spread sign convention
+#
+# `GameRecord.spread` and `core.fact_game.selected_spread` are home-relative: negative when
+# the home team is favoured. `_build_fact_game_line` inherits that from CFBD without
+# checking, and `_merge_game_lines` carried 8,575 ActionNetwork rows in on top. An inverted
+# book raises nothing and moves no row count -- a backtest just reads the favourite as the
+# underdog for that book. Measured by scripts/audit_line_sign_convention.py; see
+# docs/lines-spread-sign-2026-09-10.md.
+
+
+@pytest.fixture(scope="module")
+def graded(con):
+    """(provider_key, rows, cover_pct, mean_resid) per book with enough graded games."""
+    return con.execute("""
+        SELECT l.provider_key, count(*),
+               100.0 * count(*) FILTER (
+                 WHERE (f.home_points - f.away_points) + l.spread_close > 0) / count(*),
+               avg(l.spread_close + (f.home_points - f.away_points))
+        FROM core.fact_game_line l JOIN core.fact_game f USING (game_id)
+        WHERE l.spread_close IS NOT NULL
+          AND f.home_points IS NOT NULL AND f.away_points IS NOT NULL
+        GROUP BY 1 HAVING count(*) >= 20
+    """).fetchall()
+
+
+def test_no_book_quotes_an_inverted_spread(graded):
+    """`spread + (home_points - away_points)` cancels to ~0 when the spread is
+    home-relative. An inverted book lands at roughly *twice* the mean spread -- around
+    -20 -- so the bound is loose on purpose: it is here to catch a sign flip, not to
+    police how sharp a book is."""
+    assert graded, "no graded line rows at all -- the check has stopped working"
+    for key, rows, _cover, resid in graded:
+        assert -5.0 < resid < 5.0, (
+            f"{key}: mean(spread + margin) = {resid:.2f} over {rows} graded games; "
+            f"a home-relative spread cancels to ~0, an inverted one to ~2x the spread"
+        )
+
+
+def test_no_book_covers_at_a_degenerate_rate(graded):
+    """The second, independent half. A sign flip sends the cover rate to ~0% or ~100%
+    while `mean_resid` could in principle be dragged toward zero by a lopsided sample."""
+    for key, rows, cover, _resid in graded:
+        assert 25.0 < cover < 75.0, (
+            f"{key}: covers {cover:.1f}% of {rows} graded games -- a real book sits near 50%"
+        )
+
+
+def test_the_five_actionnetwork_books_are_graded_at_all(graded):
+    """The books the union added are the ones no code had ever checked. If they stop
+    arriving, the two tests above pass vacuously for them."""
+    have = {key for key, *_ in graded}
+    assert {"circa", "fanduel", "betmgm", "bet365", "pinnacle"} <= have, (
+        f"ActionNetwork books missing from the graded set: {have}"
+    )
