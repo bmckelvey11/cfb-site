@@ -89,12 +89,28 @@ reason it is needed today.
 
 - **The 2015–2023 first-half backfill files.** 10,868 `history_<id>.json` files exist but only
   the 2024–2025 ones carry offers; earlier seasons came back empty and are closed upstream.
-  Re-scraping them is pointless; keeping them costs nothing but the OOM the scoreboard explode
-  just hit is a volume problem, and trimming `raw.an_scoreboard` to seasons the consumers use
-  (2024+) is the cheaper fix than dropping the source.
+  Re-scraping them is pointless. **Do not trim `raw.an_scoreboard` to 2024+**, though: the
+  2015–2023 scoreboards' embedded markets are where the five-book union in
+  `core.fact_game_line` comes from. The OOM needs a memory fix in the explode, not fewer seasons.
 - **`DEFAULT_PERIODS` in the client** still asks only for 1H/1Q on the bulk scrape, while the
   full-game path is pulled by `collect_line_timing.py`. That is a split of one job across two
   scripts, not a reason either half is unnecessary.
+
+## Decision — split the cut (2026-09-11)
+
+Decided in the session that produced this doc and implemented the same day
+([`superpowers/plans/2026-09-11-an-split-cut.md`](superpowers/plans/2026-09-11-an-split-cut.md)):
+
+- **Bulk scrape retired now.** `python -m cfb_system_maker actionnetwork` is not scheduled and
+  is not to be re-run. What is on disk stays loaded.
+- **Both slates moved to the-odds-api.** Spread: amendment S4 of `prereg-line-shopping.md`,
+  `book_set_version` 4, Caesars out. Over-zero: fair = the four regulated books. Measured
+  shifts in [`oddsapi-ingest.md`](oddsapi-ingest.md).
+- **`CFB-AN-History` runs through the 2026 season**, then is cut in January 2027 so version B
+  grades the whole season on its pre-registered close — [`line-timing-collector.md`](line-timing-collector.md),
+  *Sunset*; `#an-history-sunset` in `TODO.md`. `weekly_slate.live_books` keeps one price-free
+  scoreboard call for the event id until then.
+- **Saturday the-odds-api pulls** every two hours 10:00–18:00 ET, ~425 of 500 credits a month.
 
 ## What this does not support
 

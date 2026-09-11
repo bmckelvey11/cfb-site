@@ -32,6 +32,16 @@ math. To pause it:
 Disable-ScheduledTask -TaskName CFB-Odds-Snapshot
 ```
 
+**Saturday pulls, added 2026-09-11.** A second task, **`CFB-Odds-Snapshot-Saturday`**, runs
+the same wrapper every two hours from 10:00 to 18:00 ET on Saturdays — five extra pulls; the
+daily task already fires at 20:00 — with the same battery and `StartWhenAvailable` settings.
+About 65 more credits a month, ~425 of 500 in total, off-season included: the endpoint charges
+per pull whether or not events are listed. Registered because both slates now price every book
+from this snapshot ([`odds-sources-an-vs-apis-2026-09-11.md`](odds-sources-an-vs-apis-2026-09-11.md),
+*Decision*); a six-hour-old number on a Saturday afternoon is what this shortens. Verified by a
+manual `Start-ScheduledTask` (snapshot written, 470 credits remaining). Pause with
+`Disable-ScheduledTask -TaskName CFB-Odds-Snapshot-Saturday`.
+
 ## Plan and quota — probed 2026-09-09
 
 `x-requests-remaining: 500`, `x-requests-used: 0` on a fresh period: this is the
@@ -65,6 +75,13 @@ returned.
 
 ## Read by the spread slate — promoted into `book_fair`
 
+**Since amendment S4 (2026-09-11) this snapshot plus Pinnacle is the whole live fair.** Action
+Network no longer votes; Caesars left the set and the four shared books are priced from here
+rather than live. `book_set_version` 4. Measured on 2026 week 3, 49 games, both versions built
+minutes apart: `book_fair` moved on 8 games, median 0.00, max 0.50 points; E4's side flipped on
+2; the edge ≥ 1 set went 24 → 23. The paragraphs below describe the S2 promotion as it was made
+and stand as the record of it.
+
 `research/spread/scripts/weekly_slate.py` reads the latest snapshot and its books now **vote in
 `book_fair`**, under **amendment S2** of `research/spread/docs/prereg-line-shopping.md`. The
 slate went from 4 books per game to 10.
@@ -91,6 +108,20 @@ recomputed** — no snapshot exists for those moments. Any read pooling the two 
 Names join by stripping the mascot (`oa_resolve`): Odds API says `"Miami Hurricanes"`, PT says
 `"Miami"`. Residual spellings live in `OA_ALIASES` and grow the way `ALIASES` did — when a game
 shows up in the unpriced list with books actually posted for it.
+
+## Read by the over-zero board — the only feed ✅ 2026-09-11
+
+`models/over_zero/scripts/best_line_slate.py` takes its game list and every quote from the
+latest snapshot (`oa_games`); the Action Network scoreboard is not read. The fair spread and
+fair total are the median of the four regulated books — DraftKings, FanDuel, BetRivers, BetMGM,
+the previous set minus Caesars — and the offshore five keep their single-book views. School
+names come from `oddsapi_flatten.school_of`, so the board prints CFBD spellings ("Miami",
+"James Madison") where it printed Action Network's ("Miami (FL)", "JMU").
+
+Measured against the last AN-fair run, minutes apart on the same snapshot: 10 picks on 85 games
+→ 10 on 84. On the 38 games whose names join across the two spellings, the fair spread moved on
+3 and the fair total on 6, none by more than a point, and all 4 picks in that set agree. Every
+view's `asOf` is now the snapshot time, not the run time.
 
 ## It loads — `stg.oa_odds_tick`, `stg.oa_snapshot`, `core.fact_game_odds` ✅ 2026-09-10
 

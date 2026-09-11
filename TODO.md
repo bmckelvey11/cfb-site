@@ -35,6 +35,8 @@ Soft cap ~8 open items here; `todo_sweep.py check` warns past that.)*
 
 *Cross-cutting: PFF, Action Network, odds, GraphQL, DuckDB — not owned by one unit.*
 
+- [ ] `#an-history-sunset` **Cut `CFB-AN-History` and the last Action Network call after the 2026 season** <!-- id: an-history-sunset --> — decided 2026-09-11 ([`docs/odds-sources-an-vs-apis-2026-09-11.md`](docs/odds-sources-an-vs-apis-2026-09-11.md), *Decision*). The bulk scrape is retired and both slates price from the-odds-api; the history task stays only so version B grades the whole season on its pre-registered close (AN consensus book 15). **Do in January 2027, after the last bowl grades:** final `collect_line_timing.cmd history --season 2026`, delete the task, replace `weekly_slate.live_books`'s AN event-id/kickoff lookup, amend `prereg-line-movement.md` so the 2027 close is the last the-odds-api snapshot before kickoff. Steps in [`docs/line-timing-collector.md`](docs/line-timing-collector.md) *Sunset*. **Done when** nothing in the repo calls `api.actionnetwork.com` and `eval_version_b.py` grades 2027 rows from `stg.oa_odds_tick`. P2
+
 *Source-rationalization items below are the numbered steps of
 [`docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md`](docs/superpowers/plans/2026-09-08-warehouse-rationalization-master.md)
 §8 and run **in order** — each is gated on the one above. Step 0 (preflight)

@@ -156,6 +156,28 @@ scripts\collect_line_timing.cmd history --season 2026 --weeks 1-16
 4. **No alerting.** If the task silently stops, nothing tells you. Checking the snapshot
    count once a month during the season is the intended safeguard.
 
+## Sunset — January 2027
+
+`CFB-AN-History` is the last piece of the Action Network scrape still scheduled. The bulk
+scoreboard and first-half scrape was retired on 2026-09-11 and both live slates now price from
+the-odds-api and oddspapi ([`odds-sources-an-vs-apis-2026-09-11.md`](odds-sources-an-vs-apis-2026-09-11.md),
+*Decision*). This task stays until version B has been graded on the full 2026 season, because
+its close is the AN consensus book 15 from these history files, and changing that definition
+mid-season would split the sample.
+
+When the last bowl has been graded (January 2027):
+
+1. Run the history pull once more with `--season 2026` so every event's path is complete, then
+   `schtasks /Delete /TN "CFB-AN-History" /F`.
+2. `weekly_slate.live_books` still calls the AN scoreboard for the event id and kickoff. Replace
+   that lookup (CFBD games for kickoff, the-odds-api event for identity) or the forward log loses
+   `event_id` and `kick`.
+3. Amend `research/spread/docs/prereg-line-movement.md`: version B's close from 2027 on becomes
+   the last the-odds-api snapshot before kickoff. Say the era split out loud.
+4. `CFB-PT-Snapshot` is unaffected; it never touched Action Network.
+
+Tracked as `#an-history-sunset` in `TODO.md`.
+
 ## Turning it off
 
 ```powershell
