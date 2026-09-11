@@ -711,13 +711,22 @@ def backfill_gamelines_from_actionnetwork(
                 "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
             ).fetchall()
         }
-        if not (
-            "game_lines" in stg_tables
-            and "games" in stg_tables
-            and "an_market" in stg_tables
-        ):
+        if not ("game_lines" in stg_tables and "games" in stg_tables):
+            # Not a build that has a CFBD side to widen -- nothing to say.
             return None
-        return _backfill_gamelines(con, stg_tables)
+        if "an_market" in stg_tables:
+            return _backfill_gamelines(con, stg_tables)
+        # The CFBD side loaded and the ActionNetwork side did not: an anomaly in any build
+        # that carries the tape, and reported as one. Returning a bare `None` here made the
+        # 2026-09-11 gap invisible -- `meta.load_report` is written before the explode, so
+        # the skip reached no log at all, and `_merge_game_lines` then died on the `period`
+        # column this step would have added. A report routes it through the `LOAD ERROR`
+        # line `refresh_cfbd.py` prints for every failed table.
+        return TableLoad(
+            "stg", "game_lines", 0, 0,
+            error="stg.an_market absent: ActionNetwork lines not merged into "
+                  "stg.game_lines, which leaves it without period/line_source",
+        )
     except Exception as exc:
         detail = str(exc).split("\n", 1)[0]
         return TableLoad(

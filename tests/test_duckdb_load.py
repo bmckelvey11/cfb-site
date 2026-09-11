@@ -1022,6 +1022,44 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     assert "DraftKings" in names and "FanDuel" in names
 
 
+def test_the_backfill_reports_a_missing_actionnetwork_tape(tmp_path):
+    """A CFBD side with no AN side is an anomaly, and it has to reach a log.
+
+    2026-09-11: `stg.an_market` was absent after a rebuild, this step returned a bare
+    `None`, and nothing recorded it -- `meta.load_report` is written *before* the explode,
+    so it structurally cannot hold the skip. `build_core` then died in `_merge_game_lines`
+    on the `period` column this step would have added, and the crash 200 lines later was
+    the only trace. A `TableLoad` with an error routes it through the `LOAD ERROR` line
+    `refresh_cfbd.py` prints.
+    """
+    import duckdb
+
+    db_path = tmp_path / "no_tape.duckdb"
+    con = duckdb.connect(str(db_path))
+    con.execute("CREATE SCHEMA stg")
+    con.execute('CREATE TABLE stg.games ("gameId" UBIGINT)')
+    con.execute('CREATE TABLE stg.game_lines ("gameId" UBIGINT, spread DOUBLE)')
+    con.close()
+
+    report = backfill_gamelines_from_actionnetwork(db_path)
+    assert report is not None, "a skipped backfill must still be reported"
+    assert report.error is not None and "an_market" in report.error
+
+
+def test_the_backfill_stays_quiet_when_there_is_no_cfbd_side_either(tmp_path):
+    """An AN-free build (`include_actionnetwork=False`, or any fixture without the CFBD
+    line tables) is not an anomaly and must not emit a LOAD ERROR -- the report is for the
+    case where one half loaded and the other did not."""
+    import duckdb
+
+    db_path = tmp_path / "empty.duckdb"
+    con = duckdb.connect(str(db_path))
+    con.execute("CREATE SCHEMA stg")
+    con.close()
+
+    assert backfill_gamelines_from_actionnetwork(db_path) is None
+
+
 def test_an_children_are_flat_and_the_generic_recursion_leaves_them_alone(tmp_path):
     """§8: one price should not need a 62-character column name.
 
