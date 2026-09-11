@@ -7,6 +7,7 @@ See docs/duckdb-core-ddl.md and docs/duckdb-warehouse-plan.md.
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -549,6 +550,23 @@ def _merge_game_lines(con: duckdb.DuckDBPyConnection) -> bool:
     """
     if not (_has(con, "stg", "game_lines") and _has(con, "stg", "lines_provider")):
         return False
+    # `period` and `line_source` exist only after `backfill_gamelines_from_actionnetwork`
+    # widens the table, and that step returns early when `stg.an_market` is absent. On
+    # 2026-09-11 the 05:00 refresh lost the ActionNetwork tape, the backfill skipped, and
+    # this query -- guarded on the table alone -- died on `Binder Error: Table "l" does not
+    # have a column named "period"`, taking `build_core` down at step 7 of ~14 and leaving
+    # `core` with 6 tables. Without the tape there is no AN half to union, so the merge has
+    # nothing to do: skip it and let the rest of the build finish on the REST side.
+    # Warned rather than skipped quietly -- a silent skip here is how the missing tape went
+    # unnoticed long enough to become a crash.
+    if not _has_columns(con, "stg", "game_lines", "period", "line_source"):
+        warnings.warn(
+            "stg.game_lines has no period/line_source column: the ActionNetwork backfill "
+            "did not run, so core.fact_game_line stays REST-only",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return False
     # Same bound the REST unnest applies: a line row for a game the spine excluded is an
     # orphan. Measured at 0 today; restated so it stays 0 when game_lines moves.
     # `game_lines` spells a missing number **NaN, not NULL** -- 3,414 `overUnder` and 65
@@ -881,6 +899,25 @@ def _has(con: duckdb.DuckDBPyConnection, schema: str, table: str) -> bool:
     return bool(con.execute(
         "SELECT count(*) FROM information_schema.tables "
         "WHERE table_schema = ? AND table_name = ?", [schema, table]).fetchone()[0])
+
+
+def _has_columns(
+    con: duckdb.DuckDBPyConnection, schema: str, table: str, *columns: str
+) -> bool:
+    """Every named column present on `schema.table`.
+
+    `_has` is not enough for a table whose shape depends on whether an optional source
+    loaded. `stg.game_lines` is the case that proved it: the CFBD dump lands nine columns
+    and `backfill_gamelines_from_actionnetwork` widens it only when the ActionNetwork tape
+    is there, so a guard that asks "does the table exist" says yes and the query then
+    fails to bind.
+    """
+    present = {
+        row[0] for row in con.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = ? AND table_name = ?", [schema, table]).fetchall()
+    }
+    return present.issuperset(columns)
 
 
 def _build_dim_coach(con: duckdb.DuckDBPyConnection) -> bool:
