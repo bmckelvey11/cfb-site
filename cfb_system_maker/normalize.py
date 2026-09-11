@@ -46,17 +46,79 @@ def normalize_games(
     return normalized
 
 
+# CFBD emits DraftKings under two spellings **in the same `lines` array**, on 215 games.
+# Measured 2026-09-10: `Draft Kings` is strictly a degraded duplicate -- it never carries a
+# value `DraftKings` lacks, while `DraftKings` supplies 161 `spreadOpen`, 121
+# `overUnderOpen` and ~185 moneylines the other leaves null. One book, two names.
+#
+# Owned here rather than in `duckdb_core` because this module is where a provider row is
+# chosen; `duckdb_core._provider_key` delegates to `provider_key` below, so `games.csv`,
+# `core.fact_game`, `core.fact_game_line` and `enrich`'s line-move index cannot disagree
+# about what a book is called or which of its rows is the real one.
+#
+# Deliberately NOT extended to the Caesars family -- `Caesars`, `Caesars (Pennsylvania)`
+# and `Caesars Sportsbook (Colorado)` never share a game and hold disjoint season ranges,
+# consistent with either a rename history or separate state licences. Nothing measured
+# settles which, and merging on a guess destroys the distinction irreversibly.
+PROVIDER_ALIASES = {"draft kings": "draftkings"}
+
+
+def provider_key(value: Any) -> str | None:
+    """The canonical lowercase key for a vendor provider string."""
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if not text:
+        return None
+    return PROVIDER_ALIASES.get(text, text)
+
+
+def _line_values(line: dict[str, Any]) -> int:
+    """How many of the six line numbers this row actually carries."""
+    return sum(
+        1
+        for keys in (
+            ("spread",),
+            ("spreadOpen", "spread_open"),
+            ("overUnder", "over_under", "total"),
+            ("overUnderOpen", "over_under_open", "total_open"),
+            ("homeMoneyline", "home_moneyline"),
+            ("awayMoneyline", "away_moneyline"),
+        )
+        if _first(line, *keys) is not None
+    )
+
+
+def _best_of_book(lines: list[dict[str, Any]], chosen: dict[str, Any]) -> dict[str, Any]:
+    """The most complete row for the *same book* as ``chosen``.
+
+    Which book gets selected is untouched -- only which of that book's duplicate rows is
+    read. Without this the choice is array order, so the degraded `Draft Kings` twin wins
+    roughly half the time and its nulls become a null line-move feature for a game whose
+    open is sitting in the same payload.
+    """
+    key = provider_key(chosen.get("provider"))
+    if key is None:
+        return chosen
+    best = chosen
+    for line in lines:
+        if line is chosen or provider_key(line.get("provider")) != key:
+            continue
+        if _line_values(line) > _line_values(best):
+            best = line
+    return best
+
+
 def _select_line(lines: list[dict[str, Any]], provider: str | None) -> dict[str, Any] | None:
     usable = [line for line in lines if line.get("spread") is not None or _first(line, "overUnder", "over_under") is not None]
     if not usable:
         return None
     if provider:
-        provider_lower = provider.lower()
+        wanted = provider_key(provider)
         for line in usable:
-            line_provider = str(line.get("provider", "")).lower()
-            if line_provider == provider_lower:
-                return line
-    return usable[0]
+            if provider_key(line.get("provider")) == wanted:
+                return _best_of_book(usable, line)
+    return _best_of_book(usable, usable[0])
 
 
 def _select_total(lines: list[dict[str, Any]], selected_line: dict[str, Any]) -> dict[str, Any]:

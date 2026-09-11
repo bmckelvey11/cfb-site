@@ -14,6 +14,8 @@ import duckdb
 
 from cfb_system_maker.models import GameRecord
 from cfb_system_maker.normalize import (
+    PROVIDER_ALIASES,
+    provider_key,
     _first,
     _optional_float,
     _optional_int,
@@ -226,11 +228,18 @@ def _build_dim_venue(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("ALTER TABLE core.dim_venue ADD PRIMARY KEY (venue_id)")
 
 
+def _populated(row: list[Any]) -> int:
+    """How many line values a row carries, ignoring the two key columns."""
+    return sum(1 for value in row[2:] if value is not None)
+
+
 def _provider_key(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip().lower()
-    return text or None
+    """Delegates to `normalize.provider_key`, which owns the alias map.
+
+    Two definitions of "what is this book called" is how `core.fact_game_line` and
+    `games.csv` end up disagreeing about whether a game has a DraftKings row.
+    """
+    return provider_key(value)
 
 
 def _lines_list(value: Any) -> list[dict[str, Any]]:
@@ -459,8 +468,7 @@ def _build_fact_game_line(con: duckdb.DuckDBPyConnection) -> None:
           moneyline_home, moneyline_away, formatted_spread
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
-    batch: list[list[Any]] = []
-    seen: set[tuple[int, str]] = set()
+    rows: dict[tuple[int, str], list[Any]] = {}
     # Same 2012+ bound as fact_game, inherited rather than restated: a line row for
     # a game the spine excluded would be an orphan.
     for game_id, lines_val in con.execute(
@@ -475,12 +483,8 @@ def _build_fact_game_line(con: duckdb.DuckDBPyConnection) -> None:
             if key is None:
                 continue
             pk = (gid, key)
-            if pk in seen:
-                continue
-            seen.add(pk)
             formatted = _first(line, "formattedSpread", "formatted_spread")
-            batch.append(
-                [
+            row = [
                     gid,
                     key,
                     _optional_float(_first(line, "spread")),
@@ -492,13 +496,21 @@ def _build_fact_game_line(con: duckdb.DuckDBPyConnection) -> None:
                     _optional_int(_first(line, "homeMoneyline", "home_moneyline")),
                     _optional_int(_first(line, "awayMoneyline", "away_moneyline")),
                     str(formatted) if formatted is not None else None,
-                ]
-            )
-            if len(batch) >= 2000:
-                con.executemany(insert_sql, batch)
-                batch.clear()
-    if batch:
-        con.executemany(insert_sql, batch)
+            ]
+            # Was "keep the first occurrence", which is array order and so arbitrary.
+            # Since `Draft Kings` aliases onto `draftkings`, 215 games now present the
+            # same key twice, and the two differ on 31 spreads and 21 totals -- the same
+            # book captured at two moments inside one payload. The more populated row
+            # wins: it is the one carrying the opens and moneylines, and on a tie this is
+            # still first-wins. Held in a dict rather than appended, because replacing a
+            # row already in a list means finding it first.
+            prior = rows.get(pk)
+            if prior is None or _populated(row) > _populated(prior):
+                rows[pk] = row
+
+    batch = list(rows.values())
+    for start in range(0, len(batch), 2000):
+        con.executemany(insert_sql, batch[start:start + 2000])
 
     con.execute(
         "ALTER TABLE core.fact_game_line ADD PRIMARY KEY (game_id, provider_key)"
@@ -543,33 +555,63 @@ def _merge_game_lines(con: duckdb.DuckDBPyConnection) -> bool:
     # `spread` rows. coalesce treats NaN as a value, so without this the merge fills REST
     # NULLs with NaN and every downstream comparison silently becomes false. Nulled out
     # in an outer layer so each cast is written once.
+    # Built from the same dict, so the two sides cannot drift apart.
+    aliases = "CASE lower(p.name) " + " ".join(
+        f"WHEN '{src}' THEN '{dst}'" for src, dst in PROVIDER_ALIASES.items()
+    ) + " END"
     con.execute(
-        """
+        f"""
         CREATE OR REPLACE TEMP VIEW _gql_game_line AS
         SELECT
           game_id, provider_key, line_source,
-          CASE WHEN isnan(spread_close) THEN NULL ELSE spread_close END AS spread_close,
-          CASE WHEN isnan(spread_open)  THEN NULL ELSE spread_open  END AS spread_open,
-          CASE WHEN isnan(total_close)  THEN NULL ELSE total_close  END AS total_close,
-          CASE WHEN isnan(total_open)   THEN NULL ELSE total_open   END AS total_open,
+          spread_close, spread_open, total_close, total_open,
           moneyline_home, moneyline_away
         FROM (
           SELECT
+            game_id, provider_key, line_source, provider_id,
+            CASE WHEN isnan(spread_close) THEN NULL ELSE spread_close END AS spread_close,
+            CASE WHEN isnan(spread_open)  THEN NULL ELSE spread_open  END AS spread_open,
+            CASE WHEN isnan(total_close)  THEN NULL ELSE total_close  END AS total_close,
+            CASE WHEN isnan(total_open)   THEN NULL ELSE total_open   END AS total_open,
+            moneyline_home, moneyline_away
+          FROM (
+          SELECT
             CAST(l."gameId" AS INTEGER) AS game_id,
-            lower(p.name)               AS provider_key,
+            -- Same alias `_provider_key` applies to the REST side. Without it the AN tape
+            -- re-splits the key this merge just collapsed, and `stg.lines_provider` holds
+            -- both spellings under separate ids (100 and a synthetic 888888).
+            coalesce({aliases}, lower(p.name)) AS provider_key,
             TRY_CAST(l.spread AS DOUBLE)          AS spread_close,
             TRY_CAST(l."spreadOpen" AS DOUBLE)    AS spread_open,
             TRY_CAST(l."overUnder" AS DOUBLE)     AS total_close,
             TRY_CAST(l."overUnderOpen" AS DOUBLE) AS total_open,
             TRY_CAST(l."moneylineHome" AS INTEGER) AS moneyline_home,
             TRY_CAST(l."moneylineAway" AS INTEGER) AS moneyline_away,
-            l.line_source
+            l.line_source,
+            l."linesProviderId" AS provider_id
           FROM stg.game_lines l
           JOIN stg.lines_provider p USING ("linesProviderId")
           WHERE l.period = 'game'
             AND l."gameId" IN (SELECT game_id FROM core.fact_game)
             AND p.name IS NOT NULL
+          )
         )
+        -- `game_lines` is unique on (gameId, linesProviderId), but the alias above maps
+        -- two provider ids onto one key -- `stg.lines_provider` carries DraftKings under
+        -- both CFBD's 100 and the synthetic 888888 that `_AN_BOOK_PROVIDER` assigned the
+        -- ActionNetwork feed. So the grain has to be re-established here or the full outer
+        -- join below fans out. Same rule as the REST unnest: the more populated row wins,
+        -- tie broken on the lower provider id so a rebuild is reproducible.
+        QUALIFY row_number() OVER (
+          PARTITION BY game_id, provider_key
+          ORDER BY (CASE WHEN spread_close IS NOT NULL THEN 1 ELSE 0 END
+                  + CASE WHEN spread_open  IS NOT NULL THEN 1 ELSE 0 END
+                  + CASE WHEN total_close  IS NOT NULL THEN 1 ELSE 0 END
+                  + CASE WHEN total_open   IS NOT NULL THEN 1 ELSE 0 END
+                  + CASE WHEN moneyline_home IS NOT NULL THEN 1 ELSE 0 END
+                  + CASE WHEN moneyline_away IS NOT NULL THEN 1 ELSE 0 END) DESC,
+                   provider_id
+        ) = 1
         """
     )
 

@@ -200,3 +200,37 @@ def test_source_exists_even_without_the_actionnetwork_tape(con):
     create = source[source.index("CREATE TABLE core.fact_game_line ("):]
     create = create[:create.index('"""')]
     assert "_source VARCHAR NOT NULL DEFAULT 'rest'" in create
+
+
+def test_the_two_draftkings_spellings_collapse_to_one_key(con):
+    """CFBD emits DraftKings twice in the same `lines` array on 215 games, and
+    `stg.lines_provider` carries both spellings under separate ids (CFBD's 100 and the
+    synthetic 888888 `_AN_BOOK_PROVIDER` assigned the AN feed). Left split, a consumer
+    filtering `provider_key = 'draftkings'` silently misses the other ~235 rows."""
+    keys = {r[0] for r in con.execute(
+        "SELECT DISTINCT provider_key FROM core.fact_game_line"
+        " WHERE provider_key LIKE '%draft%'").fetchall()}
+    assert keys == {"draftkings"}, f"the DraftKings key is still split: {keys}"
+
+
+def test_the_caesars_family_is_left_alone(con):
+    """The alias map covers one book on measured evidence, not every name that looks
+    similar. `Caesars`, `Caesars (Pennsylvania)` and `Caesars Sportsbook (Colorado)` never
+    share a game and hold disjoint season ranges -- consistent with a rename history *or*
+    separate state licences, and nothing measured settles which. Merging on a guess
+    destroys the distinction irreversibly, so this pins that it has not happened."""
+    keys = {r[0] for r in con.execute(
+        "SELECT DISTINCT provider_key FROM core.fact_game_line"
+        " WHERE provider_key LIKE 'caesars%'").fetchall()}
+    assert len(keys) >= 2, f"the Caesars variants were merged without evidence: {keys}"
+
+
+def test_the_alias_is_one_rule_not_two(con):
+    """`duckdb_core._provider_key` delegates to `normalize.provider_key`. Two definitions
+    of what a book is called is how `core.fact_game_line` and `games.csv` end up
+    disagreeing about whether a game has a DraftKings row at all."""
+    from cfb_system_maker.duckdb_core import _provider_key
+    from cfb_system_maker.normalize import PROVIDER_ALIASES, provider_key
+
+    assert _provider_key("Draft Kings") == provider_key("Draft Kings") == "draftkings"
+    assert PROVIDER_ALIASES == {"draft kings": "draftkings"}

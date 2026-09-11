@@ -10,7 +10,7 @@ import duckdb
 import pytest
 
 from cfb_system_maker.cli import main
-from cfb_system_maker.duckdb_core import build_core
+from cfb_system_maker.duckdb_core import _provider_key, build_core
 from cfb_system_maker.enrich import _build_line_move_index
 from cfb_system_maker.models import GameRecord
 from cfb_system_maker.normalize import _select_line, _select_total, normalize_games
@@ -338,7 +338,7 @@ def test_agreement_2_identity_columns(phase_1a_env):
         assert away_team == g.away_team
         assert home_points == g.home_points
         assert away_points == g.away_points
-        assert provider_key == (g.provider or "").strip().lower()
+        assert provider_key == _provider_key(g.provider)
         assert spread == g.spread
         assert total == g.total
 
@@ -384,7 +384,12 @@ def test_agreement_4_line_move_matches_enrich_index(phase_1a_env):
     con = duckdb.connect(str(db), read_only=True)
     for game_id, moves in index.items():
         game = by_id[game_id]
-        provider_key = (game.provider or "").strip().lower()
+        # `_provider_key`, not a local lower(): it also applies
+        # `_PROVIDER_ALIASES`, and `games.csv` carries the raw vendor string, so a
+        # game whose selected book CFBD spelled `Draft Kings` resolves to the
+        # `draftkings` row the merge keeps. Reimplementing the rule is how the two
+        # would drift apart.
+        provider_key = _provider_key(game.provider)
         row = con.execute(
             """
             SELECT spread_close, spread_open
@@ -681,7 +686,7 @@ def test_live_warehouse_agreement_1_2_7():
         assert row[5] == g.away_team
         assert row[6] == g.home_points
         assert row[7] == g.away_points
-        assert row[8] == (g.provider or "").strip().lower()
+        assert row[8] == _provider_key(g.provider)
         assert row[9] == g.spread
         assert row[10] == g.total
 
@@ -729,7 +734,12 @@ def test_live_warehouse_agreement_4_5_6():
         moves = index.get(game.game_id)
         if moves is None:
             continue
-        provider_key = (game.provider or "").strip().lower()
+        # `_provider_key`, not a local lower(): it also applies
+        # `_PROVIDER_ALIASES`, and `games.csv` carries the raw vendor string, so a
+        # game whose selected book CFBD spelled `Draft Kings` resolves to the
+        # `draftkings` row the merge keeps. Reimplementing the rule is how the two
+        # would drift apart.
+        provider_key = _provider_key(game.provider)
         row = con.execute(
             """
             SELECT spread_close, spread_open, _source
