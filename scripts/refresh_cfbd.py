@@ -42,7 +42,7 @@ from check_an_tick_pin import check as an_tick_check  # noqa: E402
 from cfb_system_maker.cfbd_client import find_cfbd_token  # noqa: E402
 from cfb_system_maker.cli import rebuild_processed_games  # noqa: E402
 from cfb_system_maker.duckdb_core import build_core  # noqa: E402
-from cfb_system_maker.duckdb_load import build_duckdb  # noqa: E402
+from cfb_system_maker.duckdb_load import RebuildInProgress, build_duckdb  # noqa: E402
 from cfb_system_maker.graphql_client import graphql_scrape  # noqa: E402
 from cfb_system_maker.scrapers import scrape  # noqa: E402
 from pff_flatten import IN_DIR as PFF_IN_DIR  # noqa: E402
@@ -272,7 +272,13 @@ def main() -> int:
     _rebuild_games_csv(args.season)
 
     print("=== rebuild cfb.duckdb ===")
-    db_path, loads = build_duckdb(cfb_paths.DATA_ROOT, explode=True)
+    try:
+        db_path, loads = build_duckdb(cfb_paths.DATA_ROOT, explode=True)
+    except RebuildInProgress as exc:
+        # The hourly schedule and a hand-run overlap easily -- a refresh is ~26 minutes.
+        # Say so in one line and leave; the warehouse the other run is building is fine.
+        print(f"  {exc}", file=sys.stderr)
+        return 1
     # `build_duckdb` reports a failed table rather than raising, and the explode reports
     # the same way. Discarding this list made both silent: on 2026-09-11 a rebuild produced
     # a `stg` with no `an_*` tables at all, `build_core` then died in `_merge_game_lines`

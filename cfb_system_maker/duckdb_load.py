@@ -7,6 +7,7 @@ not break the load. Filename suffixes supply season/week columns.
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import json
 import re
@@ -442,6 +443,52 @@ def parse_dump_stem(stem: str) -> tuple[str, int | None, int | None, str | None]
     return stem, None, None, None
 
 
+class RebuildInProgress(RuntimeError):
+    """Another process is already rebuilding this warehouse."""
+
+
+@contextlib.contextmanager
+def _exclusive_rebuild(db_path: Path):
+    """Hold an exclusive lock for the life of one rebuild, or refuse to start.
+
+    Every rebuild stages at the single fixed path ``<db>.building`` and opens by unlinking
+    whatever is already there, so a second rebuild starting mid-write deletes the file the
+    first is still writing into, and both then race on the final ``replace``. The atomic
+    replace is what makes this easy to miss: it makes *one* rebuild safe and says nothing
+    about two.
+
+    A lock rather than a per-process temp path on purpose. Unique temp paths would let two
+    full rebuilds run to completion, burning ~20 minutes each so that one can silently win
+    the replace -- two simultaneous rebuilds are never something anyone wants, so the second
+    should be told, not accommodated.
+
+    The lock is a DuckDB database opened read-write. DuckDB already takes an exclusive OS
+    file lock on one and the OS drops it when the process dies, so a crashed rebuild cannot
+    strand a lock the way a pid file would -- there is no staleness case to get wrong, and
+    no new dependency.
+
+    **Cross-process only.** DuckDB shares one instance per file within a process, so a
+    same-process second `connect` succeeds and is not refused. That matches the hazard --
+    a scheduled run against a hand-run, never one process racing itself -- but it means
+    `tests/test_rebuild_lock.py` has to prove the refusal through a real subprocess; an
+    in-process `pytest.raises` would pass for the wrong reason.
+    """
+    lock_path = db_path.with_name(db_path.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        lock = duckdb.connect(str(lock_path))
+    except duckdb.IOException as exc:
+        raise RebuildInProgress(
+            f"another rebuild already holds {lock_path.name}; refusing to start a second. "
+            f"Wait for it to finish -- two rebuilds would clobber each other's "
+            f"{db_path.name}.building and race on the final swap."
+        ) from exc
+    try:
+        yield
+    finally:
+        lock.close()
+
+
 def build_duckdb(
     data_dir: str | Path,
     output: str | Path | None = None,
@@ -454,7 +501,29 @@ def build_duckdb(
     """Create ``{data_dir}/cfb.duckdb`` (or ``output``) from raw + graphql dumps."""
     data_dir = Path(data_dir)
     db_path = Path(output) if output else data_dir / "cfb.duckdb"
+    with _exclusive_rebuild(db_path):
+        return _build_duckdb_locked(
+            data_dir, db_path,
+            only=only,
+            include_actionnetwork=include_actionnetwork,
+            explode=explode,
+            progress=progress,
+        )
+
+
+def _build_duckdb_locked(
+    data_dir: Path,
+    db_path: Path,
+    *,
+    only: set[str] | None,
+    include_actionnetwork: bool,
+    explode: bool,
+    progress: Callable[[TableLoad], None] | None,
+) -> tuple[Path, list[TableLoad]]:
+    """The rebuild itself. Only ever called holding `_exclusive_rebuild`."""
     tmp_path = db_path.with_name(db_path.name + ".building")
+    # Safe under the lock: nothing else can be writing this, so an existing one is debris
+    # from a crashed run rather than a rebuild in flight.
     if tmp_path.exists():
         tmp_path.unlink()
     tmp_path.parent.mkdir(parents=True, exist_ok=True)
