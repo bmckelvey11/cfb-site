@@ -421,7 +421,18 @@ def _scrape_grid(endpoint: Endpoint, func: Callable[..., Any], data_dir: str | P
     rows: list[dict[str, Any]] = []
     for down in range(1, 5):
         for distance in range(1, 31):
-            rows.extend(_call(func, _accepted(func, {"down": down, "distance": distance}), delay))
+            for row in _call(func, _accepted(func, {"down": down, "distance": distance}), delay):
+                # CFBD does not echo the parameters it was called with, so a row leaving
+                # this loop is unkeyed: `raw/predicted_points.json` held 10,140 objects of
+                # just `{predictedPoints, yardLine}`, and 10,140 does not divide by the 120
+                # calls, so the key was not even recoverable from row order. That is why
+                # `stg.predicted_points` failed R6's containment half and could not be
+                # dropped -- docs/warehouse-drop-superseded-2026-09-10.md.
+                #
+                # Stamped here, the only place that still knows which grid cell produced
+                # the row. The call parameters win over anything of the same name in the
+                # payload: they are what was asked for.
+                rows.append({**row, "down": down, "distance": distance})
     save_raw(data_dir, f"{endpoint.name}.json", rows)
     return ScrapeReport(endpoint.name, endpoint.mode, files=1, rows=len(rows))
 

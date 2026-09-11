@@ -48,7 +48,10 @@ class _MetricsApi:
         pass
 
     def get_predicted_points(self, down=None, distance=None):
-        return [{"down": down, "distance": distance, "predictedPoints": 1.0}]
+        # Deliberately does NOT echo down/distance -- that is what CFBD actually does, and
+        # it is why raw/predicted_points.json was 10,140 unkeyed rows. A fake that echoed
+        # them made the stamping untestable.
+        return [{"yardLine": 50, "predictedPoints": 1.0}]
 
     def get_win_probability(self, game_id=None):
         return [{"gameId": game_id, "homeWinProbability": 0.5}]
@@ -221,6 +224,24 @@ def test_grid_writes_down_distance_matrix(tmp_path):
     rows = json.loads((tmp_path / "raw" / "predicted_points.json").read_text())
     assert len(rows) == 4 * 30
     assert reports[0].rows == 120
+
+
+def test_grid_stamps_the_call_parameters_onto_every_row(tmp_path):
+    """CFBD does not echo `down`/`distance`, so without this the dump is unkeyed -- which
+    is exactly what happened: `stg.predicted_points` held 10,140 rows of
+    `{predictedPoints, yardLine}`, could not be aligned to GraphQL's grid, and so failed
+    R6's containment half and could not be dropped. 10,140 does not divide by the 120
+    calls, so the key was not recoverable from row order either.
+    See docs/warehouse-drop-superseded-2026-09-10.md."""
+    _run({"predicted_points"}, tmp_path)
+    rows = json.loads((tmp_path / "raw" / "predicted_points.json").read_text())
+
+    assert all("down" in r and "distance" in r for r in rows), "unkeyed grid rows"
+    cells = {(r["down"], r["distance"]) for r in rows}
+    assert cells == {(d, n) for d in range(1, 5) for n in range(1, 31)}
+    # One row per call here, so the key is unique; against the real API it is unique on
+    # (down, distance, yardLine), which is the grain GraphQL's own table uses.
+    assert len(cells) == len(rows)
 
 
 def test_per_game_is_opt_in(tmp_path):

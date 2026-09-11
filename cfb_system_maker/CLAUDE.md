@@ -64,7 +64,7 @@ Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 
 `duckdb` loads `data/raw/` + `data/graphql/` into `data/cfb.duckdb` (one file; REST lands in
 `raw`/`stg` under its endpoint names, GraphQL lands in `raw` under a `gql_`-prefixed name and
-`stg_gql` under its bare name — optional `stg`/`stg_gql` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`.
+in `stg` under its bare name — optional `stg` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`.
 
 **MotherDuck (`md:cfb`) is a manual mirror, local file is source of truth.** Never write to `md:cfb` directly — rebuild and verify local first (`python -m pytest -m slow tests/test_core_agreement.py`), then promote with `python scripts/promote_to_motherduck.py --dry-run` (lists tables/rows, pushes nothing) followed by `--yes` (CTAS-replaces each table, stamps `meta.warehouse_version` on both sides). See `docs/duckdb-warehouse-plan.md` (`## MotherDuck promote`) for the full runbook.
 
@@ -87,16 +87,24 @@ Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 - **Warehouse working copy:** use `$CFB_DATA_ROOT/cfb.duckdb`
   (`C:\Users\mckel\dev\cfb\data`), not MotherDuck, for catalogs, explode, and schema work.
   Catalogs describe tables, exploded columns, and named box/play stats, not app features.
-- **Two staging schemas:** `stg` holds REST-sourced tables (snake_case, unchanged names);
-  `stg_gql` holds GraphQL-sourced tables (bare snake_case — `stg_gql.game`, not
-  `stg.gql_game`). `raw` stays a single schema for both sources: GraphQL raw dumps keep a
-  `gql_` prefix (`raw.gql_game`) so they don't collide with REST raw dumps of the same
-  snake_case name (`draft_picks`, `predicted_points`, `calendar` all would). `--only <name>`
-  matching differs per phase in `cli.py`: the `duckdb` load step matches the GraphQL
-  entity name (`draftPicks`) OR the raw table name (`gql_draft_picks`); `--explode-only`
-  matches the raw table name only (`gql_draft_picks`); `--explode-lists` matches the bare
-  `stg`/`stg_gql` destination name only (`draft_picks`), touching both `stg.draft_picks`
-  and `stg_gql.draft_picks` together at that phase.
+- **One staging schema** (`stg`), since 2026-09-10 — ADR-0003 and
+  `docs/stg-gql-collapse-2026-09-10.md`. REST keeps its endpoint names; GraphQL lands under
+  its bare snake_case name (`stg.game`), with a **permanent** `_gql` suffix on exactly the
+  three names REST also owns: `calendar_gql`, `draft_picks_gql`, `predicted_points_gql`.
+  `GQL_STG_COLLIDERS` is that list. The suffixes were predicted to be temporary and are not:
+  `predicted_points` failed R6, and merging a pair into `core` never retires its `stg`
+  sources because `core` is built *from* them. `raw` is **not** collapsed — GraphQL raw dumps
+  keep a `gql_` prefix (`raw.gql_game`) so they don't collide with REST raw dumps of the same
+  snake_case name. `--only <name>` matching differs per phase in `cli.py`: the `duckdb` load
+  step matches the GraphQL entity name (`draftPicks`) OR the raw table name
+  (`gql_draft_picks`); `--explode-only` matches the raw table name only; `--explode-lists`
+  matches the `stg` destination name (`draft_picks` for REST, `draft_picks_gql` for GraphQL —
+  they are now separate tables in one schema, so it no longer touches both at once).
+- **`stg` preserves vendor field names; invented names are snake_case.** Columns keep CFBD's
+  spelling (`gameId`, `homeTeam`, `alternateNames`); explode-child *table* names, which the
+  loader invents, are snake-cased (`stg.teams__alternate_names` with an `alternateNames`
+  column). Two root tables were renamed on the same rule: `gameMedia` → `game_media`,
+  `gamePlayerStat` → `game_player_stat` (`raw` and the dump stems keep the camelCase).
 - **Exploded staging:** `stg.plays` rebuilds with
   `python -m cfb_system_maker duckdb --explode-only --only plays`. Infer JSON shape from a
   sample; grouping structure across all `raw.plays` can exhaust memory. Browse order is
@@ -139,8 +147,8 @@ Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 - **All domain types are frozen dataclasses** (`models.py`). `GameRecord` field order is the CSV schema — changing it changes `storage` read/write. New game-level data goes in `features.json`, not new CSV columns. `storage._row_to_game` parses CSV strings back, treating `""` as `None`. `SavedSystem` JSON: new fields must default for old saves.
 - **API token resolution** (`cfbd_client.find_cfbd_token`): env vars `CFBD_API_KEY`, `CFBD-API`, `BEARER_TOKEN`, then `env.env` file. `env.env` holds the real key (gitignored-style secret) — never commit or echo its value.
 - **Running season-to-date stats** (`running_stats.py`, source kind `computed_running`): values are entering-game — computed from that team's strictly-prior games in the same season, ordered by raw `startDate` (fallback: week). First game of a season → `games_played=0`, percentages/averages `None` (which fail closed as filters).
-- **Coach playstyle labels** (`coach_style.py`, feature `coach_style_cluster`): a GENERATED 189-coach dict mapping head-coach name → one of five k-means style groups; regenerate with `python scripts/build_coach_style_clusters.py`, never hand-edit. Grouped `result_lookahead` because the label is career-level (2016–2024) and residualized on SP+, so an early-season game reads a label informed by later results. `docs/coach-playstyle-analysis.md` is the validity study — read it before trusting a label: seasons match their coach's career cluster only 45.6% of the time, `balanced_spread` is a residual bucket rather than a style, and a walk-forward market test found no edge.
-- **Sidecar `_meta`**: `features.json` is `{"_meta": {registry_version, game_count, generated_at}, "games": {...}}`. `features.registry_version()` hashes sorted registry keys; the web UI warns when the sidecar was built by an older registry. Legacy flat sidecars still load.
+- **Coach playstyle labels** (`coach_style_cluster`): read `data/processed/pregame_coach_styles.json`, generated separately for each target season with training seasons strictly before that season. Assign the previous season's principal coach; this can differ from the current coach after a coaching change. Regenerate with `python -m scripts.rebuild_pregame_features --data-dir data`. Legacy `coach_style.py` career labels are not used for pregame filters. See `docs/pregame-filter-migration-2026-09-10.md` for definitions and limits.
+- **Sidecar `_meta`**: `features.json` is `{"_meta": {registry_version, game_count, generated_at}, "games": {...}}`. `features.registry_version()` hashes full feature definitions; the UI warns on older registries. Legacy flat snapshots load, but migrated postgame fields are suppressed until rebuilt. Snapshots are replaced atomically. Attendance is excluded from loaded features.
 - **Design system (`docs/design-system.md`)**: the UI runs on Saturday Signal tokens. `static/styles.css` consumes them via `var(--*)` only — put color/type/space values in `static/tokens/{colors,typography,spacing}.css`, never inline hex in `styles.css`. Three rules that bite: Instrument Serif is for 48px+ and appears nowhere in this app; JetBrains Mono is stat values and chart axes only, never tables; tables use Instrument Sans with `font-variant-numeric: tabular-nums`. CTA labels are sentence case. Radii are tight (2px controls, 8px panels).
 
 ## Tests

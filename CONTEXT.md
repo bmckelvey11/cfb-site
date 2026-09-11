@@ -36,7 +36,7 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 
 ## Warehouse layers
 
-- **Pair** — one concept arriving from both CFBD APIs as two staging tables (one in `stg_gql`, one in `stg`), under different names and different column sets. A pair is two sources of the same subject, **not** a duplicate; measurement decides whether either side is redundant.
+- **Pair** — one concept arriving from both CFBD APIs as two staging tables. Both live in `stg` since the 2026-09-10 collapse (ADR-0003); the GraphQL side carries a `_gql` suffix only where it would collide (`calendar_gql`, `draft_picks_gql`, `predicted_points_gql`). Different names and different column sets. A pair is two sources of the same subject, **not** a duplicate; measurement decides whether either side is redundant.
 - **Canonical source** — for a given pair, the side designated authoritative after measuring column containment and coverage. Established by measurement per concept, never by row count alone.
 - **Scaffolding column** — `season`, `week`, or `season_type` bound from a dump's filename rather than its payload. Where the filename does not carry one it arrives NULL and stays NULL; these are pruned at load. Distinct from a payload column that happens to be empty, which is a finding and is never auto-dropped.
 - **Relation-only entity** — a GraphQL root whose identity lives in a to-one relation rather than in its own scalars. It must be nest-selected, or its dump cannot be joined to anything and its sort is not a total order.
