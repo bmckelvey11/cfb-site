@@ -3,9 +3,10 @@
 The v1 model qualifies a game from ONE spread/total pair. Books disagree, so this
 script splits that into two jobs:
 
-  qualify on the fair number -- median spread and median total across the real
-    Action Network books (outlier-guarded), which is the distribution the 1.75
-    threshold was calibrated against (v1 fits on games.csv, one line per game)
+  qualify on the fair number -- median spread and median total across the four
+    regulated books in the the-odds-api snapshot (FAIR_BOOKS, outlier-guarded), the
+    closest live stand-in for the one-line-per-game distribution the 1.75 threshold
+    was calibrated against (v1 fits on games.csv)
   execute at the best number -- among books pricing the over at -120 or better,
     the lowest posted total, tie-broken on price
 
@@ -27,7 +28,6 @@ import argparse
 import json
 import os
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -37,66 +37,87 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "models" / "over_zero" / "v1"))
-sys.path.insert(0, str(REPO / "research" / "spread" / "scripts"))
+sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO / "scripts"))
 
-import collect_line_timing as clt  # noqa: E402
+from oddsapi_flatten import cfbd_schools, school_of  # noqa: E402
 from censoring_bias import censoring_bias, fit_pipeline, implied_team_points  # noqa: E402
 from run_on_project_data import DEFAULT_CSV, load  # noqa: E402
 
 OUT_DIR = Path(os.environ["CFB_DATA_ROOT"]) / "processed" / "over_zero"
-# Action Network book ids, names from AN's own /web/v1/books (2026-09-08). 15 and 30 are
-# consensus and opener -- not bettable, so not shoppable.
-REAL_BOOKS = {"49": "Caesars", "68": "DraftKings", "69": "FanDuel",
-              "71": "BetRivers", "75": "BetMGM"}
+# the-odds-api book keys -> display names. Since 2026-09-11 this snapshot is the only feed:
+# the Action Network scoreboard is no longer read (docs/odds-sources-an-vs-apis-2026-09-11.md).
+OA_BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betrivers": "BetRivers",
+            "betmgm": "BetMGM", "betonlineag": "BetOnline.ag", "bovada": "Bovada",
+            "lowvig": "LowVig.ag", "betus": "BetUS", "mybookieag": "MyBookie.ag"}
+OA_SNAP_DIR = Path(os.environ["CFB_DATA_ROOT"]) / "ingest" / "oddsapi"
+# Only the regulated books vote in the fair spread and fair total. The 1.75 gate was
+# calibrated on games.csv -- one CFBD line per game -- and the regulated median is the closest
+# live stand-in for that number; until 2026-09-11 it was these four plus Caesars, read live
+# from Action Network. The offshore books get their own single-book views, where the number
+# is openly one book's number. To let them vote, add them here -- and recalibrate.
+FAIR_BOOKS = ("DraftKings", "FanDuel", "BetRivers", "BetMGM")
+BOOKS = FAIR_BOOKS + tuple(n for n in OA_BOOKS.values() if n not in FAIR_BOOKS)
 OUTLIER_PTS = 2.5        # a book this far off the median of all books is ignored (n >= 3)
 MIN_ODDS = -120          # the model's own price gate (MODEL_GUIDE: over at -120 or better)
 ET = ZoneInfo("America/New_York")
 COLUMNS = ["run_at", "kick", "home", "away", "n_books", "spread_fair", "total_fair",
            "total_range", "dog_implied", "bias_fair", "p_over_fair", "pick", "best_total",
-           "best_book", "best_odds", "bias_best", "playable"]
+           "best_book", "best_odds", "bias_best", "playable", "bet_to"]
 
 
-def _usable(m: dict) -> bool:
-    """A real, currently postable main-market quote -- not in-play, not an alt line."""
-    return (not m.get("is_live") and not m.get("is_alt_market")
-            and m.get("value") is not None and m.get("odds") is not None)
+def oa_games(now: datetime, days: int) -> tuple[pd.DataFrame, str | None]:
+    """Per-book spread and total for games kicking off in the next `days` days.
 
+    Read from the latest the-odds-api snapshot on disk, never fetched: `CFB-Odds-Snapshot`
+    pulls every 6 hours plus Saturdays (see `docs/oddsapi-ingest.md`) and the free plan is 500
+    credits a month, so a slate run costs no credits. Every number is therefore AS OF
+    `pulled_at`, which the board prints beside every view.
+    """
+    snaps = sorted(OA_SNAP_DIR.glob("odds_americanfootball_ncaaf_*.json"))
+    if not snaps:
+        print(f"  no the-odds-api snapshot in {OA_SNAP_DIR}; nothing to score", file=sys.stderr)
+        return pd.DataFrame(), None
+    payload = json.loads(snaps[-1].read_text(encoding="utf-8"))
+    as_of = datetime.fromisoformat(payload["pulled_at"].replace("Z", "+00:00"))
+    age_h = (now - as_of).total_seconds() / 3600
+    print(f"  the-odds-api snapshot {snaps[-1].name}: {len(payload['events'])} events, "
+          f"{age_h:.1f}h old")
+    if age_h > 12:
+        print(f"  WARNING: snapshot is {age_h:.0f}h old -- is CFB-Odds-Snapshot still "
+              f"running?", file=sys.stderr)
 
-def live_markets(now: datetime, days: int) -> pd.DataFrame:
-    """Per-book event spread and total for games kicking off in the next `days` days."""
-    lo, hi = now - timedelta(days=1), now + timedelta(days=days)
-    wk_guess = max(1, int((now - datetime(now.year, 8, 25, tzinfo=timezone.utc)).days // 7) + 1)
+    schools = cfbd_schools()
+    lo, hi = now, now + timedelta(days=days)
     rows = []
-    for week in range(max(1, wk_guess - 1), wk_guess + 3):
-        try:
-            payload = json.loads(clt._get(
-                clt.AN_SCOREBOARD, {"season": now.year, "week": week, "seasonType": "reg"}))
-        except Exception as exc:
-            print(f"  AN week {week}: {type(exc).__name__}: {exc}", file=sys.stderr)
+    for e in payload["events"]:
+        ko = datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00"))
+        if not (lo <= ko <= hi):
             continue
-        for g in payload.get("games", []):
-            ko = datetime.fromisoformat(g["start_time"].replace("Z", "+00:00"))
-            if not (lo <= ko <= hi):
+        spreads, totals = {}, {}
+        for b in e.get("bookmakers", []):
+            name = OA_BOOKS.get(b.get("key"))
+            if name is None:          # a new book must be named before it reaches the board
+                print(f"  the-odds-api: unmapped book {b.get('key')!r}, not counted",
+                      file=sys.stderr)
                 continue
-            teams = {t["id"]: t for t in g.get("teams", [])}
-            spreads, totals = {}, {}
-            for book, b in (g.get("markets") or {}).items():
-                if book not in REAL_BOOKS:
-                    continue
-                event = b.get("event") or {}
-                for s in event.get("spread") or []:
-                    if _usable(s) and s.get("side") == "home":
-                        spreads[book] = float(s["value"])
-                for t in event.get("total") or []:
-                    if _usable(t) and t.get("side") == "over":
-                        totals[book] = (float(t["value"]), int(t["odds"]))
-            rows.append({
-                "event_id": g["id"], "kick": ko,
-                "home": teams.get(g["home_team_id"], {}).get("display_name"),
-                "away": teams.get(g["away_team_id"], {}).get("display_name"),
-                "spreads": spreads, "totals": totals})
-        time.sleep(0.5)
-    return pd.DataFrame(rows).drop_duplicates("event_id")
+            for m in b.get("markets", []):
+                for o in m.get("outcomes", []):
+                    if o.get("point") is None or o.get("price") is None:
+                        continue
+                    # The home team's own outcome carries the home spread in betting sign
+                    # (negative = home favored), the convention the model was fit on.
+                    if m.get("key") == "spreads" and o.get("name") == e["home_team"]:
+                        spreads[name] = float(o["point"])
+                    elif m.get("key") == "totals" and o.get("name") == "Over":
+                        totals[name] = (float(o["point"]), int(o["price"]))
+        rows.append({"kick": ko,
+                     # CFBD's spelling of the school, so the board reads as it always has; a
+                     # name the strip cannot resolve keeps the vendor's rather than vanishing.
+                     "home": school_of(e["home_team"], schools) or e["home_team"],
+                     "away": school_of(e["away_team"], schools) or e["away_team"],
+                     "spreads": spreads, "totals": totals})
+    return pd.DataFrame(rows), payload["pulled_at"]
 
 
 def guarded(values: pd.Series) -> pd.Series:
@@ -139,11 +160,11 @@ def shop_total(totals: dict, min_books: int = 2) -> dict:
     playable = [(t, -totals[b][1], b) for b, t in v.items() if totals[b][1] >= MIN_ODDS]
     if playable:
         total, neg_odds, book = min(playable)
-        out.update({"best_total": total, "best_book": REAL_BOOKS[book],
+        out.update({"best_total": total, "best_book": book,
                     "best_odds": -neg_odds, "playable": True})
     else:
         best = v.idxmin()
-        out.update({"best_total": float(v[best]), "best_book": REAL_BOOKS[best],
+        out.update({"best_total": float(v[best]), "best_book": best,
                     "best_odds": totals[best][1], "playable": False})
     return out
 
@@ -152,6 +173,30 @@ def bias_of(spread: np.ndarray, total: np.ndarray, fit) -> np.ndarray:
     dog, fav = implied_team_points(np.abs(spread), total)
     _, bias = censoring_bias(dog, fav, fit.tobit_dog.sigma, fit.tobit_fav.sigma)
     return bias
+
+
+def bet_to_total(spread: np.ndarray, fit, threshold: float) -> np.ndarray:
+    """Highest nonnegative half-point total with bias strictly above threshold.
+
+    Hold each view's spread and fitted sigmas fixed. Bias decreases with total,
+    so integer bisection finds the final qualifying half-point without rounding
+    an equality up into a playable line. NaN means no nonnegative total qualifies.
+    """
+    spread = np.asarray(spread, dtype=float)
+    if not np.isfinite(threshold) or threshold <= 0 or not np.isfinite(spread).all():
+        raise ValueError('Finite spreads and a positive finite threshold are required')
+    low = np.full(spread.shape, -1, dtype=np.int64)
+    high = np.ceil(2 * (np.abs(spread) + 20 * max(fit.tobit_dog.sigma, fit.tobit_fav.sigma))).astype(np.int64)
+    high = np.maximum(high, 1)
+    while np.any(bias_of(spread, high / 2, fit) > threshold):
+        high *= 2
+    while np.any(high - low > 1):
+        mid = (low + high) // 2
+        qualifies = bias_of(spread, mid / 2, fit) > threshold
+        active = high - low > 1
+        low = np.where(active & qualifies, mid, low)
+        high = np.where(active & ~qualifies, mid, high)
+    return np.where(low >= 0, low / 2, np.nan)
 
 
 def fit_model(fit_csv: Path, fit_seasons):
@@ -167,15 +212,19 @@ def score(games: pd.DataFrame, fit, fit_dog: np.ndarray, run_at: str, threshold:
           book: str | None = None, quiet: bool = False) -> pd.DataFrame:
     """One view of an already-fetched slate: shopped across books, or one book alone."""
     # One book means no shopping and no cross-book fair: that book IS both numbers.
-    only = next((k for k, v in REAL_BOOKS.items() if v == book), None) if book else None
-    need = 1 if only else 2
+    need = 1 if book else 2
 
     rows = []
     for g in games.itertuples():
         totals, spreads = g.totals, g.spreads
-        if only:
-            totals = {only: totals[only]} if only in totals else {}
-            spreads = {only: spreads[only]} if only in spreads else {}
+        if book:
+            totals = {book: totals[book]} if book in totals else {}
+            spreads = {book: spreads[book]} if book in spreads else {}
+        else:
+            # Only FAIR_BOOKS set the number the 1.75 gate reads; the offshore books reach
+            # the board through their own views.
+            totals = {b: q for b, q in totals.items() if b in FAIR_BOOKS}
+            spreads = {b: q for b, q in spreads.items() if b in FAIR_BOOKS}
         shopped = shop_total(totals, need)
         if not shopped or len(spreads) < need:
             continue
@@ -196,6 +245,7 @@ def score(games: pd.DataFrame, fit, fit_dog: np.ndarray, run_at: str, threshold:
     # Same spread, best total: isolates what shopping the total alone does to the bias.
     t["bias_best"] = bias_of(t.spread_fair.to_numpy(), t.best_total.to_numpy(), fit)
     t["pick"] = np.where(t.bias_fair > threshold, "OVER", "")
+    t["bet_to"] = bet_to_total(t.spread_fair.to_numpy(), fit, threshold)
     t["run_at"] = run_at
     t["dog_implied"] = (t.total_fair - t.spread_fair.abs()) / 2
     # The picks live where the underdog is implied for a handful of points, and the fit
@@ -220,7 +270,7 @@ def et_clock(kick: datetime) -> str:
 
 
 def export_json(views: dict[str, pd.DataFrame], path: Path, run_at: str,
-                threshold: float) -> None:
+                threshold: float, fit, oa_as_of: str | None = None) -> None:
     """Every view in one payload, for a static site that switches between them.
 
     The board is a build-time import, not a fetch, so all six views ship together. Kickoffs
@@ -228,20 +278,33 @@ def export_json(views: dict[str, pd.DataFrame], path: Path, run_at: str,
     used; leaving them in UTC would move every Saturday night game to Sunday.
     """
     payload = {"run_at": run_at, "threshold": threshold, "min_odds": MIN_ODDS,
-               "books": list(REAL_BOOKS.values()), "views": {}}
+               # The books that vote in the fair number, not every book with a view.
+               "books": list(FAIR_BOOKS), "views": {},
+               "betToBySpread": [float(x) if np.isfinite(x) else None
+                                 for x in bet_to_total(np.arange(201) / 2, fit, threshold)]}
+    market = views.get("Best lines", pd.DataFrame())
+    market_spreads = {(r.away, r.home, r.kick): float(r.spread_fair)
+                      for r in market.itertuples()}
     for name, t in views.items():
-        picks = t[t.pick == "OVER"] if not t.empty else t
+        # The board reads chronologically; bias order is the terminal report's job.
+        picks = t[t.pick == "OVER"].sort_values("kick") if not t.empty else t
         # `scored` is how many games the view could price at all. A book that posts a total
         # but no spread scores nothing -- the model needs both -- and an empty board should
         # say that rather than imply the book had no qualifying games.
-        payload["views"][name] = {"scored": len(t), "picks": [
+        # Every price on the board is as of the snapshot, not this run.
+        payload["views"][name] = {
+            "scored": len(t),
+            "asOf": oa_as_of or run_at,
+            "picks": [
             {"date": r.kick.astimezone(ET).strftime("%b %d"),
              "time": et_clock(r.kick),
              "away": r.away, "home": r.home, "total": r.total_fair, "spread": r.spread_fair,
+             "marketSpread": market_spreads.get((r.away, r.home, r.kick)),
              "bias": round(r.bias_fair, 3), "probability": round(r.p_over_fair * 100, 2),
              "dogImplied": r.dog_implied, "bestTotal": r.best_total, "bestBook": r.best_book,
+             "betTo": float(r.bet_to) if np.isfinite(r.bet_to) else None,
              "bestOdds": int(r.best_odds), "books": int(r.n_books), "playable": bool(r.playable)}
-            for r in picks.itertuples()]}
+                for r in picks.itertuples()]}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=1), encoding="utf-8")
     counts = ", ".join(f"{k} {len(v['picks'])}/{v['scored']}" for k, v in payload["views"].items())
@@ -283,7 +346,7 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=8, help="kickoff window from now")
     ap.add_argument("--threshold", type=float, default=1.75,
                     help="bet rule: over when expected censoring bias exceeds this")
-    ap.add_argument("--book", choices=sorted(REAL_BOOKS.values()),
+    ap.add_argument("--book", choices=sorted(BOOKS),
                     help="score one book's own number instead of shopping across all of "
                          "them; the fair and best columns collapse onto that book")
     ap.add_argument("--out-dir", default=str(OUT_DIR), help="'' to skip writing")
@@ -295,8 +358,8 @@ def main() -> int:
     fit, fit_dog = fit_model(Path(args.fit_csv), seasons)
     now = datetime.now(timezone.utc)
     run_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-    games = live_markets(now, args.days)
-    print(f"Fetched {len(games)} games kicking off in the next {args.days} days")
+    games, oa_as_of = oa_games(now, args.days)
+    print(f"{len(games)} games kicking off in the next {args.days} days, priced as of {oa_as_of}")
 
     t = score(games, fit, fit_dog, run_at, args.threshold, args.book)
     report(t, args.threshold, args.book)
@@ -304,9 +367,9 @@ def main() -> int:
     if args.json:
         # Every view off the one fetch: six scorings of the same games, not six AN pulls.
         views = {"Best lines": score(games, fit, fit_dog, run_at, args.threshold, quiet=True)}
-        for name in REAL_BOOKS.values():
+        for name in BOOKS:
             views[name] = score(games, fit, fit_dog, run_at, args.threshold, name, quiet=True)
-        export_json(views, Path(args.json), run_at, args.threshold)
+        export_json(views, Path(args.json), run_at, args.threshold, fit, oa_as_of)
 
     if args.out_dir and not t.empty:
         out = Path(args.out_dir)
@@ -321,26 +384,50 @@ def main() -> int:
 
 
 def _check() -> None:
-    tot = {"68": (44.5, -110), "69": (43.5, -115), "71": (43.5, -108), "75": (52.0, -110)}
+    tot = {"DraftKings": (44.5, -110), "FanDuel": (43.5, -115),
+           "BetRivers": (43.5, -108), "BetMGM": (52.0, -110)}
     s = shop_total(tot)
     # 52.0 is 8 from the median -> guarded out; best playable is the 43.5 at -108.
     assert s["n_books"] == 3 and s["total_fair"] == 43.5, s
     assert (s["best_total"], s["best_book"], s["best_odds"]) == (43.5, "BetRivers", -108), s
     assert s["playable"] is True, s
     # Nothing at -120 or better -> still reported, flagged unplayable.
-    s2 = shop_total({"68": (44.5, -135), "69": (45.0, -130)})
+    s2 = shop_total({"DraftKings": (44.5, -135), "FanDuel": (45.0, -130)})
     assert s2["playable"] is False and s2["best_total"] == 44.5, s2
-    assert not shop_total({"68": (44.5, -110)}), "one book is not a market"
+    assert not shop_total({"DraftKings": (44.5, -110)}), "one book is not a market"
     # ...unless the run asked for that one book, where fair and best are the same number.
-    s1 = shop_total({"68": (44.5, -110)}, 1)
+    s1 = shop_total({"DraftKings": (44.5, -110)}, 1)
     assert s1["total_fair"] == s1["best_total"] == 44.5 and s1["n_books"] == 1, s1
-    assert not _usable({"value": 30.5, "odds": -110, "is_alt_market": True}), "alt lines are not quotes"
     # Two books straddling: the fair total is the posted 56.5, not the synthetic 56.0.
-    s3 = shop_total({"68": (55.5, -110), "69": (56.5, -110)})
+    s3 = shop_total({"DraftKings": (55.5, -110), "FanDuel": (56.5, -110)})
     assert s3["total_fair"] == 56.5 and s3["best_total"] == 55.5, s3
     # Spreads break the other way -- the smaller magnitude, which also lowers the bias.
-    sp = pd.Series({"68": -45.5, "69": -44.5})
+    sp = pd.Series({"DraftKings": -45.5, "FanDuel": -44.5})
     assert conservative_median(sp.abs(), high=False) == 44.5
+
+    # oa_games: one row per event in the window, schools in CFBD's spelling, the home side's
+    # spread and the over's total per book, and the snapshot's own timestamp.
+    import tempfile
+    global OA_SNAP_DIR
+    saved = OA_SNAP_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        OA_SNAP_DIR = Path(tmp)
+        (OA_SNAP_DIR / "odds_americanfootball_ncaaf_20260911T060004Z.json").write_text(json.dumps({
+            "pulled_at": "2026-09-11T06:00:04Z", "events": [{
+                "commence_time": "2026-09-12T23:30:00Z", "home_team": "Miami Hurricanes",
+                "away_team": "Florida A&M Rattlers", "bookmakers": [{"key": "draftkings", "markets": [
+                    {"key": "spreads", "outcomes": [
+                        {"name": "Miami Hurricanes", "point": -57.5, "price": -110},
+                        {"name": "Florida A&M Rattlers", "point": 57.5, "price": -110}]},
+                    {"key": "totals", "outcomes": [
+                        {"name": "Over", "point": 62.5, "price": -108},
+                        {"name": "Under", "point": 62.5, "price": -112}]}]}]}]}), encoding="utf-8")
+        games, as_of = oa_games(datetime(2026, 9, 11, 12, tzinfo=timezone.utc), 8)
+    OA_SNAP_DIR = saved
+    assert as_of == "2026-09-11T06:00:04Z" and len(games) == 1, games
+    g = games.iloc[0]
+    assert g.spreads == {"DraftKings": -57.5} and g.totals == {"DraftKings": (62.5, -108)}, (g.spreads, g.totals)
+    assert (g.home, g.away) == ("Miami", "Florida A&M"), (g.home, g.away)
     print("checks pass")
 
 
