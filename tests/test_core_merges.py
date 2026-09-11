@@ -176,16 +176,36 @@ def test_dim_conference_carries_division(con):
 
 
 def test_the_line_merge_did_not_lose_a_rest_offer(con):
-    """A repoint at stg.game_lines was rejected because it drops 278 REST offers
-    game_lines has no row for. The full outer is what keeps them; `_source = 'rest'`
-    going to zero means someone turned it back into a left join."""
+    """A repoint at stg.game_lines was rejected because it dropped 278 REST offers
+    game_lines had no row for. The full outer is what keeps them, so the check is the
+    property itself: every (game, provider) offer the REST unnest produces is still in
+    core.fact_game_line. `_source = 'rest'` alone is not the guard -- it went to 0 on
+    2026-09-11 when the refresh re-pulled gameLines.json and covered all 278."""
     if "_source" not in {r[0] for r in con.execute(
         "SELECT column_name FROM information_schema.columns WHERE table_schema = 'core' "
         "AND table_name = 'fact_game_line'").fetchall()}:
         pytest.skip("line merge not built in this warehouse")
+    from cfb_system_maker.duckdb_core import _first, _lines_list, _provider_key
+
+    rest_keys = set()
+    for game_id, lines_val in con.execute(
+        "SELECT gameId, lines FROM stg.lines"
+        " WHERE gameId IN (SELECT game_id FROM core.fact_game)"
+    ).fetchall():
+        if game_id is None:
+            continue
+        for line in _lines_list(lines_val):
+            key = _provider_key(_first(line, "provider"))
+            if key is not None:
+                rest_keys.add((int(game_id), key))
+    kept = set(con.execute(
+        "SELECT game_id, provider_key FROM core.fact_game_line"
+        " WHERE _source IN ('rest', 'both')").fetchall())
+    assert rest_keys, "REST unnest produced no offers"
+    missing = rest_keys - kept
+    assert not missing, f"{len(missing)} REST offers lost by the merge, e.g. {sorted(missing)[:5]}"
     sources = {r[0]: r[1] for r in con.execute(
         "SELECT _source, count(*) FROM core.fact_game_line GROUP BY 1").fetchall()}
-    assert sources.get("rest", 0) > 0, f"REST-only line rows are gone: {sources}"
     assert sources.get("gql", 0) > 0, f"no ActionNetwork books reached core: {sources}"
 
 
@@ -203,13 +223,23 @@ def test_no_nan_reached_the_line_table(con):
 def test_line_conflicts_are_preserved_not_discarded(con):
     """REST wins a conflict because that is what `core` already held, which makes the
     merge additive -- not because it is right on the merits. The table is where that
-    open question lives; an empty one means the evidence was thrown away."""
+    open question lives, so it must exist with both sides of every disagreement, and
+    every row in it must be a genuine one. Its row count is data: ~700 on 2026-09-10
+    against an Aug 28 gameLines.json, 0 on 2026-09-11 once the refresh re-pulled the
+    dump the same morning as the REST lines."""
     if not con.execute(
         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'core' "
         "AND table_name = 'fact_game_line_conflicts'").fetchone()[0]:
         pytest.skip("line merge not built in this warehouse")
-    assert con.execute(
-        "SELECT count(*) FROM core.fact_game_line_conflicts").fetchone()[0] > 0
+    cols = {r[0] for r in con.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'core' "
+        "AND table_name = 'fact_game_line_conflicts'").fetchall()}
+    assert {"game_id", "provider_key", "column_name", "rest_value", "gql_value"} <= cols
+    bogus = con.execute(
+        "SELECT count(*) FROM core.fact_game_line_conflicts"
+        " WHERE rest_value IS NULL OR gql_value IS NULL OR rest_value = gql_value"
+    ).fetchone()[0]
+    assert bogus == 0, f"{bogus} rows in fact_game_line_conflicts are not disagreements"
 
 
 def test_source_exists_even_without_the_actionnetwork_tape(con):
