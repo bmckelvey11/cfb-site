@@ -102,14 +102,36 @@ def test_every_merge_builder_is_guarded():
 
 
 def test_fact_game_did_not_grow_to_hold_graphql_rows(con):
-    """GraphQL reaches back to 1869. Every one of its in-span games is already in
-    fact_game; the 78,030 older ones belong in fact_game_historical, not here."""
+    """`fact_game` is REST-defined: every in-span game REST carries reaches the fact, and the
+    78,030 pre-span GraphQL games belong in `fact_game_historical`. Joining `stg.games` is
+    the point -- this asked `stg.game` alone until 2026-09-11 and read 0 only because REST
+    happened to be a superset of in-span GraphQL. CFBD falsified that by dropping game
+    401866625 from its REST payload, and the assertion failed without `_build_fact_game`
+    having done anything. What the builder owes is this number; supersetness was never its
+    job, and `test_graphql_only_games_stay_a_handful` covers the gap that leaves."""
+    assert con.execute("""
+        SELECT count(*) FROM stg.games r
+        LEFT JOIN core.fact_game f ON f.game_id = r."gameId"
+        WHERE f.game_id IS NULL
+          AND r.season >= (SELECT min(season) FROM core.dim_week)
+    """).fetchone()[0] == 0
+
+
+def test_graphql_only_games_stay_a_handful(con):
+    """The blind spot the REST join above opens, held shut.
+
+    In-span games GraphQL has and REST does not are a vendor divergence, not a merge defect,
+    so they must not fail the builder's test -- but unbounded they would hide a half-loaded
+    `stg.games` or a `graphql/game.json` staled by another fortnight. One known member as of
+    2026-09-11: 401866625, Campbell vs Western Carolina 2026-09-05, which CFBD removed from
+    REST between the 09-10 and 09-11 pulls. The ceiling is deliberately loose, like the sign
+    bounds -- it catches a blow-up, not a vendor correcting a game or two."""
     assert con.execute("""
         SELECT count(*) FROM stg.game g
-        LEFT JOIN core.fact_game f ON f.game_id = g."gameId"
-        WHERE f.game_id IS NULL
+        LEFT JOIN stg.games r ON r."gameId" = g."gameId"
+        WHERE r."gameId" IS NULL
           AND g.season >= (SELECT min(season) FROM core.dim_week)
-    """).fetchone()[0] == 0
+    """).fetchone()[0] <= 25
 
 
 def test_fact_game_historical_stays_out_of_the_fact(con):
