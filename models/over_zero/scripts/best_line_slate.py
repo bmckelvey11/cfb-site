@@ -43,6 +43,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 from oddsapi_flatten import cfbd_schools, school_of  # noqa: E402
 from censoring_bias import censoring_bias, fit_pipeline, implied_team_points  # noqa: E402
 from run_on_project_data import DEFAULT_CSV, load  # noqa: E402
+from pick_history import record_views  # noqa: E402
 
 OUT_DIR = Path(os.environ["CFB_DATA_ROOT"]) / "processed" / "over_zero"
 # the-odds-api book keys -> display names. Since 2026-09-11 this snapshot is the only feed:
@@ -364,11 +365,12 @@ def main() -> int:
     t = score(games, fit, fit_dog, run_at, args.threshold, args.book)
     report(t, args.threshold, args.book)
 
+    # Preserve all book qualifications on every run, including terminal-only runs.
+    views = {"Best lines": t if not args.book else score(games, fit, fit_dog, run_at, args.threshold, quiet=True)}
+    for name in BOOKS:
+        views[name] = t if args.book == name else score(games, fit, fit_dog, run_at, args.threshold, name, quiet=True)
+    record_views(views, run_at, args.threshold, oa_as_of)
     if args.json:
-        # Every view off the one fetch: six scorings of the same games, not six AN pulls.
-        views = {"Best lines": score(games, fit, fit_dog, run_at, args.threshold, quiet=True)}
-        for name in BOOKS:
-            views[name] = score(games, fit, fit_dog, run_at, args.threshold, name, quiet=True)
         export_json(views, Path(args.json), run_at, args.threshold, fit, oa_as_of)
 
     if args.out_dir and not t.empty:
