@@ -60,6 +60,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `build_prediction_tracker.py` | `prediction-tracker.md` | `ingest/prediction_tracker_lines.csv` |
 | `eval_line_movement.py` [`--amend`] [`--decontaminate`] [`--decontaminate-wf`] [`--fine-ridge`] | `prereg-line-movement.md` A / A2 / A3 / A6 / A4 | `processed/pt_movement_preds{,_a2}{,_decon,_decon_wf}.csv`, `pt_movement{…}.json`, `pt_movement_decon_wf_a4.json` |
 | `eval_version_b.py` | `prereg-line-movement.md` B4–B5, amendments B1, B2, B3 | `processed/version_b.json` |
+| `version_b_by_week.py` | The version B read cut by season-week cluster (same joins as `eval_version_b.py`; per-week SEs are HC1, informational only) | stdout |
 | `eval_line_shopping.py` | `prereg-line-shopping.md` | `processed/line_shopping_sides.csv`, `line_shopping.json` |
 | `check_pt_line_is_close.py` | `line-movement-results.md` § target, amendment A5 | `processed/pt_line_vs_an_close.json` |
 | `model_publish_times.py` | `line-movement-results.md` § when the constituents publish | `processed/model_publish_times.csv` |

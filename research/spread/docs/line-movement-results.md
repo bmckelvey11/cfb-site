@@ -539,7 +539,7 @@ the same games and the same slope as the version B anchor read below (the curren
 first capture after Monday lands in the `tue` window). Decides nothing; read weekly alongside
 B4, per B3's stopping rule.
 
-## Version B — reads (updated 2026-09-08; amendment B1, stopping rule B3)
+## Version B — reads (updated 2026-09-15; amendment B1, stopping rule B3)
 
 One row per Monday read. **No verdict before season end; at season end, confirmatory inference
 requires ≥ 8 week clusters, and with fewer the read is reported as inconclusive** (amendment
@@ -549,6 +549,7 @@ un-clustered HC1 SE as the slope while under `MIN_WEEKS` — and triggers nothin
 | Monday | n graded | E4 slope | 95% CI | week clusters | SE kind | model_set_version | verdict |
 |---|---|---|---|---|---|---|---|
 | 2026-08-31 | 42 | +0.202 | [+0.004, +0.401] | 1 | HC1 | [2] | null |
+| 2026-09-07 | 91 (cum.) | +0.026 | [−0.090, +0.142] | 2 | HC1 | [3] | null |
 
 `read_status: pre_season_end`. One week cluster is not clustered inference; the interval above
 is optimistic and must not be read as evidence either way. E6 (+0.371 [+0.082, +0.660]) and the
@@ -564,3 +565,28 @@ Cumulative bet record, |x| ≥ 1, E4's side: 20 bets, CLV +0.47 [+0.09, +0.86], 
 graded once `core.fact_game` carried the scores: **11–9 ATS at the anchor price (55.0% [31.1,
 78.9])** — an interval that says nothing yet. The verdict waits for season end with ≥ 8 week
 clusters.
+
+### Read of 2026-09-15 (week of Monday 2026-09-07, run by `eval_version_b.py` and `version_b_by_week.py`)
+
+The Monday-routine grade on 2026-09-14 was skipped by the collector-health gate (the PT stream
+had an 18 h gap); this is the same read run by hand the next day, off the same forward log.
+
+Pooled, 91 graded games over 2 week clusters: E4 slope +0.026 [−0.090, +0.142], E6 −0.001,
+`pred_close` +0.006 — all HC1, all informational. Cumulative bet record at |x| ≥ 1: 43 bets,
+CLV +0.20 [−0.11, +0.50], beat close 37.2%, **19–24 ATS (0.442 [0.287, 0.597])**.
+
+Per week (one cluster each, so plain HC1 — `version_b_by_week.py`, reconciles to the pooled
+numbers above):
+
+| Monday | n | mean \|close − Mon\| | mean \|E4 − Mon\| | E4 slope | bets \|x\| ≥ 1 | CLV | beat close | ATS |
+|---|---|---|---|---|---|---|---|---|
+| 2026-08-31 | 42 | 0.56 | 1.01 | +0.202 | 20 | +0.47 | 55.0% | 11–9 (0.550) |
+| 2026-09-07 | 49 | 0.80 | 1.32 | −0.067 [−0.210, +0.076] | 23 | −0.04 | 21.7% | 8–15 (0.348) |
+
+At |x| ≥ 2 the 2026-09-07 week had 12 bets, CLV −0.42, beat close on 1 of 12, 6–6 ATS.
+
+What this does not support: a verdict either way. Two clusters is not clustered inference and
+the stopping rule (B3) is unchanged. It does say the week-1 read was not a preview of the season:
+the second week's slope has the opposite sign and its bets lost CLV, and the pooled slope is
+now indistinguishable from zero. The pooled interval still contains the archive's gamma (~0.25)
+and also contains zero.
