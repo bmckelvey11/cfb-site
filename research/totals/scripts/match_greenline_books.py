@@ -65,6 +65,7 @@ NAME_ALIASES = {
     "uconn": "connecticut huskies",
     "umass": "massachusetts minutemen",
     "nc state": "north carolina state wolfpack",
+    "hawai i": "hawaii rainbow warriors",   # CFBD writes Hawai'i; the apostrophe splits the token
 }
 
 # Tokens too common to identify a school on their own. "Georgia State" and "Kansas State"
