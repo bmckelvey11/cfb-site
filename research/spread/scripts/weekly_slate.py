@@ -162,7 +162,11 @@ ALIASES = {"ga tech": "georgia tech", "s carolina": "south carolina", "s florida
            "k state": "kansas state", "jax state": "jacksonville state",
            "ucf": "central florida", "utsa": "texas-san antonio",
            "s alabama": "south alabama", "louisiana": "louisiana-lafayette",
-           "va tech": "virginia tech"}
+           "va tech": "virginia tech",
+           # 2026 week 3: PT's "Miami (Fla.)" normalizes to "miami (fl)", but both live feeds
+           # strip to plain "miami" ("Miami Hurricanes", Pinnacle "Miami"); "(fl)" only ever
+           # matched Action Network, gone since amendment S4. Miami (Ohio) keeps "miami (oh)".
+           "miami (fl)": "miami"}
 
 
 # ------------------------------------------------------------------------------ models

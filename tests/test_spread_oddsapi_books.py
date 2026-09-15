@@ -48,6 +48,17 @@ def test_mascot_is_stripped_to_the_school():
     assert ws.oa_resolve("Marshall Thundering Herd", keys) == "marshall"  # two-token mascot
 
 
+def test_miami_fla_meets_the_feeds_on_plain_miami():
+    # PT writes "Miami (Fla.)"; the-odds-api writes "Miami Hurricanes" and Pinnacle "Miami".
+    # 2026 week 3 the game went unpriced because the PT key kept its "(fl)".
+    key = ws.norm("Miami (Fla.)")
+    assert key == "miami"
+    assert ws.oa_resolve("Miami Hurricanes", {key}) == key
+    assert ws.oa_resolve("Miami", {key}) == key
+    assert ws.norm("Miami (Ohio)") == "miami (oh)"
+    assert ws.oa_resolve("Miami (OH) RedHawks", {key, "miami (oh)"}) == "miami (oh)"
+
+
 def test_alias_bridges_a_spelling_the_strip_cannot_reach():
     # PT abbreviates; stripping "Panthers" leaves "florida international", which is not the key.
     assert ws.oa_resolve("Florida International Panthers", {"florida intl"}) == "florida intl"
