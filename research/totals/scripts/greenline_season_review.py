@@ -12,10 +12,11 @@ stated cover probabilities. Weeks not yet played are summarised as a pending
 slate. Rerun after each Monday's schedule refresh. Every graded row (one per
 flag per market) is also written to `greenline_results_<season>.csv` next to the
 captures, so the results survive as a flat file. Your own full-game NCAAF totals
-from the prior season's bet history (`data/ingest/bet_history/history.csv`, the
-book export behind `docs/bet-history-analysis-2023-2025.md`) ride along in the
-same file and as a baseline row, tagged `source=personal`, so PFF's flags sit
-next to what you actually bet at the same prices.
+from prior seasons' bet history (`data/ingest/bet_history/history.csv`, the book
+export behind `docs/bet-history-analysis-2023-2025.md`; `--history-seasons`,
+default 2024 and 2025) ride along in the same file and as baseline rows, tagged
+`source=personal`, so PFF's flags sit next to what you actually bet at the same
+prices.
 
 Conventions (checked against week 2 rows): `market_spread` is the HOME spread,
 negative when the home side is favoured; `greenline_spread` is PFF's home
@@ -202,11 +203,15 @@ def totals_section(graded: list[dict], personal: list[dict]) -> list[str]:
     for wk in sorted({r["week"] for r in T}):
         L.append(f"| week {wk} | {fmt(tally([r for r in T if r['week'] == wk]))} |")
     L.append(f"| all weeks | {fmt(tally(T))} |")
-    if personal:
-        yr = personal[0]["season"]
-        L.append(f"| your {yr} totals (baseline) | {fmt(tally(personal))} |")
-        L.append(f"| your {yr} unders | {fmt(tally([r for r in personal if r['side'] == 'under']))} |")
-        L.append(f"| your {yr} overs | {fmt(tally([r for r in personal if r['side'] == 'over']))} |")
+    years = sorted({r["season"] for r in personal})
+    for yr in years:
+        P = [r for r in personal if r["season"] == yr]
+        L.append(f"| your {yr} totals | {fmt(tally(P))} |")
+        L.append(f"| your {yr} unders | {fmt(tally([r for r in P if r['side'] == 'under']))} |")
+        L.append(f"| your {yr} overs | {fmt(tally([r for r in P if r['side'] == 'over']))} |")
+    if len(years) > 1:
+        L.append(f"| your {years[0]}-{years[-1]} totals (baseline) | {fmt(tally(personal))} |")
+        L.append(f"| your {years[0]}-{years[-1]} unders | {fmt(tally([r for r in personal if r['side'] == 'under']))} |")
     L += ["", "| under flags by market total | record | win% | 95% CI | units | ROI |", "|---|---|---:|---|---:|---:|"]
     for lab, fn in BANDS:
         L.append(f"| {lab} | {fmt(tally([r for r in U if fn(r['line'])]))} |")
@@ -332,13 +337,15 @@ def main() -> None:
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--out", type=Path, help="markdown path; printed only when omitted")
     ap.add_argument("--totals", action="store_true", help="totals only, with week/band/value splits")
+    ap.add_argument("--history-seasons", type=lambda v: [int(x) for x in v.split(",")], default=[2024, 2025],
+                    help="bet-history seasons to carry as the personal baseline (comma-separated August years)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
         self_check()
         return
     graded, pending = load(args.season)
-    personal = personal_totals(args.season - 1)
+    personal = [r for yr in args.history_seasons for r in personal_totals(yr)]
     md = report(graded, pending, args.season, totals_only=args.totals, personal=personal)
     print(md)
     results = IN_DIR / f"greenline_results_{args.season}.csv"
@@ -347,7 +354,8 @@ def main() -> None:
         w = csv.DictWriter(fh, fieldnames=RESULT_COLUMNS)
         w.writeheader()
         w.writerows(rows)
-    print(f"\nwrote {len(graded)} PFF rows + {len(personal)} personal {args.season - 1} totals -> {results}")
+    print(f"\nwrote {len(graded)} PFF rows + {len(personal)} personal totals "
+          f"({', '.join(map(str, args.history_seasons))}) -> {results}")
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(md, encoding="utf-8")

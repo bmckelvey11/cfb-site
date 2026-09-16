@@ -45,9 +45,14 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 |---|---|---:|---|---:|---:|
 | week 2 | 27-22 | 55.1% | 41–68% | +2.55u | +5.2% |
 | all weeks | 27-22 | 55.1% | 41–68% | +2.55u | +5.2% |
-| your 2025 totals (baseline) | 62-40 | 60.8% | 51–70% | +16.11u | +15.8% |
+| your 2024 totals | 21-14 | 60.0% | 44–74% | +5.07u | +14.5% |
+| your 2024 unders | 18-12 | 60.0% | 42–75% | +4.38u | +14.6% |
+| your 2024 overs | 3-2 | 60.0% | 23–88% | +0.69u | +13.8% |
+| your 2025 totals | 62-40 | 60.8% | 51–70% | +16.11u | +15.8% |
 | your 2025 unders | 54-38 | 58.7% | 48–68% | +10.92u | +11.9% |
 | your 2025 overs | 8-2 | 80.0% | 49–94% | +5.19u | +51.9% |
+| your 2024-2025 totals (baseline) | 83-54 | 60.6% | 52–68% | +21.18u | +15.5% |
+| your 2024-2025 unders | 72-50 | 59.0% | 50–67% | +15.30u | +12.5% |
 
 | under flags by market total | record | win% | 95% CI | units | ROI |
 |---|---|---:|---|---:|---:|
@@ -75,7 +80,7 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 
 **Bottom line.** Totals 27-22 (55.1%, CI 41-68%), unders 22-17. Break-even sits inside the interval. The minimum win rate one graded week can detect is 70%; this is not evidence of edge, and it is not evidence of none.
 
-**Against your own 2025 totals.** Baseline rows in the table above: 62-40 (60.8%, CI 51-70%), unders 54-38, at your actual prices, 102 bets from the book export. PFF's week 2 unders (22-17, 56.4%) sit inside your interval and below your point estimate; nothing yet says their flags add to what you already do. The 2025 rows are in `greenline_results_2026.csv` tagged `source=personal`, so a same-game overlap check is possible once weeks accumulate.
+**Against your own 2024-25 totals.** Baseline rows in the table above: pooled 83-54 (60.6%, CI 52-68%), unders 72-50 (59.0%, CI 50-67%), at your actual prices, 137 bets from the book export (2024: 21-14; 2025: 62-40). PFF's week 2 unders (22-17, 56.4%) sit inside your interval and below your point estimate; nothing yet says their flags add to what you already do. The 2025 rows are in `greenline_results_2026.csv` tagged `source=personal`, so a same-game overlap check is possible once weeks accumulate.
 
 **Structure that recurs, week to week**
 
