@@ -174,12 +174,13 @@ targets the audit scripts write on demand; `research/totals/docs/x.md` is a plac
 `--out` in a usage example; the `docs/MODEL_GUIDE.md` / `docs/ROI_HITRATE.md` /
 `docs/backtest_bets.csv` family resolve correctly relative to `models/over_zero/`.
 
-**One status question this pass does not settle.** `research/totals/` is a docs-and-scripts
-tree that is **not** in root `CLAUDE.md`'s units table, and it has no unit `CLAUDE.md`. It
-already held three greenline docs before this pass, and 19 more moved in, so the table
-above lists it as a docs home. That is navigational only — promoting it to a real unit
-(with its own `CLAUDE.md` and a row in the units table) is a separate decision, not
-something this reorganization grants.
+**One status question, raised here and since settled.** When this pass ran,
+`research/totals/` was a docs-and-scripts tree with no unit `CLAUDE.md` and no row in root
+`CLAUDE.md`'s units table, so the table above listed it as a docs home on navigational
+grounds only. It was promoted to a real unit later the same day: it now has
+[`research/totals/CLAUDE.md`](../research/totals/CLAUDE.md), an index at
+[`research/totals/docs/README.md`](../research/totals/docs/README.md), and a units-table
+row. Treat it as a unit.
 
 **What this does *not* support.** No doc bodies were rewritten and no claims re-verified —
 this was a move-and-index pass. The groupings above are navigational, not a statement that
