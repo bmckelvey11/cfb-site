@@ -35,9 +35,13 @@ Every unit gets this wrong in a different direction:
 
 ### 2. Two sys.path idioms, with opposite move costs
 
-- **`research/spread/` is cheap to move.** Every script does
-  `sys.path.insert(0, Path(__file__).parent)`. Move the directory whole and nothing
-  inside it breaks.
+- **`research/spread/` is cheap to *relocate*, expensive to *split*.** Every script does
+  `sys.path.insert(0, Path(__file__).parent)`. Move the directory whole and nothing inside
+  it breaks — the inserts are self-relative. But that property holds only because the
+  scripts sit together: the moment a split puts importer and imported in different
+  directories, every crossing edge needs a second insert. Step 4 is a split, so it pays
+  that cost; it is still the cheaper of the two units because the fix is additive (one
+  extra insert) rather than a rewrite of an existing hardcoded path.
 - **`models/over_zero/` is expensive to move.** 20 files hardcode the literal strings
   `v1` or `v2` in a path expression — `parent.parent / "v2"`,
   `REPO / "models" / "over_zero" / "v1"`, `parents[3]`. These are both name-sensitive and
@@ -112,6 +116,21 @@ archive/<subject>/      superseded: retained for audit, never cited as current
 Root `tests/` stays the single flat suite — that is already the convention and works.
 `archive/` already exists with exactly the "retain, never cite" rule in root `CLAUDE.md`.
 
+**`models/` is a package; the new subdirectories are not.** `models/__init__.py` exists and
+`models/totals/` has its own, which is why `python -m models.totals` works — the reference
+shape is a reference because it is *importable*, not because of where it sits. Neither
+`models/over_zero/` nor a new `models/spread/` has an `__init__.py`, and both use bare
+sibling imports resolved through `sys.path`. Moving spread under `models/` therefore does
+**not** make it `models.spread`; it produces a third directory that is neither package nor
+path-independent.
+
+This plan accepts that. `models/spread/` and `models/over_zero/` stay script-land with
+sys.path inserts, and `models/` means "live code" rather than "importable package" —
+`models.totals` is then the exception, not the rule. Converting either to a real package
+is a separate job (see What this plan does not support). The alternative is to fold
+packaging into Step 4, which roughly doubles it and couples a layout change to an import
+rewrite; not recommended in the same commit.
+
 Per subject:
 
 | Subject | Live | Research | Notes |
@@ -168,13 +187,31 @@ added path insert pointing at `models/spread/`. Update the two test files that h
 `research/spread/scripts` and the two that use `spec_from_file_location`.
 Rename the `eval_`-prefixed production modules only if doing it in the same commit is
 provably safe — otherwise leave the names and note the lie in the unit `CLAUDE.md`.
-*Gate:* `python -m pytest` back to 952/6; `weekly_slate.py` produces a slate byte-identical
-to a run captured before the move.
+*Gate:* `python -m pytest` back to 952/6, plus a pinned-input slate diff.
+
+The slate gate needs its inputs pinned or it proves nothing. `weekly_slate.py` takes
+`--snapshot` for the Prediction Tracker side, but the odds columns are not pinnable: both
+`_oddsapi()` and the Pinnacle reader glob their ingest directory and take `snaps[-1]`, the
+newest file on disk. Three scheduled tasks write into those directories
+(`CFB-Odds-Snapshot` every 6 h and Saturdays, `CFB-Odds-Snapshot-Saturday`,
+`CFB-Pinnacle-Snapshot` daily at 06:15). So either:
+
+- run both captures with `--snapshot <pinned file> --no-books`, which drops the book
+  columns from the comparison but makes it deterministic; or
+- run before and after back to back inside a window where no collector fires, and record
+  the `oa_as_of` stamp on both to prove the same snapshot was read.
+
+Without one of those, a diff cannot distinguish move-breakage from fresh odds.
 
 **Step 5 — the two `.cmd` wrappers.** Only after Step 4 is green. For each: move the file,
 fix its `%~dp0..\..\..` depth, fix the `.py` path it invokes, then
 `Set-ScheduledTask` the registered action to the new absolute path, then fire one manual
 run and read `$CFB_DATA_ROOT\logs\`.
+
+Note that `CFB-OverZero-Slate` is registered **unquoted** — its action is a bare
+`C:\...\over_zero_slate.cmd`, unlike the other five tasks, whose paths are quoted. Any new
+path containing a space fails there and only there. Quote it while re-registering.
+
 *Gate:* `Get-ScheduledTask -TaskName 'CFB-*'` shows the new paths and a manual run exits 0
 with a fresh log entry. If any doubt, leave the `.cmd` files where they are — a thin
 wrapper in the old location costs nothing and this is the failure mode that hides until
@@ -219,8 +256,10 @@ This is a naming decision, not a technical one; Step 6 is the only step it touch
 
 - It does not claim the reorganization improves any model's accuracy. It is a
   maintainability change; every gate above is a *no-change* gate.
-- It does not convert `models/over_zero/` from script-land to a package. That is a larger
-  job, gated on Finding 2, and is not required for the lifecycle split.
+- It does not convert `models/over_zero/` or `models/spread/` from script-land to a
+  package. That is a larger job, gated on Finding 2, and is not required for the lifecycle
+  split. The consequence is that `models/` after this plan means "live code", not
+  "importable package" — `models.totals` remains the only true package under it.
 - It does not resolve whether `v1`/`v2`/`v3` should be renamed to something meaningful.
   They cannot be renamed cheaply (20 hardcoded references) and renaming is not what the
   lifecycle problem needs.
