@@ -177,3 +177,22 @@ python research/totals/scripts/greenline_unders.py --week <w> && python research
 python research/totals/scripts/greenline_season_review.py --totals --figs --out research/totals/docs/greenline-totals-season-<date>.md
 ```
 The script regenerates the tables and figures; this section is hand-written and lives in the dated copy.
+
+## Lower bound to bet
+
+`research/totals/scripts/greenline_bet_bounds.py`. The conservative test: take each split's Wilson lower bound as the true win rate and ask whether it still beats 52.4% at -110. Point-estimate EV shown beside it so the price of caution is visible.
+
+| split (unders) | record | win% | 95% floor | EV at floor | EV at point | 1/4 Kelly at floor | worst price | bet at floor? |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| all, history + 2026 flags | 136-104 | 56.7% | 50.3% | -3.9% | +8.2% | 0 | -101 | no |
+| PFF 2026 flags only | 22-17 | 56.4% | 41.0% | -21.8% | +7.7% | 0 | +144 | no |
+| band <45, pooled | 10-2 | 83.3% | 55.2% | +5.4% | +59.1% | 1.5% | -123 | yes, n=12 |
+| band 55-59.5, pooled | 62-36 | 63.3% | 53.4% | +1.9% | +20.8% | 0.5% | -115 | yes |
+| band 50-54.5, pooled | 10-17 | 37.0% | 21.5% | -58.9% | -29.3% | 0 | +364 | no |
+| PFF value 3-4% | 13-6 | 68.4% | 46.0% | -12.2% | +30.6% | 0 | +117 | no |
+
+At a 90% interval the pooled all-unders floor is 51.4% (still short), 55-59.5 rises to 55.0% (EV +5.0%, quarter-Kelly 1.4%, worst price -122).
+
+**Answer.** No split clears at the floor once you account for how it was chosen. The pooled all-unders floor is 50.3%, two points short; a true 56% edge needs about 720 games before its 95% floor clears break-even, and there are 240. The two bands that clear (55-59.5 at 53.4%, <45 on 12 games) are 2 of 8 looks at one sample, and the 2023-25 history that picked 55-59.5 as the band to watch is inside its own pooled floor. The clean pre-registered test for that band is 2026 alone: 12-4, floor 51%, not there yet.
+
+**If betting anyway**, the floor gives the sizing and the price discipline: 55-59.5 unders at quarter-Kelly of the floor is 0.5% of bankroll per bet, and nothing worse than -115. Everything outside that band is entertainment-priced at the floor, whatever the point estimate says.
