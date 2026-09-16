@@ -80,7 +80,7 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 
 **Bottom line.** Totals 27-22 (55.1%, CI 41-68%), unders 22-17. Break-even sits inside the interval. The minimum win rate one graded week can detect is 70%; this is not evidence of edge, and it is not evidence of none.
 
-**Against your own 2024-25 totals.** Baseline rows in the table above: pooled 83-54 (60.6%, CI 52-68%), unders 72-50 (59.0%, CI 50-67%), at your actual prices, 137 bets from the book export (2024: 21-14; 2025: 62-40). PFF's week 2 unders (22-17, 56.4%) sit inside your interval and below your point estimate; nothing yet says their flags add to what you already do. The 2025 rows are in `greenline_results_2026.csv` tagged `source=personal`, so a same-game overlap check is possible once weeks accumulate.
+**Against your own 2024-25 totals.** Baseline rows in the table above: pooled 83-54 (60.6%, CI 52-68%), unders 72-50 (59.0%, CI 50-67%), at your actual prices, 137 bets from the book export (2024: 21-14; 2025: 62-40). Those unders were mostly PFF Greenline flags, so this is not an independent baseline: it is PFF's under record as you bet it, filtered by your own selection and shopped for price. Read it as prior evidence on the same question. Pooled with week 2: 94-67, 58.4%, CI 51-66%, which clears break-even. Two caveats keep that from being a verdict: the 2024-25 bets are the subset you chose to take, not every flag, and the prices are yours, not PFF's board. The 55-59.5 band is the one split that was on the table before week 2 was graded (band table built 2026-09-10 from 2023-25 history: 50-32) and week 2 went the same way (12-4); pooled 62-36, 63.3%, CI 53-72%. That is the strongest single thread here and still only 98 games. The personal rows are in `greenline_results_2026.csv` tagged `source=personal`.
 
 **Structure that recurs, week to week**
 
@@ -95,7 +95,7 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 - Betting Greenline unders as a system. One week, CI contains break-even.
 - Sizing by PFF's edge number or filtering by band. Both are post-hoc splits on n < 20.
 - Any claim about weeks 0-1.
-- Comparing PFF to your 2025 record as like-for-like: different season, different games, your bets were selected and priced by you.
+- Treating your 2024-25 record as independent confirmation of PFF: it is mostly PFF's own flags, selected and priced by you. Same signal, earlier seasons, with a selection filter on top.
 
 **What settles it.** Four more graded weeks (n ~ 250) gives a fair chance of separating a true 56% from 52.4%; eight weeks does it reliably. Week 3 (49 unders, mean stated edge +2.5%) grades Monday.
 
