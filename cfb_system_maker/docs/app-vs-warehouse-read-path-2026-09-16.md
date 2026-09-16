@@ -2,7 +2,8 @@
 
 **Answer: no, not the app's read path.** Two findings settle it, one platform-hard and one
 scope-hard. A narrower version of the idea — retiring the `core` tables nobody reads — stays
-open and is not addressed here.
+open and is not addressed here. Corrected 2026-09-16: an earlier draft of this page said
+`core.fact_game` had no reader. It has two.
 
 Date: 2026-09-16. Reproduce the swap finding with `scripts/check_duckdb_swap_lock.py`.
 
@@ -82,6 +83,24 @@ actually reads.
 
 ## Still open
 
-`core.fact_game`, `core.fact_game_line` and `core.fact_game_team` have no reader. Either give
-them one or retire them; carrying an unread Kimball layer is the real cost the original
-question was circling. Not decided here.
+Which `core` facts are actually unread, measured 2026-09-16 by grepping the repo for each
+table name outside `duckdb_core.py`, the audit scripts and the worktrees:
+
+| Table | Reader |
+|---|---|
+| `core.fact_game` | `research/spread/scripts/eval_version_b.py:155`, `research/totals/scripts/grade_greenline.py:179` |
+| `core.fact_game_line` | none (mentioned only in `normalize.py`'s rationale comment) |
+| `core.fact_game_team` | none |
+| `core.fact_game_odds` | none (mentioned only in `refresh_cfbd.py:224`) |
+| `core.fact_game_historical` | none |
+
+So the unread set is the four below `fact_game`, not the whole layer. Either give them a
+reader or retire them; carrying unread Kimball facts is the real cost the original question
+was circling. Not decided here.
+
+Both readers of `fact_game` are short-lived script runs that `connect(..., read_only=True)`
+and exit — the pattern Finding 1 permits. Neither holds the file across a rebuild.
+
+[data-flow-guide.md §5](data-flow-guide.md) lists neither of them in its "Who reads what"
+table, and says a `build_core` bug reaches nothing. That is now false for `fact_game`: it
+reaches the version-B spread eval and Greenline grading. The table needs both rows.
