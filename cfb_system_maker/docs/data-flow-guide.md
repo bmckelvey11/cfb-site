@@ -196,6 +196,7 @@ in `games.csv` or `features.json` reaches both.
 
 | Question | Run |
 |---|---|
+| What tables and columns exist, and what does the data look like? | Open [cfb-warehouse-catalog.html](../../docs/cfb-warehouse-catalog.html). Every table with its columns, types and first 3 rows — click a row to expand. Regenerate with `python scripts/build_warehouse_catalog.py` (`--check` to test for staleness) |
 | Is the folder and warehouse clean? | `python scripts/audit_data_hygiene.py` (read-only; `--checks folder` skips the warehouse) |
 | What did the last rebuild load, and what failed? | `SELECT * FROM meta.load_report WHERE error IS NOT NULL`; `data/logs/cfbd_refresh.log` |
 | Did every scheduled task run? | `data/logs/task_runs.csv` |
@@ -224,7 +225,10 @@ Default verification for code changes is `python -m pytest` from the repo root.
 
 ## 8. Where the detail lives
 
-Current: [data-audit-2026-09-11.md](data-audit-2026-09-11.md) (inventory and numbers),
+Current: [cfb-warehouse-catalog.html](../../docs/cfb-warehouse-catalog.html) (every table,
+its columns and sample rows; generated, see
+[the regeneration note](warehouse-catalog-regeneration-2026-09-16.md)),
+[data-audit-2026-09-11.md](data-audit-2026-09-11.md) (inventory and numbers),
 [data-coverage.md](../../docs/data-coverage.md) (endpoints, floors),
 [duckdb-warehouse-plan.md](../../docs/duckdb-warehouse-plan.md) (design and promote runbook),
 [duckdb-rebuild-spec.md](../../docs/duckdb-rebuild-spec.md), [duckdb-core-ddl.md](../../docs/duckdb-core-ddl.md),

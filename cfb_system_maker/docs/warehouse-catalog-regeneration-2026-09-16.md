@@ -54,6 +54,40 @@ landed underneath it:
 `fact_coach_season`, `fact_game_historical`, `fact_game_odds`,
 `fact_team_talent`, plus three audit tables).
 
+## Table preview — columns and sample rows
+
+Each row in the Table catalog expands to show every column with its type, and the
+first 3 rows of actual data. This adds a `detail` key to `DATA`:
+`{"<schema>.<table>": {c: [[name, type], ...], s: [[cell, ...], ...]}}`,
+322 entries, ~300 KB inline. The page is opened from disk, so `fetch` of a
+sibling JSON is CORS-blocked — it has to stay in the one file, which now runs
+about 585 KB.
+
+Three things the cells go through:
+
+- **Ordered by `ORDER BY ALL`.** An unordered `LIMIT` returns whatever the scan
+  reaches first, so a reload that changed nothing made the file differ between
+  runs and `--check` cried wolf. Ordering by the first column, or the first
+  non-nested one, is not enough: `raw.gamePlayerStat` and `raw.win_probability`
+  tie on every scalar column they have (one source file, one season, no week),
+  and only the JSON payload separates them. `ORDER BY ALL` costs ~12s across the
+  warehouse. Three consecutive builds are now byte-identical.
+- **Data root stripped.** `_source_file` columns hold absolute paths, so
+  `C:/Users/mckel/dev/cfb/data/raw/calendar_2012.json` is shown as
+  `raw/calendar_2012.json` — a committed doc should not carry the home directory
+  of whoever built it, and the path would be wrong on any other machine.
+- **Collapsed and truncated to 60 characters.** JSON payloads are
+  pretty-printed; collapsing whitespace first gets more signal into the budget.
+
+The generated file was grepped for credential-shaped strings before committing
+(`raw.pff_*` comes from authenticated pulls). Only hits were `sessionTime` and
+`sessionTimeOpponent`, both PFF stat column names.
+
+Having every column also makes an existing promise true: the search box says it
+searches "tables, columns, stat names", but only numeric and boolean columns had
+ever been in `DATA`. Searching `abbreviation` — a VARCHAR, so never in `wstats`
+— now finds 18 tables. It previously found none.
+
 ## The three rules that are not introspectable
 
 Most of `DATA` is mechanical (row counts, column counts, types). Three fields
@@ -113,18 +147,32 @@ omitted matches one of those exclusions.
 - **`named` counts are row counts, not distinct entities.** `stat_categories`
   is a name catalog with no fact rows, so its `n` is reported as 0 by
   construction rather than measured.
+- **The sample rows are not a representative sample.** They are the first three
+  under `ORDER BY ALL`, chosen for reproducibility, not for typicality. They
+  show the shape of a column, not its distribution — the lowest-sorting rows
+  skew toward early seasons, nulls and empty strings. Query the warehouse for
+  anything quantitative.
+- **A 60-character cell is not the value.** Long strings and every JSON payload
+  are truncated, so the preview tells you a column holds a JSON document, not
+  what is in it.
 - **Row counts are a point-in-time snapshot** of the 2026-09-16 13:25 EDT load.
   `loaded` in `DATA` records the build date; `--check` is what tells you the
   file has drifted from the database.
 
 ## Verification
 
-- `python scripts/build_warehouse_catalog.py --check` → clean.
-- `python -m pytest` → 970 passed, 2 skipped.
-- Page rendered and driven in a browser: header reads "322 tables across 4
-  schemas", donut shows 4 schemas, 322 of 322 tables list, search and
-  schema/domain filters work, Stats pane totals 1,947 columns + 176 named
-  = 2,123. No console errors.
+- `python scripts/build_warehouse_catalog.py --check` → clean; three consecutive
+  builds byte-identical.
+- `python -m pytest` → 974 passed, 2 skipped (22 of them
+  `tests/test_warehouse_catalog.py`).
+- Page served over `http://localhost:8777` (the `Docs (static)` launch entry —
+  at 585 KB the pane will not load it over `file://`) and driven in a browser.
+  No console errors. Header reads "322 tables across 4 schemas"; donut shows 4
+  schemas; Stats pane totals 1,947 columns + 176 named = 2,123.
+- Preview checked against four shapes: `core.dim_venue` (8 columns, 3 rows),
+  `raw.calendar` (JSON payload truncated, path stripped),
+  `core.coach_season_unmatched` (empty → "table is empty"), and
+  `stg.advanced_season_stats` (83 columns).
 
 ## Two staleness signals, deliberately different
 
