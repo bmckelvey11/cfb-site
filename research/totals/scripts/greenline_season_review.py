@@ -9,7 +9,9 @@ schedule, grades each flag's chosen side on totals, spreads and moneylines
 against the final, and reports records with Wilson intervals, units, closing-line
 value against the schedule's last posted number, and calibration of PFF's own
 stated cover probabilities. Weeks not yet played are summarised as a pending
-slate. Rerun after each Monday's schedule refresh.
+slate. Rerun after each Monday's schedule refresh. Every graded row (one per
+flag per market) is also written to `greenline_results_<season>.csv` next to the
+captures, so the results survive as a flat file.
 
 Conventions (checked against week 2 rows): `market_spread` is the HOME spread,
 negative when the home side is favoured; `greenline_spread` is PFF's home
@@ -39,6 +41,7 @@ from grade_greenline import BANDS, VALUE_BUCKETS, capture_lines, num, pff_final,
 
 IN_DIR = INGEST / "pff_scoreboard"
 BREAK_EVEN = 110 / 210
+RESULT_COLUMNS = ["week", "game", "market", "side", "line", "price", "result", "p", "value", "clv", "p_market"]
 
 
 def wilson(w: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -287,6 +290,12 @@ def main() -> None:
     graded, pending = load(args.season)
     md = report(graded, pending, args.season, totals_only=args.totals)
     print(md)
+    results = IN_DIR / f"greenline_results_{args.season}.csv"
+    with results.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=RESULT_COLUMNS)
+        w.writeheader()
+        w.writerows(sorted(graded, key=lambda r: (int(r["week"]), r["game"], r["market"])))
+    print(f"\nwrote {len(graded)} graded rows -> {results}")
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(md, encoding="utf-8")
