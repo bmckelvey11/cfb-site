@@ -215,3 +215,43 @@ Logistic fit of win on edge: slope -0.33 per point (se 0.39, p=0.40); quadratic 
 **Window.** Best contiguous range by lower bound: **2% to 4%**, 17-8 (68%), floor 48.4%. Dropped flags 4-7. That is the best of 21 ranges searched on 36 games; its floor is optimistic by construction and still does not clear break-even.
 
 **Operating bounds, if betting now:** lower 2%, upper 4%, at PFF's number after repricing at the book (a flag that reprices below zero is out regardless). Flat stakes, half a unit, no Kelly: the floor is below break-even so Kelly at the floor is zero and Kelly at the point estimate is fitting to noise. Week 3 has 24 flags inside the window (of 45). Revisit at n=150, where a 15-point gap between the window and the tails would be a real difference.
+
+## Statistical workup of the bets
+
+`research/totals/scripts/greenline_bet_stats.py`. 280 graded totals bets (201 personal unders 2023-25, 39 PFF 2026 under flags, 40 overs). Binomial p is one-sided against 52.4%. P(edge) is the posterior probability the true win rate exceeds break-even under a flat prior. Units and ROI intervals are 95% bootstrap over bets (4,000 resamples).
+
+| split | record | win% (95% CI) | binomial p | P(edge) | units (95%) | ROI (95%) |
+|---|---|---|---:|---:|---|---|
+| all unders, pooled | 136-104 | 56.7% (50–63) | 0.103 | 91% | +19.4 (-9.2 to +47.9) | +8.1% (-4 to +20) |
+| personal 2023-25 unders | 114-87 | 56.7% (50–63) | 0.123 | 89% | +16.4 (-10.1 to +43.0) | +8.2% (-5 to +21) |
+| PFF 2026 under flags | 22-17 | 56.4% (41–71) | 0.367 | 69% | +3.0 (-8.5 to +14.5) | +7.7% (-22 to +37) |
+| personal 2023 unders | 42-37 | 53.2% (42–64) | 0.490 | 55% | +1.1 (-14.3 to +18.1) | +1.4% (-18 to +23) |
+| personal 2024 unders | 18-12 | 60.0% (42–75) | 0.258 | 79% | +4.4 (-5.2 to +14.0) | +14.6% (-17 to +47) |
+| personal 2025 unders | 54-38 | 58.7% (48–68) | 0.134 | 89% | +10.9 (-6.4 to +28.3) | +11.9% (-7 to +31) |
+| all overs | 25-15 | 62.5% (47–76) | 0.130 | 90% | +7.6 (-3.9 to +19.2) | +19.1% (-10 to +48) |
+| unders, band <45 | 10-2 | 83.3% (55–95) | 0.028 | 98% | +7.1 (+1.4 to +11.0) | +59.5% (+12 to +92) |
+| unders, band 45-49.5 | 11-11 | 50.0% (31–69) | 0.669 | 41% | -1.0 (-8.8 to +8.4) | -4.7% (-40 to +38) |
+| unders, band 50-54.5 | 10-17 | 37.0% (22–56) | 0.964 | 6% | -7.9 (-17.4 to +1.7) | -29.1% (-65 to +6) |
+| unders, band 55-59.5 | 62-36 | 63.3% (53–72) | 0.019 | 98% | +20.1 (+1.2 to +38.9) | +20.5% (+1 to +40) |
+| unders, band 60-64.5 | 31-30 | 50.8% (39–63) | 0.646 | 40% | -1.8 (-17.1 to +13.1) | -3.0% (-28 to +22) |
+| unders, band 65+ | 12-8 | 60.0% (39–78) | 0.325 | 74% | +2.9 (-4.8 to +10.6) | +14.6% (-24 to +53) |
+
+**Seasons consistent with one rate?** Chi-square heterogeneity across 2023 (42-37), 2024 (18-12), 2025 (54-38), 2026 (22-17): χ²=0.69, df=3, p=0.88. No evidence the seasons differ; pooling is defensible.
+
+**Independence.** Runs test on the pooled under sequence: 114 runs vs 119 expected, p=0.52 (no streakiness beyond chance). Win-rate SE clustered by game day (78 days) is 2.94 points vs 3.20 iid; the day-clustered 95% interval on 56.7% is 50.9–62.4%. Same-day dependence is negligible here.
+
+**Drawdowns.** Max drawdown, longest losing streak, and what the point estimate predicts for the streak:
+
+| series | bets | max drawdown | longest losing run | expected longest run |
+|---|---:|---:|---:|---:|
+| personal 2023 | 79 | -10.1u | 6 | 4.9 |
+| personal 2024 | 30 | -5.4u | 3 | 3.2 |
+| personal 2025 | 92 | -6.4u | 5 | 4.5 |
+| PFF 2026 flags | 39 | -4.0u | 4 | 3.7 |
+| all unders | 240 | -10.1u | 6 | 5.9 |
+
+**Price paid.** Mean price on unders -110 (range -120 to -105); the break-even at the prices actually taken is 52.4%, vs 52.4% at a flat -110.
+
+**Multiplicity.** About 24 splits have been examined across this document. Under a Bonferroni correction the per-split threshold is p<0.0021; only the pooled rows above were specified in advance, and only the pooled all-unders row and the 55-59.5 band come near even the uncorrected 0.05. A true 56% rate needs about 720 bets before its 95% floor clears break-even; there are 240.
+
+**Reading the workup.** Pooled unders: 91% posterior probability of a positive edge, one-sided p=0.10, bootstrap units -9 to +48. Seasons agree with one rate (p=0.88) and bets behave independently (runs p=0.52, day-clustering changes the SE by a quarter of a point), so the pooled number is the right one to read. It says "probably an edge, not proven, and plausibly zero". Two bands clear uncorrected p<0.05 (55-59.5 at 0.019, <45 at 0.028 on twelve games); neither survives the 24-split correction, and both were found in the data they are tested on. Drawdowns ran at or slightly past what the point estimate predicts (2023: 6-bet losing run vs 4.9 expected, -10u), which is the ordinary cost of a 4-8% edge, not a signal.
