@@ -46,6 +46,10 @@ for joining PFF ids to the warehouse, not for lines.
 
 Each run overwrites its CSVs; the schedule snapshot is self-describing (it carries
 both opener and current), so re-running gives a fresh state, not an appended one.
+Greenline is the exception: every pull (live or `--from-dump`) also archives the raw
+`[{game, matchup}]` payload as `greenline_dumps/pff_greenline_<season>_w<week>_<UTC>.json`,
+because PFF deletes the props at kickoff and the capture is the only copy. Re-flatten
+any archived dump with `--from-dump`; never re-pull for a week that is already archived.
 """
 
 from __future__ import annotations
@@ -262,6 +266,22 @@ def write_csv(path: Path, columns: list[str], rows: list[dict]) -> None:
 
 
 def self_check() -> None:
+    import tempfile
+    global DUMP_DIR
+    keep, DUMP_DIR = DUMP_DIR, Path(tempfile.mkdtemp()) / "greenline_dumps"
+    try:
+        entries = [{"game": {"pff_game_id": 1, "pff_week": "3"},
+                    "matchup": {"greenline": {"market_over_under": 50.5}, "is_premium_subscriber": True, "tweets": ["x"]}}]
+        p = archive_dump(entries, 2026, "3", "2026-09-16T18:26:15.031Z")
+        assert p.name == "pff_greenline_2026_w3_20260916T182615.json", p.name
+        back, cap = load_dump(p)
+        assert cap == "2026-09-16T18:26:15.031Z" and back[0]["matchup"] == {"greenline": {"market_over_under": 50.5},
+                                                                             "is_premium_subscriber": True}, back
+        assert archive_dump(entries, 2026, "3", "2026-09-16T18:26:15.031Z") == p   # idempotent, never overwrites
+        bare = p.with_name("bare.json"); bare.write_text(json.dumps(entries), encoding="utf-8")
+        assert load_dump(bare) == (entries, None)
+    finally:
+        DUMP_DIR = keep
     sched = {"weeks": [{"games": [{
         "pff_game_id": 31104, "pff_week": "2", "opening_point_spread": -3.0,
         "point_spread": -3.5, "betting_value_count": 3,
@@ -343,9 +363,38 @@ def next_week(raw: list[dict], now: str | None = None) -> str | None:
     return min(upcoming, key=lambda g: g["kickoff_raw"])["pff_week"]
 
 
+DUMP_DIR = OUT_DIR / "greenline_dumps"
+
+
+def archive_dump(dump: list[dict], season: int, week, captured_at: str | None = None) -> Path:
+    """Timestamped raw copy of a Greenline pull. Keeps only the `greenline` block of each
+    matchup: that is all the flattener reads, and the full matchup payload is ~50 KB a game."""
+    stamp = (captured_at or datetime.now(timezone.utc).isoformat()).replace(":", "").replace("-", "")[:15]
+    slim = [{"game": e["game"], "matchup": {"greenline": (e["matchup"] or {}).get("greenline"),
+                                             "is_premium_subscriber": (e["matchup"] or {}).get("is_premium_subscriber")}}
+            for e in dump]
+    DUMP_DIR.mkdir(parents=True, exist_ok=True)
+    path = DUMP_DIR / f"pff_greenline_{season}_w{week}_{stamp}.json"
+    if not path.exists():
+        path.write_text(json.dumps({"captured_at": captured_at or datetime.now(timezone.utc).isoformat(),
+                                    "season": season, "week": str(week), "entries": slim}), encoding="utf-8")
+    return path
+
+
+def load_dump(path: Path) -> tuple[list[dict], str | None]:
+    """Accepts the archived shape ({captured_at, entries}) or a bare [{game, matchup}] list."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, dict):
+        return raw["entries"], raw.get("captured_at")
+    return raw, None
+
+
 def greenline_pull(sched: dict, args, games: list[dict]) -> list[dict]:
     if args.from_dump:
-        dump = json.loads(args.from_dump.read_text(encoding="utf-8"))
+        dump, captured_at = load_dump(args.from_dump)
+        week = args.week or next((str(e["game"].get("pff_week")) for e in dump), "na")
+        if not args.report:
+            print(f"archived {archive_dump(dump, args.season, week, captured_at)}")
         return [
             r for r in (greenline_row(e["game"], e["matchup"], args.season) for e in dump)
             if r is not None
@@ -359,7 +408,7 @@ def greenline_pull(sched: dict, args, games: list[dict]) -> list[dict]:
     print(f"week {week}: {len(wanted)} games")
 
     cookie = web_cookie()
-    rows, locked = [], 0
+    rows, locked, dump = [], 0, []
     for i, g in enumerate(wanted):
         slug = g.get("slug") or (g.get("matchup_path") or "").rsplit("/", 1)[-1]
         matchup = get(
@@ -367,6 +416,7 @@ def greenline_pull(sched: dict, args, games: list[dict]) -> list[dict]:
             f"league={args.league}&season={args.season}&week={week}&game={slug}",
             cookie=cookie,
         )
+        dump.append({"game": g, "matchup": matchup})
         row = greenline_row(g, matchup, args.season)
         if row is None:
             locked += 1
@@ -378,6 +428,8 @@ def greenline_pull(sched: dict, args, games: list[dict]) -> list[dict]:
         raise SystemExit(
             "every game came back locked -- PFF_WEB_COOKIE is expired or not a premium session"
         )
+    if not args.report:
+        print(f"archived {archive_dump(dump, args.season, week)}")
     if locked:
         print(f"{locked} games returned no props (not yet priced, or locked)")
     return rows
