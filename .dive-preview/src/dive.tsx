@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useDiveState, useSQLQuery } from '@motherduck/react-sql-query';
 import {
   Bar,
@@ -35,7 +36,7 @@ export default function CfbWarehouseExplorer() {
   const [view, setView] = useDiveState<'catalog' | 'coverage'>('view', 'catalog');
   const [schema, setSchema] = useDiveState<string>('schema', 'core');
   const [table, setTable] = useDiveState<string | null>('table', 'fact_game');
-  const [search, setSearch] = useDiveState<string>('search', '');
+  const [search, setSearch] = useState('');
 
   const summary = useSQLQuery(`
     SELECT
@@ -74,9 +75,7 @@ export default function CfbWarehouseExplorer() {
     SELECT
       season,
       count(*) AS games,
-      sum(has_line::INT) AS lined,
-      count(*) - sum(has_line::INT) AS unlined,
-      sum(completed::INT) AS completed
+      sum(has_line::INT) AS lined
     FROM "cfb"."core"."fact_game"
     GROUP BY 1
     ORDER BY 1
@@ -126,7 +125,6 @@ export default function CfbWarehouseExplorer() {
     season: String(r.season),
     games: N(r.games),
     lined: N(r.lined),
-    completed: N(r.completed),
     line_pct: N(r.games) > 0 ? Math.round((N(r.lined) / N(r.games)) * 100) : 0,
   }));
 

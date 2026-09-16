@@ -47,9 +47,10 @@ row (a stub). Massey and Odds API tables are not in the mirror at all.
   provenance ledger. "CFBD" is the fallback bucket.
 - Nothing here describes the **local** `cfb.duckdb`, which is the source of
   truth. Mirror gaps (PFF, Massey, Odds API, 2026 results) mean the mirror is
-  behind local, not that local lacks the data. Re-push with
-  `scripts/refresh_cfbd.py` → MotherDuck promote before drawing conclusions from
-  recent seasons.
+  behind local, not that local lacks the data. Refresh local with
+  `python scripts/refresh_cfbd.py`, then push the mirror with
+  `python scripts/promote_to_motherduck.py --yes` (manual by design) before
+  drawing conclusions from recent seasons.
 
 ## Reproduce
 
@@ -64,7 +65,11 @@ row (a stub). Massey and Odds API tables are not in the mirror at all.
 
 ## Note for future dives
 
-Stacked `<Bar stackId>` renders at the wrong scale under recharts 3.7 in this
-runtime (segments drawn at ~28% of correct height while the axis domain is
-right). Single-series bars and `ComposedChart` bar + line are correct. The dive
-uses bar (games) + right-axis line (line coverage %) for that reason.
+In the local Vite preview (recharts pinned ~3.7.0), stacked `<Bar stackId>`
+segments drew at roughly 28% of the correct height while the y-axis domain was
+correct. Cause not isolated — the fix that removed `stackId` also disabled
+animation — and this was never reproduced in the MotherDuck runtime, whose
+recharts version is unknown. Single-series bars and `ComposedChart` bar + line
+measured correct (171px max bar against a 178px plot for 3,831 games). The dive
+uses bar (games) + right-axis line (line coverage %) on that basis; it is also
+the better encoding.
