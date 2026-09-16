@@ -370,6 +370,16 @@
       .sec-h h3 {
         margin: 0;
       }
+      .peek-b .sec-h {
+        margin-bottom: 7px;
+      }
+      .peek-b .sec-h h4 {
+        margin: 0;
+      }
+      .peek-b .sec-h .pill {
+        padding: 2px 8px;
+        font-size: 11px;
+      }
     </style>
   </head>
   <body>
@@ -3389,6 +3399,45 @@
         a.click();
         URL.revokeObjectURL(a.href);
       }
+      // navigator.clipboard is undefined on file://, which is how this page is
+      // usually opened, so the textarea path is the normal one here rather than
+      // a fallback for old browsers.
+      function legacyCopy(text) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
+        document.body.appendChild(ta);
+        ta.select();
+        let ok = false;
+        try {
+          ok = document.execCommand("copy");
+        } catch (err) {
+          ok = false;
+        }
+        document.body.removeChild(ta);
+        return ok;
+      }
+      function copyText(text, btn) {
+        const was = btn.dataset.label || btn.textContent;
+        btn.dataset.label = was;
+        const done = (ok) => {
+          btn.textContent = ok ? "Copied" : "Copy failed";
+          clearTimeout(btn._t);
+          btn._t = setTimeout(() => {
+            btn.textContent = was;
+          }, 1400);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(
+            () => done(true),
+            () => done(legacyCopy(text)),
+          );
+          return;
+        }
+        done(legacyCopy(text));
+      }
+
       function exportWarehouseCsv() {
         const rows = sortBy(filteredWarehouse(), state.whSort, (s, col) => {
           if (col === "t") return s.t;
@@ -3761,7 +3810,7 @@
           : `<p class="sub">table is empty</p>`;
 
         return `<tr class="peek"><td colspan="${span}"><div class="peek-b">
-    <div><h4>${d.c.length} columns</h4><div class="tbl-wrap"><table><tbody>${colRows}</tbody></table></div></div>
+    <div><div class="sec-h"><h4>${d.c.length} columns</h4><button type="button" class="pill" data-copy="${esc(key)}" title="Copy the column names, comma-separated">Copy</button></div><div class="tbl-wrap"><table><tbody>${colRows}</tbody></table></div></div>
     <div><h4>First ${d.s.length} row${d.s.length === 1 ? "" : "s"}</h4>${sample}
       <p class="sub" style="margin:7px 0 0">Ordered by the first non-nested column. Cells over 60 characters are truncated; paths are shown relative to the data root.</p></div>
   </div></td></tr>`;
@@ -3880,6 +3929,12 @@
         if (exp) {
           if (exp.dataset.export === "warehouse") exportWarehouseCsv();
           if (exp.dataset.export === "named") exportNamedCsv();
+          return;
+        }
+        const cp = e.target.closest("[data-copy]");
+        if (cp) {
+          const d = DATA.detail[cp.dataset.copy];
+          if (d) copyText(d.c.map((c) => c[0]).join(", "), cp);
           return;
         }
         const pillBtn = e.target.closest(".pill");

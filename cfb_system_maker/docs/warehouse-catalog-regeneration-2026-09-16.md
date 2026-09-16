@@ -87,6 +87,15 @@ The generated file was grepped for credential-shaped strings before committing
 (`raw.pff_*` comes from authenticated pulls). Only hits were `sessionTime` and
 `sessionTimeOpponent`, both PFF stat column names.
 
+A **Copy** button on the column panel puts the names on the clipboard
+comma-separated, ready to paste into a `SELECT`. It tries
+`navigator.clipboard.writeText` and falls back to a hidden textarea with
+`document.execCommand("copy")`. The fallback is not legacy-browser
+defensiveness: `navigator.clipboard` is undefined on `file://`, which is the
+normal way this page is opened, so that is the path most clicks take. Both were
+exercised with a real mouse click — neither works from a programmatic `click()`,
+which carries no user activation.
+
 Having every column also makes an existing promise true: the search box says it
 searches "tables, columns, stat names", but only numeric and boolean columns had
 ever been in `DATA`. Searching `abbreviation` — a VARCHAR, so never in `wstats`
