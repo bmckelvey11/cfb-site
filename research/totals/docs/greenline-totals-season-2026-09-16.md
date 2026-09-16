@@ -209,6 +209,6 @@ Is there a minimum PFF `value` below which flags should be skipped? Sweep on the
 | 3.5% | 12-10 | 54.5% | 35% |
 | 4% | 3-6 | 33.3% | 12% |
 
-Spearman between stated edge and win: -0.11. Bottom half by edge 11-7, top half 10-8. Repriced at DraftKings the picture is the same: every positive-edge flag 15-8, 4%+ only 5-5.
+Spearman between stated edge and win: -0.11. Bottom half by edge 12-7, top half 10-10 (all 39 flags, including three PFF listed as under with a negative value). Repriced at DraftKings the picture is the same: every positive-edge flag 15-8, 4%+ only 5-5.
 
 **Answer.** No floor is supported. The win rate is flat from any-positive through 3.5% and then falls, so raising the cutoff removes bets without improving the ones left. The only cutoff the data backs is zero after repricing: skip a flag when the book's number erases the edge (`match_greenline_books.py` does this), not when PFF's number is small. Thirty-nine games; a threshold effect worth 5 points of win rate would need several hundred to show.
