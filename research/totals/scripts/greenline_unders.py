@@ -55,7 +55,7 @@ def band(line: float) -> tuple:
     raise ValueError(line)
 
 
-def unders(flags: list[dict], max_edge: float | None = None) -> list[dict]:
+def unders(flags: list[dict], max_edge: float | None = None, min_edge: float = 0.0) -> list[dict]:
     """Positive-edge unders, ranked by PFF value. `max_edge` drops flags PFF prices ABOVE it:
     week 2's 4%+ bucket went 3-5 while the rest went 18-10, so the option exists -- on eight
     games, so it is a choice, not a finding (see greenline_bet_bounds.py, edge sweep)."""
@@ -64,7 +64,7 @@ def unders(flags: list[dict], max_edge: float | None = None) -> list[dict]:
         line, value = num(f.get("market_over_under")), num(f.get("total_best_value"))
         if f.get("total_best_side") != "under" or value is None or value <= 0 or line is None:
             continue
-        if max_edge is not None and value > max_edge:
+        if value < min_edge or (max_edge is not None and value > max_edge):
             continue
         b = band(line)
         out.append({"game_id": f["pff_game_id"], "kickoff": (f.get("kickoff_raw") or "")[:16],
@@ -75,11 +75,13 @@ def unders(flags: list[dict], max_edge: float | None = None) -> list[dict]:
     return sorted(out, key=lambda r: -r["value"])
 
 
-def markdown(rows: list[dict], season: int, week: str, captured: str, n_flags: int, max_edge: float | None = None) -> str:
+def markdown(rows: list[dict], season: int, week: str, captured: str, n_flags: int, max_edge: float | None = None,
+             min_edge: float = 0.0) -> str:
     lines = [f"# PFF Greenline — positive-edge unders, {season} week {week}", "",
              f"Captured {captured} from a live PFF Pro session. {len(rows)} of {n_flags} flagged games. "
              "Lines are PFF's shown number at capture — reprice before betting."
-             + (f" Flags with PFF edge above {max_edge * 100:.1f}% are cut (week 2: 4%+ went 3-5, eight games)." if max_edge else ""), "",
+             + (f" Only flags with PFF edge in the {min_edge * 100:.1f}-{max_edge * 100:.1f}% window are listed "
+                f"(week 2: inside 17-8, outside 4-7; see greenline_edge_window.py)." if max_edge else ""), "",
              "`value` = PFF's win probability minus the 52.38% break-even at -110. Band record is YOUR",
              "under history 2023-08 → 2025-12 in that total range, not PFF's.", "",
              "| # | kickoff | game | line | PFF proj | p(under) | edge | band | your record | band ROI |",
@@ -111,6 +113,8 @@ def self_check() -> None:
     rows = unders(flags)
     assert [r["game_id"] for r in rows] == ["2", "1"], rows          # ranked by value, over/negative/no-line dropped
     assert [r["game_id"] for r in unders(flags, max_edge=0.04)] == ["1"]   # the 5% flag is cut, the 3% kept
+    assert [r["game_id"] for r in unders(flags, min_edge=0.04)] == ["2"]   # and the mirror
+    assert unders(flags, max_edge=0.04, min_edge=0.035) == []
     assert rows[0]["band"] == "<45" and rows[1]["band"] == "55-59.5"
     assert band(45.0)[0] == "45-49.5" and band(64.5)[0] == "60-64.5" and band(65.0)[0] == "65+"
     md = markdown(rows, 2026, "3", "test", 5)
@@ -124,6 +128,7 @@ def main() -> None:
     ap.add_argument("--week", required=False)
     ap.add_argument("--captured", default="", help="capture timestamp for the .md header")
     ap.add_argument("--max-edge", type=float, help="drop flags whose PFF value exceeds this (e.g. 0.04)")
+    ap.add_argument("--min-edge", type=float, default=0.0, help="drop flags whose PFF value is below this (e.g. 0.02)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
@@ -135,15 +140,16 @@ def main() -> None:
     if not src.exists():
         raise SystemExit(f"{src} not found -- run scripts/pull_pff_scoreboard.py --greenline --week {args.week}")
     flags = list(csv.DictReader(src.open(encoding="utf-8")))
-    rows = unders(flags, args.max_edge)
+    rows = unders(flags, args.max_edge, args.min_edge)
     stem = GL_DIR / f"greenline_unders_{args.season}_w{args.week}"
     with stem.with_suffix(".csv").open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)
-    stem.with_suffix(".md").write_text(markdown(rows, args.season, args.week, args.captured or "n/a", len(flags), args.max_edge),
+    stem.with_suffix(".md").write_text(markdown(rows, args.season, args.week, args.captured or "n/a", len(flags), args.max_edge, args.min_edge),
                                        encoding="utf-8")
-    cut = f" (cap {args.max_edge * 100:.1f}%: {len(unders(flags)) - len(rows)} cut)" if args.max_edge else ""
+    cut = (f" (window {args.min_edge * 100:.1f}-{args.max_edge * 100:.1f}%: {len(unders(flags)) - len(rows)} cut)"
+           if (args.max_edge or args.min_edge) else "")
     print(f"{len(rows)} positive-edge unders of {len(flags)} flags{cut} -> {stem}.csv / .md")
     for b in BANDS:
         k = sum(1 for r in rows if r["band"] == b[0])
