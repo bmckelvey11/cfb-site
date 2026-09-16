@@ -210,7 +210,8 @@ def fit_model(fit_csv: Path, fit_seasons):
 
 
 def score(games: pd.DataFrame, fit, fit_dog: np.ndarray, run_at: str, threshold: float,
-          book: str | None = None, quiet: bool = False) -> pd.DataFrame:
+          book: str | None = None, quiet: bool = False,
+          max_spread: float = np.inf) -> pd.DataFrame:
     """One view of an already-fetched slate: shopped across books, or one book alone."""
     # One book means no shopping and no cross-book fair: that book IS both numbers.
     need = 1 if book else 2
@@ -245,7 +246,10 @@ def score(games: pd.DataFrame, fit, fit_dog: np.ndarray, run_at: str, threshold:
     t["p_over_fair"] = fit.probit.win_prob(t.bias_fair.to_numpy())
     # Same spread, best total: isolates what shopping the total alone does to the bias.
     t["bias_best"] = bias_of(t.spread_fair.to_numpy(), t.best_total.to_numpy(), fit)
-    t["pick"] = np.where(t.bias_fair > threshold, "OVER", "")
+    # Past max_spread the game is scored but never picked: the fit has 42 games in 13k
+    # with |spread| > 50, so the bias out there is an extrapolation.
+    t["pick"] = np.where((t.bias_fair > threshold) & (t.spread_fair.abs() <= max_spread),
+                         "OVER", "")
     t["bet_to"] = bet_to_total(t.spread_fair.to_numpy(), fit, threshold)
     t["run_at"] = run_at
     t["dog_implied"] = (t.total_fair - t.spread_fair.abs()) / 2
@@ -312,7 +316,8 @@ def export_json(views: dict[str, pd.DataFrame], path: Path, run_at: str,
     print(f"Wrote {path} ({counts})")
 
 
-def report(t: pd.DataFrame, threshold: float, book: str | None = None) -> None:
+def report(t: pd.DataFrame, threshold: float, book: str | None = None,
+           max_spread: float = np.inf) -> None:
     if t.empty:
         print(f"No games with {book or 'two or more books'} quoting both markets.")
         return
@@ -323,11 +328,14 @@ def report(t: pd.DataFrame, threshold: float, book: str | None = None) -> None:
         print(f"{r.home:<22} {r.away:<22} {r.total_fair:>6.1f} {r.bias_fair:>6.2f} "
               f"{r.p_over_fair * 100:>7.2f}% {r.best_total:>6.1f} {r.best_book:<11} "
               f"{r.best_odds:>+6d} {r.pick}{flag if r.pick else ''}")
-    on_fair = int((t.bias_fair > threshold).sum())
-    on_best = int((t.bias_best > threshold).sum())
-    playable = int(((t.bias_fair > threshold) & t.playable).sum())
+    in_cap = t.spread_fair.abs() <= max_spread
+    on_fair = int((t.pick == "OVER").sum())
+    on_best = int(((t.bias_best > threshold) & in_cap).sum())
+    playable = int(((t.pick == "OVER") & t.playable).sum())
+    capped = int(((t.bias_fair > threshold) & ~in_cap).sum())
     label = f"{book}'s total" if book else "the fair total"
-    print(f"\n{on_fair}/{len(t)} games clear bias > {threshold} on {label}; "
+    cap = f" ({capped} more clear it but sit past the {max_spread:g} spread cap)" if capped else ""
+    print(f"\n{on_fair}/{len(t)} games clear bias > {threshold} on {label}{cap}; "
           f"{playable} of those have a price at {MIN_ODDS} or better.")
     if book:
         print(f"Single-book run: no shopping, and {book}'s own number is the gate rather "
@@ -347,6 +355,8 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=8, help="kickoff window from now")
     ap.add_argument("--threshold", type=float, default=1.75,
                     help="bet rule: over when expected censoring bias exceeds this")
+    ap.add_argument("--max-spread", type=float, default=np.inf,
+                    help="no pick when |spread| exceeds this; the fit thins out past 50")
     ap.add_argument("--book", choices=sorted(BOOKS),
                     help="score one book's own number instead of shopping across all of "
                          "them; the fair and best columns collapse onto that book")
@@ -362,13 +372,16 @@ def main() -> int:
     games, oa_as_of = oa_games(now, args.days)
     print(f"{len(games)} games kicking off in the next {args.days} days, priced as of {oa_as_of}")
 
-    t = score(games, fit, fit_dog, run_at, args.threshold, args.book)
-    report(t, args.threshold, args.book)
+    cap = args.max_spread
+    t = score(games, fit, fit_dog, run_at, args.threshold, args.book, max_spread=cap)
+    report(t, args.threshold, args.book, cap)
 
     # Preserve all book qualifications on every run, including terminal-only runs.
-    views = {"Best lines": t if not args.book else score(games, fit, fit_dog, run_at, args.threshold, quiet=True)}
+    views = {"Best lines": t if not args.book else
+             score(games, fit, fit_dog, run_at, args.threshold, quiet=True, max_spread=cap)}
     for name in BOOKS:
-        views[name] = t if args.book == name else score(games, fit, fit_dog, run_at, args.threshold, name, quiet=True)
+        views[name] = t if args.book == name else \
+            score(games, fit, fit_dog, run_at, args.threshold, name, quiet=True, max_spread=cap)
     record_views(views, run_at, args.threshold, oa_as_of)
     if args.json:
         export_json(views, Path(args.json), run_at, args.threshold, fit, oa_as_of)
