@@ -212,3 +212,22 @@ Is there a minimum PFF `value` below which flags should be skipped? Sweep on the
 Spearman between stated edge and win: -0.11. Bottom half by edge 12-7, top half 10-10 (all 39 flags, including three PFF listed as under with a negative value). Repriced at DraftKings the picture is the same: every positive-edge flag 15-8, 4%+ only 5-5.
 
 **Answer.** No floor is supported. The win rate is flat from any-positive through 3.5% and then falls, so raising the cutoff removes bets without improving the ones left. The only cutoff the data backs is zero after repricing: skip a flag when the book's number erases the edge (`match_greenline_books.py` does this), not when PFF's number is small. Thirty-nine games; a threshold effect worth 5 points of win rate would need several hundred to show.
+
+## PFF edge window: upper and lower bound
+
+`research/totals/scripts/greenline_edge_window.py`, on the 36 positive-edge under flags graded so far (week 2).
+
+| stated edge | record | win% | 95% CI |
+|---|---|---:|---|
+| 0-2% | 1-1 | 50.0% | 9–91% |
+| 2-3% | 4-2 | 66.7% | 30–90% |
+| 3-3.5% | 4-2 | 66.7% | 30–90% |
+| 3.5-4% | 9-4 | 69.2% | 42–87% |
+| 4-5% | 2-5 | 28.6% | 8–64% |
+| 5%+ | 1-1 | 50.0% | 9–91% |
+
+Logistic fit of win on edge: slope -0.33 per point (se 0.39, p=0.40); quadratic term -0.35 (se 0.36, p=0.33). Neither distinguishable from zero. Stated edge correlates -0.54 with how far the projection sits below Pinnacle, but the biggest disagreements did not lose (shade < -2: 5-3), so a cap cannot be justified as "don't fade Pinnacle by more than X" either.
+
+**Window.** Best contiguous range by lower bound: **2% to 4%**, 17-8 (68%), floor 48.4%. Dropped flags 4-7. That is the best of 21 ranges searched on 36 games; its floor is optimistic by construction and still does not clear break-even.
+
+**Operating bounds, if betting now:** lower 2%, upper 4%, at PFF's number after repricing at the book (a flag that reprices below zero is out regardless). Flat stakes, half a unit, no Kelly: the floor is below break-even so Kelly at the floor is zero and Kelly at the point estimate is fitting to noise. Week 3 has 24 flags inside the window (of 45). Revisit at n=150, where a 15-point gap between the window and the tails would be a real difference.
