@@ -37,7 +37,7 @@ HISTORY_URL = "https://api.actionnetwork.com/web/v2/markets/event/{event_id}/his
 # does serve it -- the full-game period is named "event" (not "game", which returns an
 # empty payload). `research/spread/scripts/collect_line_timing.py` pulls that separately, into
 # history_event_{id}.json so it can't collide with the firsthalf/firstquarter files
-# this module writes. See research/spread/docs/prediction-tracker-model-eval.md section 8.
+# this module writes. See archive/spread-margin-era/prediction-tracker-model-eval.md section 8.
 DEFAULT_PERIODS: tuple[str, ...] = ("firsthalf", "firstquarter")
 FULL_GAME_PERIOD = "event"
 

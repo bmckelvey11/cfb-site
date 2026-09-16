@@ -3,7 +3,7 @@
 `json_group_structure` types such a key "NULL", and the struct built from that
 type discards the real values in every unsampled row. That is how `lines`
 lost spreadOpen, overUnderOpen and both moneylines across all 38,689 staged
-rows -- see docs/duckdb-audit-2026-09-02.md S9.
+rows -- see archive/docs/duckdb-audit-2026-09-02.md S9.
 """
 
 import json

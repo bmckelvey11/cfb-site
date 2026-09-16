@@ -1,7 +1,7 @@
 """Every ``<schema>.<table>`` literal in the repo must resolve in the warehouse.
 
 Two renames in one migration broke two consumers silently and the suite stayed
-green through both (see ``docs/warehouse-schema-recommendation.md`` §0):
+green through both (see ``archive/docs/warehouse-schema-recommendation.md`` §0):
 ``stg.calendar`` -> ``stg.calendar_gql`` killed the nightly ``build_core``, and
 ``stg.gql_game`` -> ``stg.game`` killed the prediction tracker. Neither had a
 test, because tests that build their own fixtures cannot notice that the live
