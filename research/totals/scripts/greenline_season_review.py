@@ -2,6 +2,7 @@
 
     python research/totals/scripts/greenline_season_review.py
     python research/totals/scripts/greenline_season_review.py --season 2026 --out research/totals/docs/x.md
+    python research/totals/scripts/greenline_season_review.py --totals --out research/totals/docs/x.md --figs
     python research/totals/scripts/greenline_season_review.py --self-check
 
 Reads every `pff_greenline_<season>_w<week>.csv` capture plus the refreshed PFF
@@ -14,9 +15,13 @@ flag per market) is also written to `greenline_results_<season>.csv` next to the
 captures, so the results survive as a flat file. Your own full-game NCAAF totals
 from prior seasons' bet history (`data/ingest/bet_history/history.csv`, the book
 export behind `docs/bet-history-analysis-2023-2025.md`; `--history-seasons`,
-default 2024 and 2025) ride along in the same file and as baseline rows, tagged
-`source=personal`, so PFF's flags sit next to what you actually bet at the same
-prices.
+default 2023-2025) ride along in the same file and as baseline rows, tagged
+`source=personal`. Those unders were mostly Greenline flags as bet, so they are
+prior evidence on the same signal, not an independent comparison.
+
+`--figs` writes PNGs into `figs/` beside `--out` (matplotlib, light surface):
+cumulative units per season, under win rate by market-total band with Wilson
+intervals, and the projection-minus-Pinnacle shade per captured week.
 
 Conventions (checked against week 2 rows): `market_spread` is the HOME spread,
 negative when the home side is favoured; `greenline_spread` is PFF's home
@@ -42,7 +47,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cfb_paths import INGEST  # noqa: E402
-from grade_greenline import BANDS, VALUE_BUCKETS, capture_lines, num, pff_final, warehouse_final, warehouse_finals  # noqa: E402
+from grade_greenline import VALUE_BUCKETS, capture_lines, num, pff_final, warehouse_final, warehouse_finals  # noqa: E402
+from greenline_unders import BANDS as UNDER_BANDS, band  # noqa: E402
+
+# dataviz reference palette, categorical slots in fixed order (validated 2026-09-16, light surface).
+COLORS = {"pff": "#2a78d6", "2025": "#eb6834", "2024": "#1baf7a", "2023": "#eda100"}
+SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
 
 IN_DIR = INGEST / "pff_scoreboard"
 BREAK_EVEN = 110 / 210
@@ -195,6 +205,135 @@ def load(season: int):
     return graded, pending
 
 
+def method_section(season: int, graded: list[dict], personal: list[dict]) -> list[str]:
+    caps = sorted(IN_DIR.glob(f"pff_greenline_{season}_w*.csv"))
+    n_tot = sum(1 for r in graded if r["market"] == "total" and r["result"] != "push")
+    L = ["## Method and data", "",
+         "- **Flags**: every game PFF Greenline priced, captured from a live Pro session before kickoff via "
+         "`scripts/pull_pff_scoreboard.py --greenline`. PFF deletes the props at kickoff, so only captured weeks exist: "
+         + ", ".join(f"week {c.stem.rsplit('_w', 1)[1]} ({date.fromtimestamp(c.stat().st_mtime).isoformat()})" for c in caps) + ".",
+         "- **Grading**: at PFF's displayed line in the capture, -110, pushes returned. Finals from the refreshed PFF "
+         "schedule, falling back to the warehouse (`core.fact_game`) where PFF never posts a score. "
+         "Row-level results: `data/ingest/pff_scoreboard/greenline_results_<season>.csv`.",
+         "- **Personal history**: full-game NCAAF over/unders from the book export "
+         f"(`data/ingest/bet_history/history.csv`), {len(personal)} bets, graded at the price taken. "
+         "Mostly Greenline unders as bet, so prior evidence on the same signal.",
+         "- **Pinnacle**: `greenline_vs_pinnacle.py` on the oddspapi snapshot nearest the capture; fair total is the "
+         "vig-free midpoint. Bands follow `greenline_unders.py`.",
+         "- **Inference**: 95% Wilson intervals; break-even 52.4% at -110; MDE is the smallest true win rate a one-sided "
+         f"5% test detects with 80% power. At n={n_tot} that is {mde(n_tot) * 100:.0f}%; at n=250 it is "
+         f"{mde(250) * 100:.0f}%; at n=500, {mde(500) * 100:.0f}%. Games within a week share weather and slate-wide "
+         "scoring shocks, so intervals are, if anything, slightly narrow.", ""]
+    return L
+
+
+def pending_unders(season: int, wk: str) -> list[str]:
+    dk = IN_DIR / f"greenline_unders_{season}_w{wk}_draftkings.csv"
+    base = IN_DIR / f"greenline_unders_{season}_w{wk}.csv"
+    src = dk if dk.exists() else base
+    if not src.exists():
+        return []
+    rows = list(csv.DictReader(src.open(encoding="utf-8")))
+    L = [f"### Week {wk} under list ({len(rows)} positive-edge flags"
+         + (", repriced at DraftKings)" if src is dk else ")"), "",
+         "| # | game | PFF line | PFF edge | DK line | DK odds | DK edge | band | your history |",
+         "|---:|---|---:|---:|---:|---:|---:|---|---|"]
+    key = "book_edge" if src is dk else "value"
+    rows.sort(key=lambda r: -float(r.get(key) or r["value"]))
+    for i, r in enumerate(rows, 1):
+        L.append(f"| {i} | {r['away']} @ {r['home']} | {r['line']} | {float(r['value']) * 100:+.1f}% | "
+                 f"{r.get('book_line', '')} | {r.get('book_odds', '')} | "
+                 f"{(float(r['book_edge']) * 100):+.1f}%" if r.get("book_edge") else
+                 f"| {i} | {r['away']} @ {r['home']} | {r['line']} | {float(r['value']) * 100:+.1f}% | | | ")
+        L[-1] += f" | {r['band']} | {r['band_record']} |"
+    return L + [""]
+
+
+def figures(graded: list[dict], personal: list[dict], season: int, out_dir: Path) -> list[str]:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    out_dir.mkdir(parents=True, exist_ok=True)
+    plt.rcParams.update({"figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "axes.edgecolor": GRID,
+                         "axes.labelcolor": INK2, "xtick.color": INK2, "ytick.color": INK2, "text.color": INK,
+                         "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6, "axes.spines.top": False,
+                         "axes.spines.right": False, "font.size": 10, "axes.titlesize": 11, "axes.titleweight": "bold",
+                         "axes.titlelocation": "left"})
+    md = []
+
+    # 1. cumulative units, unders, one line per season
+    fig, ax = plt.subplots(figsize=(8, 4.2))
+    series = [(str(yr), [r for r in personal if r["season"] == yr and r["side"] == "under"]) for yr in
+              sorted({r["season"] for r in personal})]
+    series.append((f"PFF {season} flags", [r for r in graded if r["market"] == "total" and r["side"] == "under"]))
+    for lab, rs in series:
+        if not rs:
+            continue
+        cum, tot = [0.0], 0.0
+        for r in rs:
+            tot += (decimal(r["price"]) - 1) if r["result"] == "win" else (-1 if r["result"] == "loss" else 0)
+            cum.append(tot)
+        c = COLORS["pff"] if lab.startswith("PFF") else COLORS[lab]
+        ax.plot(range(len(cum)), cum, color=c, linewidth=2)
+        ax.annotate(f"{lab}  {tot:+.1f}u", (len(cum) - 1, tot), xytext=(6, 0), textcoords="offset points",
+                    va="center", fontsize=9, color=INK)
+    ax.axhline(0, color=INK2, linewidth=0.8)
+    ax.set_title("Cumulative units on unders, flat 1u at the price taken")
+    ax.set_xlabel("bet number within season"); ax.set_ylabel("units")
+    ax.set_xlim(0, ax.get_xlim()[1] * 1.22)
+    fig.tight_layout(); fig.savefig(out_dir / "cumulative_units.png", dpi=150); plt.close(fig)
+    md += ["![Cumulative units on unders by season](figs/cumulative_units.png)", ""]
+
+    # 2. under win rate by band, history vs PFF flags, Wilson whiskers
+    fig, ax = plt.subplots(figsize=(8, 4.2))
+    PU = [r for r in personal if r["side"] == "under"]
+    FU = [r for r in graded if r["market"] == "total" and r["side"] == "under"]
+    yrs = sorted({r["season"] for r in personal})
+    hist_lab = f"your {yrs[0]}-{yrs[-1]} unders" if yrs else "history"
+    xs = list(range(len(UNDER_BANDS)))
+    for off, (lab, rs, c) in enumerate([(hist_lab, PU, COLORS["2025"]), (f"PFF {season} flags", FU, COLORS["pff"])]):
+        pts = []
+        for i, b in enumerate(UNDER_BANDS):
+            t = tally([r for r in rs if band(r["line"])[0] == b[0]])
+            if t["w"] + t["l"] >= 3:   # a 1-0 band draws a whisker to 100%; noise, not a point
+                pts.append((i + (off - 0.5) * 0.24, t["pct"], t["lo"], t["hi"], t["w"] + t["l"]))
+        if not pts:
+            continue
+        ax.errorbar([q[0] for q in pts], [q[1] * 100 for q in pts],
+                    yerr=[[(q[1] - q[2]) * 100 for q in pts], [(q[3] - q[1]) * 100 for q in pts]],
+                    fmt="o", color=c, ecolor=c, elinewidth=1.4, capsize=3, markersize=7, label=lab)
+        for q in pts:
+            ax.annotate(f"n={q[4]}", (q[0], q[1] * 100), xytext=(0, -14), textcoords="offset points",
+                        ha="center", fontsize=7.5, color=INK2)
+    ax.axhline(BREAK_EVEN * 100, color=INK2, linewidth=0.9, linestyle="--")
+    ax.annotate("break-even 52.4%", (len(UNDER_BANDS) - 0.5, BREAK_EVEN * 100), xytext=(0, 4),
+                textcoords="offset points", ha="right", fontsize=8, color=INK2)
+    ax.set_xticks(xs); ax.set_xticklabels([b[0] for b in UNDER_BANDS]); ax.set_ylim(0, 100)
+    ax.set_ylabel("under win %"); ax.set_xlabel("market total at capture")
+    ax.set_title("Under win rate by market total, 95% Wilson intervals"); ax.legend(frameon=False, loc="lower left")
+    fig.tight_layout(); fig.savefig(out_dir / "band_winrate.png", dpi=150); plt.close(fig)
+    md += ["![Under win rate by market-total band](figs/band_winrate.png)", ""]
+
+    # 3. projection minus Pinnacle fair, one panel per captured week
+    files = sorted(IN_DIR.glob(f"greenline_vs_pinnacle_{season}_w*.csv"))
+    if files:
+        fig, axes = plt.subplots(1, len(files), figsize=(4 * len(files), 3.6), sharey=True, squeeze=False)
+        for ax, f in zip(axes[0], files):
+            wk = f.stem.rsplit("_w", 1)[1]
+            d = [float(r["proj"]) - float(r["pin_fair"]) for r in csv.DictReader(f.open(encoding="utf-8"))
+                 if r.get("proj") and r.get("pin_fair")]
+            ax.hist(d, bins=[x / 2 for x in range(-8, 9)], color=COLORS["pff"], edgecolor=SURFACE, linewidth=1)
+            ax.axvline(0, color=INK2, linewidth=0.9)
+            ax.set_title(f"week {wk}: median {st.median(d):+.2f}, {sum(1 for x in d if x < 0)}/{len(d)} below")
+            ax.set_xlabel("PFF projection − Pinnacle fair total (pts)")
+        axes[0][0].set_ylabel("flagged games")
+        fig.suptitle("Where the under tilt comes from: the projection sits below Pinnacle", x=0.01, ha="left",
+                     fontsize=11, fontweight="bold")
+        fig.tight_layout(); fig.savefig(out_dir / "pinnacle_shade.png", dpi=150); plt.close(fig)
+        md += ["![Projection minus Pinnacle fair total, per captured week](figs/pinnacle_shade.png)", ""]
+    return md
+
+
 def totals_section(graded: list[dict], personal: list[dict]) -> list[str]:
     """Totals-only splits: week, side, market-total band, PFF value bucket. Accumulate, do not act."""
     T = [r for r in graded if r["market"] == "total"]
@@ -212,9 +351,17 @@ def totals_section(graded: list[dict], personal: list[dict]) -> list[str]:
     if len(years) > 1:
         L.append(f"| your {years[0]}-{years[-1]} totals (baseline) | {fmt(tally(personal))} |")
         L.append(f"| your {years[0]}-{years[-1]} unders | {fmt(tally([r for r in personal if r['side'] == 'under']))} |")
-    L += ["", "| under flags by market total | record | win% | 95% CI | units | ROI |", "|---|---|---:|---|---:|---:|"]
-    for lab, fn in BANDS:
-        L.append(f"| {lab} | {fmt(tally([r for r in U if fn(r['line'])]))} |")
+    PU = [r for r in personal if r["side"] == "under"]
+    yrs = f"{years[0]}-{years[-1]}" if years else "history"
+    L += ["", f"| unders by market total | your {yrs} | PFF {T[0]['season'] if T else ''} flags | pooled | pooled 95% CI |",
+          "|---|---|---|---|---|"]
+    for b in UNDER_BANDS:
+        h = [r for r in PU if band(r["line"])[0] == b[0]]
+        f_ = [r for r in U if band(r["line"])[0] == b[0]]
+        th, tf, tp = tally(h), tally(f_), tally(h + f_)
+        rec = lambda t: f"{t['w']}-{t['l']} ({t['pct'] * 100:.0f}%)" if t["n"] else "--"
+        ci = f"{tp['lo'] * 100:.0f}–{tp['hi'] * 100:.0f}%" if tp["n"] else "--"
+        L.append(f"| {b[0]} | {rec(th)} | {rec(tf)} | {rec(tp)} | {ci} |")
     L += ["", "| under flags by PFF value | record | win% | 95% CI | units | ROI |", "|---|---|---:|---|---:|---:|"]
     for lab, fn in VALUE_BUCKETS:
         L.append(f"| {lab} | {fmt(tally([r for r in U if r['value'] is not None and fn(r['value'])]))} |")
@@ -223,7 +370,7 @@ def totals_section(graded: list[dict], personal: list[dict]) -> list[str]:
 
 
 def report(graded: list[dict], pending: dict, season: int, totals_only: bool = False,
-           personal: list[dict] = ()) -> str:
+           personal: list[dict] = (), figs: Path | None = None) -> str:
     if totals_only:
         graded = [r for r in graded if r["market"] == "total"]
     L = [f"# PFF Greenline {'totals' if totals_only else 'picks'}, {season} season to date", "",
@@ -277,7 +424,10 @@ def report(graded: list[dict], pending: dict, season: int, totals_only: bool = F
           "information; a stated-p above the actual win% means the numbers are overconfident.", ""]
 
     if totals_only:
+        L += method_section(season, graded, list(personal))
         L += totals_section(graded, list(personal))
+        if figs is not None:
+            L += ["## Figures", ""] + figures(graded, list(personal), season, figs)
 
     for wk, flags in sorted(pending.items()):
         L += [f"## Pending: week {wk}", ""]
@@ -290,6 +440,8 @@ def report(graded: list[dict], pending: dict, season: int, totals_only: bool = F
               f"moneylines {sum(1 for f in ml if f['money_line_best_side'] == 'away')} away / {sum(1 for f in ml if f['money_line_best_side'] == 'home')} home.",
               f"- mean stated edge: totals {st.mean(num(f['total_best_value']) for f in tot) * 100:+.2f}%, "
               f"spreads {st.mean(num(f['spread_best_value']) for f in sp) * 100:+.2f}%." if tot and sp else "", ""]
+        if totals_only:
+            L += pending_unders(season, wk)
     return "\n".join(L)
 
 
@@ -337,7 +489,8 @@ def main() -> None:
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--out", type=Path, help="markdown path; printed only when omitted")
     ap.add_argument("--totals", action="store_true", help="totals only, with week/band/value splits")
-    ap.add_argument("--history-seasons", type=lambda v: [int(x) for x in v.split(",")], default=[2024, 2025],
+    ap.add_argument("--figs", action="store_true", help="write PNG figures to figs/ beside --out")
+    ap.add_argument("--history-seasons", type=lambda v: [int(x) for x in v.split(",")], default=[2023, 2024, 2025],
                     help="bet-history seasons to carry as the personal baseline (comma-separated August years)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
@@ -346,7 +499,8 @@ def main() -> None:
         return
     graded, pending = load(args.season)
     personal = [r for yr in args.history_seasons for r in personal_totals(yr)]
-    md = report(graded, pending, args.season, totals_only=args.totals, personal=personal)
+    figs = (args.out.parent / "figs") if (args.figs and args.out) else None
+    md = report(graded, pending, args.season, totals_only=args.totals, personal=personal, figs=figs)
     print(md)
     results = IN_DIR / f"greenline_results_{args.season}.csv"
     rows = sorted(graded, key=lambda r: (int(r["week"]), r["game"], r["market"])) + sorted(personal, key=lambda r: r["date"])
