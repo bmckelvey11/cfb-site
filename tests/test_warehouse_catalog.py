@@ -111,6 +111,25 @@ def test_render_round_trips_through_the_parser():
     assert bwc.parse_data(rebuilt) == data
 
 
+def _structure(data: dict) -> dict:
+    """The parts of DATA that only a schema change moves.
+
+    Row counts are `count(*)`, so they drift on every `refresh_cfbd.py` and
+    would turn the default `python -m pytest` gate red on work that never
+    touched the catalog. `--check` stays byte-exact; this only guards the
+    shape -- a table appearing or vanishing, a column set changing, an origin
+    or domain shifting.
+    """
+    return {
+        "tables": [{k: v for k, v in t.items() if k != "r"} for t in data["tables"]],
+        "wstats": data["wstats"],
+        # `named` is emitted count-desc, so its order drifts too -- compare unordered.
+        "named": {(n["src"], n["name"], n["cat"]) for n in data["named"]},
+        "domainOrder": data["domainOrder"],
+        "coreNote": data["coreNote"],
+    }
+
+
 def test_committed_catalog_matches_the_live_warehouse():
     db = Path(os.environ.get("CFB_DATA_ROOT", "")) / "cfb.duckdb"
     if not db.exists():
@@ -118,13 +137,8 @@ def test_committed_catalog_matches_the_live_warehouse():
     html = bwc.CATALOG.read_text(encoding="utf-8")
     new_html, data, _seed = bwc.build(html)
 
-    # `loaded` is a build date, so it drifts on its own -- compare the rest.
-    old = bwc.parse_data(html)
-    old.pop("loaded", None)
-    fresh = dict(data)
-    fresh.pop("loaded", None)
-    assert old == fresh, (
-        "docs/cfb-warehouse-catalog.html is stale -- run "
+    assert _structure(bwc.parse_data(html)) == _structure(data), (
+        "docs/cfb-warehouse-catalog.html is structurally stale -- run "
         "`python scripts/build_warehouse_catalog.py`"
     )
     assert "graphql" not in new_html.split("const DATA")[1][:200_000], (
