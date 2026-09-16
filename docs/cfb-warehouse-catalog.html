@@ -3101,7 +3101,8 @@
 
       function renderStatic() {
         document.getElementById("sourceLine").textContent =
-          `Source: local cfb.duckdb (C:\\Users\\mckel\\data\\cfb) · ${DATA.loaded} · ${DATA.tables.length} tables across 5 schemas`;
+          `Source: local cfb.duckdb · ${DATA.loaded} · ${DATA.tables.length} tables across ` +
+          `${new Set(DATA.tables.map((t) => t.s)).size} schemas`;
         document.getElementById("stats").innerHTML = [
           ["tables", String(DATA.tables.length)],
           ["exploded stat columns", fmt(DATA.wstats.length)],
