@@ -21,6 +21,7 @@ human-facing product intent. None should duplicate another file's rules.
 | Totals model | `models/totals/` | `models/totals/CLAUDE.md` |
 | Over-zero models and floor-bias research | `models/over_zero/` | `models/over_zero/CLAUDE.md` |
 | Spread forecast research | `research/spread/` | `research/spread/CLAUDE.md` |
+| Totals research not yet in the harness (Greenline evaluation, modeling reading) | `research/totals/` | `research/totals/CLAUDE.md` |
 
 ## Shared rules
 
