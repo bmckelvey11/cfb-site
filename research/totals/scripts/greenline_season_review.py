@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cfb_paths import INGEST  # noqa: E402
-from grade_greenline import capture_lines, num, pff_final, warehouse_final, warehouse_finals  # noqa: E402
+from grade_greenline import BANDS, VALUE_BUCKETS, capture_lines, num, pff_final, warehouse_final, warehouse_finals  # noqa: E402
 
 IN_DIR = INGEST / "pff_scoreboard"
 BREAK_EVEN = 110 / 210
@@ -162,8 +162,28 @@ def load(season: int):
     return graded, pending
 
 
-def report(graded: list[dict], pending: dict, season: int) -> str:
-    L = [f"# PFF Greenline picks, {season} season to date", "",
+def totals_section(graded: list[dict]) -> list[str]:
+    """Totals-only splits: week, side, market-total band, PFF value bucket. Accumulate, do not act."""
+    T = [r for r in graded if r["market"] == "total"]
+    U = [r for r in T if r["side"] == "under"]
+    L = ["## Totals in depth", "", "| split | record | win% | 95% CI | units | ROI |", "|---|---|---:|---|---:|---:|"]
+    for wk in sorted({r["week"] for r in T}):
+        L.append(f"| week {wk} | {fmt(tally([r for r in T if r['week'] == wk]))} |")
+    L.append(f"| all weeks | {fmt(tally(T))} |")
+    L += ["", "| under flags by market total | record | win% | 95% CI | units | ROI |", "|---|---|---:|---|---:|---:|"]
+    for lab, fn in BANDS:
+        L.append(f"| {lab} | {fmt(tally([r for r in U if fn(r['line'])]))} |")
+    L += ["", "| under flags by PFF value | record | win% | 95% CI | units | ROI |", "|---|---|---:|---|---:|---:|"]
+    for lab, fn in VALUE_BUCKETS:
+        L.append(f"| {lab} | {fmt(tally([r for r in U if r['value'] is not None and fn(r['value'])]))} |")
+    L.append("")
+    return L
+
+
+def report(graded: list[dict], pending: dict, season: int, totals_only: bool = False) -> str:
+    if totals_only:
+        graded = [r for r in graded if r["market"] == "total"]
+    L = [f"# PFF Greenline {'totals' if totals_only else 'picks'}, {season} season to date", "",
          f"Generated {date.today().isoformat()} by `research/totals/scripts/greenline_season_review.py`. "
          "Graded at the line in the capture, -110 on spreads and totals, market price on moneylines. "
          "Intervals are 95% Wilson. Pushes excluded from win% and calibration.", ""]
@@ -172,35 +192,37 @@ def report(graded: list[dict], pending: dict, season: int) -> str:
           (", ".join(f"week {k} ({len(v)} flags)" for k, v in sorted(pending.items())) or "none"), ""]
 
     L += ["## Record by market", "", "| market | record | win% | 95% CI | units | ROI |", "|---|---|---:|---|---:|---:|"]
-    for m in ("total", "spread", "moneyline"):
+    markets = [m for m in ("total", "spread", "moneyline") if any(r["market"] == m for r in graded)]
+    for m in markets:
         L.append(f"| {m} | {fmt(tally([r for r in graded if r['market'] == m]))} |")
-    L.append(f"| all | {fmt(tally(graded))} |")
+    if len(markets) > 1:
+        L.append(f"| all | {fmt(tally(graded))} |")
     n_tot = sum(1 for r in graded if r["result"] != "push")
     L += ["", f"Break-even at -110 is 52.4%. At n={n_tot} pooled, the smallest true win rate a one-sided test "
           f"would reliably detect is {mde(n_tot) * 100:.0f}%; per market it is "
           + ", ".join(f"{m} {mde(sum(1 for r in graded if r['market'] == m and r['result'] != 'push')) * 100:.0f}%"
-                      for m in ("total", "spread", "moneyline")) + ". Anything short of that is not evidence either way.", ""]
+                      for m in markets) + ". Anything short of that is not evidence either way.", ""]
 
     L += ["## By side", "", "| market | side | record | win% | 95% CI | units | ROI |", "|---|---|---|---:|---|---:|---:|"]
-    for m in ("total", "spread", "moneyline"):
+    for m in markets:
         for s in sorted({r["side"] for r in graded if r["market"] == m}):
             L.append(f"| {m} | {s} | {fmt(tally([r for r in graded if r['market'] == m and r['side'] == s]))} |")
 
     L += ["", "## Closing-line value (PFF board close)", ""]
-    for m in ("total", "spread"):
+    for m in [m for m in ("total", "spread") if m in markets]:
         L.append(f"- **{m}**: {clv_line([r for r in graded if r['market'] == m])}")
     L += ["", "Positive means the number moved toward PFF's side after the capture. This is the board PFF "
           "shows, not Pinnacle, so it measures whether PFF's flags lead their own displayed market.", ""]
 
     L += ["## Does PFF's own ranking work?", "", "| market | top half by value | bottom half |", "|---|---|---|"]
-    for m in ("total", "spread", "moneyline"):
+    for m in markets:
         rs = sorted([r for r in graded if r["market"] == m and r["value"] is not None], key=lambda r: -r["value"])
         h = len(rs) // 2
         L.append(f"| {m} | {fmt(tally(rs[:h]))} | {fmt(tally(rs[h:]))} |")
 
     L += ["", "## Calibration of PFF's stated probabilities", "",
           "| market | n | mean stated p | actual win% | Brier (PFF) | Brier (market) |", "|---|---:|---:|---:|---:|---:|"]
-    for m in ("total", "spread", "moneyline"):
+    for m in markets:
         rs = [r for r in graded if r["market"] == m and r["result"] != "push" and r["p"] is not None]
         if not rs:
             continue
@@ -210,6 +232,9 @@ def report(graded: list[dict], pending: dict, season: int) -> str:
     L += ["", "Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 line) and the "
           "vig-free price for moneylines. PFF beating the market column means its stated probabilities carry "
           "information; a stated-p above the actual win% means the numbers are overconfident.", ""]
+
+    if totals_only:
+        L += totals_section(graded)
 
     for wk, flags in sorted(pending.items()):
         L += [f"## Pending: week {wk}", ""]
@@ -253,13 +278,14 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--out", type=Path, help="markdown path; printed only when omitted")
+    ap.add_argument("--totals", action="store_true", help="totals only, with week/band/value splits")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
         self_check()
         return
     graded, pending = load(args.season)
-    md = report(graded, pending, args.season)
+    md = report(graded, pending, args.season, totals_only=args.totals)
     print(md)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
