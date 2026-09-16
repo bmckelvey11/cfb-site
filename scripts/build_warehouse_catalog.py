@@ -30,7 +30,8 @@ import argparse
 import json
 import re
 import sys
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import duckdb
@@ -203,6 +204,37 @@ def domain_of(schema: str, name: str) -> str:
     return "other"
 
 
+SAMPLE_ROWS = 3
+CELL_CHARS = 60
+_DATA_ROOT_RE = re.compile(
+    re.escape(str(cfb_paths.DATA_ROOT)).replace(r"\\", "[\\\\/]") + "[\\\\/]?",
+    re.IGNORECASE,
+)
+
+
+def sample_cell(value: object) -> object:
+    """One preview cell: JSON-safe, machine-path-free, one line, short.
+
+    `_source_file` columns hold absolute paths, so the data root is stripped --
+    a committed doc should not carry whoever built it's home directory, and the
+    path would go stale on any other machine anyway.
+    """
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()[:19]
+    text = _DATA_ROOT_RE.sub("", str(value))
+    # JSON payloads are pretty-printed; collapsing gets more signal per char.
+    text = " ".join(text.split())
+    if len(text) > CELL_CHARS:
+        text = text[: CELL_CHARS - 1] + "…"
+    return text
+
+
 def is_nested(ctype: str) -> bool:
     return (
         ctype == "JSON"
@@ -210,6 +242,24 @@ def is_nested(ctype: str) -> bool:
         or "MAP(" in ctype
         or ctype.endswith("[]")
     )
+
+
+def sample_rows(
+    con: duckdb.DuckDBPyConnection, schema: str, name: str
+) -> list[list]:
+    """A few preview rows, ordered so the same data always samples the same way.
+
+    An unordered `limit` returns whatever the scan reaches first, so `--check`
+    fires after a reload that changed nothing. `ORDER BY ALL` rather than the
+    first column or the first non-nested one: `raw.gamePlayerStat` and
+    `raw.win_probability` tie on every scalar column they have (one source file,
+    one season, no week), and only the JSON payload separates them. Costs about
+    12s across the warehouse, which a generator can afford.
+    """
+    got = con.execute(
+        f'select * from "{schema}"."{name}" order by all limit {SAMPLE_ROWS}'
+    ).fetchall()
+    return [[sample_cell(v) for v in row] for row in got]
 
 
 def is_key(col: str) -> bool:
@@ -234,10 +284,14 @@ def introspect(con: duckdb.DuckDBPyConnection, seed: dict) -> dict:
         "select schema_name, table_name from duckdb_tables() order by 1, 2"
     ).fetchall()
 
-    tables, wstats = [], []
+    tables, wstats, detail = [], [], {}
     for schema, name in rows:
         cols = con.execute(f'describe "{schema}"."{name}"').fetchall()
         n_rows = con.execute(f'select count(*) from "{schema}"."{name}"').fetchone()[0]
+        detail[f"{schema}.{name}"] = {
+            "c": [[c[0], c[1]] for c in cols],
+            "s": sample_rows(con, schema, name),
+        }
         domain = domain_of(schema, name)
         n_stat = n_nested = 0
         for col, ctype, *_ in cols:
@@ -286,6 +340,7 @@ def introspect(con: duckdb.DuckDBPyConnection, seed: dict) -> dict:
         "tables": tables,
         "wstats": wstats,
         "named": named,
+        "detail": detail,
         "domainOrder": seed["domainOrder"],
         "coreNote": {
             t["n"]: CORE_NOTES.get(t["n"], "")
@@ -309,6 +364,14 @@ def render(data: dict) -> str:
             body = ", ".join(f"{k}: {json.dumps(v)}" for k, v in row.items())
             lines.append(f"          {{ {body} }},")
         lines.append("        ],")
+    # One line per table: 322 entries pretty-printed would swamp the diff.
+    lines.append("        detail: {")
+    for key, d in data["detail"].items():
+        lines.append(
+            f"          {json.dumps(key)}: "
+            f"{json.dumps(d, separators=(',', ':'), ensure_ascii=False)},"
+        )
+    lines.append("        },")
     lines.append("        domainOrder: [")
     for d in data["domainOrder"]:
         lines.append(f"          {json.dumps(d)},")

@@ -23,6 +23,18 @@
       ],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "Docs (static)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8777",
+        "--directory",
+        "docs"
+      ],
+      "port": 8777
     }
   ]
 }

@@ -7,8 +7,11 @@ information the live database cannot re-derive on its own.
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -84,6 +87,47 @@ def test_keys_and_grain_are_not_measurements():
     assert bwc.measure_kind("dome", "BOOLEAN") == "flag"
 
 
+def test_sample_cells_are_short_json_safe_and_carry_no_machine_paths():
+    root = str(bwc.cfb_paths.DATA_ROOT)
+    assert bwc.sample_cell(f"{root}/raw/calendar_2012.json") == "raw/calendar_2012.json"
+    assert bwc.sample_cell(root.replace("\\", "/") + "/raw/x.json") == "raw/x.json"
+    # Pretty-printed JSON collapses to one line before it is cut.
+    assert bwc.sample_cell('{\r\n  "a":   1\r\n}') == '{ "a": 1 }'
+    long = bwc.sample_cell("x" * 500)
+    assert len(long) == bwc.CELL_CHARS and long.endswith("…")
+    assert bwc.sample_cell(None) is None
+    assert bwc.sample_cell(True) is True
+    assert bwc.sample_cell(Decimal("1.5")) == 1.5
+    assert bwc.sample_cell(datetime(2026, 9, 16, 13, 25, 18)) == "2026-09-16T13:25:18"
+    json.dumps([bwc.sample_cell(v) for v in (None, 1, 1.5, True, "a", Decimal("2"))])
+
+
+def test_the_committed_samples_leak_no_home_directory():
+    """A committed doc must not carry whoever built it's absolute paths."""
+    data = bwc.parse_data(bwc.CATALOG.read_text(encoding="utf-8"))
+    root = str(bwc.cfb_paths.DATA_ROOT)
+    needles = {root.lower(), root.replace("\\", "/").lower()}
+    for key, d in data["detail"].items():
+        for row in d["s"]:
+            for cell in row:
+                if isinstance(cell, str):
+                    low = cell.lower()
+                    assert not any(n in low for n in needles), f"{key}: {cell}"
+                    assert len(cell) <= bwc.CELL_CHARS, f"{key}: {cell}"
+
+
+def test_every_table_has_a_detail_entry():
+    data = bwc.parse_data(bwc.CATALOG.read_text(encoding="utf-8"))
+    for t in data["tables"]:
+        key = f"{t['s']}.{t['n']}"
+        assert key in data["detail"], f"no columns/sample captured for {key}"
+        d = data["detail"][key]
+        assert len(d["c"]) == t["c"], f"{key}: column count disagrees with the row"
+        assert len(d["s"]) <= bwc.SAMPLE_ROWS
+        for row in d["s"]:
+            assert len(row) == t["c"], f"{key}: sample row is not {t['c']} wide"
+
+
 def test_render_round_trips_through_the_parser():
     """Write-back must not corrupt DATA: what render emits, parse_data reads."""
     data = {
@@ -96,6 +140,13 @@ def test_render_round_trips_through_the_parser():
              "k": "flag", "g": "core"}
         ],
         "named": [{"src": "team_stats", "name": "games", "cat": "team box", "n": 1953}],
+        "detail": {
+            "core.dim_team": {
+                "c": [["team_id", "INTEGER"], ["school", "VARCHAR"]],
+                # A quote, a non-ASCII ellipsis, a null and a bool in one row.
+                "s": [[1, 'He said "hi"…'], [2, None], [3, True]],
+            }
+        },
         "domainOrder": ["core", "games"],
         # Quotes and a non-ASCII dash: both have to survive the string masker.
         "coreNote": {"dim_week": 'Season × week "grain"'},
@@ -125,9 +176,36 @@ def _structure(data: dict) -> dict:
         "wstats": data["wstats"],
         # `named` is emitted count-desc, so its order drifts too -- compare unordered.
         "named": {(n["src"], n["name"], n["cat"]) for n in data["named"]},
+        # Column lists are schema; sample rows are data, and move with the data.
+        "detail": {k: v["c"] for k, v in data["detail"].items()},
         "domainOrder": data["domainOrder"],
         "coreNote": data["coreNote"],
     }
+
+
+def test_sampling_is_deterministic():
+    """Two builds of the same data must sample the same rows.
+
+    Without a total order the sample drifts between runs, which makes `--check`
+    cry wolf after a reload that changed nothing.
+    """
+    db = Path(os.environ.get("CFB_DATA_ROOT", "")) / "cfb.duckdb"
+    if not db.exists():
+        pytest.skip("no live CFB_DATA_ROOT warehouse")
+    import duckdb
+
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        # The tables that tie on every scalar column, so only a total order fixes them.
+        for schema, name in (
+            ("raw", "gamePlayerStat"),
+            ("raw", "win_probability"),
+            ("stg", "pff_defense_pass_rush"),
+        ):
+            first = bwc.sample_rows(con, schema, name)
+            assert first == bwc.sample_rows(con, schema, name), f"{schema}.{name}"
+    finally:
+        con.close()
 
 
 def test_committed_catalog_matches_the_live_warehouse():
