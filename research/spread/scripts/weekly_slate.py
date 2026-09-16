@@ -312,7 +312,7 @@ def oddsapi_books(now: datetime) -> pd.DataFrame:
         ko = datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00"))
         if not (lo <= ko <= hi):
             continue
-        quotes = {}
+        quotes, flipped = {}, {}
         for b in e.get("bookmakers", []):
             if b.get("key") not in OA_BOOKS:      # a new book must be named before it votes
                 print(f"  the-odds-api: unmapped book {b.get('key')!r}, not counted",
@@ -322,14 +322,23 @@ def oddsapi_books(now: datetime) -> pd.DataFrame:
                 if m.get("key") != "spreads":
                     continue
                 for o in m.get("outcomes", []):
-                    # the home team's own outcome carries the home spread in betting sign
-                    # (negative = home favored), the same convention AN uses.
-                    if (o.get("name") == e["home_team"] and o.get("point") is not None
-                            and o.get("price") is not None
-                            and ODDS_WINDOW[0] <= o["price"] <= ODDS_WINDOW[1]):
+                    # each team's own outcome carries that team's spread in betting sign
+                    # (negative = favored), the same convention AN uses.
+                    if (o.get("point") is None or o.get("price") is None
+                            or not ODDS_WINDOW[0] <= o["price"] <= ODDS_WINDOW[1]):
+                        continue
+                    if o.get("name") == e["home_team"]:
                         quotes[OA_BOOKS[b["key"]]] = (float(o["point"]), int(o["price"]))
+                    elif o.get("name") == e["away_team"]:
+                        flipped[OA_BOOKS[b["key"]]] = (float(o["point"]), int(o["price"]))
         rows.append({"oa_home_raw": e["home_team"], "oa_road_raw": e["away_team"],
                      "oa_quotes": quotes, "oa_as_of": payload["pulled_at"]})
+        # Neutral-site games: the feed's home can be PT's road (2026 wk3 Kansas-Arizona St.,
+        # Virginia-West Va.). A second row in the other orientation, priced off the away
+        # outcome, matches PT's (home, road) when the first cannot; the both-teams merge
+        # means only one of the two can ever join a PT row.
+        rows.append({"oa_home_raw": e["away_team"], "oa_road_raw": e["home_team"],
+                     "oa_quotes": flipped, "oa_as_of": payload["pulled_at"]})
     return pd.DataFrame(rows)
 
 
@@ -425,8 +434,13 @@ def pinnacle_lines(now: datetime) -> pd.DataFrame:
                 continue
             for o in m["outcomes"].values():
                 for pl in o["players"].values():
-                    if pl.get("mainLine") and pl["bookmakerOutcomeId"].endswith("/home"):
-                        rows.append({"pin_home_raw": f["participant1Name"], "pin_road_raw": f["participant2Name"],
+                    side = pl["bookmakerOutcomeId"].split("/")[-1]
+                    if pl.get("mainLine") and side in ("home", "away"):
+                        # the "/away" row is the same line from the other team's side, kept so a
+                        # neutral-site game PT keys the other way round still joins (see oddsapi_books)
+                        home, road = ((f["participant1Name"], f["participant2Name"]) if side == "home"
+                                      else (f["participant2Name"], f["participant1Name"]))
+                        rows.append({"pin_home_raw": home, "pin_road_raw": road,
                                      "Pinnacle_home": -float(pl["bookmakerOutcomeId"].split("/")[0]),
                                      "Pinnacle_odds": int(pl["priceAmerican"]), "pin_limit": pl.get("limit"),
                                      "pin_active": bool(pl.get("active")), "pin_as_of": payload["pulled_at"]})

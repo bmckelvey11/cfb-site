@@ -95,10 +95,29 @@ def test_reads_home_side_quotes_from_the_latest_snapshot(tmp_path, monkeypatch):
 
     oa = ws.oddsapi_books(NOW)
 
-    assert len(oa) == 1
+    assert len(oa) == 2                         # the event in both orientations
     # keyed by display name, not by the feed's own book key, so both feeds dedup into one dict
     assert oa.oa_quotes.iloc[0] == {"DraftKings": (-7.5, -110), "FanDuel": (-7.0, -108)}
     assert oa.oa_as_of.iloc[0] == "2026-09-09T20:05:31Z"
+    # the flipped row: the away team as home, its own spread and its own price
+    assert oa.oa_home_raw.iloc[1] == "Middle Tennessee Blue Raiders"
+    assert oa.oa_quotes.iloc[1] == {"DraftKings": (7.5, -110), "FanDuel": (7.0, -110)}
+
+
+def test_neutral_site_game_joins_when_pt_keys_it_the_other_way(tmp_path, monkeypatch):
+    """2026 wk3: PT and CFBD had Kansas home, the feeds had Arizona State home, and the
+    exact (home, road) merge left the game unpriced. The flipped row prices PT's orientation."""
+    write(tmp_path, snapshot([event("Arizona State Sun Devils", "Kansas Jayhawks",
+                                    {"draftkings": (-5.5, -110)})]), monkeypatch)
+    slate = pd.DataFrame({"key": ["kansas"], "rkey": ["arizona state"]})   # PT: Arizona St. @ Kansas
+
+    oa = ws.oddsapi_books(NOW)
+    oa["key"] = [ws.oa_resolve(n, set(slate.key)) for n in oa.oa_home_raw]
+    oa["rkey"] = [ws.oa_resolve(n, set(slate.rkey)) for n in oa.oa_road_raw]
+    merged = slate.merge(oa, on=["key", "rkey"], how="left")
+
+    assert len(merged) == 1
+    assert merged.oa_quotes.iloc[0] == {"DraftKings": (5.5, -110)}     # Kansas +5.5 as PT's home
 
 
 def test_prices_outside_the_odds_window_are_dropped(tmp_path, monkeypatch):
