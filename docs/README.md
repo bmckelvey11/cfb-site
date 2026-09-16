@@ -12,9 +12,10 @@ Unit-specific docs live in that unit's `docs/`:
 | Totals research | [`research/totals/docs/`](../research/totals/docs/) |
 | Superseded, never cited as current | [`archive/`](../archive/README.md) |
 
-The warehouse/ingest cluster below is **correctly** at root: it is cited from 38 files
-across `scripts/`, `cfb_system_maker/`, and `tests/`, and it describes the shared
-`cfb.duckdb` warehouse rather than any one unit.
+The warehouse/ingest cluster below is **correctly** at root: 33 files under `scripts/`,
+`cfb_system_maker/`, and `tests/` cite a doc that lives here, 16 of them the warehouse
+cluster specifically, and these docs describe the shared `cfb.duckdb` warehouse rather
+than any one unit.
 
 ---
 
@@ -131,7 +132,11 @@ which references are stale?
 
 **Method.** Enumerated every `.md` outside vendored and tool trees (418 files), then
 grepped every `docs/...` path literal out of `*.py`, `*.cmd`, `*.md`, `*.js`, `*.html` and
-resolved each against the filesystem to separate live references from dangling ones.
+resolved each against the filesystem to separate live references from dangling ones. The
+two counts in the header are: files under `scripts/`, `cfb_system_maker/`, and `tests/`
+citing a path that resolves to a file in root `docs/` (33), and the subset of those citing
+one of the 16 warehouse-cluster docs listed below (16 files). Unit-relative citations —
+e.g. `docs/MODEL_GUIDE.md` from inside `models/over_zero/` — are excluded from both.
 
 **What moved** (all were untracked, so plain `mv` then `git add`):
 
@@ -168,6 +173,13 @@ Fix those two comment lines the next time it is committed.
 targets the audit scripts write on demand; `research/totals/docs/x.md` is a placeholder
 `--out` in a usage example; the `docs/MODEL_GUIDE.md` / `docs/ROI_HITRATE.md` /
 `docs/backtest_bets.csv` family resolve correctly relative to `models/over_zero/`.
+
+**One status question this pass does not settle.** `research/totals/` is a docs-and-scripts
+tree that is **not** in root `CLAUDE.md`'s units table, and it has no unit `CLAUDE.md`. It
+already held three greenline docs before this pass, and 19 more moved in, so the table
+above lists it as a docs home. That is navigational only — promoting it to a real unit
+(with its own `CLAUDE.md` and a row in the units table) is a separate decision, not
+something this reorganization grants.
 
 **What this does *not* support.** No doc bodies were rewritten and no claims re-verified —
 this was a move-and-index pass. The groupings above are navigational, not a statement that
