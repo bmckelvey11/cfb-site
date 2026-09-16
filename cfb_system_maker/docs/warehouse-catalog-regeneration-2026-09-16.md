@@ -121,9 +121,22 @@ omitted matches one of those exclusions.
 
 - `python scripts/build_warehouse_catalog.py --check` → clean.
 - `python -m pytest` → 970 passed, 2 skipped.
-- Page rendered and driven in a browser: donut shows 4 schemas, 322 of 322
-  tables list, search and schema/domain filters work, Stats pane totals
-  1,947 columns + 176 named = 2,123.
+- Page rendered and driven in a browser: header reads "322 tables across 4
+  schemas", donut shows 4 schemas, 322 of 322 tables list, search and
+  schema/domain filters work, Stats pane totals 1,947 columns + 176 named
+  = 2,123. No console errors.
+
+## Two staleness signals, deliberately different
+
+- `--check` is **byte-exact**. It is the human-invoked "should I regenerate?"
+  question, and it fires on row drift, which is what you want after a refresh.
+- `test_committed_catalog_matches_the_live_warehouse` compares **structure
+  only** — tables minus row counts, wstats, named unordered, domainOrder,
+  coreNote. Row counts move on every `refresh_cfbd.py`, and the root
+  `CLAUDE.md` makes `python -m pytest` the default gate, so a volume-sensitive
+  assertion there would redden the suite on unrelated work. The test still
+  catches a table appearing or vanishing, a column set changing, and an origin
+  or domain shift.
 
 ## Related
 
