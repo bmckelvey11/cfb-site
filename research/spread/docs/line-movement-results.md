@@ -142,6 +142,13 @@ on large spreads — the same reason the 2026-09-08 audit retired the 3.2 points
 constant for movement bets. Predicting where the line goes is not the same as beating it, and
 this tree has only ever established the former.
 
+**Backtest of `weekly_slate.py`'s bet rule (re-run 2026-09-16, `eval_ats_vs_breakeven.py`,
+unchanged).** The slate bets E4's side at |E4 − book fair| ≥ 1. The archive can only price
+that rule at the opener (|E4 − open| ≥ 1, 2,902 bets, 52.0% [49.2, 54.8], CLV +1.24 pts;
+≥ 2: 338 bets, 60.4% [48.7, 71.6], CLV +3.72) — the numbers above, none clearing break-even.
+At the price the slate actually sees, the only test is version B (below): 43 bets, 19–24.
+The archive says the rule reads the close; neither test says it beats the bet.
+
 Does not establish: that any of it is reachable. The archive has no publication timestamps.
 Week 1 of 2026 showed the remaining move on Monday was zero for early-season games whose openers
 posted in spring. The panel's edge lives in the first quarter of the move.
