@@ -114,7 +114,41 @@ So: CLV as a *number* is computable back to 2021 (open vs close). CLV with
 *timing* — did we beat the close by acting at the right hour — is a 2026-and-
 forward question with a few hundred games behind it.
 
-### 3b. Full-game Action Network lines have stopped accruing this season
+### 3a. Action Network cannot backfill before 2024 — the vendor returns nothing
+
+This is the finding that matters if AN is being used as a *historical* odds
+source rather than a live one, and it is a hard floor.
+
+The bulk scrape did run for every season. It fetched a history file for **every
+event in every season 2015–2026** — 927/927 for 2015, 942/942 for 2018, and so
+on. The files are all there on disk. **They are 2 bytes each.** Action Network
+answered `{}`.
+
+| season | history files | non-empty (real odds) |
+| ---: | ---: | ---: |
+| 2015–2023 | 8,163 | **0** |
+| 2024 | 907 | 858 |
+| 2025 | 910 | 872 |
+
+The cliff is exact and it is at 2024. A 2015 file is `{}`; a 2024 file is ~67 KB
+keyed by book id (`15`, `30`, `68`, `69`, `71`). The scoreboard payloads tell the
+same story from the other side: every season carries a `markets` key, and it is
+an empty dict until 2024, when it fills with 5–6 books.
+
+This is not an auth problem or a partial scrape. The run log records two errors
+in the entire pull, both HTTP 504s — every other request returned 200 with an
+empty body. **Re-scraping will not recover a single pre-2024 price**, and it
+also explains why retiring the bulk scrape cost so little: it was fetching ~930
+empty files per historical season.
+
+So the usable Action Network backfill is **2024 and 2025 — about 1,730 games**,
+plus whatever 2026 accrues live. Anything needing odds history before 2024 has
+to come from `core.fact_game_line` (closes back to 2013, opens back to 2021) or
+from Prediction Tracker, not from AN.
+
+### 3b. Full-game AN lines also stopped accruing this season
+
+Secondary to the above, and only relevant if AN is also wanted going forward.
 
 The 2026 row above is not just partial, it is *diverging*, and the two tables
 move in opposite directions week by week:
@@ -186,23 +220,28 @@ completely, with nothing left over:
 
 ## What follows from it
 
-1. **Decide whether losing full-game AN lines was intended.** This is the only
-   item here that is still changing. If the-odds-api is meant to replace them,
-   nothing to do beyond noting it; if not, `an_market` has been dead since week 1
-   and every week that passes is gone. Cheapest check is whether anything reads
+1. **If AN was meant as a historical backfill, it cannot be one before 2024.**
+   The pre-2024 files exist and are empty; the vendor does not serve odds history
+   that far back, and no amount of re-scraping changes it. Budget AN as two
+   complete seasons (2024–2025, ~1,730 games) and source anything older from
+   `core.fact_game_line` or Prediction Tracker.
+2. **Separately, decide whether losing full-game AN lines going forward was
+   intended.** If the-odds-api is meant to replace them, nothing to do beyond
+   noting it; if not, `an_market` has been dead since week 1. Cheapest check is
+   whether anything reads
    `stg.an_market`. Two do: `research/spread/scripts/eval_line_shopping.py`
    (`TABLE = "stg.an_market"`) and `check_pt_line_is_close.py`. Both are pinned
    to `SEASONS = (2024, 2025)`, so both still work — but either one extended to
    2026 would silently read a single week and report a line-shopping result off
    99 events. `models/over_zero` is unaffected; it reads `raw.an_*` directly.
-2. **Fix the era in any backtest, or fix the book.** 2021–2026 is the honest
+3. **Fix the era in any backtest, or fix the book.** 2021–2026 is the honest
    window for opener→close work on the warehouse tape. If a longer window is
    needed, `bovada` is the only book with both meaningful history and current
    presence, and it is also the bridge for comparing the old panel to the new.
-3. **The 2026 tick tape is the scarce asset.** It is the only timestamped record
+4. **The 2026 tick tape is the scarce asset.** It is the only timestamped record
    and it only accumulates going forward, which argues for keeping
    `CFB-AN-History` (Mondays 09:00) healthy — a missed week is not recoverable
    by re-scraping.
-4. **Treat pre-2021 as close-only.** Eight seasons of closing lines are still
+5. **Treat pre-2021 as close-only.** Eight seasons of closing lines are still
    usable for grading and for margin-vs-close work; they just cannot answer a
    movement question.
