@@ -35,6 +35,18 @@
         "docs"
       ],
       "port": 8777
+    },
+    {
+      "name": "Dive Preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        ".dive-preview",
+        "run",
+        "dev"
+      ],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }
