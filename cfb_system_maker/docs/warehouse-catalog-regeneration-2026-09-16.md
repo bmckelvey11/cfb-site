@@ -20,8 +20,12 @@ the script and pinned by `tests/test_warehouse_catalog.py` (18 tests).
 
 Data: local `cfb.duckdb`, 5.0 GB, loaded 2026-09-16 17:25 UTC via
 `refresh_cfbd.py` — 119 raw + 28 stg tables reported, 0 load errors, 0 empty.
-Reproduce with `python scripts/build_warehouse_catalog.py` (`--check` to test
-for staleness without writing).
+
+Reproduce with `python scripts/build_warehouse_catalog.py`. `--check` reports
+staleness without writing; it takes ~18s, most of it the `ORDER BY ALL` sampling
+described below. To view the page in the Claude preview pane, start the
+`Docs (static)` entry in `.claude/launch.json` — at 585 KB the pane refuses it
+over `file://`. Opening it in an ordinary browser works either way.
 
 ## What changed since 2026-08-29
 

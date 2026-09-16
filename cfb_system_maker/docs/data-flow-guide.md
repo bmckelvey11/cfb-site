@@ -196,7 +196,7 @@ in `games.csv` or `features.json` reaches both.
 
 | Question | Run |
 |---|---|
-| What tables and columns exist, and what does the data look like? | Open [cfb-warehouse-catalog.html](../../docs/cfb-warehouse-catalog.html). Every table with its columns, types and first 3 rows — click a row to expand. Regenerate with `python scripts/build_warehouse_catalog.py` (`--check` to test for staleness) |
+| What tables and columns exist, and what does the data look like? | Open [cfb-warehouse-catalog.html](../../docs/cfb-warehouse-catalog.html). Every table with its columns, types and first 3 rows — click a row to expand. Regenerate with `python scripts/build_warehouse_catalog.py` (`--check` tests for staleness without writing; ~18s either way) |
 | Is the folder and warehouse clean? | `python scripts/audit_data_hygiene.py` (read-only; `--checks folder` skips the warehouse) |
 | What did the last rebuild load, and what failed? | `SELECT * FROM meta.load_report WHERE error IS NOT NULL`; `data/logs/cfbd_refresh.log` |
 | Did every scheduled task run? | `data/logs/task_runs.csv` |
