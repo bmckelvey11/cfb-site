@@ -123,7 +123,7 @@ slate, rewrites `site/lib/board.json`, and rebuilds `site/dist`. It does **not**
 the `sites` remote needs your auth, so pushing the board stays a hand step.
 
 Like the line-timing tasks, it only fires while `mckel` is logged on
-(`docs/line-timing-collector.md` § Limitations). Every run appends to
+(root `docs/line-timing-collector.md` § Limitations). Every run appends to
 `$CFB_DATA_ROOT/logs/over_zero_slate.log`; a failed slate skips the build and the log
 says so.
 
