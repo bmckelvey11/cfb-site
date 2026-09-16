@@ -45,6 +45,9 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 |---|---|---:|---|---:|---:|
 | week 2 | 27-22 | 55.1% | 41–68% | +2.55u | +5.2% |
 | all weeks | 27-22 | 55.1% | 41–68% | +2.55u | +5.2% |
+| your 2025 totals (baseline) | 62-40 | 60.8% | 51–70% | +16.11u | +15.8% |
+| your 2025 unders | 54-38 | 58.7% | 48–68% | +10.92u | +11.9% |
+| your 2025 overs | 8-2 | 80.0% | 49–94% | +5.19u | +51.9% |
 
 | under flags by market total | record | win% | 95% CI | units | ROI |
 |---|---|---:|---|---:|---:|
@@ -72,6 +75,8 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 
 **Bottom line.** Totals 27-22 (55.1%, CI 41-68%), unders 22-17. Break-even sits inside the interval. The minimum win rate one graded week can detect is 70%; this is not evidence of edge, and it is not evidence of none.
 
+**Against your own 2025 totals.** Baseline rows in the table above: 62-40 (60.8%, CI 51-70%), unders 54-38, at your actual prices, 102 bets from the book export. PFF's week 2 unders (22-17, 56.4%) sit inside your interval and below your point estimate; nothing yet says their flags add to what you already do. The 2025 rows are in `greenline_results_2026.csv` tagged `source=personal`, so a same-game overlap check is possible once weeks accumulate.
+
 **Structure that recurs, week to week**
 
 - Under share: 39/49 (week 2), 49/57 (week 3). The projection sits below Pinnacle's fair total on 37/48 (w2) and 44/48 (w3) flagged games, median shade -1.35 and -1.53 points. That is a model with a low mean, not game-by-game reads.
@@ -85,6 +90,7 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 - Betting Greenline unders as a system. One week, CI contains break-even.
 - Sizing by PFF's edge number or filtering by band. Both are post-hoc splits on n < 20.
 - Any claim about weeks 0-1.
+- Comparing PFF to your 2025 record as like-for-like: different season, different games, your bets were selected and priced by you.
 
 **What settles it.** Four more graded weeks (n ~ 250) gives a fair chance of separating a true 56% from 52.4%; eight weeks does it reliably. Week 3 (49 unders, mean stated edge +2.5%) grades Monday.
 
@@ -94,3 +100,4 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 python scripts/pull_pff_scoreboard.py --season 2026
 python research/totals/scripts/greenline_season_review.py --totals --out research/totals/docs/greenline-totals-season-<date>.md
 ```
+(the script regenerates the tables; re-append this section or keep it in the dated copy)

@@ -11,7 +11,11 @@ value against the schedule's last posted number, and calibration of PFF's own
 stated cover probabilities. Weeks not yet played are summarised as a pending
 slate. Rerun after each Monday's schedule refresh. Every graded row (one per
 flag per market) is also written to `greenline_results_<season>.csv` next to the
-captures, so the results survive as a flat file.
+captures, so the results survive as a flat file. Your own full-game NCAAF totals
+from the prior season's bet history (`data/ingest/bet_history/history.csv`, the
+book export behind `docs/bet-history-analysis-2023-2025.md`) ride along in the
+same file and as a baseline row, tagged `source=personal`, so PFF's flags sit
+next to what you actually bet at the same prices.
 
 Conventions (checked against week 2 rows): `market_spread` is the HOME spread,
 negative when the home side is favoured; `greenline_spread` is PFF's home
@@ -41,7 +45,9 @@ from grade_greenline import BANDS, VALUE_BUCKETS, capture_lines, num, pff_final,
 
 IN_DIR = INGEST / "pff_scoreboard"
 BREAK_EVEN = 110 / 210
-RESULT_COLUMNS = ["week", "game", "market", "side", "line", "price", "result", "p", "value", "clv", "p_market"]
+RESULT_COLUMNS = ["source", "season", "week", "date", "game", "market", "side", "line", "price", "result",
+                  "p", "value", "clv", "p_market"]
+HISTORY = INGEST / "bet_history" / "history.csv"
 
 
 def wilson(w: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -70,7 +76,8 @@ def grade_flag(f: dict, g: dict, finals: list[dict], lines: dict) -> list[dict]:
     if final is None:
         return []
     away, home = final
-    base = {"week": f["pff_week"], "game": f"{f['away_abbreviation']}@{f['home_abbreviation']}"}
+    base = {"source": "pff", "season": int(f.get("season") or 0), "week": f["pff_week"],
+            "date": (f.get("kickoff_raw") or "")[:10], "game": f"{f['away_abbreviation']}@{f['home_abbreviation']}"}
     out = []
 
     line = num(f.get("market_over_under"))
@@ -146,6 +153,28 @@ def clv_line(rows: list[dict]) -> str:
     return f"mean {m:+.2f} ± {1.96 * se:.2f} pts (n={len(xs)}); beat close {beat}, lost {lost}, flat {len(xs) - beat - lost}"
 
 
+def personal_totals(season: int, path: Path = HISTORY) -> list[dict]:
+    """Your full-game NCAAF over/unders for one season, in the graded-row shape.
+
+    The export's first line is a `data:text/csv` prefix, not a header. A season runs
+    August through the following January, so `season` is the August year."""
+    if not path.exists():
+        return []
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
+    out = []
+    for r in csv.DictReader(lines[1:]):
+        t = r.get("Start Time") or ""
+        if r.get("League") != "ncaaf" or r.get("Type") not in ("over", "under") or r.get("Period") != "game":
+            continue
+        if not (f"{season}-08-01" <= t < f"{season + 1}-02-01") or r.get("Result") not in ("win", "loss", "push"):
+            continue
+        out.append({"source": "personal", "season": season, "week": "", "date": t[:10], "game": r["Game"],
+                    "market": "total", "side": r["Type"], "line": num(r["Odds/Spread/Total"]),
+                    "price": num(r["Odds"]), "result": r["Result"], "p": None, "value": None, "clv": None,
+                    "p_market": 0.5})
+    return out
+
+
 def load(season: int):
     sched = {x["pff_game_id"]: x for x in csv.DictReader((IN_DIR / f"pff_schedule_{season}.csv").open(encoding="utf-8"))}
     finals = warehouse_finals(season)
@@ -165,7 +194,7 @@ def load(season: int):
     return graded, pending
 
 
-def totals_section(graded: list[dict]) -> list[str]:
+def totals_section(graded: list[dict], personal: list[dict]) -> list[str]:
     """Totals-only splits: week, side, market-total band, PFF value bucket. Accumulate, do not act."""
     T = [r for r in graded if r["market"] == "total"]
     U = [r for r in T if r["side"] == "under"]
@@ -173,6 +202,11 @@ def totals_section(graded: list[dict]) -> list[str]:
     for wk in sorted({r["week"] for r in T}):
         L.append(f"| week {wk} | {fmt(tally([r for r in T if r['week'] == wk]))} |")
     L.append(f"| all weeks | {fmt(tally(T))} |")
+    if personal:
+        yr = personal[0]["season"]
+        L.append(f"| your {yr} totals (baseline) | {fmt(tally(personal))} |")
+        L.append(f"| your {yr} unders | {fmt(tally([r for r in personal if r['side'] == 'under']))} |")
+        L.append(f"| your {yr} overs | {fmt(tally([r for r in personal if r['side'] == 'over']))} |")
     L += ["", "| under flags by market total | record | win% | 95% CI | units | ROI |", "|---|---|---:|---|---:|---:|"]
     for lab, fn in BANDS:
         L.append(f"| {lab} | {fmt(tally([r for r in U if fn(r['line'])]))} |")
@@ -183,7 +217,8 @@ def totals_section(graded: list[dict]) -> list[str]:
     return L
 
 
-def report(graded: list[dict], pending: dict, season: int, totals_only: bool = False) -> str:
+def report(graded: list[dict], pending: dict, season: int, totals_only: bool = False,
+           personal: list[dict] = ()) -> str:
     if totals_only:
         graded = [r for r in graded if r["market"] == "total"]
     L = [f"# PFF Greenline {'totals' if totals_only else 'picks'}, {season} season to date", "",
@@ -237,7 +272,7 @@ def report(graded: list[dict], pending: dict, season: int, totals_only: bool = F
           "information; a stated-p above the actual win% means the numbers are overconfident.", ""]
 
     if totals_only:
-        L += totals_section(graded)
+        L += totals_section(graded, list(personal))
 
     for wk, flags in sorted(pending.items()):
         L += [f"## Pending: week {wk}", ""]
@@ -271,6 +306,21 @@ def self_check() -> None:
     assert grade_flag(f, {"is_over": "False"}, [], {}) == []
     t = tally([dict(result="win", price=-110), dict(result="loss", price=-110), dict(result="push", price=-110)])
     assert (t["w"], t["l"], t["p"]) == (1, 1, 1) and abs(t["units"] - (100 / 110 - 1)) < 1e-9
+    import tempfile
+    hist = Path(tempfile.mkdtemp()) / "history.csv"
+    hist.write_text("data:text/csv;charset=utf-8,\n"
+                    "League,Start Time,Game,Pick Desc,Type,Period,Odds,Odds/Spread/Total,Result,Units Wagered,Units Net,Money Wagered,Money Net,Tag\n"
+                    "ncaaf,2025-09-06T23:00:00.000Z,A @ B,A @ B: u55.5 -110,under,game,-110,55.5,win,1,0.9091,1000,909,\n"
+                    "ncaaf,2025-09-06T23:00:00.000Z,A @ B,A +3 -110,spread_away,game,-110,3,win,1,0.9091,1000,909,\n"
+                    "ncaaf,2025-09-06T23:00:00.000Z,C @ D,C @ D: o50 -105,over,firsthalf,-105,50,loss,1,-1,1000,-1000,\n"
+                    "ncaaf,2026-01-01T23:00:00.000Z,E @ F,E @ F: u40 -115,under,game,-115,40,loss,1,-1,1000,-1000,\n"
+                    "ncaaf,2026-08-30T23:00:00.000Z,G @ H,G @ H: u40 -110,under,game,-110,40,win,1,0.9,1000,900,\n"
+                    "ncaab,2025-11-06T23:00:00.000Z,X @ Y,X @ Y: u140 -110,under,game,-110,140,win,1,0.9,1000,900,\n",
+                    encoding="utf-8")
+    pt = personal_totals(2025, hist)
+    assert [(r["game"], r["side"], r["price"], r["result"]) for r in pt] == [("A @ B", "under", -110.0, "win"),
+                                                                             ("E @ F", "under", -115.0, "loss")], pt
+    assert personal_totals(2024, hist) == []
     lo, hi = wilson(21, 36)
     assert 0.41 < lo < 0.43 and 0.72 < hi < 0.74, (lo, hi)
     assert abs(mde(40) - 0.72) < 0.01
@@ -288,14 +338,16 @@ def main() -> None:
         self_check()
         return
     graded, pending = load(args.season)
-    md = report(graded, pending, args.season, totals_only=args.totals)
+    personal = personal_totals(args.season - 1)
+    md = report(graded, pending, args.season, totals_only=args.totals, personal=personal)
     print(md)
     results = IN_DIR / f"greenline_results_{args.season}.csv"
+    rows = sorted(graded, key=lambda r: (int(r["week"]), r["game"], r["market"])) + sorted(personal, key=lambda r: r["date"])
     with results.open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=RESULT_COLUMNS)
         w.writeheader()
-        w.writerows(sorted(graded, key=lambda r: (int(r["week"]), r["game"], r["market"])))
-    print(f"\nwrote {len(graded)} graded rows -> {results}")
+        w.writerows(rows)
+    print(f"\nwrote {len(graded)} PFF rows + {len(personal)} personal {args.season - 1} totals -> {results}")
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(md, encoding="utf-8")
