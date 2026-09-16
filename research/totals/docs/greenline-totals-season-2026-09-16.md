@@ -91,37 +91,37 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 
 ## Pending: week 3
 
-- 57 flagged games; totals 49 under / 8 over; spreads 36 away / 21 home; moneylines 21 away / 32 home.
-- mean stated edge: totals +2.50%, spreads +4.08%.
+- 57 flagged games; totals 49 under / 8 over; spreads 36 away / 21 home; moneylines 22 away / 31 home.
+- mean stated edge: totals +2.53%, spreads +4.14%.
 
 ### Week 3 under list (25 positive-edge flags, repriced at DraftKings)
 
 | # | game | PFF line | PFF edge | DK line | DK odds | DK edge | band | your history |
 |---:|---|---:|---:|---:|---:|---:|---|---|
 | 1 | NDSU @ SAC | 50.5 | +3.7% | 51.5 | -102 | +10.0% | 50-54.5 | 6-11 (35%) |
-| 2 | TROY @ MIZZ | 49.5 | +3.5% | 50.5 | -108 | +8.1% | 45-49.5 | 8-4 (67%) |
-| 3 | SMU @ LOU | 59.5 | +3.6% | 59.5 | -102 | +5.8% | 55-59.5 | 50-32 (61%) |
-| 4 | LAT @ BAY | 53.0 | +3.6% | 53.5 | -108 | +5.4% | 50-54.5 | 6-11 (35%) |
+| 2 | SMU @ LOU | 59.5 | +3.6% | 59.5 | -102 | +5.8% | 55-59.5 | 50-32 (61%) |
+| 3 | LAT @ BAY | 53.0 | +3.6% | 53.5 | -108 | +5.4% | 50-54.5 | 6-11 (35%) |
+| 4 | UNT @ TXST | 63.5 | +2.5% | 63.5 | -102 | +5.3% | 60-64.5 | 30-30 (50%) |
 | 5 | UTSA @ TEX | 58.5 | +3.8% | 58.5 | -105 | +4.9% | 55-59.5 | 50-32 (61%) |
 | 6 | FRES @ SJSU | 50.5 | +3.7% | 50.5 | -108 | +4.8% | 50-54.5 | 6-11 (35%) |
-| 7 | CCAR @ DEL | 57.5 | +3.7% | 57.5 | -110 | +3.9% | 55-59.5 | 50-32 (61%) |
-| 8 | KU @ ASU | 50.5 | +3.7% | 50.5 | -112 | +3.9% | 50-54.5 | 6-11 (35%) |
-| 9 | FIU @ FAU | 62.5 | +2.8% | 62.5 | -110 | +3.5% | 60-64.5 | 30-30 (50%) |
-| 10 | UNT @ TXST | 63.5 | +2.5% | 63.5 | -110 | +3.4% | 60-64.5 | 30-30 (50%) |
-| 11 | ARST @ TCU | 56.5 | +3.0% | 56.5 | -110 | +3.3% | 55-59.5 | 50-32 (61%) |
-| 12 | JMU @ SDSU | 46.5 | +2.3% | 46.5 | -105 | +3.1% | 45-49.5 | 8-4 (67%) |
-| 13 | UTEP @ MICH | 49.5 | +3.8% | 49.5 | -115 | +3.0% | 45-49.5 | 8-4 (67%) |
-| 14 | MIA @ WF | 55.5 | +3.9% | 55.5 | -115 | +2.7% | 55-59.5 | 50-32 (61%) |
-| 15 | LSU @ MISS | 58.5 | +3.8% | 58.5 | -115 | +2.6% | 55-59.5 | 50-32 (61%) |
-| 16 | KENN @ TENN | 59.5 | +2.4% | 59.5 | -110 | +2.6% | 55-59.5 | 50-32 (61%) |
-| 17 | UAB @ ULL | 56.5 | +2.7% | 56.5 | -112 | +2.5% | 55-59.5 | 50-32 (61%) |
-| 18 | TUL @ KSU | 49.5 | +2.9% | 49.5 | -112 | +2.4% | 45-49.5 | 8-4 (67%) |
-| 19 | WKU @ IND | 60.5 | +2.9% | 60.5 | -115 | +2.4% | 60-64.5 | 30-30 (50%) |
-| 20 | USC @ RUTG | 59.5 | +3.0% | 59.5 | -115 | +2.2% | 55-59.5 | 50-32 (61%) |
-| 21 | UK @ TXAM | 49.5 | +3.2% | 49.5 | -115 | +2.1% | 45-49.5 | 8-4 (67%) |
-| 22 | EMU @ WIS | 45.5 | +2.7% | 45.5 | -108 | +2.0% | 45-49.5 | 8-4 (67%) |
-| 23 | USU @ UTAH | 56.5 | +2.7% | 56.5 | -115 | +1.9% | 55-59.5 | 50-32 (61%) |
-| 24 | VT @ UMD | 53.5 | +2.2% | 53.5 | -115 | +0.8% | 50-54.5 | 6-11 (35%) |
+| 7 | UTEP @ MICH | 49.5 | +3.8% | 49.5 | -108 | +4.6% | 45-49.5 | 8-4 (67%) |
+| 8 | USC @ RUTG | 59.5 | +3.0% | 59.5 | -105 | +4.4% | 55-59.5 | 50-32 (61%) |
+| 9 | KU @ ASU | 50.5 | +3.7% | 50.5 | -110 | +4.3% | 50-54.5 | 6-11 (35%) |
+| 10 | CCAR @ DEL | 57.5 | +3.7% | 57.5 | -110 | +3.9% | 55-59.5 | 50-32 (61%) |
+| 11 | KENN @ TENN | 59.5 | +2.4% | 59.5 | -105 | +3.8% | 55-59.5 | 50-32 (61%) |
+| 12 | ARST @ TCU | 56.5 | +3.0% | 56.5 | -110 | +3.3% | 55-59.5 | 50-32 (61%) |
+| 13 | LSU @ MISS | 58.5 | +3.8% | 58.5 | -112 | +3.3% | 55-59.5 | 50-32 (61%) |
+| 14 | TROY @ MIZZ | 49.5 | +3.5% | 49.5 | -112 | +3.2% | 45-49.5 | 8-4 (67%) |
+| 15 | FIU @ FAU | 62.5 | +2.8% | 62.5 | -112 | +3.1% | 60-64.5 | 30-30 (50%) |
+| 16 | WKU @ IND | 60.5 | +2.9% | 60.5 | -112 | +3.0% | 60-64.5 | 30-30 (50%) |
+| 17 | MIA @ WF | 55.5 | +3.9% | 55.5 | -115 | +2.7% | 55-59.5 | 50-32 (61%) |
+| 18 | EMU @ WIS | 45.5 | +2.7% | 45.5 | -105 | +2.7% | 45-49.5 | 8-4 (67%) |
+| 19 | UAB @ ULL | 56.5 | +2.7% | 56.5 | -112 | +2.5% | 55-59.5 | 50-32 (61%) |
+| 20 | TUL @ KSU | 49.5 | +2.9% | 49.5 | -112 | +2.4% | 45-49.5 | 8-4 (67%) |
+| 21 | USU @ UTAH | 56.5 | +2.7% | 56.5 | -115 | +1.9% | 55-59.5 | 50-32 (61%) |
+| 22 | JMU @ SDSU | 46.5 | +2.3% | 46.5 | -112 | +1.5% | 45-49.5 | 8-4 (67%) |
+| 23 | VT @ UMD | 53.5 | +2.2% | 53.5 | -115 | +0.8% | 50-54.5 | 6-11 (35%) |
+| 24 | UK @ TXAM | 50.5 | +3.4% | 49.5 | -115 | -1.3% | 50-54.5 | 6-11 (35%) |
 | 25 | STAN @ DUKE | 51.5 | +2.4% | 50.5 | -115 | -4.8% | 50-54.5 | 6-11 (35%) |
 
 ## Reading
@@ -149,7 +149,7 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 - Treating the band pattern as settled: 98 games in the good band, 27 in the bad one.
 - Any claim about weeks 0-1, or about spreads and moneylines (see `greenline-season-review-2026-09-16.md`).
 
-**Operating rule for week 3 (2-4% window).** The week 3 list is built with `--min-edge 0.02 --max-edge 0.04`: 27 of 45 positive-edge unders, 24 still positive at DraftKings, 11 of them in the 55-59.5 band. The window is the best of 21 ranges on 36 games (inside 17-8, outside 4-7; see "PFF edge window" below), so it is a bet-selection choice, not a tested rule. All 57 flags are graded Monday regardless, which is what tests it: the 18 cut flags are the control.
+**Operating rule for week 3 (2-4% window).** The week 3 list is built with `--min-edge 0.02 --max-edge 0.04`: 27 of 45 positive-edge unders (capture 14:26 ET), 23 still positive at DraftKings, 11 of them in the 55-59.5 band. The window is the best of 21 ranges on 36 games (inside 17-8, outside 4-7; see "PFF edge window" below), so it is a bet-selection choice, not a tested rule. All 57 flags are graded Monday regardless, which is what tests it: the 18 cut flags are the control.
 
 **What settles it.** Four more graded weeks brings 2026 flags to n~250 (MDE 60%); with the history pooled, n~450 (MDE 58%). The band split needs the 50-54.5 cell to keep losing and 55-59.5 to keep winning for another ~50 games each before it is more than a lean. Week 3 grades Monday.
 
