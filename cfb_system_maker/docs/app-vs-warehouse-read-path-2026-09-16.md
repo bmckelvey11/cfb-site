@@ -94,9 +94,11 @@ table name outside `duckdb_core.py`, the audit scripts and the worktrees:
 | `core.fact_game_odds` | none (mentioned only in `refresh_cfbd.py:224`) |
 | `core.fact_game_historical` | none |
 
-So the unread set is the four below `fact_game`, not the whole layer. Either give them a
-reader or retire them; carrying unread Kimball facts is the real cost the original question
-was circling. Not decided here.
+So the unread set is the four below `fact_game`, not the whole layer. **Decided 2026-09-16:
+keep them.** Nothing is retired. `build_core` builds them in one pass with `fact_game`, which
+does have readers, so the carrying cost is rebuild time already being spent rather than a
+separate path to maintain — and an unread fact is cheaper to keep than to re-derive when a
+model wants it.
 
 Both readers of `fact_game` are short-lived script runs that `connect(..., read_only=True)`
 and exit — the pattern Finding 1 permits. Neither holds the file across a rebuild.

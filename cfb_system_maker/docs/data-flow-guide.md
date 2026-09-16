@@ -1,6 +1,6 @@
 # Data flow guide — sources, warehouse, consumers
 
-Living reference. Last verified 2026-09-11 against the code and the
+Living reference. Last verified 2026-09-16 against the code and the
 [data audit](data-audit-2026-09-11.md). When a step here stops matching the code, fix
 the code or this page in the same commit.
 
@@ -186,11 +186,22 @@ result-informed carries the `result_lookahead` tag.
 | Spread line-movement model | `research/spread/scripts/weekly_slate.py` | upstream processed files → `weekly_slate_<stamp>.csv` + `latest` pointer | |
 | Prediction Tracker build | `research/spread/scripts/build_prediction_tracker.py` | `stg.game` (needs postseason) | `stg.games` |
 | Timing decay eval | `research/spread/scripts/eval_timing_decay.py` | `stg.an_history_tick`, `stg.an_scoreboard` | |
+| Spread version-B eval | `research/spread/scripts/eval_version_b.py` | `core.fact_game` (finals), read-only | |
+| Greenline grading | `research/totals/scripts/grade_greenline.py`; `greenline_season_review.py` imports its `warehouse_final(s)` | `core.fact_game` where PFF posts no score, read-only | |
 | SQLite mirror | `scripts/mirror_duckdb_to_sqlite.py` | `raw`, `stg`, `meta` → `cfb_mirror.sqlite` | nothing reads its output; deleted 2026-09-11 |
 | MotherDuck promote | `scripts/promote_to_motherduck.py` | all four schemas → `md:cfb` | hand-run only |
 
-The consequence: a bug in `build_core` cannot reach the app or the totals model today. A bug
-in `games.csv` or `features.json` reaches both.
+The consequence: a bug in `build_core` cannot reach the app or the totals model today. It can
+reach research — `core.fact_game` supplies finals to the version-B spread eval and to
+Greenline grading, so `build_core` is not a dead end. `fact_game_line`, `fact_game_team`,
+`fact_game_odds` and `fact_game_historical` have no reader as of 2026-09-16; they are kept,
+not retired. A bug in `games.csv` or `features.json` reaches the app and the totals model
+both.
+
+Every warehouse reader above opens `read_only=True` and exits. Keep it that way: a
+process holding `cfb.duckdb` open makes the rebuild's final `tmp_path.replace(db_path)` fail
+on Windows, which breaks refresh step 5. Check with `scripts/check_duckdb_swap_lock.py`; the
+reasoning is in [app-vs-warehouse-read-path-2026-09-16.md](app-vs-warehouse-read-path-2026-09-16.md).
 
 ## 6. Checking the pipe
 
