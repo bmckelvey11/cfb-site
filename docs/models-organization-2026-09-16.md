@@ -9,7 +9,7 @@ scope: `cfb_system_maker/` (its own unit, own instructions), `cfbd-python/` (ven
 
 ## Method
 
-Read the tree under `models/` and `research/`; read the four unit `CLAUDE.md` files,
+Read the tree under `models/` and `research/`; read the five unit `CLAUDE.md` files,
 `CONTEXT.md`, and `PRODUCT.md`; then ran five checks that decide the ordering:
 
 1. `git check-ignore` on `models/over_zero/data`, `.../site`, and the loose tarballs.
@@ -31,7 +31,7 @@ Every unit gets this wrong in a different direction:
 | `models/totals/` | package + `__main__` CLI, tests in root `tests/` | none — this is the reference shape |
 | `research/spread/` | 20 scripts, 14 docs | **production lives under `research/`** (`weekly_slate.py` is "run the model") |
 | `models/over_zero/` | 38 `.py` across 8 subtrees, incl. `research/b1..b7` | **research lives under `models/`**, and `v1/v2/v3` are live, not frozen |
-| `research/totals/` | 9 scripts, 5 docs | not in the root `CLAUDE.md` Units table; has no `CLAUDE.md` |
+| `research/totals/` | 9 scripts, 8 docs | two unrelated strands sharing one flat `scripts/` + `docs/` |
 
 ### 2. Two sys.path idioms, with opposite move costs
 
@@ -39,7 +39,7 @@ Every unit gets this wrong in a different direction:
   `sys.path.insert(0, Path(__file__).parent)`. Move the directory whole and nothing inside
   it breaks — the inserts are self-relative. But that property holds only because the
   scripts sit together: the moment a split puts importer and imported in different
-  directories, every crossing edge needs a second insert. Step 4 is a split, so it pays
+  directories, every crossing edge needs a second insert. Step 5 is a split, so it pays
   that cost; it is still the cheaper of the two units because the fix is additive (one
   extra insert) rather than a rewrite of an existing hardcoded path.
 - **`models/over_zero/` is expensive to move.** 20 files hardcode the literal strings
@@ -128,7 +128,7 @@ This plan accepts that. `models/spread/` and `models/over_zero/` stay script-lan
 sys.path inserts, and `models/` means "live code" rather than "importable package" —
 `models.totals` is then the exception, not the rule. Converting either to a real package
 is a separate job (see What this plan does not support). The alternative is to fold
-packaging into Step 4, which roughly doubles it and couples a layout change to an import
+packaging into Step 5, which roughly doubles it and couples a layout change to an import
 rewrite; not recommended in the same commit.
 
 Per subject:
@@ -138,7 +138,7 @@ Per subject:
 | Totals model | `models/totals/` | — | already correct, no change |
 | Over-zero | `models/over_zero/` (`v1`–`v3`, `monitor/`, `scripts/`, `saturation_bias/`, `floor_bias_1h/`) | `research/over_zero/` ← move `models/over_zero/research/` | version dirs stay put (Finding 2) |
 | Spread | `models/spread/` ← the 9-file production closure | `research/spread/` keeps the 11 studies + `docs/` | biggest change, cheapest to do |
-| Greenline grading | — | `research/greenline/` ← rename `research/totals/` | see Open question |
+| Greenline grading | — | `research/totals/greenline/` | nested under totals, per the 2026-09-16 decision |
 
 ## Hazards — do not touch
 
@@ -179,7 +179,18 @@ from their own depth, so each moved file needs its path expression re-pointed at
 `2026-09-10_spread_magnitude/spread_magnitude.py`) and diff the output against the
 `RESULTS.md` already committed beside it.
 
-**Step 4 — split spread into `models/spread/` + `research/spread/`.** The big one.
+**Step 4 — nest Greenline: `research/totals/{scripts,docs}` → `research/totals/greenline/`.**
+See Decision above for the target and the full list of surfaces. Order within the step:
+`git mv` the 9 scripts and the 3 review docs plus `figs/`; bump `parents[3]` → `parents[4]`
+in all 9; move `docs/README.md` up to `research/totals/README.md` and rewrite its two link
+tables; fix `research/totals/CLAUDE.md`, root `docs/README.md`, the 9 usage docstrings, and
+the emitted path in `greenline_bet_stats.py:158`.
+*Gate:* `python research/totals/greenline/scripts/<name>.py --self-check` passes for all
+nine — every one of them takes `--self-check`, which is why this step needs no new harness.
+Then re-run `greenline_season_review.py --figs` and confirm the three PNGs land beside the
+moved docs and the review's image links still resolve.
+
+**Step 5 — split spread into `models/spread/` + `research/spread/`.** The big one.
 Move the 9-file production closure from Finding 3 to `models/spread/`; the 11 studies stay.
 Because both groups use `sys.path.insert(0, parent)`, the studies that import production
 modules (`eval_line_movement` → `eval_prediction_tracker_models`, etc.) each need one
@@ -203,7 +214,7 @@ newest file on disk. Three scheduled tasks write into those directories
 
 Without one of those, a diff cannot distinguish move-breakage from fresh odds.
 
-**Step 5 — the two `.cmd` wrappers.** Only after Step 4 is green. For each: move the file,
+**Step 6 — the two `.cmd` wrappers.** Only after Step 5 is green. For each: move the file,
 fix its `%~dp0..\..\..` depth, fix the `.py` path it invokes, then
 `Set-ScheduledTask` the registered action to the new absolute path, then fire one manual
 run and read `$CFB_DATA_ROOT\logs\`.
@@ -217,19 +228,20 @@ with a fresh log entry. If any doubt, leave the `.cmd` files where they are — 
 wrapper in the old location costs nothing and this is the failure mode that hides until
 October.
 
-**Step 6 — instructions.** Update the root `CLAUDE.md` Units table (it will gain
+**Step 7 — instructions.** Update the root `CLAUDE.md` Units table (it will gain
 `models/spread/` and, per the open question, `research/greenline/`), write the two new
 nested `CLAUDE.md` files, and point `AGENTS.md` at them.
 *Gate:* every path named in every `CLAUDE.md` resolves.
 
 ## Verification gates
 
-Run before Step 0 and after Step 6, plus the per-step gates above:
+Run before Step 0 and after Step 7, plus the per-step gates above:
 
 ```bash
 python -m pytest                                        # baseline: 952 collected, 6 deselected
 python -m models.totals backtest --line ou_open --permute
 python models/over_zero/v1/demo_reproduce.py            # guards the sibling-import numerics
+for f in research/totals/greenline/scripts/*.py; do python "$f" --self-check; done
 ```
 
 The `demo_reproduce.py` gate matters because `models/over_zero/CLAUDE.md` warns that the
@@ -239,18 +251,70 @@ behavior. A moved path that still imports can still change results.
 `pytest.ini` deselects slow tests by default, so a silently-dropped test file is invisible
 unless the collected count is compared.
 
-## Open question
+## Decision: Greenline nests under totals
 
-`research/totals/` is Greenline **vendor grading** — `grade_greenline.py`,
-`greenline_vs_pinnacle.py`, `match_greenline_books.py` — not research on the totals model.
-It is absent from the root `CLAUDE.md` Units table and has no `CLAUDE.md`.
+**Settled 2026-09-16: `research/totals/greenline/`, not a sibling unit.**
 
-Recommendation: make it its own unit, `research/greenline/`, with its own `CLAUDE.md`,
-and add it to the Units table. The alternative — fold it under a totals umbrella — mixes
-a vendor-evaluation subject with a model subject and would make `MEMORY.md`'s
-"personal unders were PFF flags" caveat harder to keep in view.
+An earlier draft of this plan recommended promoting Greenline to its own top-level
+`research/greenline/` unit, on the grounds that vendor evaluation is a different subject
+from totals modeling. That recommendation is withdrawn. Greenline evaluation *is* totals
+work — it grades a totals board — and `research/totals/` already exists as a real unit
+with its own `CLAUDE.md` and a row in the root Units table. Splitting it out would create
+a fourth research unit to hold nine scripts and trade one navigational problem for another.
 
-This is a naming decision, not a technical one; Step 6 is the only step it touches.
+Correcting the earlier draft: `research/totals/` is **not** missing from the Units table
+and **does** have a `CLAUDE.md` — both were added by the 2026-09-16 docs pass. The stale
+claim came from `docs/README.md`, whose "one status question this pass does not settle"
+paragraph predates that promotion. That paragraph should be marked settled in Step 7.
+
+The problem that remains is internal, and `research/totals/docs/README.md` already names
+it exactly: two strands, "with nothing shared between them", sharing one flat `scripts/`
+and one flat `docs/`. The fix is to give strand 1 its own subtree.
+
+### Target
+
+```
+research/totals/
+  CLAUDE.md               keep; re-point its script and doc paths
+  README.md               moved up out of docs/ — it indexes the unit, not one strand
+  greenline/              strand 1: vendor-pick evaluation
+    scripts/              the 9 greenline_* / grade_ / match_ scripts
+    docs/                 the 3 greenline-*.md reviews + figs/
+  docs/                   strand 2 only: fbs-totals-*, research-prompts/fbs-totals/
+```
+
+### The one real hazard
+
+Every Greenline script resolves the repo root by **depth**:
+
+```python
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))   # research/totals/scripts/x.py → repo root
+```
+
+Nesting one level deeper makes `parents[3]` resolve to `research/totals/` instead of the
+repo root, and `from cfb_paths import INGEST` fails. **All 9 scripts need `parents[3]` →
+`parents[4]`.** This is the same depth-sensitivity that makes over_zero expensive
+(Finding 2); it is cheap here only because there are nine files and the edit is uniform.
+
+The sibling imports (`from match_greenline_books import ...`,
+`from greenline_season_review import ...`) use `sys.path.insert(0, parent)` and survive,
+because all nine move together.
+
+### Everything else that names these paths
+
+| Surface | What breaks |
+| --- | --- |
+| `research/totals/docs/README.md` | relative links `../scripts/greenline_*.py` (10 of them) and `figs/` |
+| `research/totals/CLAUDE.md` | the pipeline listing and `docs/greenline-season-review-2026-09-16.md` |
+| root `docs/README.md` | lines 12, 145–147, 173, and the stale status paragraph at 177 |
+| `greenline-totals-season-2026-09-16.md` | `figs/*.png` — survives if `figs/` moves with it |
+| `greenline_season_review.py --figs` | writes into `figs/` beside `--out`; relative, survives |
+| 9 script docstrings | usage lines read `python research/totals/scripts/...` |
+| `greenline_bet_stats.py:158` | emits its own path **into generated markdown** — stale provenance in future review docs if missed |
+
+No test references it (`tests/` has no `research/totals` path) and no scheduled task runs
+it — the six `CFB-*` tasks do not include Greenline. So this step has neither of the two
+nastiest breakage surfaces, which is why it sits early in the sequence.
 
 ## What this plan does not support
 
@@ -282,5 +346,5 @@ python -m pytest --collect-only -q | tail -1
 Get-ScheduledTask -TaskName 'CFB-*' | ForEach-Object { $n=$_.TaskName; $_.Actions | ForEach-Object { "$n :: $($_.Execute) $($_.Arguments)" } }
 ```
 
-If Step 4 is executed, the import-closure computation gets a real script at
+If Step 5 is executed, the import-closure computation gets a real script at
 `scripts/audit_import_closure.py` — it is the one piece here worth re-running.
