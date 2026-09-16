@@ -99,6 +99,26 @@ def report(rows: list[dict], z: float) -> str:
     return "\n".join(L)
 
 
+def edge_sweep(rows: list[dict], z: float) -> str:
+    """Win rate of PFF under flags at or above each stated-edge cutoff: is there a floor worth using?"""
+    U = [r for r in rows if r["source"] == "pff" and r["market"] == "total" and r["side"] == "under"
+         and r["value"] and r["result"] != "push"]
+    L = ["", f"PFF stated edge as a cutoff (2026 under flags, n={len(U)}):", "",
+         f"{'min edge':>9} {'record':>8} {'win%':>6} {'floor':>6} {'EV@floor':>9}"]
+    for t in (0.0, 0.02, 0.03, 0.035, 0.04, 0.05):
+        s = [r for r in U if float(r["value"]) >= t]
+        w = sum(r["result"] == "win" for r in s)
+        if s:
+            lo, _ = wilson(w, len(s), z)
+            L.append(f"{t * 100:8.1f}% {w:>4}-{len(s) - w:<3} {w / len(s) * 100:5.1f}% {lo * 100:5.1f}% "
+                     f"{(lo * B110 - (1 - lo)) * 100:+8.1f}%")
+    xs = sorted(U, key=lambda r: float(r["value"]))
+    h = len(xs) // 2
+    lo_w = sum(r["result"] == "win" for r in xs[:h]); hi_w = sum(r["result"] == "win" for r in xs[h:])
+    L.append(f"bottom half by edge {lo_w}-{h - lo_w}, top half {hi_w}-{len(xs) - h - hi_w}")
+    return "\n".join(L)
+
+
 def self_check() -> None:
     assert american(0.5238) == "-110" and american(0.5) == "+100" and american(0.4) == "+150"
     assert abs(kelly(0.5238)) < 0.001 and abs(kelly(0.60) - (0.6 * B110 - 0.4) / B110) < 1e-9
@@ -125,6 +145,7 @@ def main() -> None:
         raise SystemExit(f"{src} not found -- run greenline_season_review.py first")
     rows = list(csv.DictReader(src.open(encoding="utf-8")))
     print(report([bound_row(lab, rs, args.z) for lab, rs in splits(rows)], args.z))
+    print(edge_sweep(rows, args.z))
 
 
 if __name__ == "__main__":

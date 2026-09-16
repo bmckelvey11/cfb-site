@@ -196,3 +196,19 @@ At a 90% interval the pooled all-unders floor is 51.4% (still short), 55-59.5 ri
 **Answer.** No split clears at the floor once you account for how it was chosen. The pooled all-unders floor is 50.3%, two points short; a true 56% edge needs about 720 games before its 95% floor clears break-even, and there are 240. The two bands that clear (55-59.5 at 53.4%, <45 on 12 games) are 2 of 8 looks at one sample, and the 2023-25 history that picked 55-59.5 as the band to watch is inside its own pooled floor. The clean pre-registered test for that band is 2026 alone: 12-4, floor 51%, not there yet.
 
 **If betting anyway**, the floor gives the sizing and the price discipline: 55-59.5 unders at quarter-Kelly of the floor is 0.5% of bankroll per bet, and nothing worse than -115. Everything outside that band is entertainment-priced at the floor, whatever the point estimate says.
+
+## Lower bound of PFF's own edge
+
+Is there a minimum PFF `value` below which flags should be skipped? Sweep on the 2026 under flags (`greenline_bet_bounds.py`, second table):
+
+| min PFF edge | record | win% | 95% floor |
+|---:|---|---:|---:|
+| any (>0) | 21-15 | 58.3% | 42% |
+| 2% | 20-14 | 58.8% | 42% |
+| 3% | 16-12 | 57.1% | 39% |
+| 3.5% | 12-10 | 54.5% | 35% |
+| 4% | 3-6 | 33.3% | 12% |
+
+Spearman between stated edge and win: -0.11. Bottom half by edge 11-7, top half 10-8. Repriced at DraftKings the picture is the same: every positive-edge flag 15-8, 4%+ only 5-5.
+
+**Answer.** No floor is supported. The win rate is flat from any-positive through 3.5% and then falls, so raising the cutoff removes bets without improving the ones left. The only cutoff the data backs is zero after repricing: skip a flag when the book's number erases the edge (`match_greenline_books.py` does this), not when PFF's number is small. Thirty-nine games; a threshold effect worth 5 points of win rate would need several hundred to show.
