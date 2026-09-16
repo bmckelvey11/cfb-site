@@ -79,12 +79,19 @@ in any row count.
 
 The three books with real history all stop at or before 2023. Every sharp book
 starts in 2024 or later. **There is no season in which `consensus` and `pinnacle`
-both appear** — zero overlap, so the two cannot be calibrated against each other
-on this data.
+both appear**, so the two can never be compared directly on the same slate.
 
-A backtest running 2013→2026 on "the line" is therefore quietly switching which
-market it is measuring partway through. `bovada` (2019–2026, 8 seasons) and
-`caesars` (2018–2026, 6) are the only books that straddle the cut.
+They can be compared *indirectly*, and it is worth being precise about that
+rather than overstating the break. `bovada` runs 2019–2026 unbroken, overlapping
+`consensus` for five seasons (2019–2023) and `pinnacle` for two (2025–2026);
+`espn bet` (2023, 2024, 2025) bridges the same gap more narrowly. So a chained
+calibration through `bovada` is available even though a direct one is not.
+`caesars` looks like a bridge on its first/last years but is not — it is missing
+2021, 2022 and 2023 entirely.
+
+What does not survive is an unqualified 2013→2026 backtest on "the line": it
+silently changes which market it measures partway through, and the change lands
+between 2023 and 2024.
 
 ### 3. Tick-level movement is 2026-only
 
@@ -106,6 +113,33 @@ books, 160 games.
 So: CLV as a *number* is computable back to 2021 (open vs close). CLV with
 *timing* — did we beat the close by acting at the right hour — is a 2026-and-
 forward question with a few hundred games behind it.
+
+### 3b. Full-game Action Network lines have stopped accruing this season
+
+The 2026 row above is not just partial, it is *diverging*, and the two tables
+move in opposite directions week by week:
+
+| 2026 week | `an_market` (full game) | `an_history` (1H/1Q) |
+| ---: | ---: | ---: |
+| 1 | 99 | 99 |
+| 2 | **7** | 86 |
+| 3 | **0** | 74 |
+| 4 | **0** | 4 |
+
+In 2024 and 2025 `an_market` slightly *led* `an_history` (899 vs 858; 892 vs
+872). In 2026 it stops after week 1 while the 1H/1Q tape keeps filling.
+
+The cause is the retirement of the bulk Action Network scrape on 2026-09-11
+([odds-sources-an-vs-apis-2026-09-11.md](../../docs/odds-sources-an-vs-apis-2026-09-11.md)).
+`an_market` is built from the scoreboard's `markets` blob, which only the retired
+bulk scrape wrote; `an_history` and `an_history_tick` come from
+`collect_line_timing.py`, which still runs Mondays. So full-game AN lines were an
+unannounced casualty of that retirement.
+
+Whether that matters is a judgement call — the-odds-api now covers full-game
+markets across 9 books and was the stated reason for the retirement. But it is a
+silent change in what the warehouse holds, and per the note below, a week not
+collected cannot be back-filled.
 
 ### 4. 2012 is empty at the source, and it explains the `gameLines` audit gap
 
@@ -139,20 +173,36 @@ completely, with nothing left over:
   opener differ systematically from those without (bigger games? earlier kickoffs?)
   was not tested, and if they do, any movement model fit on them is selected.
 - **Nothing here validates the 2026 AN tick tape.** 263 of 888 events is what the
-  collector has reached, not a checked sample; `market` covering only 106 events
-  while `1H/1Q` covers 263 is unexplained and worth a look.
+  collector has reached, not a checked sample.
+- **This says nothing about the spread model's line data.** `weekly_slate.py`
+  reads Prediction Tracker captures (`ingest/prediction_tracker/`, via
+  `eval_prediction_tracker_models` and `processed/pt_movement*.json`), **not**
+  `core.fact_game_line`. Its "20 walk-forward seasons" are PT seasons. None of
+  the findings above — the 2021 opener floor, the 2023/24 book break — have been
+  shown to apply to it, and PT coverage was not audited here. Do not read this
+  report as clearing or condemning that model; it is a different tape.
 - **No claim about edge.** Coverage is the input to a model, not evidence that
   any of it is predictive.
 
 ## What follows from it
 
-1. **Fix the era in any backtest, or fix the book.** 2021–2026 is the honest
-   window for opener→close work. If a longer window is needed, `bovada` is the
-   only book with both meaningful history and current presence.
-2. **The 2026 tick tape is the scarce asset.** It is the only timestamped record
+1. **Decide whether losing full-game AN lines was intended.** This is the only
+   item here that is still changing. If the-odds-api is meant to replace them,
+   nothing to do beyond noting it; if not, `an_market` has been dead since week 1
+   and every week that passes is gone. Cheapest check is whether anything reads
+   `stg.an_market`. Two do: `research/spread/scripts/eval_line_shopping.py`
+   (`TABLE = "stg.an_market"`) and `check_pt_line_is_close.py`. Both are pinned
+   to `SEASONS = (2024, 2025)`, so both still work — but either one extended to
+   2026 would silently read a single week and report a line-shopping result off
+   99 events. `models/over_zero` is unaffected; it reads `raw.an_*` directly.
+2. **Fix the era in any backtest, or fix the book.** 2021–2026 is the honest
+   window for opener→close work on the warehouse tape. If a longer window is
+   needed, `bovada` is the only book with both meaningful history and current
+   presence, and it is also the bridge for comparing the old panel to the new.
+3. **The 2026 tick tape is the scarce asset.** It is the only timestamped record
    and it only accumulates going forward, which argues for keeping
    `CFB-AN-History` (Mondays 09:00) healthy — a missed week is not recoverable
    by re-scraping.
-3. **Treat pre-2021 as close-only.** Eight seasons of closing lines are still
+4. **Treat pre-2021 as close-only.** Eight seasons of closing lines are still
    usable for grading and for margin-vs-close work; they just cannot answer a
    movement question.
