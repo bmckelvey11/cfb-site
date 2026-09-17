@@ -89,6 +89,36 @@ The 2026 captures (63 under flags, weeks 2-3) against the 201 bet unders, both b
 | DUKE | 7 | 28 | 25% | 4-3 |
 | FAU | 7 | 25 | 28% | 3-4 |
 
+## Reading
+
+**1. The selection is a rule, not a shrug.** Bet unders sit at a median total of 58.0 against 51.5 for the games passed over on the same days. 78% of the bets are on totals of 55 or more, against 31% of the slate (z +13.1). Spread magnitude, by contrast, is flat -- the picks are not about mismatches, they are about high numbers.
+
+**2. The rule does not explain the profit.** The two heaviest bands disagree: 55-59.5 went 50-32 (61%) on 82 bets while 60-64.5 went 30-30 exactly (50%) on 60. Betting high totals is where the volume went; it is not uniformly where the winning came from, and 50-54.5 went 6-11.
+
+**3. Line shopping is real but small, and not the explanation.** The taken number beat the warehouse's selected total by a mean of +0.47 points. That is worth something at these numbers, but it is nowhere near the ~4-point gap in finding 4.
+
+**4. The bet unders and the Greenline flags do not sit at the same numbers.** Medians 58.5 against 54.5. Nearly 30% of the bets are in 60-64.5, where the 2026 captures put 6.3% of their flags; over half the flags sit below 55, where only a fifth of the bets do. **So "13% of the flags" was never a subset relationship** -- it is roughly 13% by count at a materially different distribution of totals. That weakens the transfer that `scripts/mc_combined_totals.py` assumes when it pools these unders into the Greenline prior. It does not refute the pooling: the flag sample is two weeks of 2026 against a 2.3-season betting record, and Greenline's 2023-25 flag distribution is unobserved -- which is the same missing archive that made the real join impossible.
+
+## What this does not support
+
+- **A filter.** Every split here is measured on the same 201 bets that produced the pooled 56.4%. The high-total tilt is a hypothesis to test against the 2026 captures, not a rule to bet.
+- **Any claim about which flags were skipped.** The comparison set is all FBS games, not PFF's flag list.
+- **The distribution gap as settled.** n=63 flags, weeks 2-3 only.
+
+## Follow-ups
+
+1. **Record which flags get bet, starting now.** From 2026 week 2 forward both a capture and a bet can exist in the same week. A few weeks of that answers the coverage and distribution questions directly, where no amount of work on 2023-25 can.
+2. **`greenline_unders.py`'s `BANDS` constant does not reconcile.** Its rows sum to 202 bets and 88 losses against a record of 201 and 87; the tables above sum to 201 and 87 exactly. The `<45` and `65+` rows are where it differs.
+
+## Reproduce
+
+```
+python research/totals/scripts/under_selection_profile.py \
+  --out research/totals/docs/under-selection-profile-2026-09-17.md
+```
+
+Data: `data/ingest/bet_history/history.csv` (201 full-game NCAAF unders, 2023-08 to 2025-12), `core.fact_game` + `core.dim_team` for the slate, `data/ingest/pff_scoreboard/greenline_unders_2026_w*.csv` for the flags.
+
 ## Weekday
 
 | day | bet | share of bet | share of slate |

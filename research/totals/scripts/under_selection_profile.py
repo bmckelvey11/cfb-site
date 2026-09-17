@@ -326,7 +326,74 @@ def render(d: dict) -> str:
     for t, k in team.most_common(10):
         out.append(f"| {t} | {k} | {avail[t]} | {k / avail[t]:.0%} | {rec[t][0]}-{rec[t][1]} |")
 
-    out += ["", "## Weekday", "",
+    hi = sum(1 for r in bet if r["total"] >= 55)
+    hi_un = sum(1 for r in unbet if r["total"] >= 55)
+    z55 = two_prop_z(hi, len(bet), hi_un, len(unbet))
+    by = {b["band"]: b for b in d["by_line"]}
+    out += ["", "## Reading", "",
+            f"**1. The selection is a rule, not a shrug.** Bet unders sit at a median "
+            f"total of {statistics.median([r['total'] for r in bet]):.1f} against "
+            f"{statistics.median([r['total'] for r in unbet]):.1f} for the games passed "
+            f"over on the same days. {hi / len(bet):.0%} of the bets are on totals of 55 "
+            f"or more, against {hi_un / len(unbet):.0%} of the slate (z {z55:+.1f}). "
+            f"Spread magnitude, by contrast, is flat -- the picks are not about "
+            f"mismatches, they are about high numbers.",
+            "",
+            f"**2. The rule does not explain the profit.** The two heaviest bands "
+            f"disagree: 55-59.5 went {by['55-59.5']['w']}-{by['55-59.5']['l']} "
+            f"({by['55-59.5']['pct']:.0%}) on {by['55-59.5']['n']} bets while 60-64.5 "
+            f"went {by['60-64.5']['w']}-{by['60-64.5']['l']} exactly "
+            f"({by['60-64.5']['pct']:.0%}) on {by['60-64.5']['n']}. Betting high totals "
+            f"is where the volume went; it is not uniformly where the winning came from, "
+            f"and 50-54.5 went {by['50-54.5']['w']}-{by['50-54.5']['l']}.",
+            "",
+            "**3. Line shopping is real but small, and not the explanation.** The taken "
+            "number beat the warehouse's selected total by a mean of +0.47 points. That "
+            "is worth something at these numbers, but it is nowhere near the ~4-point gap "
+            "in finding 4.",
+            "",
+            "**4. The bet unders and the Greenline flags do not sit at the same numbers.** "
+            "Medians 58.5 against 54.5. Nearly 30% of the bets are in 60-64.5, where the "
+            "2026 captures put 6.3% of their flags; over half the flags sit below 55, "
+            "where only a fifth of the bets do. **So \"13% of the flags\" was never a "
+            "subset relationship** -- it is roughly 13% by count at a materially different "
+            "distribution of totals. That weakens the transfer that "
+            "`scripts/mc_combined_totals.py` assumes when it pools these unders into the "
+            "Greenline prior. It does not refute the pooling: the flag sample is two "
+            "weeks of 2026 against a 2.3-season betting record, and Greenline's 2023-25 "
+            "flag distribution is unobserved -- which is the same missing archive that "
+            "made the real join impossible.",
+            "",
+            "## What this does not support",
+            "",
+            "- **A filter.** Every split here is measured on the same 201 bets that "
+            "produced the pooled 56.4%. The high-total tilt is a hypothesis to test "
+            "against the 2026 captures, not a rule to bet.",
+            "- **Any claim about which flags were skipped.** The comparison set is all FBS "
+            "games, not PFF's flag list.",
+            "- **The distribution gap as settled.** n=63 flags, weeks 2-3 only.",
+            "",
+            "## Follow-ups",
+            "",
+            "1. **Record which flags get bet, starting now.** From 2026 week 2 forward both "
+            "a capture and a bet can exist in the same week. A few weeks of that answers "
+            "the coverage and distribution questions directly, where no amount of work on "
+            "2023-25 can.",
+            "2. **`greenline_unders.py`'s `BANDS` constant does not reconcile.** Its rows "
+            "sum to 202 bets and 88 losses against a record of 201 and 87; the tables above "
+            "sum to 201 and 87 exactly. The `<45` and `65+` rows are where it differs.",
+            "",
+            "## Reproduce",
+            "",
+            "```",
+            "python research/totals/scripts/under_selection_profile.py \\",
+            "  --out research/totals/docs/under-selection-profile-2026-09-17.md",
+            "```",
+            "",
+            "Data: `data/ingest/bet_history/history.csv` (201 full-game NCAAF unders, "
+            "2023-08 to 2025-12), `core.fact_game` + `core.dim_team` for the slate, "
+            "`data/ingest/pff_scoreboard/greenline_unders_2026_w*.csv` for the flags.",
+            "", "## Weekday", "",
             "| day | bet | share of bet | share of slate |", "|---|---:|---:|---:|"]
     dow = lambda s: dt.date.fromisoformat(s).strftime("%a")  # noqa: E731
     sl2 = Counter(dow(g["date"]) for g in bet + unbet)

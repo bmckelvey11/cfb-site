@@ -1,7 +1,8 @@
 # Monte Carlo: $20,000 bankroll across over-zero + Greenline totals, weeks 4–15 of 2026
 
 Completed September 17, 2026. Revised the same day to pool the personal under history
-into the Greenline prior. Reproduce with
+into the Greenline prior, then again to bracket the headline between the pooled and
+graded-flags-only priors. Reproduce with
 `python scripts/mc_combined_totals.py --paths 100000`
 (`--self-check` runs the copula, prior and coverage assertions).
 
@@ -17,17 +18,24 @@ on a different calendar and Greenline's flag volume is not established for them.
 
 ## The answer in one paragraph
 
+**The answer is bracketed, not resolved, and the bracket is the Greenline prior.**
 Betting the Greenline unders at the rate they have historically been bet (~6 a week)
-at 1% units, alongside the over-zero OVERs: median **$21,306 (+6.5%)**, 90% band
-**$17,685 to $24,888**, **27.7% chance of finishing down**, no path through zero.
-The Greenline win rate is drawn from a **141–109 pooled record** — 27–22 from the
-2026 graded flags plus **114–87 from the 201 full-game unders in the personal book
-export, 2023-08 to 2025-12**, which were mostly PFF Greenline flags. That pooling is
-what changes the picture: on the graded flags alone (n=49) 35% of paths drew a losing
-Greenline win rate; pooled, only **10%** do. The edge is now supported by the
-evidence in the repo. What it is supported *by* is a selection-filtered personal
-record — roughly 13% of the flags, the ones that got picked — which is why the
-volume question below matters more than the stake question.
+at 1% units, alongside the over-zero OVERs:
+
+| Greenline prior | median | 90% band | P(down) |
+|---|---:|---|---:|
+| `pooled` — 141–109, the 2026 flags **plus** 201 personal unders | **$21,306** (+6.5%) | $17,685 – $24,888 | **27.7%** |
+| `n49` — 27–22, the 2026 graded flags alone | **$20,930** (+4.7%) | $16,164 – $25,564 | **37.4%** |
+
+Neither is the answer on its own. The pooled prior adds **114–87 from the 201
+full-game unders in the personal book export, 2023-08 to 2025-12**, which were mostly
+PFF Greenline flags — the same signal in earlier seasons. That drops the probability
+of drawing a losing Greenline win rate from 35% to 10%. But
+`research/totals/docs/under-selection-profile-2026-09-17.md` shows those 201 unders
+sit at a **median total of 58.5 against 54.5 for the 2026 flags**, so the two
+populations are not the same and the pooled prior probably overstates. Greenline's
+2023–25 flag distribution is unobserved, so how much it overstates cannot be settled
+from what exists. Plan between the two rows.
 
 ## Method
 
@@ -39,14 +47,15 @@ path from a Jeffreys Beta posterior, never fixed at a point estimate.
 | prior | record | source | posterior mean | P(below break-even) |
 |---|---|---|---:|---:|
 | `n49` | 27–22 | 2026 week 2 graded flags | 55.0% | 35% |
-| **`pooled` (used)** | **141–109** | **+ 201 personal unders, 2023–2025 (114–87)** | **56.4%** | **10%** |
+| **`pooled`** | **141–109** | **+ 201 personal unders, 2023–2025 (114–87)** | **56.4%** | **10%** |
 | `pff-window` | 99–72 | + the 2024-25 slice only (72–50) | 57.9% | 7% |
 
 The personal unders come from `data/ingest/bet_history/history.csv` —
 201 full-game NCAAF unders, 114–87, no pushes, mean price **−110.1**, which is why
 the Greenline leg stays priced at −110. By season: 2023 42–37, 2024 18–12,
 2025 54–38. Summarised in `docs/bet-history-analysis-2023-2025.md` (114-87, 56.7%,
-CI 49.8–63.4, +19.0u).
+CI 49.8–63.4, +19.0u) and profiled game by game in
+`research/totals/docs/under-selection-profile-2026-09-17.md`.
 
 **This is pooled as prior evidence, not as independent confirmation.** Those unders
 were mostly PFF Greenline flags — the same signal in earlier seasons, bet by the same
@@ -62,9 +71,14 @@ median by $439.
 ### Coverage: the population question
 
 The 201-bet record is **not** a record of betting every flag. In 2025 it covers ~92
-unders against roughly 690 flags at the current rate — about **13%**. The pooled
-56.4% therefore describes *the flags that got picked, at prices that got shopped*.
-The other 87% are the flags that got passed on, and they have no record at all.
+unders against roughly 690 flags at the current rate — about **13% by count, and at a
+materially different distribution of totals**, not a subset. The selection profile
+puts the bet unders at a median total of 58.5 against 54.5 for the 2026 flags, with
+30% of the bets in the 60–64.5 band where the flags put 6.3%, and finds the selection
+is a genuine rule: 78% of the bets are on totals of 55 or more against 31% of the
+available slate (z +13.1). A +0.47-point mean line-shopping edge does not close a
+~4-point gap. So the pooled 56.4% describes *a different, higher-total population of
+unders* than the one the Greenline leg would actually bet.
 
 So coverage is a scenario, not a constant:
 
@@ -127,11 +141,13 @@ Worst single week: median −$833, 5th percentile −$1,452.
 
 ## What the numbers say
 
-**1. Pooling the personal unders is the whole revision.** It moves the Greenline
-posterior from 55.0% (sd 0.07) to 56.4% (sd 0.031) and the probability of drawing a
-losing win rate from 35% to 10%. Everything downstream follows from that. Compare the
-two `n49` rows against their pooled twins: same volumes, same stakes, P(down) drops
-36.0% → 20.6% and 37.4% → 27.7%.
+**1. The Greenline prior is the whole projection, and it is the thing least
+settled.** Pooling moves the posterior from 55.0% (sd 0.07) to 56.4% (sd 0.031) and
+the probability of drawing a losing win rate from 35% to 10%; P(down) drops
+36.0% → 20.6% and 37.4% → 27.7% at matched volumes and stakes. But the selection
+profile shows the pooled half comes from a higher-total population than the flags,
+so 56.4% is an upper reading and 55.0% a lower one. Everything else in this document
+is stable across that choice; the headline is not.
 
 **2. Volume, not stake, is the live decision — and it points the opposite way from
 intuition.** Betting every flag at 0.25% *lowers* P(down) to 20.6% versus 27.7% at the
@@ -167,6 +183,10 @@ tail number is not, because ρ is assumed.
 - **Greenline as independently validated.** The pooled prior is 80% personal-betting
   history of the same signal. It is prior evidence, not an outside check. The 2026
   graded flags alone remain n=49, CI 41–68%.
+- **The pooled prior as transferable in full.** The 201 unders sit ~4 points higher in
+  total than the 2026 flags and load a band (60–64.5) the flags barely touch. That is
+  a different population, so pooling probably overstates. By how much is unknowable
+  from what exists — the 2023–25 flag distribution was never captured.
 - **The "every flag" rows as achievable.** They assume the picked-flag win rate
   transfers to the 87% that were passed on.
 - **Any claim about the selection rule.** The personal record is price-shopped and
@@ -189,10 +209,12 @@ tail number is not, because ρ is assumed.
    juice twice, not two bets. Rare so far only because over-zero's early picks are FCS
    cupcakes PFF does not flag; that changes as its remaining bets move to FBS
    matchups. **"Combined" needs a stated rule before it is bet.**
-2. **The selection rule is unencoded.** The single highest-value follow-up is joining
-   the 201 personal unders back to the flag lists that produced them to recover *which*
-   flags got bet. That would turn "13% coverage" from an assumption into a filter, and
-   would say whether the "every flag" rows are reachable.
+2. **Record which flags get bet, starting now.** The join that would settle coverage —
+   bet unders against the flags that produced them — **cannot be run**: Greenline
+   captures start at 2026 week 2, the warehouse holds no Greenline projections, and the
+   bet history ends 2025-12. There is no season where both exist. From week 2 forward
+   there is, so logging which flags get taken answers coverage and the distribution gap
+   in a few weeks, where no further work on 2023–25 can.
 3. **Keep grading.** Four more graded weeks gets the 2026 flags to n ≈ 250 on their
    own, at which point the prior stops doing the work. Capture Wednesday
    (`scripts/pull_pff_scoreboard.py --greenline`), grade Monday
