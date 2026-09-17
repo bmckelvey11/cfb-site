@@ -13,7 +13,10 @@ other, and nothing here re-litigates A2 or A6.
 
 PT publishes ~150 named model columns. Does any of them, bet against the closing line, make money?
 
-## Answer: no. Not one of 109 screened models, and picking the best one out-of-sample lands on a coin flip.
+## Answer: none is demonstrably profitable, and picking the best one out-of-sample lands on a coin flip.
+
+The walk-forward read is decisive (§ 1, and § 3 on its power). The per-model leaderboard is
+weaker than it first looks: it convicts 73 of 109 and leaves 36 unresolved — see § 3.
 
 ### 0. These are not rescalings of the market
 
@@ -81,11 +84,39 @@ significantly *below* break-even, none above.** The test is two-sided against 0.
 The distribution across all 109 is centred on a coin flip (mean 0.4984, sd 0.0122, median
 0.4987). The models are not systematically wrong; they are systematically not worth −110.
 
+### 3. What these tests could have detected
+
+Added 2026-09-17, alongside the same block in the companion studies. "Zero models clear
+break-even" is only half the picture; the other half is how many had the precision for a real
+edge to have shown up.
+
+| | count |
+|---|---|
+| CI lower bound above break-even (**a proven winner**) | **0** of 109 |
+| CI entirely below break-even (**an edge excluded**) | **73** of 109 |
+| CI upper bound above break-even (**an edge not excluded**) | **36** of 109 |
+
+Median per-model SE is 0.0084, so the median MDE at 80% power is 0.0235 — enough to convict two
+thirds of the family and no more. **The sweep does not prove every model is worthless.** It
+shows that none is demonstrably good, and that 36 of them remain unresolved at this sample size.
+
+The walk-forward read carries no such caveat:
+
+| | value |
+|---|---|
+| SE | 0.00518 |
+| MDE at 80% power | 0.0145 |
+| gap to break-even | +0.0237 = **1.6x the MDE** |
+
+That is the read the answer rests on, and it is well powered.
+
 ## What this does not support
 
-- **Not a claim the models are uninformative.** They are not rescalings of the line (§0), and
+- **Not a claim the models are uninformative.** They are not rescalings of the line (§ 0), and
   A2/A6 measured real content against the movement target. This says they do not convert to ATS
   profit against the close.
+- **Not a claim that all 109 are unprofitable.** 73 have an edge excluded; **36 do not** (§ 3).
+  The decisive result is the walk-forward, not the leaderboard.
 - **Not a result about E4.** E4 is opener-anchored on a screened top-20 consensus, fit; these are
   raw single-model columns graded at the close. Different object, different estimand.
 - **Not a survivorship-clean statement about the excluded 43 columns.** Models below the screen

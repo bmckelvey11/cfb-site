@@ -120,6 +120,61 @@ def main() -> int:
         out[f"quintiles_{col}"] = rows
         print(f"  break-even {BREAKEVEN:.4f}. AUC is of the panel signal (-disagree) on HOME cover.")
 
+    # TREND. Five separate quintile tests are a weak way to ask "does linestd modulate the
+    # signal" -- each is underpowered and a non-monotone table can hide a real slope. One
+    # regression of the win indicator on linestd is the powered version.
+    print("")
+    print("TREND -- does the panel signal degrade as the panel disagrees with itself?")
+    X = np.column_stack([np.ones(len(d)), d.linestd.to_numpy(float)])
+    b, *_ = np.linalg.lstsq(X, won.astype(float), rcond=None)
+    xs = d.linestd.to_numpy(float)
+    uniq = np.unique(seasons)
+    idx = {c: np.flatnonzero(seasons == c) for c in uniq}
+    slopes, at2 = [], []
+    for _ in range(N_BOOT):
+        tk = np.concatenate([idx[c] for c in RNG.choice(uniq, len(uniq), replace=True)])
+        Xb = np.column_stack([np.ones(len(tk)), xs[tk]])
+        bv, *_ = np.linalg.lstsq(Xb, won.astype(float)[tk], rcond=None)
+        slopes.append(bv[1])
+        at2.append(bv[0] + 2 * bv[1])
+    s_lo, s_hi = float(np.percentile(slopes, 2.5)), float(np.percentile(slopes, 97.5))
+    cross = (BREAKEVEN - b[0]) / b[1]
+    out["trend"] = {"intercept": float(b[0]), "slope": float(b[1]), "slope_lo": s_lo,
+                    "slope_hi": s_hi, "breakeven_crossing_linestd": float(cross),
+                    "observed_min_linestd": float(xs.min()),
+                    "pred_at_2": float(b[0] + 2 * b[1]),
+                    "pred_at_2_lo": float(np.percentile(at2, 2.5)),
+                    "pred_at_2_hi": float(np.percentile(at2, 97.5))}
+    print(f"  ATS = {b[0]:.4f} {b[1]:+.5f} * linestd   slope 95% CI [{s_lo:+.5f}, {s_hi:+.5f}]")
+    print("  The slope is negative and its interval excludes 0: the signal really does decay as")
+    print("  the panel disagrees. But the size is what matters --")
+    print(f"  break-even {BREAKEVEN:.4f} is reached only at linestd = {cross:.2f}, and the "
+          f"observed minimum is {xs.min():.2f}.")
+    print(f"  Even extrapolated to linestd = 2 the fit gives {b[0] + 2 * b[1]:.4f} "
+          f"[{np.percentile(at2, 2.5):.4f}, {np.percentile(at2, 97.5):.4f}].")
+    for thr in (2.5, 3.0, 3.5):
+        m = xs <= thr
+        print(f"  actual games with linestd <= {thr}: n {int(m.sum()):5d}  ATS {won[m].mean():.4f}")
+
+    print("")
+    print("POWER -- what could these tests have detected?")
+    se_base = (out["baseline_all_games"]["hi"] - out["baseline_all_games"]["lo"]) / 3.92
+    gap = BREAKEVEN - out["baseline_all_games"]["ats"]
+    print(f"  baseline: SE {se_base:.5f}, MDE at 80% power {2.8 * se_base:.4f}; the gap to "
+          f"break-even is {gap:+.4f}, {gap / (2.8 * se_base):.1f}x the MDE -- decisive.")
+    pw = {"se_baseline": float(se_base), "mde_baseline_80": float(2.8 * se_base),
+          "gap_to_breakeven_in_mde": float(gap / (2.8 * se_base))}
+    for col in ("linestd", "linestd_resid"):
+        q = pd.DataFrame(out[f"quintiles_{col}"])
+        mde = 2.8 * (q.hi - q.lo) / 3.92
+        cant = int((q.hi > BREAKEVEN).sum())
+        pw[f"median_mde_{col}"] = float(mde.median())
+        pw[f"quintiles_cannot_exclude_edge_{col}"] = cant
+        print(f"  quintiles of {col}: median MDE {mde.median():.4f}; {cant} of {len(q)} have an "
+              f"upper bound above break-even, so a small edge there is NOT excluded.")
+    out["power"] = pw
+    print("  The pooled baseline and the trend are well powered; the per-quintile cells are not.")
+
     OUT.write_text(json.dumps(out, indent=2))
     print("")
     print(f"wrote {OUT}")

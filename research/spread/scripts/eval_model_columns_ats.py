@@ -157,6 +157,34 @@ def main() -> int:
     out["n_q_below_10pct"] = int((lb.q < 0.10).sum())
     out["n_ci_clears_breakeven"] = int((lb.lo > BREAKEVEN).sum())
 
+    # POWER. "Zero models clear break-even" is only half the picture: the other half is how
+    # many had enough precision for a real edge to have shown up. A model whose interval spans
+    # break-even has not been cleared OR convicted.
+    print("")
+    print("POWER -- what could these tests have detected?")
+    se = (lb.hi - lb.lo) / 3.92
+    mde = 2.8 * se
+    cant_exclude = int((lb.hi > BREAKEVEN).sum())
+    excluded = int((lb.hi <= BREAKEVEN).sum())
+    print(f"  per model: median SE {se.median():.4f}, median MDE at 80% power {mde.median():.4f}")
+    print(f"  CI lower bound above break-even (a proven winner): {int((lb.lo > BREAKEVEN).sum())}")
+    print(f"  CI upper bound above break-even (an edge NOT excluded): {cant_exclude} of {len(lb)}")
+    print(f"  CI entirely below break-even (an edge excluded): {excluded} of {len(lb)}")
+    print("  So the sweep convicts two thirds of the family and leaves the rest unresolved --")
+    print("  it does not prove every model is worthless, only that none is demonstrably good.")
+    pw = {"median_se": float(se.median()), "median_mde_80": float(mde.median()),
+          "n_proven_winner": int((lb.lo > BREAKEVEN).sum()),
+          "n_edge_not_excluded": cant_exclude, "n_edge_excluded": excluded}
+    if wf_won:
+        se_wf = (out["walk_forward"]["hi"] - out["walk_forward"]["lo"]) / 3.92
+        gap = BREAKEVEN - out["walk_forward"]["ats_season_mean"]
+        pw["se_walk_forward"] = float(se_wf)
+        pw["mde_walk_forward_80"] = float(2.8 * se_wf)
+        pw["gap_to_breakeven_in_mde"] = float(gap / (2.8 * se_wf))
+        print(f"  walk-forward: SE {se_wf:.5f}, MDE {2.8 * se_wf:.4f}; the gap to break-even is "
+              f"{gap:+.4f}, {gap / (2.8 * se_wf):.1f}x the MDE -- well powered.")
+    out["power"] = pw
+
     OUT.write_text(json.dumps(out, indent=2))
     print("")
     print(f"wrote {OUT}")

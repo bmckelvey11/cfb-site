@@ -10,7 +10,7 @@ pick a side — it can only claim to say **how much to trust something else**. T
 claim: does panel disagreement forecast how unpredictable the game is, and does the panel's own
 signal work better where the panel agrees with itself?
 
-## Answer: no to both. And the panel's side loses on 23 seasons.
+## Answer: it modulates the signal a little, nowhere near enough to matter. And the panel's side loses on 23 seasons.
 
 ### 1. `linestd` does not forecast game volatility
 
@@ -57,19 +57,66 @@ Cover rate of the panel's side by `linestd` quintile, season-cluster CIs:
 | 4 | 3,188 | 5.71 | 0.5060 | [0.4882, 0.5273] | 0.501 |
 | 5 (most disagreement) | 3,204 | 7.58 | 0.4813 | [0.4649, 0.4990] | 0.478 |
 
-Nothing clears 0.5238 — not one quintile's interval even reaches it. There is no monotone trend:
-the "most agreement" quintile (0.4994) and the "most disagreement" quintile (0.4813) are both
-losers, and quintile 4 is the best of the five.
+No quintile's point estimate clears 0.5238, and the table is not monotone — the "most
+agreement" quintile (0.4994) and the "most disagreement" quintile (0.4813) are both losers, with
+quintile 4 the best of the five. Repeating the cut on `linestd` residualized on `|line|`, so the
+quintiles are not a spread-size cut in disguise, gives the same picture (0.4818 to 0.5083).
 
-Repeating the cut on `linestd` residualized on `|line|`, so the quintiles are not a spread-size
-cut in disguise, changes nothing (0.4818 to 0.5083 across quintiles, every interval below
-break-even).
+**Corrected 2026-09-17** — this section first said "there is no monotone trend", resting on that
+non-monotone table. Five separate quintile tests are a weak way to ask the question: each has a
+median MDE of about 0.024, and a real slope can hide inside that. The powered version is one
+regression, and it does find something (§ 4).
+
+### 4. There *is* a trend — and it is far too small to matter
+
+Regressing the win indicator on `linestd`, season-cluster bootstrap on the slope:
+
+```
+ATS = 0.5205 - 0.00517 x linestd     slope 95% CI [-0.01004, -0.00052]
+```
+
+The interval excludes zero. The panel's signal really does decay as the panel disagrees with
+itself, so `linestd` is a genuine confidence modulator — the quintile table was simply too noisy
+to show it.
+
+It is also useless, and the arithmetic says so cleanly:
+
+| | value |
+|---|---|
+| `linestd` at which the fit reaches break-even | **-0.64** |
+| observed minimum `linestd` | 1.24 |
+| fitted ATS extrapolated to `linestd` = 2 | 0.5101 [0.4967, 0.5239] |
+
+Break-even is reached only at a **negative** dispersion, which cannot exist. And at the low end
+the extrapolation does not survive contact with the data:
+
+| cut | n | ATS |
+|---|---|---|
+| `linestd` <= 2.5 | 300 | **0.4733** |
+| `linestd` <= 3.0 | 1,083 | 0.4995 |
+| `linestd` <= 3.5 | 2,509 | 0.5054 |
+
+So the trend is statistically real and economically irrelevant: you would need to extrapolate
+past the physical floor of the variable to reach the vig.
+
+### 5. What these tests could have detected
+
+| test | MDE at 80% power | observed | reading |
+|---|---|---|---|
+| baseline vs break-even | 0.0103 | gap +0.0295 | **2.9x the MDE — decisive** |
+| trend slope vs 0 | — | CI excludes 0 | powered; effect real but tiny |
+| per-quintile vs break-even | ~0.024 | — | **1 of 5 quintiles has an upper bound above break-even** |
+
+The pooled baseline and the trend are well powered. The individual quintile cells are **not** —
+one of the five cannot exclude a small edge, which is why § 3 should be read as "no quintile is
+demonstrably profitable", not "every quintile is demonstrably unprofitable".
 
 ## What this does not support
 
-- **Not a claim that `linestd` is meaningless as a descriptive statistic.** It measures real
-  panel dispersion; it just has no forecasting content for the spread, and most of its variation
-  is spread size.
+- **Not a claim that `linestd` carries no information at all.** § 4 finds a real negative slope.
+  The claim is that the effect is far too small to lift the panel signal over the vig, and that
+  most of `linestd`'s raw variation is spread size.
+- **Not a claim that `linestd` forecasts volatility.** That one is a clean null (§ 1).
 - **Not a claim about fading the panel.** The baseline 0.4943 [0.4871, 0.5015] is below
   break-even, so the other side of it is 0.5057 — also below 0.5238 once you pay vig on it. This
   is a null, not an inverted edge.
