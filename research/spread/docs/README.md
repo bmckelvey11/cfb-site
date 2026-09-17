@@ -54,6 +54,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `build-brief-2026-09-08.md` | appendix | Parallel execution of the hardened plan: waves, file ownership, per-agent acceptance checks. |
 | `actionable-picks-2026-09-17.md` | review | Can the slate be bet today? No — the anchor holds ~0.7 pt of move total, and beat-close inverts with edge. Points at the results doc. |
 | `phcover-accuracy-2026-09-17.md` | review | EXPLORATORY: PT's published P(home covers). AUC 0.489, Brier skill negative, and 99.45% a transform of `lineavg - line`. No signal. |
+| `linestd-confidence-2026-09-17.md` | review | EXPLORATORY: PT's panel dispersion. No volatility content; no quintile rescues the panel signal, which goes 0.4943 ATS over 2003-2025. |
 | `review-2026-09-02-composite-spread.md` | dated record | The pivot from margin to movement; §5–6 set the direction. Cites archived files. |
 | `session-guide-2026-09-02.md` | dated record | Narrative of the 2026-09-02 session. Paths and numbers are as of that day; see its banner. |
 
@@ -71,6 +72,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `check_pt_line_is_close.py` | `line-movement-results.md` § target, amendment A5 | `processed/pt_line_vs_an_close.json` |
 | `model_publish_times.py` | `line-movement-results.md` § when the constituents publish | `processed/model_publish_times.csv` |
 | `eval_phcover_calibration.py` | `phcover-accuracy-2026-09-17.md` | `processed/phcover_calibration.json` |
+| `eval_linestd_confidence.py` | `linestd-confidence-2026-09-17.md` | `processed/linestd_confidence.json` |
 | `edge_vs_market_move.py` | `actionable-picks-2026-09-17.md` § 0: regresses the served `edge` on the move since the opener | stdout |
 | `version_b_ceiling.py` | `line-movement-results.md` § version B read of 2026-09-17: E\|close − anchor\| (the CLV ceiling) and each week's anchor ET weekday | stdout |
 
