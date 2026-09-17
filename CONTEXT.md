@@ -43,7 +43,7 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Prior** — the graded record a leg's win rate is drawn from. The Greenline **planning prior** is the half-pooled record (κ = 0.5: the 2026 flags plus the 2023–25 unders at half weight); `n49` and `pooled` are the **bracket** around it, reported alongside and never the planning number.
 - **Growth vehicle** — the bankroll's purpose: compounded across seasons and strategies (golf to be added once graded), not defended over one stretch. Sizing is fractional Kelly off the planning prior; the per-season drawdown cap is a constraint, not the objective.
 - **Bust** — a simulated path whose running bankroll passes through zero mid-season. Reported as a rate on every scenario; percentiles on a busting row are unreachable.
-- **Conflict** — the same game flagged on opposite sides by two legs. Rule: Greenline takes the game, over-zero skips it.
+- **Conflict** — the same game flagged on opposite sides by two legs. Rule: over-zero takes the game, Greenline skips it (flipped 2026-09-17; was Greenline first).
 - **Unit** — one flat bet as a fraction of the *starting* bankroll. Never compounded; Saturday kickoffs are simultaneous.
 
 ## Warehouse layers

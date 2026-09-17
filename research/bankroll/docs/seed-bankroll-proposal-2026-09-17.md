@@ -88,8 +88,9 @@ market. Flags are captured Wednesday, graded Monday. ~85% of flags are unders.
 ### Conflict rule
 
 Week 2, Rice @ Notre Dame: over-zero said OVER 54.5 and Greenline flagged UNDER 55.5.
-Betting both pays juice twice for a hedge. **Rule: Greenline takes the game, over-zero
-skips it.**
+Betting both pays juice twice for a hedge. **Rule: over-zero takes the game, Greenline
+skips it.** The skipped Greenline flag is marked not bet in the ledger with a note, so the
+control still grades it.
 
 ### Excluded, for now
 

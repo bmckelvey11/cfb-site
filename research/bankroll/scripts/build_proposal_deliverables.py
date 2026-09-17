@@ -179,7 +179,7 @@ def build_pptx() -> Path:
         ["role", "better evidence, nearly spent for 2026; ~a third of 2027's profit", "carries the 2026 projection"],
     ], col_w=[2.3, 4.9, 4.9], size=12)
     text(s, 0.6, 5.6, 12, 1.2, [
-        "Conflict rule: same game flagged on opposite sides → Greenline takes it, over-zero skips it.",
+        "Conflict rule: same game flagged on opposite sides → over-zero takes it, Greenline skips it.",
         "Excluded: the pred-tracker-model (research, not a bet); Greenline spreads and moneylines (21–28 and 21–25 in week 2).",
     ], 13, color=MUTED)
 
