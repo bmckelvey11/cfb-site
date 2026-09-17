@@ -51,6 +51,7 @@ _TOKENS = {
 OVERRIDES = {
     "Hawaii": "Hawai'i",        # CFBD spells it with an okina
     "UT San Antonio": "UTSA",
+    "CS Sacramento": "Sacramento State",  # FBS from 2026
 }
 
 

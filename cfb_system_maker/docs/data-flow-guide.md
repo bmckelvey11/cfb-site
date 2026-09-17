@@ -26,7 +26,7 @@ PFF, odds ───┘                     ▲                  └─ research/
 | `data/graphql/*.json` | One dump per CFBD GraphQL table (50) | `python -m cfb_system_maker graphql`; `game` and `gameLines` re-pulled daily | no |
 | `data/ingest/oddsapi/`, `ingest/oddspapi/` | the-odds-api snapshots (every 6 h), Pinnacle snapshots (daily 06:15) | `scripts/pull_odds.py`, `scripts/pull_oddspapi.py` | no |
 | `data/ingest/snapshots/` | Point-in-time REST line snapshots. Not globbed by the loader on purpose | hand | no |
-| `data/ingest/massey/`, `ingest/prediction_tracker/` | Massey ranks, Prediction Tracker captures | `scripts/massey_ranks.py`; `CFB-PT-Snapshot` task | no |
+| `data/ingest/massey/`, `ingest/prediction_tracker/` | Massey ranks, Prediction Tracker captures | `CFB-Massey-Weekly` task (`scripts/pull_massey.cmd`); `CFB-PT-Snapshot` task | no |
 | `data/processed/games.csv` | The flat game table the app and the totals model read | `refresh_cfbd.py` → `cli.rebuild_processed_games` | no |
 | `data/processed/features.json` | Registry-driven features for the app | `python -m cfb_system_maker enrich` | no |
 | `data/processed/{actionnetwork,pff,oddsapi,massey}/*.csv` | Flattened vendor tables the loader picks up | `scripts/*_flatten.py`, run by the refresh | no |
@@ -77,8 +77,11 @@ pinned by `scripts/check_pff_pin.py`.
 `oa_snapshot.csv`. History starts 2026-09-09; before that the only line movement is the
 Action Network tape ([oddsapi-ingest.md](../../docs/oddsapi-ingest.md)).
 
-**Massey and Prediction Tracker.** Hand-run scrapes into `ingest/`, flattened by
-`scripts/massey_flatten.py` and `research/spread/scripts/build_prediction_tracker.py`.
+**Massey and Prediction Tracker.** Massey is pulled weekly by `CFB-Massey-Weekly`
+(`scripts/pull_massey.cmd`: `massey_ranks.py update` fetches the current season's missing
+editions, then `massey_flatten.py` rewrites `processed/massey/`; Tuesday 04:30, ahead of
+the 05:00 rebuild). Prediction Tracker is a hand-run scrape into `ingest/`, flattened by
+`research/spread/scripts/build_prediction_tracker.py`.
 
 **Scheduled tasks** (Windows Task Scheduler, every wrapper appends to `logs/task_runs.csv`
 via `scripts/task_ledger.cmd`):

@@ -7,6 +7,7 @@ GET that, then de-obfuscate the numeric columns flagged `gfac`.
 Commands
   discover  one request per season -> the exact list of edition dates
   fetch     one edition per date   -> full ~75-system ranking table
+  update    discover the current season, fetch what is missing (weekly task)
   selftest  offline decstr check + on-disk CMP permutation check
 """
 
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import datetime as dt
 import json
 import os
 import re
@@ -171,6 +173,31 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     return 0
 
 
+def current_season(today: dt.date | None = None) -> int:
+    """Massey season for a date: Aug-Dec belong to that year, Jan-Jul to the prior one."""
+    today = today or dt.date.today()
+    return today.year if today.month >= 8 else today.year - 1
+
+
+def cmd_update(args: argparse.Namespace) -> int:
+    """Refresh editions.json for the current season and fetch any edition not on disk."""
+    season = args.season or current_season()
+    dates = season_editions(season, args.delay)
+    if not dates:
+        print("%d: no editions published yet" % season)
+        return 0
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    idx_path = OUT_DIR / "editions.json"
+    index = json.loads(idx_path.read_text()) if idx_path.exists() else {}
+    index[str(season)] = dates
+    idx_path.write_text(json.dumps(index, indent=1), encoding="utf-8")
+    missing = [d for d in dates if not (OUT_DIR / ("ranks_%s.json" % d)).exists()]
+    print("%d: %d editions, %d missing" % (season, len(dates), len(missing)))
+    if not missing:
+        return 0
+    return cmd_fetch(argparse.Namespace(date=missing, force=False, delay=args.delay))
+
+
 def cmd_selftest(args: argparse.Namespace) -> int:
     token = (
         "flOmHEVgrdbN5LZrVym7RNB7ukM0n7MF-fHdwnxUnWjAfaUjfcK--QsTusydNf25B8HohmQCyy8sL_LPfXkhkv"
@@ -214,6 +241,10 @@ def main(argv: list | None = None) -> int:
     f.add_argument("--date", nargs="*", help="YYYYMMDD (default: everything in editions.json)")
     f.add_argument("--force", action="store_true", help="re-download existing files")
     f.set_defaults(func=cmd_fetch)
+
+    u = sub.add_parser("update", help="discover the current season and fetch missing editions")
+    u.add_argument("--season", type=int, help="override the season (default: by today's date)")
+    u.set_defaults(func=cmd_update)
 
     s = sub.add_parser("selftest", help="verify decoding")
     s.add_argument("--limit", type=int, default=5)
