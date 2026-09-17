@@ -549,11 +549,14 @@ def compute_grain(
     keys = [c for c, ctype, *_ in cols if is_key(c)]
     if not keys or n_rows == 0:
         return ""
-    tuple_expr = " || '\x01' || ".join(
-        f"coalesce(\"{c}\"::varchar, '\x00')" for c in keys
-    )
+    # `SELECT DISTINCT` over the key columns, not a concatenated sentinel string.
+    # The old form joined keys with a literal 0x01 and mapped NULL to a literal 0x00,
+    # both embedded raw in the SQL text -- duckdb 1.5.5 reads the NUL as ending the
+    # string literal and fails with `unterminated quoted string`. DISTINCT already
+    # treats NULL as its own key value, so no sentinel or separator is needed.
+    key_list = ", ".join(f'"{c}"' for c in keys)
     distinct = con.execute(
-        f'select count(distinct {tuple_expr}) from "{schema}"."{name}"'
+        f'select count(*) from (select distinct {key_list} from "{schema}"."{name}")'
     ).fetchone()[0]
     label = ", ".join(keys)
     if distinct == n_rows:
