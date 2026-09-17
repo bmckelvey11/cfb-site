@@ -85,6 +85,40 @@ Selected rows (full table linked above):
    ρ = 0.20 pooled and κ = 0.25) are one to six standard errors from the line, not
    ties.
 
+## Kelly comparison
+
+Asked after the review: does quarter Kelly agree with 0.5%? No. It is two to four
+times larger and fails the stated tolerance.
+
+Single-bet Kelly at −110: `f* = (p·b − (1−p)) / b`. Quarter of that, then a
+simultaneous-bets adjustment `f / (1 + (n−1)·ρ_outcome)` for 9 bets at outcome
+correlation ≈ 0.063.
+
+| prior | full Kelly | quarter | quarter, 9 simultaneous | P(−25%) at that unit |
+|---|---:|---:|---:|---:|
+| pooled (56.4%) | 8.4% | 2.1% | 1.4% | 6.7% / 2.0% |
+| n49 (55.0%) | 5.5% | 1.4% | 0.9% | 9.1% / ~2% |
+
+Growth-optimal unit under the full simulator (max E[log(final/start)], 20k paths,
+both legs, correlation and parameter uncertainty included): ≈ 4% under pooled,
+≈ 3% under n49, with P(−25%) of 18% and 25% respectively. 0.5% is roughly
+one-eighth Kelly under pooled and one-sixth under n49.
+
+| unit | E[log growth] pooled / n49 | P(−25%) pooled / n49 | max drawdown 95th pooled / n49 |
+|---:|---|---|---|
+| 0.5% | +0.046 / +0.031 | 0.00% / 0.04% | $1,976 / $2,687 |
+| 1.0% | +0.082 / +0.052 | 0.39% / 3.67% | $3,782 / $5,057 |
+| 1.4% | +0.107 / +0.065 | 2.0% / 9.1% | $5,244 / $6,869 |
+| 2.1% | +0.146 / +0.082 | 6.7% / 17.2% | $7,856 / $9,728 |
+| 3.0% | +0.186 / +0.093 | 12.4% / 24.7% | $11,331 / $13,120 |
+
+Reading: quarter Kelly maximizes growth under a tolerance the proposal does not
+have. The proposal's rule is a 1% chance of losing a quarter of the money, under
+the pessimistic prior; that binds at about 0.75% under n49 and 1% under pooled.
+Kelly-fractional sizing would be the right frame for a bankroll that is meant to be
+grown across seasons; for a gift being defended over twelve weeks, the drawdown
+tolerance is the binding constraint and 0.5% is where it lands.
+
 ## What this does not support
 
 - **Any of the skeptical settings as the true model.** They are stress cases. κ, the
