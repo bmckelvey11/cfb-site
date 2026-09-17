@@ -20,6 +20,7 @@ PFF showed, and accumulate until the sample can answer.
 | [greenline-season-review-2026-09-16.md](greenline-season-review-2026-09-16.md) | Season to date, all three markets — record, Wilson intervals, units, ROI, CLV, calibration, and the minimum detectable win rate for each sample |
 | [greenline-totals-season-2026-09-16.md](greenline-totals-season-2026-09-16.md) | The same review narrowed to totals, with the CLV section against the PFF board close |
 | [greenline-w2-grade-2026-09-15.md](greenline-w2-grade-2026-09-15.md) | Week 2's 36 positive-edge unders graded, including the six flags that needed a score or line fallback |
+| [under-selection-profile-2026-09-17.md](under-selection-profile-2026-09-17.md) | Which unders got bet, 2023-25, against every FBS game on the same days — the selection is a high-total rule, and the bet unders sit six points above where Greenline flags |
 
 > **Read the MDE line before quoting any record.** Each review states the smallest true win
 > rate its own sample could reliably detect. Every split so far sits below that floor, so
@@ -45,8 +46,28 @@ they silently read a stale capture.
 | 5b | [`../scripts/greenline_bet_bounds.py`](../scripts/greenline_bet_bounds.py) | Conservative bet test — is a split still +EV at the Wilson *lower* bound? |
 | 5c | [`../scripts/greenline_edge_window.py`](../scripts/greenline_edge_window.py) | Does PFF's stated `value` rank anything? Win rate by edge bin, logistic fit, edge vs Pinnacle disagreement |
 | — | [`../scripts/greenline_pricing.py`](../scripts/greenline_pricing.py) | Side analysis: reverse-engineers the arithmetic behind PFF's displayed numbers |
+| — | [`../scripts/greenline_bet_log.py`](../scripts/greenline_bet_log.py) | **The ledger of which flags actually got bet.** Seed after every capture, mark before the games grade |
+| — | [`../scripts/under_selection_profile.py`](../scripts/under_selection_profile.py) | Profiles the 2023-25 bet unders against the slate they were picked from |
 
 Every script takes `--self-check`.
+
+### The weekly habit
+
+Capture is automated; **marking is not, and an unmarked week is lost data.** The ledger
+distinguishes `y`, `n`, and blank, and blank means *not yet marked* — coverage refuses to
+compute on a week that still has blanks, because defaulting them to "no" manufactures the
+very number the ledger exists to measure.
+
+```
+python research/totals/scripts/greenline_bet_log.py --seed        # after each capture
+python research/totals/scripts/greenline_bet_log.py --show 4      # review the week
+python research/totals/scripts/greenline_bet_log.py --mark 4 31190 31204   # or --none 4
+python research/totals/scripts/greenline_bet_log.py --coverage
+```
+
+This is the only thing that can answer whether the personal under record transfers to
+Greenline's flags: no work on 2023-25 can, because no flag archive for those seasons
+exists.
 
 ### Figures
 
