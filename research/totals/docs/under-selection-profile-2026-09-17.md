@@ -40,19 +40,19 @@ Taken line minus warehouse market total: median +0.0, mean +0.47 points (n=200).
 
 ## Do the bet unders even live where Greenline flags?
 
-The 2026 captures (63 under flags, weeks 2-3) against the 201 bet unders, both banded on their own line:
+The 2026 captures (87 under flags, weeks 2-3, from the raw capture rather than the positive-edge list) against the 201 bet unders, both banded on their own line:
 
-- Greenline flags: median 54.5, mean 53.8
+- Greenline flags: median 52.5, mean 53.2
 - bet unders: median 58.5, mean 57.7
 
 | band | Greenline flags | bet unders |
 |---|---:|---:|
-| <45 | 3.2% | 5.5% |
-| 45-49.5 | 22.2% | 6.0% |
-| 50-54.5 | 27.0% | 8.5% |
-| 55-59.5 | 39.7% | 40.8% |
-| 60-64.5 | 6.3% | 29.9% |
-| 65+ | 1.6% | 9.5% |
+| <45 | 1.1% | 5.5% |
+| 45-49.5 | 26.4% | 6.0% |
+| 50-54.5 | 35.6% | 8.5% |
+| 55-59.5 | 31.0% | 40.8% |
+| 60-64.5 | 4.6% | 29.9% |
+| 65+ | 1.1% | 9.5% |
 
 ## Spread magnitude
 
@@ -97,7 +97,7 @@ The 2026 captures (63 under flags, weeks 2-3) against the 201 bet unders, both b
 
 **3. Line shopping is real but small, and not the explanation.** The taken number beat the warehouse's selected total by a mean of +0.47 points. That is worth something at these numbers, but it is nowhere near the ~4-point gap in finding 4.
 
-**4. The bet unders and the Greenline flags do not sit at the same numbers.** Medians 58.5 against 54.5. Nearly 30% of the bets are in 60-64.5, where the 2026 captures put 6.3% of their flags; over half the flags sit below 55, where only a fifth of the bets do. **So "13% of the flags" was never a subset relationship** -- it is roughly 13% by count at a materially different distribution of totals. That weakens the transfer that `scripts/mc_combined_totals.py` assumes when it pools these unders into the Greenline prior. It does not refute the pooling: the flag sample is two weeks of 2026 against a 2.3-season betting record, and Greenline's 2023-25 flag distribution is unobserved -- which is the same missing archive that made the real join impossible.
+**4. The bet unders and the Greenline flags do not sit at the same numbers.** Medians 58.5 against 52.5 -- a six-point gap. Nearly 40% of the bets are at 60 or above, where the 2026 captures put 5.7% of their under flags; 63% of the flags sit below 55, where 14.5% of the bets do. **So "13% of the flags" was never a subset relationship** -- it is roughly 13% by count at a materially different distribution of totals. That weakens the transfer that `scripts/mc_combined_totals.py` assumes when it pools these unders into the Greenline prior. It does not refute the pooling: the flag sample is two weeks of 2026 against a 2.3-season betting record, and Greenline's 2023-25 flag distribution is unobserved -- which is the same missing archive that made the real join impossible.
 
 ## What this does not support
 

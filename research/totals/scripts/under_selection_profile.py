@@ -153,14 +153,19 @@ def two_prop_z(k1: int, n1: int, k2: int, n2: int) -> float:
 
 
 def greenline_flag_lines() -> list[float]:
-    """The totals PFF flagged as unders in the 2026 captures that exist."""
+    """Every total PFF took the UNDER on in the 2026 captures.
+
+    Read from the raw capture, not from `greenline_unders_<season>_w<week>.csv`.
+    That file is `greenline_unders.py`'s positive-edge list and can carry a
+    `--max-edge` cap: week 3 has 49 under flags, 45 of them positive-edge, and 27
+    in the written file. Banding the filtered file understates how low PFF's
+    unders sit -- median 54.5 against 52.5 for the real population.
+    """
     out = []
-    for path in sorted((INGEST / "pff_scoreboard").glob("greenline_unders_2026_w*.csv")):
-        if path.stem.endswith("_draftkings"):
-            continue
+    for path in sorted((INGEST / "pff_scoreboard").glob("pff_greenline_2026_w*.csv")):
         for r in csv.DictReader(path.open(encoding="utf-8")):
-            if r.get("line"):
-                out.append(float(r["line"]))
+            if r.get("total_best_side") == "under" and r.get("market_over_under"):
+                out.append(float(r["market_over_under"]))
     return out
 
 
@@ -277,7 +282,8 @@ def render(d: dict) -> str:
         out += ["",
                 "## Do the bet unders even live where Greenline flags?",
                 "",
-                f"The 2026 captures ({len(gl)} under flags, weeks 2-3) against the "
+                f"The 2026 captures ({len(gl)} under flags, weeks 2-3, from the raw "
+                f"capture rather than the positive-edge list) against the "
                 f"{len(pl)} bet unders, both banded on their own line:",
                 "",
                 f"- Greenline flags: median {statistics.median(gl):.1f}, "
@@ -352,12 +358,12 @@ def render(d: dict) -> str:
             "is worth something at these numbers, but it is nowhere near the ~4-point gap "
             "in finding 4.",
             "",
-            "**4. The bet unders and the Greenline flags do not sit at the same numbers.** "
-            "Medians 58.5 against 54.5. Nearly 30% of the bets are in 60-64.5, where the "
-            "2026 captures put 6.3% of their flags; over half the flags sit below 55, "
-            "where only a fifth of the bets do. **So \"13% of the flags\" was never a "
-            "subset relationship** -- it is roughly 13% by count at a materially different "
-            "distribution of totals. That weakens the transfer that "
+"**4. The bet unders and the Greenline flags do not sit at the same numbers.** "
+            "Medians 58.5 against 52.5 -- a six-point gap. Nearly 40% of the bets are at "
+            "60 or above, where the 2026 captures put 5.7% of their under flags; 63% of "
+            "the flags sit below 55, where 14.5% of the bets do. **So \"13% of the "
+            "flags\" was never a subset relationship** -- it is roughly 13% by count at a "
+            "materially different distribution of totals. That weakens the transfer that "
             "`scripts/mc_combined_totals.py` assumes when it pools these unders into the "
             "Greenline prior. It does not refute the pooling: the flag sample is two "
             "weeks of 2026 against a 2.3-season betting record, and Greenline's 2023-25 "
