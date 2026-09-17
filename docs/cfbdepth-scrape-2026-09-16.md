@@ -140,11 +140,29 @@ permanent table.
 ### Gotcha: line endings
 
 Google serves CRLF. Writing `response.text` in text mode on Windows translates
-the LF again, yielding `
+the LF again, yielding `
+
+
 ` and a phantom blank line between every row —
 which parses without error and silently doubles row counts. The script writes
 `response.content` as bytes to avoid it. The first run of 2026-09-16 hit this
 and was repaired in place before verification.
+
+The in-place repair was a blind `
+` -> `
+` byte replace, which would
+have corrupted any cell legitimately containing `
+` inside a quoted field
+(the free-text injury notes being the only plausible host). Checked rather than
+assumed: Alabama was re-pulled with the fixed script and diffed against the
+repaired copy. 5 of 7 tabs byte-identical; the other two differ by a single
+value (`Impact Rank` 53 -> 55) at identical byte length, i.e. genuine upstream
+churn, not repair damage. The fresh, server-faithful bytes contain zero
+`
+`, confirming no cell holds that sequence. The repair was lossless.
+
+That drift is also the reminder that these sheets are live: national ranks move
+between pulls, so a snapshot is only ever true as of its directory date.
 
 ## Full snapshot — 2026-09-16 (done)
 
