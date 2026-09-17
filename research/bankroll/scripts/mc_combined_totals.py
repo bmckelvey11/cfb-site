@@ -108,6 +108,12 @@ class Config:
     gl_range: tuple = GL_BETS_RANGE
     resize_weekly: bool = True  # units off the bankroll at the start of each week
     seed: int = 20260917
+    # --- stress knobs (bankroll_stress.py); defaults reproduce the base model ---
+    oz_center: float | None = None   # override the post-haircut over-zero mean (e.g. 0.565)
+    oz_extra_sd: float = 0.0         # add N(0, sd) to each path's over-zero haircut
+    gl_kappa: float | None = None    # discounted-history prior: Beta(27.5 + k*114, 22.5 + k*87)
+    gl_marginal_penalty: float = 0.0 # Greenline bets beyond GL_MARGINAL_BASE a week win at p - d
+    gl_marginal_base: int = 6        # the first N bets a week keep the full p
 
 
 def _copula_wins(rng, counts, shock, thresh, a, c, upper: bool) -> np.ndarray:
@@ -130,9 +136,22 @@ def simulate(cfg: Config) -> dict:
     # Jeffreys posterior: Beta(w + 1/2, l + 1/2).
     p_oz = rng.beta(OZ_WINS + 0.5, OZ_LOSSES + 0.5, n)
     if cfg.oz_haircut:
-        p_oz = np.clip(p_oz - OZ_SELECTION_HAIRCUT, 0.01, 0.99)
-    gl_w, gl_l = GL_PRIORS[cfg.gl_prior]
-    p_gl = rng.beta(gl_w + 0.5, gl_l + 0.5, n)
+        # The haircut is a point correction by default. oz_extra_sd makes the
+        # selection correction itself uncertain (review item 1); oz_center moves it.
+        haircut = OZ_SELECTION_HAIRCUT + (rng.normal(0.0, cfg.oz_extra_sd, n) if cfg.oz_extra_sd else 0.0)
+        if cfg.oz_center is not None:
+            haircut += (OZ_WINS / (OZ_WINS + OZ_LOSSES) - OZ_SELECTION_HAIRCUT) - cfg.oz_center
+        p_oz = np.clip(p_oz - haircut, 0.01, 0.99)
+    if cfg.gl_kappa is None:
+        gl_w, gl_l = GL_PRIORS[cfg.gl_prior]
+        p_gl = rng.beta(gl_w + 0.5, gl_l + 0.5, n)
+    else:
+        # Partial pooling: the 201 personal unders (114-87) count kappa-fold.
+        # kappa=0 is n49, kappa=1 is pooled.
+        gl_w = GL_PRIORS["n49"][0] + cfg.gl_kappa * 114
+        gl_l = GL_PRIORS["n49"][1] + cfg.gl_kappa * 87
+        p_gl = rng.beta(gl_w + 0.5, gl_l + 0.5, n)
+    p_gl_marg = np.clip(p_gl - cfg.gl_marginal_penalty, 0.01, 0.99)
 
     oz_b, gl_b = payout(OZ_PRICE), payout(GL_PRICE)
     oz_stake = cfg.bankroll * cfg.oz_unit
@@ -141,6 +160,7 @@ def simulate(cfg: Config) -> dict:
     # thresholds on the latent scoring variable (see module docstring)
     z_oz = np.sqrt(2) * erfinv(2 * (1 - p_oz) - 1)   # OVER wins when S >  z_oz
     z_gl = -np.sqrt(2) * erfinv(2 * (1 - p_gl) - 1)  # UNDER wins when S <  z_gl
+    z_gl_marg = -np.sqrt(2) * erfinv(2 * (1 - p_gl_marg) - 1)
 
     oz_season = rng.poisson(rng.choice(OZ_WEEK4PLUS_HISTORY, n)).astype(np.int64)
     a, c = np.sqrt(cfg.rho), np.sqrt(1.0 - cfg.rho)
@@ -149,6 +169,9 @@ def simulate(cfg: Config) -> dict:
     turnover = np.zeros(n)
     worst_week = np.zeros(n)
     running_min = np.zeros(n)  # deepest drawdown, for the mid-season bust check
+    peak = np.zeros(n)         # running peak of cumulative pnl, for max drawdown
+    max_dd = np.zeros(n)       # largest peak-to-trough fall, in dollars
+    weeks_under = np.zeros(n)  # weeks ending below the starting bankroll
     oz_remaining = oz_season.copy()
     # Percentiles of the bankroll after each week. Keeping the quantiles rather than
     # the paths is what makes a fan chart affordable at 100k paths.
@@ -170,7 +193,12 @@ def simulate(cfg: Config) -> dict:
         else:
             flags = GL_FLAGS_BY_WEEK[w] if cfg.gl_volume == "slate" else GL_FLAGS_PER_WEEK
             gl_n = rng.poisson(flags * cfg.gl_coverage, n)
-        gl_wins = _copula_wins(rng, gl_n, shock, z_gl, a, c, upper=False)
+        if cfg.gl_marginal_penalty > 0:
+            base_n = np.minimum(gl_n, cfg.gl_marginal_base)
+            gl_wins = (_copula_wins(rng, base_n, shock, z_gl, a, c, upper=False)
+                       + _copula_wins(rng, gl_n - base_n, shock, z_gl_marg, a, c, upper=False))
+        else:
+            gl_wins = _copula_wins(rng, gl_n, shock, z_gl, a, c, upper=False)
         week_pnl = gl_wins * gl_stake * gl_b - (gl_n - gl_wins) * gl_stake
 
         # over-zero's few bets thinned uniformly across the weeks that remain
@@ -183,6 +211,9 @@ def simulate(cfg: Config) -> dict:
         turnover += gl_n * gl_stake + oz_n * oz_stake
         worst_week = np.minimum(worst_week, week_pnl)
         running_min = np.minimum(running_min, pnl)
+        peak = np.maximum(peak, pnl)
+        max_dd = np.maximum(max_dd, peak - pnl)
+        weeks_under += pnl < 0
         fan.append(np.percentile(cfg.bankroll + pnl, PCTS))
 
     return {
@@ -199,6 +230,9 @@ def simulate(cfg: Config) -> dict:
         # can go through zero and keep betting. Percentiles on such a path are
         # unreachable in reality -- report the rate rather than hiding it.
         "p_bust": float((cfg.bankroll + running_min <= 0).mean()),
+        "n_bust": int((cfg.bankroll + running_min <= 0).sum()),
+        "max_dd": max_dd,            # dollars, per path
+        "weeks_under": weeks_under,  # per path
         "fan": np.array(fan),  # (weeks + 1, len(PCTS))
     }
 
@@ -436,6 +470,17 @@ def self_check() -> None:
     assert grow["p_bust"] == 0.0, grow["p_bust"]
     assert grow["final"].min() > 0
     assert np.percentile(grow["final"], 95) > np.percentile(flat["final"], 95)
+    # stress knobs: kappa endpoints must reproduce the named priors; a marginal
+    # penalty must lower the median; extra haircut sd must widen over-zero p
+    k0 = simulate(Config(paths=5_000, seed=6, gl_kappa=0.0))
+    k1 = simulate(Config(paths=5_000, seed=6, gl_kappa=1.0))
+    assert abs(k0["p_gl_mean"] - 0.55) < 0.01 and abs(k1["p_gl_mean"] - 0.564) < 0.01
+    base = simulate(Config(paths=5_000, seed=7))
+    pen = simulate(Config(paths=5_000, seed=7, gl_marginal_penalty=0.03))
+    assert np.median(pen["final"]) < np.median(base["final"])
+    wide = simulate(Config(paths=5_000, seed=7, oz_extra_sd=0.03))
+    assert wide["p_oz_below_breakeven"] > base["p_oz_below_breakeven"]
+    assert base["max_dd"].min() >= 0 and base["weeks_under"].max() <= WEEKS_REMAINING
     print("self-check OK")
 
 

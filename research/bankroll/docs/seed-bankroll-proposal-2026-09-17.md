@@ -35,8 +35,8 @@ reports both.
 
 | Greenline prior | median | 90% band | P(down) | P(−25%) | busts |
 |---|---:|---|---:|---:|---:|
-| `pooled` (141–109) | **$20,945** (+4.7%) | $18,598 – $23,541 | 26.0% | 0.0% | 0.0% |
-| `n49` (27–22) | **$20,673** (+3.4%) | $17,600 – $24,112 | 36.9% | 0.0% | 0.0% |
+| `pooled` (141–109) | **$20,945** (+4.7%) | $18,598 – $23,541 | 26.0% | 0 of 50,000 | 0 of 50,000 |
+| `n49` (27–22) | **$20,673** (+3.4%) | $17,600 – $24,112 | 36.9% | 23 of 50,000 | 0 of 50,000 |
 
 ## 3. What gets bet
 
@@ -154,6 +154,13 @@ Three things the grid says:
    is ~16% of flags, above the 13% the record was earned at, so a slice of every
    week's bets falls on flags the record never covered. The ledger is what prices
    that; until it does, treat the volume as a plan, not evidence.
+4. **The recommendation survives a more skeptical model.** An outside review asked
+   whether 0.5% holds when the over-zero haircut is uncertain, the Greenline prior is
+   only partly pooled, bets 7–12 each week are weaker, and same-slate correlation is
+   up to five times the assumed value. It passes all 25 stress cases, including all
+   of them at once (worst case: median +1.8%, 0.33% of paths down 25%, no busts).
+   1% fails 13 of 25. Details in
+   [bankroll-stress-2026-09-17.md](bankroll-stress-2026-09-17.md).
 
 ## 6. Risk, stated plainly
 
@@ -163,8 +170,12 @@ At the recommended 0.5% / 1% units, re-sized weekly:
 |---|---:|---:|
 | P(season ends below $20,000) | 26.0% | 36.9% |
 | P(ends below $15,000) | 0.0% | 0.0% |
-| P(passes through $0) | 0.0% | 0.0% |
+| P(passes through $0) | 0 of 50,000 | 0 of 50,000 |
 | 5th-percentile ending bankroll | $18,598 | $17,600 |
+| mean of the worst 5% of endings | $18,039 | $16,905 |
+| largest mid-season drawdown, median / 95th pct | $794 / $1,996 | $876 / $2,671 |
+| P(a drawdown deeper than 10% at some point) | 5.0% | 12.7% |
+| weeks below the start, median | 2 | 3 |
 | worst single week, median | −$534 | −$551 |
 | total staked over 12 weeks | ~$13,100 | ~$13,100 |
 
@@ -206,9 +217,14 @@ by a few hundred dollars. ρ is assumed, not measured.
 | Monday | re-size units off the bankroll; rerun the projection with the new record | `mc_combined_totals.py` |
 
 Marking which flags get bet is the one step that is not automated and the one that
-resolves the biggest open question. Four more graded weeks gets the 2026 flags to
-n≈250 on their own, at which point the prior stops doing the work and the stake
-decision in §5 gets revisited.
+resolves the biggest open question.
+
+**Updating rule, fixed now.** The projection is rerun each Monday with the graded
+record. The Greenline unit does not change during the season except by this rule:
+it moves from 0.5% to 1% only when the 2026 flags alone (no pooling) pass
+P(−25%) ≤ 1% with no busts at 1%, which needs roughly four more graded weeks at the
+current rate. It moves from 0.5% to 0.25% if the 2026-only record falls below
+break-even on its posterior mean. No other in-season changes.
 
 ## Data and dates
 
