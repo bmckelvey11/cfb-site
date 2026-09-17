@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A4 — Joins</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# A4 — Joins
+
+Portable SQL: select, types/NULL, aggregation, joins, subqueries/CTEs, windows, set ops & modelling
+
+*Standard (runs in PostgreSQL)*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Combine tables with `INNER`, `LEFT`, and `FULL OUTER JOIN`, always via explicit `JOIN ... ON`.
+- Write a self-join to compare a table to itself.
+- Express "rows with no match" as an anti-join with `NOT EXISTS`.
+- Detect join fan-out with a row-count assertion.
+- Avoid the postseason `dim_week` trap and the missing-team `dim_team` trap.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+A join matches rows across tables on a condition. `INNER JOIN` keeps only matched pairs; `LEFT JOIN` keeps every left row and fills NULL where the right side is absent; `FULL OUTER JOIN` keeps unmatched rows from both sides. Always write `JOIN t ON a.k = t.k` — never comma joins, which invite accidental cross products.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Two warehouse traps live here. First, `core.dim_week` has exactly one `postseason` row per season (verified: 15 rows across 15 seasons). If you join games to `dim_week` on `(season, week)`, postseason games — whose `week` does not line up — silently vanish. Join on `(season, week, season_type)` or handle postseason separately. Second, opponents outside the CFBD team table receive name-derived ids that are absent from `dim_team`; an `INNER JOIN` to `dim_team` drops those games. Verified: 44 away teams in 2024 have no `dim_team` row. **Always `LEFT JOIN` to `dim_team`** and expect NULLs for exotic opponents.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+An anti-join finds left rows with no right match: `WHERE NOT EXISTS (SELECT 1 FROM dim_team t WHERE t.team_id = fg.away_team_id)`. Fan-out is the silent killer: if the right table has multiple rows per key, an inner join multiplies your left rows. Guard it — assert the post-join row count equals the pre-join count when you expect one-to-one. Concretely: `fact_game` has one row per game, but `fact_game_line` has one row per game *per provider*, so joining them multiplies each game by its provider count. That is correct *if* you want per-provider rows and a disaster if you then `avg(selected_total)` expecting a per-game mean. The fix is to state the intended grain in a comment and check the row count against it before trusting any aggregate.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- standard
+-- rows: 1
+SELECT count(*) AS away_teams_missing_from_dim
+FROM core.fact_game AS fg
+WHERE fg.season = 2024
+  AND NOT EXISTS (
+    SELECT 1
+    FROM core.dim_team AS t
+    WHERE t.team_id = fg.away_team_id
+  );
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+The worked solution returns the scalar 44. Validate the complement: games whose away team *is* in `dim_team` plus 44 must equal total 2024 games.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- `INNER JOIN dim_team` on the away side, silently dropping 44 games.
+- Joining to `dim_week` on `(season, week)` only, losing all postseason games.
+- Comma joins with the filter in `WHERE`, producing an accidental cross product.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

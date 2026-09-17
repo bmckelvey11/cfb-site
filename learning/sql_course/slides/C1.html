@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C1 — Descriptive statistics</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# C1 — Descriptive statistics
+
+Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone
+
+*DuckDB*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Summarise a distribution with mean, spread, and shape.
+- Read quantiles, median, and mode.
+- Build a histogram with `floor` bins.
+- Interpret skew and kurtosis for game totals and margins.
+- Explain why margin distributions spike at key numbers (3 and 7).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Plain language.** A distribution has a centre (mean, median, mode), a spread (standard deviation, variance, IQR), and a shape (skew = lopsidedness, kurtosis = tail heaviness). For betting, the *shape* of the margin distribution is money: NFL/CFB final margins cluster on 3 and 7 because scoring comes in field goals and touchdowns, so a spread of -3 is worth more than -2.5.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The SQL.** DuckDB provides `avg`, `stddev_samp`, `var_samp`, `median`, `quantile_cont`, `mode`, `skewness`, and `kurtosis` [duckdb.org/docs/sql/functions/aggregates]. DuckDB 1.5.5 has no `width_bucket`; bin with `floor`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Worked solution.** Descriptive summary of 2024 regular-season game totals.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Returns **1** row: n = **3745**, mean = **52.56**, sd = **17.62**, median = **52**, p25 = **41**, p75 = **63**.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**How to read it.** Mean ≈ median (52.6 vs 52) means totals are only mildly skewed. An SD of 17.6 says a one-sigma game swings ±17–18 points around 52 — enormous relative to a typical total line, which is why single-game totals are noisy and edges are small. The IQR (41→63) holds the middle half of games.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The key-number lesson, quantified.** Across 2014–2024 regular-season games (n = 23,092 live), **15.82%** of final margins land on exactly 3 or 7 — one game in six — because scoring arrives in field goals (3) and touchdowns-plus-extra-point (7). The margin's skewness is ~0.03 and kurtosis ~0.06 (near-symmetric, near-normal in the middle), yet those two spikes dominate spread economics: a line of -3 straddles the single most common margin, so buying or selling the half-point around 3 (to -2.5 or -3.5) changes your push/win/loss mix far more than the same half-point anywhere else. This is why totals models and spread models must respect the discreteness of football scoring rather than treating outcomes as smoothly continuous.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+SELECT
+  count(*)                                              AS n,
+  round(avg(home_points + away_points), 2)              AS mean_total,
+  round(stddev_samp(home_points + away_points), 2)      AS sd_total,
+  median(home_points + away_points)                     AS median_total,
+  round(quantile_cont(home_points + away_points, 0.25), 1) AS p25,
+  round(quantile_cont(home_points + away_points, 0.75), 1) AS p75
+FROM core.fact_game
+WHERE season = 2024
+  AND season_type = 'regular'
+  AND home_points IS NOT NULL
+  AND away_points IS NOT NULL;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+n must equal the completed 2024 regular games from A2/C1 (3,745). Median between p25 and p75 by construction.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Using `stddev_pop`/`var_pop` (population) when you want sample statistics for inference.
+- Binning with too-wide buckets and hiding the 3/7 spikes.
+- Treating mean≈median as proof of normality — check skew and kurtosis.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

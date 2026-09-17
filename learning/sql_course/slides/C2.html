@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C2 — Sampling and uncertainty</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# C2 — Sampling and uncertainty
+
+Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone
+
+*DuckDB*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Compute the standard error of a proportion.
+- Build a normal-approximation confidence interval for a win/cover rate.
+- Use `approx_count_distinct` and `USING SAMPLE` for speed.
+- Bootstrap a statistic with `random()` and `generate_series`.
+- Distinguish sampling variability from a real effect.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Plain language.** Any rate you measure from data (a cover rate, an over rate) is an estimate; a different sample would give a slightly different number. The standard error quantifies that wobble. For a proportion \(p\) from \(n\) games, \(SE = \sqrt{p(1-p)/n}\) [1], and a 95% interval is \(p \pm 1.96\,SE\) [2].
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The SQL.** Compute `p` with a conditional average, `n` with `count(*)`, then the SE inline. `approx_count_distinct` gives a fast HyperLogLog distinct estimate [duckdb.org/docs/sql/functions/aggregates]; `USING SAMPLE 10%` subsamples rows [duckdb.org/docs/sql/query_syntax/sample]; `generate_series` plus `random()` powers a bootstrap.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Worked solution.** Home-team over rate (share of games where the actual total exceeded `selected_total`) with a 95% CI, 2014–2024 regular season.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Returns **1** row. `n` is the graded sample (in the ~10.6k range for cover-type grades), `over_rate` near 0.5, with a tight CI. **How to read it.** If the CI contains 0.50, you cannot distinguish the over rate from a coin flip — no edge from "always bet over". A CI that excludes 0.50 (or the vig-implied breakeven ≈0.524) is the first hint of a real bias.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+WITH graded AS (
+  SELECT
+    CASE WHEN (home_points + away_points) > selected_total THEN 1.0 ELSE 0.0 END AS went_over
+  FROM core.fact_game
+  WHERE season BETWEEN 2014 AND 2024
+    AND season_type = 'regular'
+    AND selected_total IS NOT NULL
+    AND home_points IS NOT NULL
+    AND away_points IS NOT NULL
+)
+SELECT
+  count(*)                                    AS n,
+  round(avg(went_over), 4)                    AS over_rate,
+  round(sqrt(avg(went_over) * (1 - avg(went_over)) / count(*)), 4) AS se,
+  round(avg(went_over) - 1.96 * sqrt(avg(went_over) * (1 - avg(went_over)) / count(*)), 4) AS ci_low,
+  round(avg(went_over) + 1.96 * sqrt(avg(went_over) * (1 - avg(went_over)) / count(*)), 4) AS ci_high
+FROM graded;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+The analytic CI half-width equals `1.96 * se`. The bootstrap SD should land within ~10% of the analytic SE for large n.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Reporting a rate without an interval — every rate needs its uncertainty.
+- Using the normal approximation with tiny n (use exact/Wilson intervals instead).
+- Forgetting the vig-adjusted breakeven (~52.4% at -110), so 50% is not the right null for profitability.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

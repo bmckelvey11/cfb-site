@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C6 — Feature engineering without lookahead</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# C6 — Feature engineering without lookahead
+
+Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone
+
+*DuckDB*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Build rolling means with explicit pre-game frames.
+- Compute an exponentially weighted mean via a recursive CTE.
+- Opponent-adjust a stat with an iterative join.
+- Derive rest days and travel from `dim_venue`.
+- Tag every feature with its as-of timestamp and audit for `result_lookahead`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Plain language.** A pre-game feature may use only information available before kickoff. Any feature touching the game's own result is a leak and must be flagged `result_lookahead`. Rolling means need a frame that excludes the current row (A6). Exponentially weighted means weight recent games more; rest days come from the gap between a team's consecutive `start_date`s; travel needs venue coordinates.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The SQL.** Rolling frames use `ROWS BETWEEN n PRECEDING AND 1 PRECEDING`. EWMA is naturally recursive: \(s_t = \alpha x_{t} + (1-\alpha) s_{t-1}\) [11], built with `WITH RECURSIVE`. Rest days: `date_diff('day', lag(start_date) OVER (...), start_date)`. Travel: `dim_venue.latitude/longitude` with a haversine expression.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+The organising principle is a single question asked of every column: *would this value have been knowable at kickoff?* Rolling means with a `1 PRECEDING` frame pass; a season-to-date average that includes the current game fails; opponent strength computed from the opponent's *full* season (including games after this one) fails subtly and is the most common real-world leak. Rest and travel are safe because they depend only on the schedule, which is fixed in advance. Tag each engineered feature with the timestamp of the latest input it used, and you can later run the `result_lookahead` audit mechanically: any feature whose as-of timestamp is not strictly before `start_date` is disqualified, no human judgement required.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Worked solution.** Pre-game rest days for each team in 2024 regular season, plus the count of team-games that have a defined rest value.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Returns **1** row: the number of team-games with a defined prior game (each team's first game has NULL rest, correctly). **How to read it.** `rest_days` uses only the previous game's date — strictly pre-game, no leak. The NULLs on first games are honest missingness, not an error.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+WITH team_games AS (
+  SELECT game_id, start_date, home_team_id AS team_id
+  FROM core.fact_game WHERE season = 2024 AND season_type = 'regular'
+  UNION ALL
+  SELECT game_id, start_date, away_team_id
+  FROM core.fact_game WHERE season = 2024 AND season_type = 'regular'
+),
+rested AS (
+  SELECT
+    team_id, game_id, start_date,
+    date_diff('day',
+              lag(start_date) OVER (PARTITION BY team_id ORDER BY start_date),
+              start_date) AS rest_days
+  FROM team_games
+)
+SELECT count(*) AS team_games_with_rest
+FROM rested
+WHERE rest_days IS NOT NULL;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+`team_games_with_rest` = 7,494 minus the number of distinct teams (each team's first game has NULL rest). Validate by counting distinct `team_id` and subtracting.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Frame ending at `CURRENT ROW` — the classic leak.
+- Computing opponent adjustment from full-season stats that include future games.
+- Forgetting to tag result-informed features, then trusting a backtest that cheated.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

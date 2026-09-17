@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C3 — Hypothesis tests in SQL</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# C3 — Hypothesis tests in SQL
+
+Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone
+
+*DuckDB*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Run a two-proportion z-test (home vs away cover rate).
+- Run a Welch t-test comparing mean totals across eras.
+- Run a chi-square test for conference × over/under.
+- Approximate a p-value from a z-score via a normal CDF.
+- Recognise when the test is invalid (clustering, multiple comparisons).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Plain language.** A hypothesis test asks: could the difference I see be pure chance? The two-proportion z-test compares two rates; the Welch t-test compares two means with unequal variances; chi-square compares observed vs expected counts in a table. Each yields a test statistic you convert to a p-value — the probability of a result this extreme if nothing is going on.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The SQL.** DuckDB has no built-in p-value function and no native error function (`erf` is not in this build), so approximate the standard normal CDF with the Abramowitz–Stegun polynomial in exercise 1. The two-proportion z is \(z = (p_1 - p_2)/\sqrt{\hat p(1-\hat p)(1/n_1 + 1/n_2)}\) [4] with pooled \(\hat p\).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Worked solution.** Compare the home-cover rate vs the away-cover rate (they are complementary in a two-outcome grade, so this doubles as a test that the home cover rate differs from 0.5). Sample size of gradeable spread games, 2014–2024 regular:
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Returns **1** row: `n_decided` ≈ 10,594 non-push spread games, `home_cover_rate` near 0.5, and a z-score for "differs from 50%". **How to read it.** |z| > 1.96 means the home-cover rate is significantly off 50% at the 5% level; a z near 0 says home/away cover is a wash — the market prices home advantage efficiently.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+WITH graded AS (
+  SELECT
+    CASE WHEN (home_points - away_points) + selected_spread > 0 THEN 1 ELSE 0 END AS home_cover,
+    CASE WHEN (home_points - away_points) + selected_spread = 0 THEN 1 ELSE 0 END AS push
+  FROM core.fact_game
+  WHERE season BETWEEN 2014 AND 2024
+    AND season_type = 'regular'
+    AND selected_spread IS NOT NULL
+    AND home_points IS NOT NULL
+    AND away_points IS NOT NULL
+)
+SELECT
+  sum(1) FILTER (WHERE push = 0)                          AS n_decided,
+  round(avg(home_cover) FILTER (WHERE push = 0), 4)       AS home_cover_rate,
+  round( (avg(home_cover) FILTER (WHERE push = 0) - 0.5)
+         / sqrt(0.25 / sum(1) FILTER (WHERE push = 0)), 3) AS z_vs_half
+FROM graded;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+For (1), a |z| of 1.96 must map to p ≈ 0.05. Validate the CDF approximation at z=0 (should give 0.5) and z=1.96 (≈0.975).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Treating each game as independent when games share teams/seasons — clustering inflates significance. Cluster by team-season or use a season-block bootstrap.
+- Running many tests and celebrating the one that "worked" (multiple comparisons).
+- Using a pooled-variance t-test when variances clearly differ (use Welch).
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

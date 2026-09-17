@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A3 — Aggregation</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# A3 — Aggregation
+
+Portable SQL: select, types/NULL, aggregation, joins, subqueries/CTEs, windows, set ops & modelling
+
+*Standard (runs in PostgreSQL)*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Summarise groups with `GROUP BY` and filter groups with `HAVING`.
+- Count uniqueness with `COUNT(DISTINCT ...)`.
+- Compute conditional aggregates by putting `CASE` inside `SUM`/`AVG`.
+- Produce subtotals with `ROLLUP` and `GROUPING SETS`.
+- Distinguish a row filter (`WHERE`) from a group filter (`HAVING`).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Aggregation collapses many rows into summary numbers. `GROUP BY conference` produces one row per conference; the `SELECT` list may then contain only grouping columns and aggregates (`count`, `sum`, `avg`, `min`, `max`). `WHERE` filters rows *before* grouping; `HAVING` filters *after*, so "conferences with at least 50 games" is a `HAVING count(*) >= 50`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+`COUNT(DISTINCT team_id)` counts unique values, useful for "how many distinct teams played". Conditional aggregation is the workhorse of analytics: `SUM(CASE WHEN home_points > away_points THEN 1 ELSE 0 END)` counts home wins, and `AVG(CASE WHEN ... THEN 1.0 ELSE 0.0 END)` gives a rate. This pattern turns one pass over the data into many metrics side by side.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+`ROLLUP(a, b)` adds subtotal rows: totals for each `(a,b)`, each `a`, and a grand total, with NULLs marking the rolled-up levels. `GROUPING SETS` lets you name exactly which combinations you want. All of this is standard SQL and runs in PostgreSQL. Grain matters: `fact_game` is one row per game, so summing `home_points + away_points` gives per-game totals; if you first exploded to one row per team, the same sum would double-count.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- standard
+-- rows: 14
+SELECT
+  fg.home_conference AS conference,
+  count(*) AS n_games,
+  round(avg(fg.home_points + fg.away_points), 2) AS avg_total
+FROM core.fact_game AS fg
+JOIN core.dim_team AS t
+  ON fg.home_team_id = t.team_id
+WHERE fg.season = 2024
+  AND fg.season_type = 'regular'
+  AND t.is_fbs = TRUE
+  AND fg.home_points IS NOT NULL
+  AND fg.away_points IS NOT NULL
+  AND fg.home_conference IS NOT NULL
+GROUP BY fg.home_conference
+ORDER BY avg_total DESC;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+14 rows is the count of FBS conferences with a 2024 home game. Validate: the same query without the aggregate, `SELECT DISTINCT home_conference` under identical filters, returns 14 conference names.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Putting a non-aggregated, non-grouped column in `SELECT` (illegal in strict SQL).
+- Using `WHERE count(*) > 50` instead of `HAVING`.
+- Forgetting the FBS filter and inflating group counts with FCS/lower-division opponents.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

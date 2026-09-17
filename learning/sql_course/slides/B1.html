@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B1 — DuckDB conveniences</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# B1 — DuckDB conveniences
+
+DuckDB dialect: conveniences, FILTER/QUALIFY, JSON/structs, line time-series, performance/reuse
+
+*DuckDB / MotherDuck*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Standard → DuckDB
+
+| Standard SQL | DuckDB shortcut |
+|---|---|
+| `SELECT ... FROM t` | `FROM t SELECT ...` (FROM-first) — [duckdb.org/docs/sql/query_syntax/from] |
+| `SELECT` every column then drop one by hand | `SELECT * EXCLUDE (col)` — [duckdb.org/docs/sql/expressions/star] |
+| Wrap a column in a `CASE` to transform it | `SELECT * REPLACE (expr AS col)` — [duckdb.org/docs/sql/expressions/star] |
+| List each column in `GROUP BY` | `GROUP BY ALL` — [duckdb.org/docs/sql/query_syntax/groupby] |
+| List each column in `ORDER BY` | `ORDER BY ALL` — [duckdb.org/docs/sql/query_syntax/orderby] |
+| `UNION` (positional) | `UNION BY NAME` (column-name aligned) — [duckdb.org/docs/sql/query_syntax/setops] |
+| `information_schema.columns` | `DESCRIBE t` and `SUMMARIZE t` — [duckdb.org/docs/guides/meta/describe] |
+| `SELECT ... FROM information_schema.tables` | `SHOW DATABASES` / `SHOW TABLES` — [duckdb.org/docs] |
+| N/A | `ATTACH 'md:cfb'` cloud attach — [motherduck.com/docs] |
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Draft queries FROM-first for faster iteration.
+- Project columns by exception with `EXCLUDE`/`REPLACE`.
+- Collapse boilerplate with `GROUP BY ALL` and `ORDER BY ALL`.
+- Union heterogeneous sources safely with `UNION BY NAME`.
+- Profile a table instantly with `SUMMARIZE`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+DuckDB keeps standard SQL but adds ergonomics that shrink analytical queries. **FROM-first** lets you type `FROM core.fact_game` and see the table before deciding columns; `SELECT` can even be omitted for `SELECT *`. **`* EXCLUDE (c)`** projects all columns except named ones — perfect for wide fact tables where you want everything but one noisy column. **`* REPLACE (expr AS c)`** keeps every column but swaps one expression in place.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**`GROUP BY ALL`** infers grouping keys as every non-aggregated `SELECT` expression, and **`ORDER BY ALL`** sorts by every selected column; both eliminate the error-prone habit of re-listing columns. **`UNION BY NAME`** aligns inputs by column name rather than position, so two `stg` tables with overlapping-but-reordered columns stack correctly and fill missing columns with NULL. **`SUMMARIZE t`** returns per-column count, min, max, approximate distinct, null percentage, and quantiles in one shot — the fastest way to profile a new table. **`DESCRIBE`** shows the schema. On MotherDuck, `ATTACH 'md:cfb'` connects the cloud database; in this sandbox it is already attached as `cfb`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+One caveat learned live: **`QUALIFY` cannot combine with `GROUP BY ALL`** in current DuckDB — use an explicit `GROUP BY` when you also `QUALIFY` (see B2).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 10
+SUMMARIZE core.fact_game_line;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+`SUMMARIZE` returns exactly one row per column: 10 for `fact_game_line`. Cross-check against `SELECT count(*) FROM information_schema.columns WHERE table_schema='core' AND table_name='fact_game_line'`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Combining `QUALIFY` with `GROUP BY ALL` (unsupported — binder error).
+- Assuming `EXCLUDE`/`REPLACE` exist in PostgreSQL — they are DuckDB-only.
+- Using `UNION BY NAME` when you actually needed positional `UNION ALL` (they differ when column names collide).
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

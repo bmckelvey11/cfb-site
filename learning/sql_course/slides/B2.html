@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B2 — Filtering and windows the DuckDB way</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# B2 — Filtering and windows the DuckDB way
+
+DuckDB dialect: conveniences, FILTER/QUALIFY, JSON/structs, line time-series, performance/reuse
+
+*DuckDB / MotherDuck*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Standard → DuckDB
+
+| Standard SQL | DuckDB shortcut |
+|---|---|
+| `SUM(CASE WHEN c THEN x END)` | `SUM(x) FILTER (WHERE c)` — [duckdb.org/docs/sql/query_syntax/filter] |
+| Wrap a window in a CTE then `WHERE rn=1` | `QUALIFY row_number() OVER (...) = 1` — [duckdb.org/docs/sql/query_syntax/qualify] |
+| `ROW_NUMBER` + self-join to get the max-of row | `arg_max(val, ordercol)` / `arg_min` — [duckdb.org/docs/sql/functions/aggregates] |
+| `string_agg` / `array_agg` | `list(x)`, `list_distinct(x)` — [duckdb.org/docs/sql/functions/aggregates] |
+| Manual `CASE` pivot | `PIVOT` / `UNPIVOT` — [duckdb.org/docs/sql/statements/pivot] |
+
+*Note: `FILTER` is actually standard SQL:2003 and works in PostgreSQL too; SQLite lacks it. `QUALIFY` originated in Teradata/Snowflake and is not in PostgreSQL.*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Write per-condition aggregates with `FILTER` instead of `CASE`.
+- Filter on window results with `QUALIFY`, skipping the CTE wrapper.
+- Pick the row that maximises/minimises a column with `arg_max`/`arg_min`.
+- Aggregate values into lists with `list()`.
+- Reshape long↔wide with `PIVOT`/`UNPIVOT`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+`FILTER (WHERE ...)` attaches a condition to a single aggregate: `count(*) FILTER (WHERE selected_spread < 0)` counts home favourites in one clean expression, and you can place many such aggregates side by side. `QUALIFY` filters on window-function output the way `HAVING` filters on aggregates — so "the latest tick per event" becomes `QUALIFY row_number() OVER (PARTITION BY event_id ORDER BY updated_at DESC) = 1`, no CTE required.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+`arg_max(a, b)` returns the value of `a` from the row where `b` is largest (and `arg_min` for smallest) — a compact replacement for the rank-then-filter pattern when you want one attribute. `list(x)` collects grouped values into an array (`list_distinct` dedupes), useful for "all providers that priced this game". `PIVOT` turns rows into columns (e.g. one column per provider) and `UNPIVOT` does the reverse (wide betting columns back to long tick form). Remember the B1 caveat: pair `QUALIFY` with an explicit `GROUP BY`, not `GROUP BY ALL`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 5
+SELECT
+  home_conference,
+  round(avg(selected_total), 2) AS avg_total
+FROM core.fact_game
+WHERE season = 2024
+  AND season_type = 'regular'
+  AND selected_total IS NOT NULL
+  AND home_conference IS NOT NULL
+GROUP BY home_conference
+QUALIFY row_number() OVER (ORDER BY avg(selected_total) DESC) <= 5;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+Exactly 5 rows. Validate the ranking by rerunning without `QUALIFY`, ordering by `avg_total DESC`, and confirming the same top five (Mountain West topped the live run).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- `QUALIFY` with `GROUP BY ALL` (binder error) — use explicit `GROUP BY`.
+- Expecting `QUALIFY` to work in PostgreSQL (it does not).
+- Using `arg_max` and forgetting ties are broken arbitrarily.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

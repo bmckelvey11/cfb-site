@@ -75,3 +75,27 @@ def test_course_markdown_fixes():
     assert "Abramowitz" in c3_1
     c8_1 = next(line for line in COURSE.splitlines() if line.startswith("1. Conform `stg.games`"))
     assert "tagged `'both'`" in c8_1
+
+
+def test_build_slides(tmp_path):
+    from learning.sql_course.build_slides import build_all, render_module
+    from learning.sql_course.course_parse import parse_course
+
+    paths = build_all(Path("learning/sql_course/cfb_sql_course.md"), tmp_path)
+    assert len(paths) == 22
+    html = (tmp_path / "A4.html").read_text(encoding="utf-8")
+    assert html.count("<section data-markdown>") >= 7
+    assert "ROWS BETWEEN" not in html or "A6" in html
+
+    d_html = (tmp_path / "D.html").read_text(encoding="utf-8")
+    mods = {m.code: m for m in parse_course(COURSE)}
+    d_sections = render_module(mods["D"]).count("<section data-markdown>")
+    assert d_sections == 1 + len(mods["D"].reference_sections)  # title + 10
+    assert len(mods["D"].reference_sections) == 10
+    for heading, _ in mods["D"].reference_sections:
+        assert heading in d_html
+
+    b2 = (tmp_path / "B2.html").read_text(encoding="utf-8")
+    assert "| Standard SQL" in b2
+    assert "QUALIFY" in b2
+    assert "cdn.jsdelivr.net/npm/reveal.js@5/" in html

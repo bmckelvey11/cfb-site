@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A7 — Set operations and data-modelling foundations</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# A7 — Set operations and data-modelling foundations
+
+Portable SQL: select, types/NULL, aggregation, joins, subqueries/CTEs, windows, set ops & modelling
+
+*Standard (runs in PostgreSQL)*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Combine result sets with `UNION`, `INTERSECT`, and `EXCEPT`, and know when to keep duplicates (`UNION ALL`).
+- State the grain of a table in one sentence and defend it.
+- Distinguish primary/foreign keys and surrogate vs natural keys.
+- Read a star schema: facts reference dimensions by key.
+- Write data-quality tests as plain SQL: uniqueness, not-null, referential integrity, freshness.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Set operators stack two same-shaped result sets. `UNION` removes duplicates; `UNION ALL` keeps them and is cheaper — use it when you know rows are disjoint (like the home/away unpivot in A6). `INTERSECT` returns rows in both; `EXCEPT` returns rows in the first but not the second (great for "in 2024 but not 2023").
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+The grain of a table is the meaning of one row — the single most important fact about it. `core.fact_game` is one row per game. `core.fact_game_line` is one row per game per provider. `core.fact_game_team` is one row per game per team (a running pre-game stat snapshot). State grain in a comment above every CTE and table.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Keys enforce grain. A *primary key* uniquely identifies a row; a *foreign key* points at another table's primary key. A *natural key* is a real-world identifier (`game_id` from the source); a *surrogate key* is a warehouse-generated integer with no business meaning. Dimensions hold descriptive attributes (`dim_team.school`, `dim_venue.dome`); facts hold measurements and foreign keys to dimensions — that is the star schema. Data-quality tests are just SQL that should return zero rows: duplicate keys, NULLs in required columns, orphan foreign keys, and staleness checks against `meta.load_report.loaded_at`. The mental model is that a test is a *negative* assertion: you write the query that finds violations and assert it returns zero rows. This inverts the usual instinct ("show me the good rows") and is what makes tests composable — you can `UNION ALL` a dozen zero-expected checks into one audit statement (see C8) that a scheduler runs after every load. Freshness deserves special mention for a betting warehouse: a line table that silently stopped loading is worse than one that errors loudly, because you will keep querying stale prices and never know. Compare `max(loaded_at)` per schema against an expected cadence and flag anything overdue.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- standard
+-- rows: 1
+SELECT count(*) AS orphan_provider_rows
+FROM core.fact_game_line AS l
+WHERE l.provider_key IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM core.dim_lines_provider AS p
+    WHERE p.provider_key = l.provider_key
+  );
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+The worked query should return 0 orphans in a clean warehouse. If not, list the offending `provider_key` values by dropping the `count(*)` and selecting `DISTINCT l.provider_key`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- `UNION` when you meant `UNION ALL`, silently collapsing legitimate duplicates.
+- Comparing result sets with mismatched column order (set ops match by position, not name).
+- Writing a quality test that returns rows on success — tests should return zero rows when healthy.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

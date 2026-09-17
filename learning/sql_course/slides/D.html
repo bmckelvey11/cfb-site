@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D — SQL best practices (reference)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# D — SQL best practices (reference)
+
+Best-practices reference
+
+*Portable habits*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Layout and formatting
+
+Pick one style and never mix. This course uses **lowercase keywords** with **one clause per line** and **trailing commas** in select lists. Lowercase keywords reduce visual noise and read like prose; the SQL parser does not care, so the only argument is human legibility, and lowercase wins for most modern teams. One clause per line (`select` / `from` / `where` / `group by` / `order by` each starting a line) means a diff shows exactly which clause changed — invaluable under version control. Trailing commas keep each column on its own line so adding or removing a column is a one-line change; the counter-argument (leading commas make it obvious when a comma is missing) is legitimate — either is fine, but decide once and apply it everywhere. Indent the body of each clause. Align `on` conditions under their `join`. A query you can scan in five seconds is a query you can trust.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Naming
+
+Use `snake_case` for everything; never quote mixed-case identifiers if you can avoid it. State grain in the table name: dimensions are prefixed `dim_` and are singular in spirit (`dim_team`, one row per team), facts are prefixed `fact_` and named for their grain (`fact_game` = one game, `fact_game_line` = one game×provider). Booleans read as assertions: `is_fbs`, `has_line`, `is_current`, `dome`, `grass` — a `where is_fbs` clause is self-documenting. Columns that are foreign keys end in `_id` (`home_team_id`), timestamps end in `_at` (`loaded_at`, `pulled_at`, `updated_at`), and dates carry their unit when ambiguous (`rest_days`). Consistency beats cleverness: if the warehouse already uses `provider_key`, do not invent `provider_id` in your scratch tables.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Grain, CTEs, and structure
+
+**Always state grain in a comment above every CTE and every saved table**: `-- grain: one row per team-game`. Grain is the contract; most analytical bugs are grain bugs (a fan-out you did not expect, a double count). Prefer CTEs over nested subqueries — `with` reads top-to-bottom as a pipeline, one idea per CTE, each independently testable by selecting from it. A five-CTE query where each CTE does one thing is far easier to debug than one query nested five deep. Name CTEs for what they produce (`graded`, `rolling`, `home_stats`), not `t1`, `t2`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Joins and projection
+
+Use explicit `join ... on`; **never comma joins**, which hide the join condition in the `where` clause and invite accidental cross products. Make every join's intent obvious: `inner` when you require a match, `left` when the right side is optional (always `left join dim_team` — 44 away teams have no dimension row). **Never `select *` in anything you save** — a view or table built on `*` breaks silently when an upstream column is added or reordered; list columns explicitly. Exploratory `select *` at the REPL is fine; persisted `*` is a landmine. Project early: select only the columns you need before a join so the engine moves less data. Filter early: put selective predicates (`season = 2024`) before joins so fewer rows enter them.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Fan-out and dedupe discipline
+
+Guard fan-out with a row-count assertion whenever you expect one-to-one: after joining `fact_game` to a dimension, confirm the count did not grow. If it did, the dimension is not unique on the join key and you have silently multiplied rows — a class of bug that quietly corrupts every downstream average. Prefer `qualify` with a window `row_number()` over `distinct` for deduplication: `distinct` hides *why* rows duplicated and cannot express "keep the latest", whereas `qualify row_number() over (partition by key order by updated_at desc) = 1` states the tiebreak explicitly. Reach for `distinct` only for genuinely set-like questions ("distinct conferences"), never as a band-aid for a fan-out you did not diagnose.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## NULL and NaN discipline
+
+Compare nullable columns with `is distinct from`, not `=`/`<>`, so two NULLs compare equal and a NULL-vs-value compares different. Use `coalesce` **only at the edge** — the final display or the input boundary — never mid-computation where it silently converts "unknown" into a fabricated value and biases aggregates. Remember NaN is not NULL: `coalesce(nan_col, 0)` returns NaN, and `nan_col is not null` is true; detect NaN with `isnan(x)` (DuckDB defines `NaN = NaN` as TRUE, unlike IEEE 754, so `x <> x` never fires). In this warehouse, GraphQL numerics can arrive as the string `"NaN"`; the loader nulls most, but verify rather than assume. When a rate could divide by zero, guard with `nullif(denominator, 0)`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Dates and timezones
+
+Store timestamps as `timestamptz` in **UTC** and convert to a display timezone only at the presentation layer. The warehouse already does this — `fact_game.start_date`, `fact_game_odds.pulled_at`, and `an_history_tick.updated_at` are all `timestamp with time zone`. Kickoff-relative logic (rest days, as-of joins for closing lines) must compare timestamps in a single consistent zone; mixing local and UTC is how a "pre-game" tick sneaks in from after kickoff. Tag every engineered feature with its as-of timestamp so you can prove it predates the game.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Idempotency, immutability, and provenance
+
+Make scripts rerunnable: use `create or replace view/table/macro` so a second run does not error. Keep `raw` immutable — it is the replay log; never update or delete it, and never analyse from it. Every number that reaches a decision should be reproducible from a query under version control: commit the SQL that produced it, not just the result. When you merge two sources, carry a `_provenance` / `_source` marker (as `core.fact_game_line._source ∈ rest/gql/both` does) so you can always trace a row back. Write the data-quality test next to the model it protects, in the same file, so the test cannot rot separately from the query.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Comments and performance
+
+Comment the **why**, not the what: `-- exclude postseason: dim_week has one postseason row per season` is useful; `-- filter season type` merely restates the code. Performance basics, in order of impact: filter early and project early (already covered); avoid wrapping a join or filter column in a function (`where cast(start_date as date) = ...` defeats pruning — compare against a range instead); check `explain analyze` before optimising by guesswork; and prefer set-based logic over row-by-row simulation (a recursive bootstrap is fine, a correlated subquery per row is usually not).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Anti-patterns, each with the fix
+
+- **`select *` in a view.** Fix: list columns; the view survives upstream schema changes.
+- **Comma join.** `from a, b where a.k=b.k` → **Fix:** `from a join b on a.k = b.k`.
+- **Inner join to `dim_team`.** Drops 44 exotic opponents. **Fix:** `left join`, expect NULLs.
+- **Joining games to `dim_week` on `(season, week)`.** Loses all postseason. **Fix:** add `season_type`, or handle postseason separately.
+- **`where x = null`.** Never matches. **Fix:** `x is null`.
+- **`coalesce(x, 0)` to "handle" NaN.** NaN passes through. **Fix:** detect with `isnan(x)` (DuckDB defines `NaN = NaN` as TRUE, unlike IEEE 754, so `x <> x` never fires).
+- **`not in (subquery)` where the subquery can be NULL.** Returns nothing. **Fix:** `not exists`.
+- **`distinct` to fix duplicate rows.** Hides the cause. **Fix:** diagnose the fan-out; dedupe with `qualify row_number()`.
+- **Window frame ending at `current row` for a pre-game feature.** Leaks the result. **Fix:** end at `1 preceding`.
+- **Choosing a betting rule after seeing all seasons.** In-sample overfit. **Fix:** walk-forward, judge out-of-sample.
+- **Population stats (`stddev_pop`) for inference.** Understates uncertainty. **Fix:** `stddev_samp` / `var_samp`.
+- **Writing to `cfb`.** It is read-only and errors. **Fix:** target `sandbox.main.<name>`.
+- **Treating games as independent in a hypothesis test.** Clustering inflates significance. **Fix:** cluster by team-season or use a block bootstrap.
+
+Follow these and every number you ship will be reproducible, leak-free, and portable off DuckDB the day you need it to be.
+
+---
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

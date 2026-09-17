@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C4 — Correlation and regression</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# C4 — Correlation and regression
+
+Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone
+
+*DuckDB*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Measure linear association with `corr` and `covar_samp`.
+- Fit a one-variable line with `regr_slope`, `regr_intercept`, `regr_r2`.
+- Compute residuals with window functions.
+- Residualise to get a partial correlation.
+- Run a leakage check on a "predictor".
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Plain language.** Correlation \(r\) measures how tightly two variables move together, from -1 to 1. Simple linear regression fits \(y = a + b x\); the slope \(b\) is the expected change in \(y\) per unit \(x\), and \(R^2\) is the fraction of \(y\)'s variance the line explains. Residual = actual − predicted; what is left after the model.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The SQL.** DuckDB has the full `regr_*` family and `corr`/`covar_samp` as aggregates [duckdb.org/docs/sql/functions/aggregates]. No procedural code needed for a one-variable fit.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Worked solution.** How well does the closing market total predict the actual total? Regress actual total on `selected_total`, 2019–2024 regular season.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Returns **1** row: n = **6492**, r = **0.3777**, slope = **0.8517**, intercept = **8.5306** (and r² = r² ≈ 0.143). **How to read it.** r ≈ 0.38 (r² ≈ 0.14) means the closing total explains only ~14% of the variance in actual totals — the rest is game-day noise. That is expected and healthy: if the market explained most variance, totals would be trivially predictable. A slope near 1 with a small intercept would say the line is unbiased; slope 0.85 hints the market slightly compresses extremes over this window (interpret cautiously given noise).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+SELECT
+  count(*)                                                       AS n,
+  round(corr(selected_total, home_points + away_points), 4)      AS r,
+  round(regr_slope(home_points + away_points, selected_total), 4) AS slope,
+  round(regr_intercept(home_points + away_points, selected_total), 4) AS intercept,
+  round(regr_r2(home_points + away_points, selected_total), 4)   AS r2
+FROM core.fact_game
+WHERE season BETWEEN 2019 AND 2024
+  AND season_type = 'regular'
+  AND selected_total IS NOT NULL
+  AND home_points IS NOT NULL
+  AND away_points IS NOT NULL;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+The live worked run returned exactly n=6492, r=0.3777, slope=0.8517, intercept=8.5306. Your rerun over the same filters must match.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Reversing argument order in `regr_slope(y, x)` (DuckDB is `y` first, then `x`).
+- Reading correlation as causation, or high r² on a leaked feature as skill.
+- Ignoring that games share teams, so residuals are not independent.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

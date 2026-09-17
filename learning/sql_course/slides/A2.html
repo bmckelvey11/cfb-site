@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A2 — Types and NULL (and NaN)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# A2 — Types and NULL (and NaN)
+
+Portable SQL: select, types/NULL, aggregation, joins, subqueries/CTEs, windows, set ops & modelling
+
+*Standard (runs in PostgreSQL)*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Convert types safely with `CAST` and handle missing data with `COALESCE` and `NULLIF`.
+- Branch row-by-row with `CASE`.
+- Reason correctly under three-valued logic (`TRUE`/`FALSE`/`UNKNOWN`).
+- Compare nullable columns safely with `IS DISTINCT FROM`.
+- Detect the difference between NaN and NULL, and know why `COALESCE` treats NaN as populated.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+SQL columns have types, and mixing them silently is a trap. `CAST(x AS DOUBLE)` makes intent explicit. `COALESCE(a, b, c)` returns the first non-NULL argument — use it to supply defaults, but only at the display edge, never mid-computation where it can hide real gaps. `NULLIF(a, b)` returns NULL when `a = b`, which is the idiomatic guard against division by zero: `x / NULLIF(y, 0)`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+`CASE WHEN ... THEN ... ELSE ... END` is portable conditional logic; you will use it constantly for conditional aggregation in A3.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+NULL is not a value; it is the absence of one. Any arithmetic or comparison with NULL yields UNKNOWN, not TRUE or FALSE, so `WHERE x = NULL` never matches — use `IS NULL`. This three-valued logic means `NOT (x = 1)` does not include NULL rows. `a IS DISTINCT FROM b` is the null-safe not-equals: it treats two NULLs as equal and a NULL-vs-value as different, returning a clean boolean.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+NaN ("not a number") is different again. GraphQL numerics sometimes arrive as the string `"NaN"`; the loader nulls most of them, but any floating NaN that survives is a real, non-NULL value. So `x IS NOT NULL` is TRUE for NaN, and `COALESCE(x, 0)` returns the NaN unchanged — it never triggers the fallback. Detect NaN explicitly rather than assuming NULL handling caught it.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- standard
+-- rows: 3
+SELECT
+  CASE
+    WHEN home_points + away_points < 45 THEN 'low'
+    WHEN home_points + away_points < 60 THEN 'mid'
+    ELSE 'high'
+  END AS total_bucket,
+  count(*) AS n_games
+FROM core.fact_game
+WHERE season = 2024
+  AND season_type = 'regular'
+  AND home_points IS NOT NULL
+  AND away_points IS NOT NULL
+GROUP BY
+  CASE
+    WHEN home_points + away_points < 45 THEN 'low'
+    WHEN home_points + away_points < 60 THEN 'mid'
+    ELSE 'high'
+  END
+ORDER BY total_bucket;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+The three bucket counts must sum to the count of completed 2024 regular games (games with both scores). Validate with a single `count(*)` under the same `WHERE`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Using `WHERE x = NULL` instead of `x IS NULL`.
+- Assuming `COALESCE(x, 0)` cleans NaN — it does not; NaN is non-NULL.
+- Dividing without `NULLIF`, then getting an error or an infinity.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

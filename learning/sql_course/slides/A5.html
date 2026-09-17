@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A5 — Subqueries and CTEs</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# A5 — Subqueries and CTEs
+
+Portable SQL: select, types/NULL, aggregation, joins, subqueries/CTEs, windows, set ops & modelling
+
+*Standard (runs in PostgreSQL)*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Use scalar, `IN`, and correlated `EXISTS` subqueries appropriately.
+- Refactor nested subqueries into named `WITH` CTEs, one idea per CTE.
+- Understand when a correlated subquery is evaluated per outer row.
+- Write a recursive CTE to walk a chain (e.g. a season sequence).
+- State the grain of each CTE in a comment.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+A subquery is a query nested inside another. A *scalar* subquery returns one value and can sit in a `SELECT` or `WHERE` (e.g. compare each game's total to the season average). An `IN (SELECT ...)` subquery filters against a set. A *correlated* subquery references the outer row and runs conceptually once per outer row — powerful but potentially slow; `EXISTS`/`NOT EXISTS` are its most efficient forms because they stop at the first match.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Common Table Expressions (`WITH name AS (...)`) name intermediate results. They read top-to-bottom, so a pipeline of transformations becomes a sequence of named steps instead of deeply nested parentheses. The discipline: one idea per CTE, and a one-line comment above each stating its grain ("one row per team-season"). This is the single biggest readability win in analytical SQL and is fully portable.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Recursive CTEs (`WITH RECURSIVE`) build a result by repeatedly referencing themselves: an anchor query seeds the first rows, and a recursive query extends them until no new rows appear. You can walk a coaching lineage, generate a sequence of seasons, or expand any parent-child chain. PostgreSQL, SQLite, and DuckDB all support the same `WITH RECURSIVE` syntax.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+A practical rule for choosing between a correlated subquery and a join: if you need one aggregate per outer row and the inner set is small, a correlated `EXISTS` is clear and often optimised into a semi-join; if you need many columns from the inner side, join instead. And prefer a CTE over a repeated subquery — computing the season average once in a `WITH` block and referencing it twice is both faster and impossible to get subtly inconsistent, which is exactly the kind of silent bug that produces two "season averages" that disagree by a rounding error.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- standard
+-- rows: 1
+SELECT count(*) AS games_above_season_avg
+FROM core.fact_game AS fg
+WHERE fg.season = 2024
+  AND fg.season_type = 'regular'
+  AND fg.home_points IS NOT NULL
+  AND fg.away_points IS NOT NULL
+  AND (fg.home_points + fg.away_points) > (
+    SELECT avg(f2.home_points + f2.away_points)
+    FROM core.fact_game AS f2
+    WHERE f2.season = 2024
+      AND f2.season_type = 'regular'
+      AND f2.home_points IS NOT NULL
+      AND f2.away_points IS NOT NULL
+  );
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+Games above the 2024 average should be close to but not exactly half of 3,745 (distributions are skewed). Validate by also counting games *below* average; the two plus ties equal 3,745.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- `NOT IN (subquery)` where the subquery can return NULL — it silently returns no rows.
+- Deeply nested subqueries instead of readable CTEs.
+- Omitting the grain comment, then misreading a CTE's row meaning downstream.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

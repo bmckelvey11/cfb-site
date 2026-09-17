@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B5 — Performance and reuse</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# B5 — Performance and reuse
+
+DuckDB dialect: conveniences, FILTER/QUALIFY, JSON/structs, line time-series, performance/reuse
+
+*DuckDB / MotherDuck*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Standard → DuckDB
+
+| Standard SQL | DuckDB / MotherDuck |
+|---|---|
+| `EXPLAIN` | `EXPLAIN` and `EXPLAIN ANALYZE` (with timings) — [duckdb.org/docs/guides/meta/explain_analyze] |
+| Stored functions / views | `CREATE MACRO` (scalar & table) and `CREATE VIEW` — [duckdb.org/docs/sql/statements/create_macro] |
+| `COPY ... TO` CSV | `COPY (query) TO 'f.parquet' (FORMAT parquet)` — [duckdb.org/docs/sql/statements/copy] |
+| Single-node engine | MotherDuck shares, hybrid execution, `md:` vs local — [motherduck.com/docs] |
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Read a query plan and its runtime with `EXPLAIN ANALYZE`.
+- Encapsulate logic in scalar and table `MACRO`s (in `sandbox.main`).
+- Create reusable `VIEW`s over the warehouse.
+- Export a result to Parquet.
+- Understand MotherDuck hybrid execution and where a query runs.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+`EXPLAIN` prints the query plan; `EXPLAIN ANALYZE` runs it and annotates each operator with rows and time, so you can see whether a filter pushed down or a join blew up. The performance basics that matter most: filter early (put selective predicates before joins), project early (`SELECT` only needed columns), and avoid wrapping a join/filter column in a function that defeats pruning.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Reuse comes in three forms. A **scalar `MACRO`** parameterises an expression (e.g. American-odds→probability from C5). A **table `MACRO`** parameterises a whole query and is called like a table function. A **`VIEW`** names a query you rerun often. All writes go to `sandbox.main` — e.g. `CREATE OR REPLACE VIEW sandbox.main.v_game_totals AS ...`. `CREATE OR REPLACE` makes scripts idempotent.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+`COPY (SELECT ...) TO 'file.parquet' (FORMAT parquet)` exports a result set; Parquet preserves types and compresses well. On MotherDuck, tables live in the cloud (`md:`); the engine uses **hybrid execution**, running parts of a query locally and parts in the cloud depending on where data sits. **Shares** let you expose a database read-only to others. Knowing whether you are hitting `md:cfb` (cloud) or a local table changes latency and cost — profile with `EXPLAIN ANALYZE` when a query feels slow.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+CREATE OR REPLACE VIEW sandbox.main.v_game_totals AS
+SELECT
+  game_id,
+  season,
+  season_type,
+  home_points + away_points AS actual_total,
+  selected_total AS market_total
+FROM cfb.core.fact_game
+WHERE home_points IS NOT NULL
+  AND away_points IS NOT NULL;
+
+SELECT count(*) AS rows_in_view
+FROM sandbox.main.v_game_totals
+WHERE season = 2024 AND season_type = 'regular';
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+`rows_in_view` for 2024 regular season should match the A3/A1 completed-game counts. Confirm the object landed in scratch: it appears under `sandbox.main`, and any attempt to `CREATE` in `cfb` fails (read-only).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Creating views/macros in `cfb` (read-only — it errors); always target `sandbox.main`.
+- Reading `EXPLAIN` top-down; plans execute leaves-first.
+- Forgetting `CREATE OR REPLACE`, so a rerun throws "already exists".
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

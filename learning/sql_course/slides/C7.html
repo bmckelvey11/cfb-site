@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C7 — Backtesting and walk-forward evaluation</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# C7 — Backtesting and walk-forward evaluation
+
+Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone
+
+*DuckDB*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Split data into train/test by season to avoid leakage.
+- Run an expanding-window (walk-forward) evaluation.
+- Record win/loss and ROI per rule per period.
+- Compute drawdown with cumulative window sums.
+- Persist results to `sandbox.main.backtest_result`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Plain language.** A backtest replays a betting rule on history *as if you did not know the future*. Walk-forward trains on seasons up to year Y and tests on Y+1, expanding the window each step, so no test game informs its own prediction. ROI = net units / units staked. Drawdown is the worst peak-to-trough dip of the cumulative bankroll — the pain you must survive.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The SQL.** Grade each bet, assign a unit P&L (win = decimal_odds − 1, loss = −1, push = 0), then aggregate per (rule, season, week). Cumulative bankroll and running max come from window `SUM`/`MAX OVER`; drawdown = running_max − cumulative.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Worked solution.** Grade the naive rule "bet the over at the closing total" per season, 2015–2024 regular, at -110 pricing, and persist to scratch.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+The final `SELECT` returns **1** row; its value is the number of (rule, season, week) cells written to `sandbox.main.backtest_result`. **How to read it.** A `roi_per_bet` clustered around −0.045 across seasons is the vig eating a no-edge rule — exactly what you expect from "always over". A genuine edge would show consistently positive ROI across *out-of-sample* seasons, not one lucky year. And ROI alone is not enough: two rules with identical ROI can have wildly different drawdowns, and the one that dips your bankroll 40% before recovering is the one you will abandon at the worst moment. That is why exercise 2 computes cumulative bankroll and running-max drawdown — a rule is only as good as the losing streak you can psychologically and financially survive. Report ROI, its confidence interval (C2), and max drawdown together; never one in isolation.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+CREATE OR REPLACE TABLE sandbox.main.backtest_result AS
+WITH graded AS (
+  SELECT
+    season,
+    week,
+    CASE
+      WHEN (home_points + away_points) > selected_total THEN 0.9091  -- win at -110
+      WHEN (home_points + away_points) = selected_total THEN 0.0     -- push
+      ELSE -1.0
+    END AS pnl_units
+  FROM core.fact_game
+  WHERE season BETWEEN 2015 AND 2024
+    AND season_type = 'regular'
+    AND selected_total IS NOT NULL
+    AND home_points IS NOT NULL
+    AND away_points IS NOT NULL
+)
+SELECT
+  'always_over' AS rule,
+  season,
+  week,
+  count(*)                          AS n_bets,
+  round(sum(pnl_units), 2)          AS net_units,
+  round(sum(pnl_units) / count(*), 4) AS roi_per_bet
+FROM graded
+GROUP BY season, week;
+
+SELECT count(*) AS backtest_rows FROM sandbox.main.backtest_result;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+`backtest_rows` equals distinct (season, week) pairs 2015–2024 regular that had gradeable totals. Validate: `SELECT count(*) FROM (SELECT DISTINCT season, week FROM core.fact_game WHERE ...)`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Choosing the rule after seeing all seasons (in-sample overfitting) — always evaluate out-of-sample.
+- Ignoring pushes in ROI (a push returns the stake, pnl 0).
+- Writing the table to `cfb` (read-only); it must be `sandbox.main.backtest_result`.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

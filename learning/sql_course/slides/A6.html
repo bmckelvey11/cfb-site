@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A6 — Window functions</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# A6 — Window functions
+
+Portable SQL: select, types/NULL, aggregation, joins, subqueries/CTEs, windows, set ops & modelling
+
+*Standard (runs in PostgreSQL)*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Rank and number rows with `ROW_NUMBER`, `RANK`, and `DENSE_RANK`.
+- Reach across rows with `LAG` and `LEAD`.
+- Compute running and rolling aggregates with `SUM() OVER` and explicit frames.
+- Rebuild pre-game rolling team stats by hand, and see why frame bounds enforce no-lookahead.
+- Deduplicate with `ROW_NUMBER` inside a CTE.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+A window function computes across a set of rows *related to the current row* without collapsing them — unlike `GROUP BY`, every input row survives. The `OVER (PARTITION BY ... ORDER BY ...)` clause defines the peer group and its order. `ROW_NUMBER()` gives a unique 1,2,3 within each partition; `RANK()` leaves gaps after ties; `DENSE_RANK()` does not.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+`LAG(x, 1)` reads the previous row's value in the ordering, `LEAD(x, 1)` the next. For betting features this is how you get "points scored in the previous game". Running totals use `SUM(x) OVER (PARTITION BY team ORDER BY date)`; the default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+The no-lookahead rule is enforced by the frame. A pre-game rolling average must use only earlier games, so the frame is `ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING` — explicitly excluding the current row. If you accidentally include `CURRENT ROW`, the "pre-game" feature leaks the game's own result. That single frame choice is the difference between an honest backtest and a fantasy.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Deduplication: number rows with `ROW_NUMBER() OVER (PARTITION BY key ORDER BY tiebreak)` inside a CTE, then keep `WHERE rn = 1`. All of this is standard SQL:2003+ and portable.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- standard
+-- rows: 1
+WITH team_games AS (
+  -- grain: one row per team per game (home and away unpivoted)
+  SELECT game_id, season, week, start_date,
+         home_team_id AS team_id, home_points AS points
+  FROM core.fact_game
+  WHERE season = 2024 AND season_type = 'regular'
+  UNION ALL
+  SELECT game_id, season, week, start_date,
+         away_team_id AS team_id, away_points AS points
+  FROM core.fact_game
+  WHERE season = 2024 AND season_type = 'regular'
+),
+rolling AS (
+  -- grain: one row per team-game with pre-game rolling mean
+  SELECT team_id, game_id, start_date, points,
+         avg(points) OVER (
+           PARTITION BY team_id
+           ORDER BY start_date
+           ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING
+         ) AS pregame_avg_pts_last3
+  FROM team_games
+)
+SELECT count(*) AS team_game_rows
+FROM rolling;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+7,494 team-game rows must equal twice the 3,747 games. Validate: `SELECT 2 * count(*) FROM core.fact_game WHERE season=2024 AND season_type='regular'`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Frame ending at `CURRENT ROW` for a "pre-game" feature — a lookahead leak.
+- Forgetting `ORDER BY` in the window, making running sums meaningless.
+- Using `RANK` where you needed a unique `ROW_NUMBER` (ties break your dedupe).
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

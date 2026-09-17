@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B3 — Semi-structured data</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# B3 — Semi-structured data
+
+DuckDB dialect: conveniences, FILTER/QUALIFY, JSON/structs, line time-series, performance/reuse
+
+*DuckDB / MotherDuck*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Standard → DuckDB
+
+| Standard SQL | DuckDB shortcut |
+|---|---|
+| Vendor-specific JSON functions | `json_extract(j,'$.k')`, `j ->> 'k'` — [duckdb.org/docs/data/json/overview] |
+| Normalise an array into rows with a numbers table | `unnest(list)` (with `WITH ORDINALITY` for index) — [duckdb.org/docs/sql/query_syntax/unnest] |
+| Composite type gymnastics | `STRUCT`, `row(...)`, `s.field` dot access — [duckdb.org/docs/sql/data_types/struct] |
+| Array columns via extensions | native `LIST`, `list[i]`, `MAP` — [duckdb.org/docs/sql/data_types/list] |
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Extract fields from JSON with `json_extract` and `->>`.
+- Explode arrays to rows with `unnest`, recovering the `_idx` position.
+- Read and build `STRUCT` values and access fields by dot.
+- Understand how a `stg` table is reconstructed from `raw` JSON.
+- Work with the exploded `stg.<table>__<column>` `_idx` tables.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+The `raw` schema stores each source dump as JSON. `stg` is the typed, exploded version. `json_extract(payload, '$.field')` pulls a value by JSON path; `->>` returns it as text (`payload ->> 'homeTeam'`). Understanding this lets you audit how a `stg` column was derived and spot loader bugs — but you still query `stg`, not `raw`, for analysis.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Nested arrays are DuckDB `LIST` columns. `stg.lines.lines` is a `LIST` of `STRUCT`s (each with `provider`, `spread`, `overUnder`, `spreadOpen`, `overUnderOpen`, moneylines, `formattedSpread`), and `stg.game.homeLineScores` is a `HUGEINT[]`. `unnest(col)` turns one row with an N-element list into N rows; adding `WITH ORDINALITY` (or DuckDB's generated index) recovers the position, which is exactly what the `stg.<table>__<column>` explosion tables store as `_idx`. `STRUCT` values are accessed with dot notation (`s.provider`), and you can build them with `struct_pack(a := 1, b := 2)`. `LIST[i]` indexes (1-based), and `MAP` gives key→value lookups. This is how you turn the nested `stg.lines` shape into a flat, per-provider row set that mirrors `core.fact_game_line`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+The payoff is auditability. When `core.fact_game_line` shows a total you distrust, you can trace it back: unnest `stg.lines.lines`, filter to the game and provider, and compare — if they disagree, the merge logic (not the source) is the suspect. Semi-structured skills also unlock features the typed layer never materialised: a provider that only the GraphQL feed carried, a moneyline present in the array but dropped from `core`, or the per-quarter `homeLineScores` that let you reconstruct in-game scoring pace. Explode once, index with `_idx`, and you have columns the star schema chose not to expose.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+WITH exploded AS (
+  SELECT
+    gameId,
+    unnest(lines) AS ln
+  FROM stg.lines
+  WHERE season = 2024
+    AND seasonType = 'regular'
+)
+SELECT count(*) AS provider_line_rows
+FROM exploded
+WHERE ln.provider IS NOT NULL;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+Compare `provider_line_rows` to `SELECT count(*) FROM core.fact_game_line l JOIN core.fact_game g ON l.game_id=g.game_id WHERE g.season=2024 AND g.season_type='regular'`. They should be close; the `core` merge dedupes and adds GraphQL-only providers (`_source`).
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Querying `raw` for analysis instead of using it only to understand provenance.
+- Forgetting `unnest` is 1-based when reasoning about `_idx`.
+- Treating a `LIST` column as scalar and getting a type error.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

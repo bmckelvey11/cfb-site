@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C5 — Rates, odds, and calibration</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# C5 — Rates, odds, and calibration
+
+Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone
+
+*DuckDB*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Convert American odds to implied probability and remove the vig.
+- Compute expected value and the Kelly fraction in SQL.
+- Build a calibration table: predicted bucket vs realised rate.
+- Score probabilities with Brier score and log loss.
+- Use closing-line value as a performance metric.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Plain language.** American odds encode a price. Negative odds \(o<0\): implied prob \(= \frac{-o}{-o+100}\) [5]; positive: \(\frac{100}{o+100}\) [6]. Two sides' implied probabilities sum to >1 — the excess is the vig; divide each by the sum to get fair (no-vig) probabilities. Expected value of a unit bet at decimal odds \(d\) with true prob \(p\) is \(EV = p\,(d-1) - (1-p)\) [7]. The Kelly fraction is \(f^\* = \frac{p(d-1)-(1-p)}{d-1}\) [8]. Calibration asks: when I say 60%, does it happen 60% of the time? Brier score is mean squared error of probabilities [9]; log loss penalises confident wrong calls harshly [10].
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The SQL.** All are arithmetic over `fact_game_line` / `fact_game_odds` columns (`moneyline_home`, `odds`). Bucket predictions with `least(floor(implied_home_prob * 10) + 1, 10)`, then compare mean predicted to realised in each bucket. DuckDB 1.5.5 has no `width_bucket`.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Worked solution.** Convert home moneylines to implied probability and check calibration against actual home wins, 2015–2024 regular season, in 10 deciles.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Executed successfully; returns one row per non-empty decile (≤10). **How to read it.** If the market is calibrated, `mean_predicted` ≈ `realised_rate` in every decile (with vig, predicted will slightly exceed realised because implied probs are inflated by the juice). Systematic gaps in a decile are where a bettor might have edge — or where sample noise fools you. Anchor your intuition to the vig: at standard -110 pricing each side implies about 52.4% and the two sides sum to ~104.8%, so the 4.8% overround is the house's cut. A calibrated market will show `mean_predicted` running a hair above `realised_rate` in every decile precisely by that margin. Your job as a modeller is to find deciles — or, better, feature regions — where *your* probability is calibrated but the *market's* is not, and the gap exceeds the vig. Everything narrower than the vig is unbettable no matter how real.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: (one per non-empty decile, <= 10)
+WITH p AS (
+  SELECT
+    g.game_id,
+    CASE WHEN l.moneyline_home < 0
+         THEN (-l.moneyline_home)::DOUBLE / ((-l.moneyline_home) + 100)
+         ELSE 100.0 / (l.moneyline_home + 100)
+    END AS implied_home_prob,
+    CASE WHEN g.home_points > g.away_points THEN 1.0 ELSE 0.0 END AS home_win
+  FROM core.fact_game_line AS l
+  JOIN core.fact_game AS g ON g.game_id = l.game_id
+  WHERE g.season BETWEEN 2015 AND 2024
+    AND g.season_type = 'regular'
+    AND l.moneyline_home IS NOT NULL
+    AND g.home_points IS NOT NULL
+    AND g.away_points IS NOT NULL
+)
+SELECT
+  least(floor(implied_home_prob * 10) + 1, 10) AS prob_decile,
+  count(*)                                   AS n,
+  round(avg(implied_home_prob), 3)           AS mean_predicted,
+  round(avg(home_win), 3)                    AS realised_rate
+FROM p
+GROUP BY prob_decile
+ORDER BY prob_decile;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+Brier score for a coin-flip predictor (always 0.5) is 0.25 — your market Brier should be below 0.25 if the line has skill. No-vig two-sided probabilities must sum to 1.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Forgetting to remove vig, so implied probabilities sum above 1 and EV is understated.
+- Kelly on the vig-laden probability instead of your own estimate — Kelly needs your true p.
+- Reading a single noisy decile as edge without a confidence interval (see C2).
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

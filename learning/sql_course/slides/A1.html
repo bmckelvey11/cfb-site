@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A1 — Orientation</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# A1 — Orientation
+
+Portable SQL: select, types/NULL, aggregation, joins, subqueries/CTEs, windows, set ops & modelling
+
+*Standard (runs in PostgreSQL)*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Read the warehouse map from `information_schema.tables` and `.columns` instead of guessing.
+- Write the core single-table query shape: `SELECT ... FROM ... WHERE ... ORDER BY ... LIMIT`.
+- Alias tables and columns for readable output.
+- Know which table to reach for: `stg` for typed source data, `core` for the star schema, `meta` for load provenance.
+- Understand why `raw` is off-limits for analysis.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+The warehouse has four analytical layers. `raw` is a replay log — one table per source dump with the payload as JSON. Never query it for analysis. `stg` holds typed, exploded tables and is the default place to poke at source data. `core` is a Kimball star schema: conformed dimensions (`dim_team`, `dim_week`, `dim_venue`, `dim_conference`, `dim_coach`, `dim_lines_provider`) surrounded by fact tables (`fact_game`, `fact_game_line`, `fact_game_team`, `fact_game_odds`, and more). `meta.load_report` records what loaded, how many rows, and when.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Before writing any query, you introspect. Two catalog views answer "what exists?": `information_schema.tables` lists every table with its schema, and `information_schema.columns` lists every column with its type. These are themselves standard SQL and portable across PostgreSQL, SQLite, and DuckDB.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+The everyday query shape is five clauses in fixed order: `SELECT` (which columns), `FROM` (which table), `WHERE` (row filter), `ORDER BY` (sort), `LIMIT` (cap rows). Aliases (`fg` for a table, `AS n` for a column) keep queries short and self-documenting. Start here: point at `core.fact_game`, which holds one row per REST game from 2012 on, with `home_points`, `away_points`, `selected_spread`, and `selected_total` already attached.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- standard
+-- rows: 3747
+SELECT
+  game_id,
+  week,
+  home_team,
+  away_team,
+  home_points,
+  away_points
+FROM core.fact_game
+WHERE season = 2024
+  AND season_type = 'regular'
+ORDER BY week DESC, game_id;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+The worked solution returns exactly 3,747 rows. Cross-check: `SELECT count(*) FROM core.fact_game WHERE season=2024 AND season_type='regular'` must equal the row count you see.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Querying `raw` tables for analysis (they hold JSON blobs, not typed columns).
+- Forgetting `season_type = 'regular'` and silently mixing in postseason games.
+- Assuming a column name; always confirm it in `information_schema.columns` first.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+> **Why it matters for betting.** Every model you build starts by selecting the right games. Mixing postseason into a "regular-season" training set, or querying a stale table, poisons everything downstream. Orientation is not busywork — it is the first line of defence against a silently wrong number.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

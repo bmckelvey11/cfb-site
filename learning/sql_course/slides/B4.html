@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B4 — Time series on betting lines</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# B4 — Time series on betting lines
+
+DuckDB dialect: conveniences, FILTER/QUALIFY, JSON/structs, line time-series, performance/reuse
+
+*DuckDB / MotherDuck*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Standard → DuckDB
+
+| Standard SQL | DuckDB shortcut |
+|---|---|
+| Correlated subquery for "latest tick before T" | `ASOF JOIN ... ON a.t >= b.t` — [duckdb.org/docs/guides/sql_features/asof_join] |
+| `date_trunc('hour', ts)` then group | `time_bucket(INTERVAL '1 hour', ts)` — [duckdb.org/docs/sql/functions/timestamp] |
+| `ROWS BETWEEN` frames only | `RANGE BETWEEN INTERVAL '3 days' PRECEDING ...` on timestamps — [duckdb.org/docs/sql/window_functions] |
+| `EXTRACT(EPOCH FROM ...)` differences | `age(a,b)`, `epoch(...)` helpers — [duckdb.org/docs/sql/functions/timestamp] |
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Distinguish opener, close, and intraday ticks across the three line sources.
+- Measure line movement and closing-line value (CLV).
+- Match a tick to a game with `ASOF JOIN` on timestamps.
+- Bucket ticks into intervals with `time_bucket`.
+- Use `RANGE` windows measured in time, not rows.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Three tables hold line prices at different resolutions. `core.fact_game_line` stores one opener and one close per game×provider (`spread_open`, `spread_close`, `total_open`, `total_close`; 7,291 rows have both open and close totals). `core.fact_game_odds` (86,640 rows) holds odds-api snapshots with `pulled_at`, `market`, `side`, `line`, and `odds`. `stg.an_history_tick` (410,845 rows) is the finest grain: Action Network line ticks with `updated_at`, `line`, and `odds`. Odds-api history starts 2026-09-09; Action Network ticks go back further.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Line movement** is `total_close - total_open` (or spread). **Closing-line value** compares the price you would have bet to the closing price — beating the close is the single best predictor of long-run edge, so CLV is your north-star metric (formalised in C5). To attach the right tick to a kickoff you need "the last tick at or before time T": that is an `ASOF JOIN`, which matches each left row to the most recent right row satisfying an inequality — vastly cleaner and faster than a correlated subquery. `time_bucket(INTERVAL '6 hours', updated_at)` groups ticks into windows for a movement chart. A `RANGE BETWEEN INTERVAL '24 hours' PRECEDING AND CURRENT ROW` window averages over calendar time regardless of how many ticks fell in it — the honest way to compute "average line over the last day".
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: (one per movement bucket, see below)
+WITH moved AS (
+  SELECT
+    l.game_id,
+    l.provider_key,
+    l.total_close - l.total_open AS total_move
+  FROM core.fact_game_line AS l
+  JOIN core.fact_game AS g
+    ON g.game_id = l.game_id
+  WHERE g.season = 2024
+    AND g.season_type = 'regular'
+    AND l.total_open IS NOT NULL
+    AND l.total_close IS NOT NULL
+)
+SELECT
+  CASE
+    WHEN total_move <= -3 THEN '<= -3'
+    WHEN total_move <  0  THEN '-3..0'
+    WHEN total_move =  0  THEN '0 (no move)'
+    WHEN total_move <= 3  THEN '0..3'
+    ELSE '> 3'
+  END AS move_bucket,
+  count(*) AS n
+FROM moved
+GROUP BY 1
+ORDER BY 1;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+The bucket counts sum to the number of 2024 regular-season provider-lines with both open and close totals — a subset of the 7,291 total open/close rows. Validate with `count(*)` under the same `moved` filter.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Querying odds-api history before 2026-09-09 and finding nothing (it starts then).
+- Using a row-count frame when you meant a time-range frame (`ROWS` vs `RANGE`).
+- Forgetting that `ASOF JOIN` needs both the equality keys (event/market/side) and the inequality on time.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C8 — Capstone</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/monokai.css">
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-markdown>
+<textarea data-template>
+# C8 — Capstone
+
+Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone
+
+*DuckDB*
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Learning goals
+
+- Conform two API "pair" tables into one with a `_provenance` marker.
+- Design `sandbox.main.fact_bet` with explicit grain and SCD-2 for names.
+- Build a leak-free backtest dataset joining games, lines, team stats, and a rolling window.
+- Produce a walk-forward evaluation for an over/under rule.
+- Ship a one-statement data-quality audit set.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Plain language.** This ties everything together. Two source APIs deliver the same concept with different columns (REST `stg.games`/`stg.lines` vs GraphQL `stg.game`/`stg.game_lines`); `core` already merges them, and you replicate that merge with a `_provenance` column recording which side each row came from — the pattern `core.fact_game_line._source ∈ rest/gql/both` demonstrates. `fact_bet` is your personal ledger: grain = one row per placed bet (one bet, one side, one price), with SCD-2 versioning of team names and coaches so a historical bet still shows the name as it was.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**The SQL (skeleton).** Conform with `UNION BY NAME` plus a literal `_provenance`; build the modelling dataset from `fact_game` + `fact_game_line` + `fact_game_team` + a rolling window CTE (frame ending `1 PRECEDING`); walk forward with an expanding trailing-rate rule; audit with a single `UNION ALL` of zero-expected-row checks.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+**Worked solution.** The leak-free join size — how many gradeable modelling rows exist for 2019–2024 regular, joining games to their closing total and the home team's pre-game running stats.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+Returns **1** row: the count of leak-free modelling rows (the ~6.5k gradeable 2019–2024 games, matching C4's n=6,492 base with a LEFT JOIN preserving all games). **How to read it.** LEFT JOIN keeps every game even when `fact_game_team` lacks a snapshot, so the count equals the `base` size; missing stats appear as NULL features to impute or flag, never as dropped rows.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Worked solution
+
+```sql
+-- duckdb
+-- rows: 1
+WITH base AS (
+  SELECT
+    g.game_id, g.season, g.week, g.start_date,
+    g.home_team_id, g.away_team_id,
+    g.selected_total,
+    (g.home_points + g.away_points) AS actual_total
+  FROM core.fact_game AS g
+  WHERE g.season BETWEEN 2019 AND 2024
+    AND g.season_type = 'regular'
+    AND g.selected_total IS NOT NULL
+    AND g.home_points IS NOT NULL
+    AND g.away_points IS NOT NULL
+),
+home_stats AS (
+  -- grain: one row per game, home team's running pre-game stats
+  SELECT game_id, win_pct, ats_pct
+  FROM core.fact_game_team
+  WHERE home_away = 'home'
+)
+SELECT count(*) AS modelling_rows
+FROM base AS b
+LEFT JOIN home_stats AS h ON h.game_id = b.game_id;
+```
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Check yourself
+
+`modelling_rows` should match `base`'s size because of the LEFT JOIN (verified ≈6,492 for 2019–2024). The audit statement returns zero rows in a clean warehouse; any row names the failing check.
+</textarea>
+</section>
+<section data-markdown>
+<textarea data-template>
+## Common mistakes
+
+- Inner-joining `fact_game_team` and silently dropping games without a snapshot.
+- Building `fact_bet` without stating grain, then double-counting a two-sided bet.
+- Letting the trailing over-rate include the test season (leak) — compute it as-of the prior seasons only.
+</textarea>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({ hash: true, plugins: [RevealMarkdown, RevealHighlight] });
+</script>
+</body>
+</html>
