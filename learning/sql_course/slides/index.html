@@ -2,32 +2,113 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>CFB SQL Course</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The CFB Warehouse SQL Course</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --paper: #F7F6F2;
+  --ink: #1B2A41;
+  --ink-soft: #4A5568;
+  --rule: #D7D9D3;
+  --flag: #F2C230;
+  --turf: #2F6B3B;
+  --turf-wash: #E9F0E6;
+  --code-bg: #EEF0EC;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--serif); font-size: 18px; line-height: 1.55; }
+main { max-width: 44em; margin: 0 auto; padding: 4rem 1.5rem 5rem; }
+header h1 { font-size: 2.6rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em;
+  margin: 0 0 1rem; max-width: 12em; }
+header p { font-size: 1.1rem; color: var(--ink-soft); max-width: 34em; margin: 0; }
+header code { font-family: var(--mono); font-size: 0.85em; }
+header .start { display: inline-block; margin-top: 1.6rem; padding: 0.55em 1.1em;
+  background: var(--ink); color: var(--paper); text-decoration: none; font-weight: 600; }
+header .start:hover, header .start:focus-visible { background: var(--turf); }
+section.part { margin-top: 3.2rem; padding-top: 1.4rem; border-top: 2px solid var(--ink); }
+section.part h2 { font-size: 1.5rem; margin: 0 0 0.3rem; }
+section.part .focus { margin: 0; color: var(--ink-soft); }
+section.part .dialect { margin: 0.2rem 0 1.2rem; font-style: italic; color: var(--ink-soft); }
+ul.modules { list-style: none; margin: 0; padding: 0; }
+ul.modules li { display: flex; align-items: baseline; gap: 1rem;
+  padding: 0.55rem 0; border-bottom: 1px solid var(--rule); }
+ul.modules li:last-child { border-bottom: none; }
+ul.modules .tag { flex: 0 0 3.2em; text-align: center; background: var(--flag);
+  font-weight: 700; padding: 0.05em 0; }
+ul.modules a { color: var(--ink); text-decoration: none; }
+ul.modules a:hover, ul.modules a:focus-visible { color: var(--turf); text-decoration: underline;
+  text-underline-offset: 0.15em; }
+@media (max-width: 600px) {
+  body { font-size: 17px; }
+  main { padding: 2.5rem 1rem 4rem; }
+  header h1 { font-size: 2.1rem; }
+}
+</style>
 </head>
 <body>
-<h1>CFB SQL Course</h1>
-<ul>
-<li><a href="A1.html">A1 — Orientation</a></li>
-<li><a href="A2.html">A2 — Types and NULL (and NaN)</a></li>
-<li><a href="A3.html">A3 — Aggregation</a></li>
-<li><a href="A4.html">A4 — Joins</a></li>
-<li><a href="A5.html">A5 — Subqueries and CTEs</a></li>
-<li><a href="A6.html">A6 — Window functions</a></li>
-<li><a href="A7.html">A7 — Set operations and data-modelling foundations</a></li>
-<li><a href="B1.html">B1 — DuckDB conveniences</a></li>
-<li><a href="B2.html">B2 — Filtering and windows the DuckDB way</a></li>
-<li><a href="B3.html">B3 — Semi-structured data</a></li>
-<li><a href="B4.html">B4 — Time series on betting lines</a></li>
-<li><a href="B5.html">B5 — Performance and reuse</a></li>
-<li><a href="C1.html">C1 — Descriptive statistics</a></li>
-<li><a href="C2.html">C2 — Sampling and uncertainty</a></li>
-<li><a href="C3.html">C3 — Hypothesis tests in SQL</a></li>
-<li><a href="C4.html">C4 — Correlation and regression</a></li>
-<li><a href="C5.html">C5 — Rates, odds, and calibration</a></li>
-<li><a href="C6.html">C6 — Feature engineering without lookahead</a></li>
-<li><a href="C7.html">C7 — Backtesting and walk-forward evaluation</a></li>
-<li><a href="C8.html">C8 — Capstone</a></li>
-<li><a href="D.html">D — SQL best practices (reference)</a></li>
+<main>
+<header>
+<h1>The CFB Warehouse SQL Course</h1>
+<p>Work top to bottom; each module assumes the ones before it. Read the concepts,
+run the worked solution against <code>md:cfb</code>, confirm the row count, then
+attempt the exercises from the hints alone.</p>
+<a class="start" href="A1.html">Start with A1</a>
+</header>
+<section class="part">
+<h2>Part A — Standard SQL (portable)</h2>
+<p class="focus">Portable SQL: select, types/NULL, aggregation, joins, subqueries/CTEs, windows, set ops & modelling</p>
+<p class="dialect">Standard (runs in PostgreSQL)</p>
+<ul class="modules">
+<li><span class="tag">A1</span><a href="A1.html">Orientation</a></li>
+<li><span class="tag">A2</span><a href="A2.html">Types and NULL (and NaN)</a></li>
+<li><span class="tag">A3</span><a href="A3.html">Aggregation</a></li>
+<li><span class="tag">A4</span><a href="A4.html">Joins</a></li>
+<li><span class="tag">A5</span><a href="A5.html">Subqueries and CTEs</a></li>
+<li><span class="tag">A6</span><a href="A6.html">Window functions</a></li>
+<li><span class="tag">A7</span><a href="A7.html">Set operations and data-modelling foundations</a></li>
 </ul>
+</section>
+<section class="part">
+<h2>Part B — DuckDB dialect on MotherDuck</h2>
+<p class="focus">DuckDB dialect: conveniences, FILTER/QUALIFY, JSON/structs, line time-series, performance/reuse</p>
+<p class="dialect">DuckDB / MotherDuck</p>
+<ul class="modules">
+<li><span class="tag">B1</span><a href="B1.html">DuckDB conveniences</a></li>
+<li><span class="tag">B2</span><a href="B2.html">Filtering and windows the DuckDB way</a></li>
+<li><span class="tag">B3</span><a href="B3.html">Semi-structured data</a></li>
+<li><span class="tag">B4</span><a href="B4.html">Time series on betting lines</a></li>
+<li><span class="tag">B5</span><a href="B5.html">Performance and reuse</a></li>
+</ul>
+</section>
+<section class="part">
+<h2>Part C — Statistics and modelling in SQL</h2>
+<p class="focus">Statistics & modelling: descriptives, uncertainty, tests, regression, odds/calibration, features, backtesting, capstone</p>
+<p class="dialect">DuckDB</p>
+<ul class="modules">
+<li><span class="tag">C1</span><a href="C1.html">Descriptive statistics</a></li>
+<li><span class="tag">C2</span><a href="C2.html">Sampling and uncertainty</a></li>
+<li><span class="tag">C3</span><a href="C3.html">Hypothesis tests in SQL</a></li>
+<li><span class="tag">C4</span><a href="C4.html">Correlation and regression</a></li>
+<li><span class="tag">C5</span><a href="C5.html">Rates, odds, and calibration</a></li>
+<li><span class="tag">C6</span><a href="C6.html">Feature engineering without lookahead</a></li>
+<li><span class="tag">C7</span><a href="C7.html">Backtesting and walk-forward evaluation</a></li>
+<li><span class="tag">C8</span><a href="C8.html">Capstone</a></li>
+</ul>
+</section>
+<section class="part">
+<h2>Part D — SQL best practices (reference)</h2>
+<p class="focus">Best-practices reference</p>
+<p class="dialect">Portable habits</p>
+<ul class="modules">
+<li><span class="tag">D</span><a href="D.html">SQL best practices (reference)</a></li>
+</ul>
+</section>
+</main>
 </body>
 </html>
