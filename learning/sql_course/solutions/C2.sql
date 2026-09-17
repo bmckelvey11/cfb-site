@@ -30,12 +30,12 @@ FROM core.fact_game_line;
 -- check: manual
 SELECT avg(CASE WHEN home_points + away_points > selected_total THEN 1.0 ELSE 0.0 END) AS over_rate
 FROM core.fact_game
-USING SAMPLE 10%
 WHERE season = 2024
   AND season_type = 'regular'
   AND selected_total IS NOT NULL
   AND home_points IS NOT NULL
-  AND away_points IS NOT NULL;
+  AND away_points IS NOT NULL
+USING SAMPLE 10%;
 
 -- exercise: 4
 -- check: manual
