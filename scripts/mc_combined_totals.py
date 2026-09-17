@@ -47,7 +47,8 @@ OZ_SELECTION_HAIRCUT = (OZ_WINS / (OZ_WINS + OZ_LOSSES)) - 0.582  # ~0.063
 
 # Volume, weeks 4-15. over-zero week-4+ counts by season: 2021..2025 = 8,11,9,11,14.
 OZ_WEEK4PLUS_HISTORY = (8, 11, 9, 11, 14)
-# Greenline: 49 gradeable totals flags in week 2, 57 flags in week 3.
+# Greenline: 49 gradeable totals flags in week 2, 57 flagged in week 3. 49 is the
+# graded count and the conservative floor of the two, so that is what is used.
 GL_FLAGS_PER_WEEK = 49.0
 
 WEEKS_REMAINING = 12  # weeks 4-15 of the 2026 regular season
@@ -113,6 +114,7 @@ def simulate(cfg: Config) -> dict:
     pnl = np.zeros(n)
     turnover = np.zeros(n)
     worst_week = np.zeros(n)
+    running_min = np.zeros(n)  # deepest drawdown, for the mid-season bust check
     oz_remaining = oz_season.copy()
 
     for w in range(WEEKS_REMAINING):
@@ -131,6 +133,7 @@ def simulate(cfg: Config) -> dict:
         pnl += week_pnl
         turnover += gl_n * gl_stake + oz_n * oz_stake
         worst_week = np.minimum(worst_week, week_pnl)
+        running_min = np.minimum(running_min, pnl)
 
     return {
         "config": dict(cfg.__dict__, weeks=WEEKS_REMAINING),
@@ -141,6 +144,10 @@ def simulate(cfg: Config) -> dict:
         "mean_turnover": float(turnover.mean()),
         "final": cfg.bankroll + pnl,
         "worst_week": worst_week,
+        # Stakes are flat off the STARTING bankroll with no stop-loss, so a path
+        # can go through zero and keep betting. Percentiles on such a path are
+        # unreachable in reality -- report the rate rather than hiding it.
+        "p_bust": float((cfg.bankroll + running_min <= 0).mean()),
     }
 
 
@@ -171,6 +178,9 @@ def report(res: dict, label: str) -> str:
         f"- P(end above ${b0 * 1.25:,.0f}, +25%): {(f > b0 * 1.25).mean():.1%}",
         f"- worst single week: median ${np.median(res['worst_week']):,.0f}, "
         f"5th pct ${np.percentile(res['worst_week'], 5):,.0f}",
+        f"- **paths that pass through $0 mid-season: {res['p_bust']:.1%}** "
+        f"(flat stakes off the starting bankroll, no stop-loss -- every "
+        f"percentile above assumes betting continues past zero)",
         "",
     ])
 
@@ -244,6 +254,7 @@ def main() -> None:
         ("Over-zero only (Greenline stood down)", variant(gl_unit=0.0)),
         ("Greenline only, 0.25%", variant(oz_unit=0.0)),
         ("Headline, uncorrelated (rho=0) -- variance check", variant(rho=1e-9)),
+        ("Headline at rho=0.25 -- correlation sensitivity", variant(rho=0.25)),
         ("Headline, no selection haircut on over-zero", variant(oz_haircut=False)),
     ]
 
@@ -258,6 +269,7 @@ def main() -> None:
             "p_loss": float((f < cfg.bankroll).mean()),
             "turnover": res["mean_turnover"],
             "p_gl_below_breakeven": res["p_gl_below_breakeven"],
+            "p_bust": res["p_bust"],
         }
     print("\n".join(out))
     if args.json:
