@@ -59,6 +59,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `model-columns-ats-2026-09-17.md` | review | EXPLORATORY: all 109 screened PT model columns bet ATS against the close. Walk-forward selection lands at 0.5001; no model's CI clears the vig. |
 | `phwin-moneyline-2026-09-17.md` | review | EXPLORATORY: phwin priced against real moneylines, 2021-25. Loses; the spread control arm is unresolved, not an edge. |
 | `panel-vs-line-2026-09-17.md` | review | EXPLORATORY: what the ~140 `line*` columns are. None of 141 beats the closing line, and deviation from it correlates +0.97 with error. |
+| `panel-ats-2026-09-17.md` | review | EXPLORATORY: the bettability test the RMSE study could not do. 2 of 330 testable cells clear break-even; `linecrunch` clears it while losing on RMSE. |
 | `review-2026-09-02-composite-spread.md` | dated record | The pivot from margin to movement; §5–6 set the direction. Cites archived files. |
 | `session-guide-2026-09-02.md` | dated record | Narrative of the 2026-09-02 session. Paths and numbers are as of that day; see its banner. |
 
@@ -80,6 +81,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_phwin_accuracy.py` | `phwin-accuracy-2026-09-17.md` | `processed/phwin_accuracy.json` |
 | `eval_phwin_moneyline.py` [`--from-season`] [`--to-season`] [`--cluster`] | `phwin-moneyline-2026-09-17.md` | `processed/phwin_moneyline.json` |
 | `eval_panel_vs_line.py` [`--min-n`] | `panel-vs-line-2026-09-17.md` | `processed/panel_vs_line.json` |
+| `eval_panel_ats.py` [`--min-bets`] | `panel-ats-2026-09-17.md` | `processed/panel_ats.json` |
 | `eval_model_columns_ats.py` | `model-columns-ats-2026-09-17.md` | `processed/model_columns_ats.json` |
 | `edge_vs_market_move.py` | `actionable-picks-2026-09-17.md` § 0: regresses the served `edge` on the move since the opener | stdout |
 | `version_b_ceiling.py` | `line-movement-results.md` § version B read of 2026-09-17: E\|close − anchor\| (the CLV ceiling) and each week's anchor ET weekday | stdout |

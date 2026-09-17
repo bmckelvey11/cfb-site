@@ -62,6 +62,21 @@ Perfectly monotone. At r = +0.97, **how far a column departs from the market lin
 is.** Departure from the line is error, essentially all of it. The best-performing columns are
 the ones that deviate least, and the four closest hugs occupy the top of the table.
 
+## Correction (same day): RMSE is not a bettability test
+
+This document originally let the RMSE ranking carry more weight than it can. **RMSE is squared,
+symmetric and averaged over every game; a bet needs only the sign of the disagreement, only on
+the games you choose, and only 52.381% of the time.** A column can be worse on RMSE and still
+have a sign edge at a threshold.
+
+`panel-ats-2026-09-17.md` runs that test directly — 141 models × 3 thresholds, BH-corrected. The
+broad null survives (2 of 330 testable cells above break-even, pooled 0.4981), but one column,
+`linecrunch`, is **3.2% worse than the line on RMSE** and still posts 0.5418 ATS over 1,185 bets
+with all three of its seasons above break-even. RMSE ranking would have discarded it.
+
+Read the measurements below as what they are — a description of point-estimate accuracy — and
+not as evidence about bettability. That question is answered in the ATS study.
+
 ## Why this matters for everything else in this tree
 
 This is the mechanism behind the day's other nulls, stated at the source:
@@ -83,6 +98,7 @@ is the part that is wrong.
 - **Not a walk-forward result, and not model selection.** Everything here is pooled and
   in-sample. A column's ratio is a description, not a forecast of its future ratio. The
   registered machinery for picking models is `prior_skill()` and `walk_forward()`.
+- **Not a bettability result.** See the correction above and `panel-ats-2026-09-17.md`.
 - **Not a claim that the panel is useless to the registered work.** E4 does **not** bet the
   panel's level against the line. It is anchored on the **opener** and uses a screened top-20
   consensus to forecast where the line will **move**. That is a different estimand and amendment
