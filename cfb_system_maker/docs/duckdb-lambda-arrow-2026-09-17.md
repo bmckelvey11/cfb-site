@@ -98,48 +98,76 @@ The bare-worktree row's one remaining failure is `test_sql_course.py::...[B5]`, 
 artifact in loose end (1) below. Create that directory and the suite is green under duckdb
 2.0.0.dev end to end.
 
-Under duckdb **1.5.5** the full suite is `3 failed, 1005 passed, 2 skipped, 5 deselected`
-both before and after. All three are loose ends (2) and (3), in files this change does not
-touch.
+Under duckdb **1.5.5** the full suite was `3 failed, 1005 passed, 2 skipped, 5 deselected`
+at that point -- loose ends (2) and (3) below, in files the lambda-arrow change does not
+touch. Both were fixed the same day (see below); the suite is now **1008 passed** on
+duckdb 1.5.5 and on 2.0.0.dev alike.
 
 ## What this does *not* support
 
 - It does not show the test suite is isolation-clean. It shows this *particular* failure
   was not an isolation problem. No bisect was run, so nothing was proven either way about
   cross-file state elsewhere in the suite.
-- It does not make the codebase duckdb-2.0-ready. Only the lambda arrow was audited. Other
-  2.0 removals may still be latent — `tests/test_sql_course.py` is the obvious next place
-  to look, and the remaining full-suite failure below is unrelated to it.
+- It does not make the codebase duckdb-2.0-ready, nor 1.5.5-safe. Three version-sensitive
+  SQL sites were found and fixed (the lambda arrow, plus loose ends (2) and (3) below);
+  nobody audited the rest of the SQL in the tree for either direction. What is established
+  is only that the suite passes end to end on both wheels today.
 - It says nothing about which interpreter the project *should* run on. `.venv` (duckdb
   1.5.5) remains the project environment; `C:\Python314` happening to be first on `PATH`
   with a 2.0 nightly is the reason the two runs disagreed, and that skew is still there.
 
-## Loose ends, not addressed here
+## Loose ends
 
-None of these were touched; all are independent of this finding, and all were confirmed
-present before the change (the files involved are unmodified).
+Three were found while diagnosing the above, all in files the lambda-arrow fix does not
+touch. Two are now fixed; one is not a bug.
 
 1. **`test_sql_course.py::test_every_solution_runs[B5]`** fails in a worktree only.
    `learning/sql_course/solutions/B5.sql` does `COPY ... TO 'data/games_2024.parquet'`, a
    *relative* path, and a worktree has no `data/` directory. `mkdir data` and it passes.
-   Not a bug, a worktree artifact.
-2. **`test_sql_course.py::test_every_solution_runs[C2]`** fails under duckdb **1.5.5**
-   with `Parser Error: syntax error at or near "WHERE"` on `C2-3`, and passes under 2.0.
-3. **`test_warehouse_catalog.py`**, two tests, fail under duckdb **1.5.5** with
-   `Parser Error: unterminated quoted string`, and pass under 2.0.
-   `scripts/build_warehouse_catalog.py:552` builds a grain key by joining columns with
-   literal `0x01` and `0x00` control characters embedded directly in the SQL string;
-   1.5.5 treats the NUL as terminating the literal.
+   Not a bug, a worktree artifact -- **no change made**.
 
-(2) and (3) are the *same class of problem as this one* pointing the other way: SQL that
-one duckdb version accepts and the other does not, with the disagreement showing up as an
-apparently random test failure. Worth a pass of its own.
+2. **`test_sql_course.py::test_every_solution_runs[C2]`** -- `C2-3` wrote
+   `FROM core.fact_game USING SAMPLE 10% WHERE season = 2024 ...`. duckdb 1.5.5 rejects a
+   `WHERE` after `USING SAMPLE` (`Parser Error: syntax error at or near "WHERE"`); 2.0's
+   parser accepts it. Moving `USING SAMPLE 10%` to the end of the statement parses on both
+   **and** matches the exercise as written -- "draw a 10% sample of 2024 games" means
+   sample the filtered rows, whereas the sample clause attached to the `FROM` applies
+   before the filter. **Fixed 2026-09-17.**
+
+3. **`test_warehouse_catalog.py`**, two tests -- `compute_grain` in
+   `scripts/build_warehouse_catalog.py` built a uniqueness probe by joining the key columns
+   with a literal `0x01` and mapping NULL to a literal `0x00`, both embedded raw in the SQL
+   text. duckdb 1.5.5 reads the NUL as ending the string literal
+   (`Parser Error: unterminated quoted string`); 2.0 tolerates it. Replaced with
+   `select count(*) from (select distinct <keys> from ...)`, which needs no sentinel and no
+   separator. **Fixed 2026-09-17.**
+
+   `SELECT DISTINCT` was chosen over `count(DISTINCT (a, b))` deliberately: the struct form
+   collapses to plain `count(DISTINCT a)` when there is a single key column, which *drops*
+   NULLs and would have silently changed the grain verdict for single-key tables like
+   `core.dim_team`. Measured on both wheels against `(1), (2), (NULL)`: sentinel 3,
+   `SELECT DISTINCT` 3, struct 2.
+
+(2) and (3) were the *same class of problem as the lambda arrow*: SQL that one duckdb
+version accepts and the other rejects, surfacing as an apparently random test failure. All
+three sites are now version-neutral.
 
 ## Reproduce
 
+Run the whole suite under both wheels -- that is the check that matters here, since every
+failure in this write-up was a disagreement between them:
+
 ```
-python -m pytest tests/test_duckdb_load.py -q                       # duckdb 2.0.0.dev
-.venv/Scripts/python.exe -m pytest tests/test_duckdb_load.py -q     # duckdb 1.5.5
+python -m pytest -q                       # duckdb 2.0.0.dev  (C:\Python314 on PATH)
+.venv/Scripts/python.exe -m pytest -q     # duckdb 1.5.5      (project environment)
 ```
 
-Both must pass. The regression guard runs as part of either.
+Both are `1008 passed` as of 2026-09-17 (a worktree needs `mkdir data` first, per loose
+end (1)). The narrower checks for the lambda arrow alone:
+
+```
+python -m pytest tests/test_duckdb_load.py -q
+.venv/Scripts/python.exe -m pytest tests/test_duckdb_load.py -q
+```
+
+The source guard runs as part of either.
