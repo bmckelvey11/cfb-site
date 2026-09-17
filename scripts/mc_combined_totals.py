@@ -37,9 +37,18 @@ from scipy.special import erfinv, ndtr
 # --- Priors, all from graded records in this repo -------------------------------
 # over-zero: 151-83 walk-forward, 2016-2025 (models/over_zero/docs/ROI_HITRATE.md)
 OZ_WINS, OZ_LOSSES = 151, 83
-# Greenline totals: 27-22, 2026 week 2
-# (research/totals/docs/greenline-season-review-2026-09-16.md)
-GL_WINS, GL_LOSSES = 27, 22
+# Greenline totals. Three defensible priors, selected with --gl-prior.
+#  n49         27-22, 2026 week 2 graded flags only
+#              (research/totals/docs/greenline-season-review-2026-09-16.md)
+#  pooled      + the 201 full-game unders in the personal book export, 2023-08
+#              to 2025-12, 114-87 at a mean price of -110.1
+#              (docs/bet-history-analysis-2023-2025.md,
+#              data/ingest/bet_history/history.csv). Pooled as PRIOR EVIDENCE:
+#              those unders were mostly PFF Greenline flags, so this is the
+#              same signal in earlier seasons, never independent confirmation.
+#  pff-window  the same pooling restricted to 2024-25 (72-50), the slice most
+#              strongly identified as PFF-driven. Sensitivity only.
+GL_PRIORS = {"n49": (27, 22), "pooled": (141, 109), "pff-window": (99, 72)}
 
 # MODEL_GUIDE.md: the 1.75 threshold was chosen on this data, so the 64.5% point
 # estimate is selection-inflated. The guide says plan on the 58.2% lower bound.
@@ -50,6 +59,12 @@ OZ_WEEK4PLUS_HISTORY = (8, 11, 9, 11, 14)
 # Greenline: 49 gradeable totals flags in week 2, 57 flagged in week 3. 49 is the
 # graded count and the conservative floor of the two, so that is what is used.
 GL_FLAGS_PER_WEEK = 49.0
+
+# What fraction of the flags actually gets bet. The 201-bet personal record came
+# from roughly 92 unders in 2025 against ~690 flags at this rate -- about 13%.
+# Betting all 49 a week is a DIFFERENT population from the one that record
+# measures: the other 87% are the flags he passed on, and they have no record.
+GL_COVERAGE_HISTORICAL = 0.13
 
 WEEKS_REMAINING = 12  # weeks 4-15 of the 2026 regular season
 
@@ -74,6 +89,8 @@ class Config:
     oz_unit: float = 0.01       # fraction of STARTING bankroll per over-zero bet
     gl_unit: float = 0.0025     # fraction of STARTING bankroll per Greenline bet
     oz_haircut: bool = True     # apply the guide's selection haircut to over-zero p
+    gl_prior: str = "pooled"    # key into GL_PRIORS
+    gl_coverage: float = 1.0    # fraction of weekly Greenline flags actually bet
     seed: int = 20260917
 
 
@@ -98,7 +115,8 @@ def simulate(cfg: Config) -> dict:
     p_oz = rng.beta(OZ_WINS + 0.5, OZ_LOSSES + 0.5, n)
     if cfg.oz_haircut:
         p_oz = np.clip(p_oz - OZ_SELECTION_HAIRCUT, 0.01, 0.99)
-    p_gl = rng.beta(GL_WINS + 0.5, GL_LOSSES + 0.5, n)
+    gl_w, gl_l = GL_PRIORS[cfg.gl_prior]
+    p_gl = rng.beta(gl_w + 0.5, gl_l + 0.5, n)
 
     oz_b, gl_b = payout(OZ_PRICE), payout(GL_PRICE)
     oz_stake = cfg.bankroll * cfg.oz_unit
@@ -120,7 +138,7 @@ def simulate(cfg: Config) -> dict:
     for w in range(WEEKS_REMAINING):
         shock = rng.standard_normal(n)
 
-        gl_n = rng.poisson(GL_FLAGS_PER_WEEK, n)
+        gl_n = rng.poisson(GL_FLAGS_PER_WEEK * cfg.gl_coverage, n)
         gl_wins = _copula_wins(rng, gl_n, shock, z_gl, a, c, upper=False)
         week_pnl = gl_wins * gl_stake * gl_b - (gl_n - gl_wins) * gl_stake
 
@@ -139,6 +157,7 @@ def simulate(cfg: Config) -> dict:
         "config": dict(cfg.__dict__, weeks=WEEKS_REMAINING),
         "p_oz_mean": float(p_oz.mean()),
         "p_gl_mean": float(p_gl.mean()),
+        "gl_prior": "%d-%d" % (gl_w, gl_l),
         "p_gl_below_breakeven": float((p_gl < breakeven(GL_PRICE)).mean()),
         "p_oz_below_breakeven": float((p_oz < breakeven(OZ_PRICE)).mean()),
         "mean_turnover": float(turnover.mean()),
@@ -160,7 +179,7 @@ def report(res: dict, label: str) -> str:
         "",
         f"- drawn win rates: over-zero mean {res['p_oz_mean']:.1%} "
         f"(P below break-even {res['p_oz_below_breakeven']:.0%}), "
-        f"Greenline mean {res['p_gl_mean']:.1%} "
+        f"Greenline mean {res['p_gl_mean']:.1%} from a {res['gl_prior']} prior "
         f"(P below break-even {res['p_gl_below_breakeven']:.0%})",
         f"- total staked over the 12 weeks: ${res['mean_turnover']:,.0f} "
         f"({res['mean_turnover'] / b0:.1f}x the starting bankroll)",
@@ -214,10 +233,20 @@ def self_check() -> None:
                       np.sqrt(0.3), np.sqrt(0.7), upper=False)
     assert np.corrcoef(up, dn)[0, 1] < -0.3, np.corrcoef(up, dn)[0, 1]
 
-    # the Greenline posterior must keep real mass below break-even, or the sim
-    # has smuggled in an edge the source data disclaims
-    res = simulate(Config(paths=5_000, seed=2))
-    assert 0.25 < res["p_gl_below_breakeven"] < 0.50, res["p_gl_below_breakeven"]
+    # the n=49 posterior must keep real mass below break-even, or the sim has
+    # smuggled in an edge that one graded week does not establish
+    thin = simulate(Config(paths=5_000, seed=2, gl_prior="n49"))
+    assert 0.25 < thin["p_gl_below_breakeven"] < 0.50, thin["p_gl_below_breakeven"]
+
+    # pooling the 201 personal unders must actually tighten it, not just relabel
+    fat = simulate(Config(paths=5_000, seed=2, gl_prior="pooled"))
+    assert fat["p_gl_below_breakeven"] < 0.20, fat["p_gl_below_breakeven"]
+
+    # coverage must scale volume, not the win rate
+    lo = simulate(Config(paths=5_000, seed=3, gl_coverage=GL_COVERAGE_HISTORICAL))
+    hi = simulate(Config(paths=5_000, seed=3, gl_coverage=1.0))
+    assert lo["mean_turnover"] < hi["mean_turnover"] / 3
+    assert abs(lo["p_gl_mean"] - hi["p_gl_mean"]) < 0.005
     print("self-check OK")
 
 
@@ -231,6 +260,10 @@ def main() -> None:
     ap.add_argument("--gl-unit", type=float, default=0.0025)
     ap.add_argument("--no-haircut", action="store_true",
                     help="skip the MODEL_GUIDE selection haircut on over-zero p")
+    ap.add_argument("--gl-prior", choices=sorted(GL_PRIORS), default="pooled",
+                    help="which Greenline record to draw the win rate from")
+    ap.add_argument("--gl-coverage", type=float, default=1.0,
+                    help="fraction of the weekly Greenline flags actually bet")
     ap.add_argument("--seed", type=int, default=20260917)
     ap.add_argument("--json", help="write the scenario table here")
     ap.add_argument("--self-check", action="store_true")
@@ -242,20 +275,31 @@ def main() -> None:
 
     base = Config(bankroll=args.bankroll, paths=args.paths, rho=args.rho,
                   oz_unit=args.oz_unit, gl_unit=args.gl_unit,
-                  oz_haircut=not args.no_haircut, seed=args.seed)
+                  oz_haircut=not args.no_haircut, gl_prior=args.gl_prior,
+                  gl_coverage=args.gl_coverage, seed=args.seed)
 
     def variant(**kw):
         return Config(**dict(base.__dict__, **kw))
 
+    cov = GL_COVERAGE_HISTORICAL
     scenarios = [
-        ("Combined -- Greenline 0.25%, over-zero 1.0% (headline)", base),
-        ("Combined -- Greenline 0.50%, over-zero 1.0%", variant(gl_unit=0.005)),
-        ("Combined -- Greenline 1.0%, over-zero 1.0%", variant(gl_unit=0.01)),
+        ("Pooled prior, bet at the historical rate (~6/wk), 1% units -- headline",
+         variant(gl_coverage=cov, gl_unit=0.01)),
+        ("Pooled prior, historical rate, 2% units",
+         variant(gl_coverage=cov, gl_unit=0.02)),
+        ("Pooled prior, bet EVERY flag (~49/wk), 0.25% units",
+         variant(gl_coverage=1.0, gl_unit=0.0025)),
+        ("Pooled prior, bet EVERY flag, 1% units",
+         variant(gl_coverage=1.0, gl_unit=0.01)),
+        ("n=49 prior (week 2 only), every flag at 0.25% -- the previous headline",
+         variant(gl_prior="n49", gl_coverage=1.0, gl_unit=0.0025)),
+        ("n=49 prior, historical rate at 1%",
+         variant(gl_prior="n49", gl_coverage=cov, gl_unit=0.01)),
+        ("2024-25 window prior (72-50), historical rate at 1% -- sensitivity",
+         variant(gl_prior="pff-window", gl_coverage=cov, gl_unit=0.01)),
         ("Over-zero only (Greenline stood down)", variant(gl_unit=0.0)),
-        ("Greenline only, 0.25%", variant(oz_unit=0.0)),
-        ("Headline, uncorrelated (rho=0) -- variance check", variant(rho=1e-9)),
-        ("Headline at rho=0.25 -- correlation sensitivity", variant(rho=0.25)),
-        ("Headline, no selection haircut on over-zero", variant(oz_haircut=False)),
+        ("Headline at rho=0.25 -- correlation sensitivity",
+         variant(gl_coverage=cov, gl_unit=0.01, rho=0.25)),
     ]
 
     out, blob = [], {}

@@ -1,8 +1,9 @@
 # Monte Carlo: $20,000 bankroll across over-zero + Greenline totals, weeks 4–15 of 2026
 
-Completed September 17, 2026. Reproduce with
+Completed September 17, 2026. Revised the same day to pool the personal under history
+into the Greenline prior. Reproduce with
 `python scripts/mc_combined_totals.py --paths 100000`
-(`--self-check` runs the copula and payout assertions).
+(`--self-check` runs the copula, prior and coverage assertions).
 
 ## The question
 
@@ -13,188 +14,196 @@ Greenline totals flags?
 
 **Scope is the regular season only.** Bowls and the playoff are excluded: they run
 on a different calendar and Greenline's flag volume is not established for them.
-Adding them would roughly halve a normal week's Greenline volume across the bowl
-stretch and give over-zero a handful of extra bets, so it widens the distribution
-modestly in both directions without moving the conclusions.
 
 ## The answer in one paragraph
 
-Median **$21,644 (+8.2%)**, with a 90% band of **$14,018 to $28,979** and a
-**36.0% chance of ending the season down**. But that headline is a statement about
-Greenline, not about the combination. Greenline supplies ~590 of the ~601 bets and
-over-zero supplies ~11, so over-zero on its own moves the median by **+0.7%**
-($20,133) and cannot move it further at any sane stake. And Greenline has no
-established edge — its own season review says so, and 35% of the simulated paths
-draw a Greenline win rate below break-even. This is a variance projection, not an
-expected-value projection.
+Betting the Greenline unders at the rate they have historically been bet (~6 a week)
+at 1% units, alongside the over-zero OVERs: median **$21,306 (+6.5%)**, 90% band
+**$17,685 to $24,888**, **27.7% chance of finishing down**, no path through zero.
+The Greenline win rate is drawn from a **141–109 pooled record** — 27–22 from the
+2026 graded flags plus **114–87 from the 201 full-game unders in the personal book
+export, 2023-08 to 2025-12**, which were mostly PFF Greenline flags. That pooling is
+what changes the picture: on the graded flags alone (n=49) 35% of paths drew a losing
+Greenline win rate; pooled, only **10%** do. The edge is now supported by the
+evidence in the repo. What it is supported *by* is a selection-filtered personal
+record — roughly 13% of the flags, the ones that got picked — which is why the
+volume question below matters more than the stake question.
 
 ## Method
 
-One path = one whole remainder-of-season, 100,000 paths.
+One path = one whole remainder-of-season, 100,000 paths. Win rates are drawn per
+path from a Jeffreys Beta posterior, never fixed at a point estimate.
 
-**Win rates are drawn, not fixed.** Each path draws its own win rate from the
-Jeffreys Beta posterior of that strategy's graded record:
+### The Greenline prior
 
-| leg | record | source | posterior mean | P(below break-even) |
+| prior | record | source | posterior mean | P(below break-even) |
 |---|---|---|---:|---:|
-| over-zero OVER | 151–83 walk-forward, 2016–2025 | `models/over_zero/docs/ROI_HITRATE.md` | 64.5% → **58.2%** after haircut | 12% |
-| Greenline totals | 27–22, 2026 week 2 | `research/totals/docs/greenline-season-review-2026-09-16.md` | **55.0%** | 35% |
+| `n49` | 27–22 | 2026 week 2 graded flags | 55.0% | 35% |
+| **`pooled` (used)** | **141–109** | **+ 201 personal unders, 2023–2025 (114–87)** | **56.4%** | **10%** |
+| `pff-window` | 99–72 | + the 2024-25 slice only (72–50) | 57.9% | 7% |
 
-This is the load-bearing choice. Fixing Greenline at 55.1% would produce a
-confident-looking curve resting entirely on a number its own source disclaims
-("**any claim that Greenline totals beat break-even**… n=49, CI 41–68%"). Drawing
-it keeps 35% of paths on a losing strategy, which is what n=49 actually buys.
+The personal unders come from `data/ingest/bet_history/history.csv` —
+201 full-game NCAAF unders, 114–87, no pushes, mean price **−110.1**, which is why
+the Greenline leg stays priced at −110. By season: 2023 42–37, 2024 18–12,
+2025 54–38. Summarised in `docs/bet-history-analysis-2023-2025.md` (114-87, 56.7%,
+CI 49.8–63.4, +19.0u).
 
-The over-zero draw takes MODEL_GUIDE.md's instruction literally and subtracts a
-6.3-point selection haircut (64.5% → 58.2%), because the 1.75 threshold was chosen
-on the same data that produced the 64.5%.
+**This is pooled as prior evidence, not as independent confirmation.** Those unders
+were mostly PFF Greenline flags — the same signal in earlier seasons, bet by the same
+person. Pooling it is legitimate; presenting it as an outside check on PFF is not,
+and no row in this document does.
 
-**Volume.** over-zero's season count is front-loaded into the FCS-cupcake weeks
-that have already played. Week-4-and-later counts by season were 2021–2025:
-8, 11, 9, 11, 14. Paths resample that, then Poisson it: **~11 bets for the entire
-rest of the season**, not the 12–14/week the published board showed in weeks 1–2.
-Greenline draws Poisson(49) totals flags per week: 49 gradeable in week 2 and 57
-flagged in week 3, and 49 is used as the conservative floor of the two — **~590
-bets** across the 12 weeks. Using 53 would scale the Greenline leg by ~8% and move
-no conclusion.
+The `pff-window` row exists because the 2024-25 slice is the one most strongly
+identified as PFF-driven. It is a sensitivity, not the headline: "mostly" is not
+"only", 2023 is the same bettor in the same market, and splitting on a qualitative
+recollection to reach a higher prior is exactly the move to avoid. It moves the
+median by $439.
 
-The over-zero volume assumption has one direct check. 2026 published 25 picks in
-weeks 1–2; the 2025 backtest had 26 over the same weeks. That agreement is what
-licenses extrapolating the backtest's week-4+ history to 2026, and it pre-empts the
-obvious objection that the board showed 12–14 picks a week. The two counts are
-different constructions — published per-book union vs market-consensus qualifiers —
-so read it as reassurance, not validation.
+### Coverage: the population question
 
-**Correlation.** Bets inside a week share one scoring-environment shock through a
-Gaussian copula. **ρ = 0.10 is assumed, not estimated** — one graded Greenline week
-cannot measure it — so a ρ = 0.25 row is run alongside, and finding 4 below is
-stated as a range rather than a point. Because over-zero is all overs and
-Greenline is ~85% unders, that shared factor correlates the two legs *negatively* —
-a high-scoring Saturday pays over-zero and hurts Greenline. Conditional on the
-shock, bets are independent, so each week's win count is a single binomial draw.
+The 201-bet record is **not** a record of betting every flag. In 2025 it covers ~92
+unders against roughly 690 flags at the current rate — about **13%**. The pooled
+56.4% therefore describes *the flags that got picked, at prices that got shopped*.
+The other 87% are the flags that got passed on, and they have no record at all.
 
-**Prices per leg**, not one blended price: over-zero at −120 (its operational rule,
-break-even 54.55%), Greenline at −110 (how it is graded, break-even 52.38%).
+So coverage is a scenario, not a constant:
 
-**Pushes are not modelled.** All 234 graded over-zero bets and all 49 graded
-Greenline totals sat on half-point lines. Realised push rate: zero.
+- **Historical rate (13%, ~6 bets/week, ~77 over 12 weeks)** — matches volume to the
+  evidence. This is the headline.
+- **Every flag (~49/week, ~590 over 12 weeks)** — assumes the 56.4% transfers to the
+  flags that were passed on. Nothing in the data supports that, and selection makes
+  it unlikely to hold in full.
 
-**Staking** is flat, as a fraction of the *starting* $20,000 — no compounding.
-MODEL_GUIDE.md §"compounded bankroll" explicitly warns off compounded figures for
-this strategy, because simultaneous Saturday kickoffs make within-slate compounding
-impossible.
+### The over-zero leg
+
+151–83 walk-forward, 2016–2025 (`models/over_zero/docs/ROI_HITRATE.md`), with
+MODEL_GUIDE.md's selection haircut applied: 64.5% → **58.2%**, because the 1.75
+threshold was chosen on the same data. Priced at −120, its operational rule.
+
+Volume is front-loaded into the FCS-cupcake weeks already played. Week-4-and-later
+counts by season, 2021–2025: 8, 11, 9, 11, 14. Paths resample that and Poisson it —
+**~11 bets for the entire rest of the season**, not the 12–14/week the board showed
+in weeks 1–2. Check on that: 2026 published 25 picks in weeks 1–2 against 26 in the
+2025 backtest over the same weeks. Different constructions (published per-book union
+vs market-consensus qualifiers), so read the agreement as reassurance, not validation.
+
+### Correlation, prices, pushes, staking
+
+Bets inside a week share one scoring-environment shock through a Gaussian copula.
+**ρ = 0.10 is assumed, not estimated** — one graded Greenline week cannot measure it —
+so a ρ = 0.25 row runs alongside. Because over-zero is all overs and Greenline is
+~85% unders, the shared factor correlates the two legs *negatively*: a high-scoring
+Saturday pays over-zero and hurts Greenline.
+
+Prices are per leg: over-zero −120 (break-even 54.55%), Greenline −110 (52.38%).
+**Pushes are not modelled** — all 234 graded over-zero bets, all 49 graded Greenline
+totals and all 201 personal unders sat on half-point lines. Realised push rate: zero.
+**Staking is flat off the starting $20,000**, no compounding; MODEL_GUIDE.md warns off
+compounded figures because simultaneous Saturday kickoffs make them unachievable.
 
 ## Results
 
-All figures: 100,000 paths, ρ = 0.10, over-zero at 1% ($200/bet) unless stated.
+100,000 paths, ρ = 0.10, over-zero at 1% ($200/bet) throughout.
 
-| scenario | staked | median | 5th pct | 95th pct | P(down) | P(−50%) | busts mid-season |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| **Greenline 0.25% ($50), over-zero 1% — headline** | $31.5k | **$21,644** | $14,018 | $28,979 | **36.0%** | 0.5% | 0.0% |
-| Greenline 0.50% ($100), over-zero 1% | $60.9k | $23,158 | $7,924 | $37,842 | 36.6% | 7.8% | 0.6% |
-| Greenline 1.0% ($200), over-zero 1% | $119.7k | $26,185 | −$4,306 | $55,618 | 36.9% | 19.1% | **8.7%** |
-| Over-zero only | $2.1k | $20,133 | $19,100 | $21,133 | 39.3% | 0.0% | 0.0% |
-| Greenline only, 0.25% | $29.4k | $21,509 | $13,877 | $28,882 | 37.2% | 0.6% | 0.0% |
-| Headline at ρ = 0 (variance check) | $31.5k | $21,647 | $14,736 | $28,330 | 34.6% | 0.3% | 0.0% |
-| Headline at ρ = 0.25 (sensitivity) | $31.5k | $21,656 | $13,141 | $29,859 | — | 0.7% | 0.0% |
-| Headline, no over-zero haircut | $31.5k | $21,882 | $14,286 | $29,229 | 34.0% | 0.4% | 0.0% |
+| scenario | GL bets | staked | median | 5th | 95th | P(down) | P(−25%) | busts |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Pooled, historical rate (~6/wk), 1% — headline** | ~77 | $17.4k | **$21,306** | $17,685 | $24,888 | **27.7%** | 0.2% | 0.0% |
+| Pooled, historical rate, 2% | ~77 | $32.7k | $22,473 | $15,348 | $29,518 | 28.5% | 4.2% | 0.0% |
+| Pooled, every flag (~49/wk), 0.25% | ~590 | $31.5k | $22,400 | $17,597 | $27,083 | 20.6% | 0.6% | 0.0% |
+| Pooled, every flag, 1% | ~590 | $119.7k | $29,161 | $9,988 | $48,012 | 21.6% | 11.3% | 0.9% |
+| `n49` prior, every flag, 0.25% *(previous headline)* | ~590 | $31.5k | $21,644 | $14,018 | $28,979 | 36.0% | 7.6% | 0.0% |
+| `n49` prior, historical rate, 1% | ~77 | $17.4k | $20,930 | $16,164 | $25,564 | 37.4% | 2.0% | 0.0% |
+| `pff-window` prior, historical rate, 1% | ~77 | $17.4k | $21,745 | $18,009 | $25,433 | 22.1% | 0.2% | 0.0% |
+| Over-zero only | 0 | $2.1k | $20,133 | $19,100 | $21,133 | 39.4% | 0.0% | 0.0% |
+| Headline at ρ = 0.25 | ~77 | $17.4k | $21,305 | $17,209 | $25,300 | 29.7% | 0.6% | 0.0% |
 
-**Read the last column before the others.** Stakes are flat off the starting
-$20,000 with no stop-loss, so a path that goes through zero keeps betting. In the
-1% row, 8.7% of paths do exactly that — its 1st, 5th and 10th percentiles
-(−$16,633, −$4,306, $2,385) are arithmetic, not outcomes anyone could have. The
-median of that row survives the contamination; its left tail does not.
-
-Headline scenario, full percentiles:
+Headline, full percentiles:
 
 | pct | 1% | 5% | 10% | 25% | 50% | 75% | 90% | 95% | 99% |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| ending bankroll | $10,997 | $14,018 | $15,702 | $18,542 | $21,644 | $24,703 | $27,406 | $28,979 | $31,789 |
+| ending bankroll | $16,191 | $17,685 | $18,473 | $19,812 | $21,306 | $22,785 | $24,106 | $24,888 | $26,385 |
 
-Worst single week in the headline scenario: median −$945, 5th percentile −$1,761.
+Worst single week: median −$833, 5th percentile −$1,452.
 
 ## What the numbers say
 
-**1. Over-zero is a rounding error from here.** ~11 bets × $200 at 58.2% is a
-median of +$133 over twelve weeks. Its whole season was decided in weeks 1–3.
-Its 5th–95th band is $19,100–$21,133 — it cannot lose you much and cannot make you
-much. Any meaningful return for the rest of 2026 has to come from Greenline.
+**1. Pooling the personal unders is the whole revision.** It moves the Greenline
+posterior from 55.0% (sd 0.07) to 56.4% (sd 0.031) and the probability of drawing a
+losing win rate from 35% to 10%. Everything downstream follows from that. Compare the
+two `n49` rows against their pooled twins: same volumes, same stakes, P(down) drops
+36.0% → 20.6% and 37.4% → 27.7%.
 
-**2. Which means the projection is a Greenline projection, and Greenline has no
-established edge.** P(down) sits near 36% across every combined scenario
-(36.0 → 36.6 → 36.9 as the stake quadruples). That flatness is forced, not
-discovered — flat staking off a fixed base makes terminal P&L linear in the unit,
-so the sign of the result stops depending on the unit once it is large enough to
-matter. The claim worth keeping is the one underneath it: **stake size moves the
-spread, not the sign.** No unit converts an unestablished edge into a likely profit.
+**2. Volume, not stake, is the live decision — and it points the opposite way from
+intuition.** Betting every flag at 0.25% *lowers* P(down) to 20.6% versus 27.7% at the
+historical rate, despite a similar amount staked. More bets means less sampling noise
+around a parameter that is 90% likely to be profitable. If the 56.4% genuinely applies
+to all 49 flags, betting all of them is strictly better.
 
-The 36% itself is roughly, not exactly, the 35% posterior mass below break-even.
-Sampling noise is not negligible — 49 bets a week at ρ = 0.10 gives a season
-win-rate sd of about 0.049 against a posterior sd of about 0.07; convolved,
-Φ((0.5238 − 0.55) / 0.0855) ≈ 0.38. The two effects are close in size and the
-agreement is partly coincidence.
+**But that is the assumption the evidence cannot carry.** The 56.4% was earned on ~13%
+of the flags — the picked ones. The unpicked 87% are unpriced. Everything in the
+"every flag" rows is conditional on a transfer the data does not demonstrate, and
+PFF's own `value` ranking failing to order outcomes (top half 13–11 vs bottom half
+14–11 on totals) means there is no published filter that reconstructs the selection
+either. **The headline uses the historical rate because that is the population the
+evidence came from.**
 
-**3. Greenline has no stake that is both meaningful and survivable.** 49 bets a
-Saturday at 1% is 49% of bankroll at risk in one afternoon on ~85% same-direction
-unders. At that stake the 1st percentile path is **−$16,633** — arithmetically
-negative, i.e. bust well before week 15, because the model flat-stakes off the
-starting bankroll with no ruin stop. Even 0.25% puts ~12% of bankroll on one
-correlated slate every week. And there is no principled way to trim to a top-N:
-the season review found PFF's own `value` ranking does not order outcomes
-(top half 13–11 vs bottom half 14–11 on totals). This is a structural property of
-the strategy as specified, not a tuning parameter.
+**3. Over-zero is a rounding error from here.** ~11 bets × $200 at 58.2% is a median
+of **+$133** across twelve weeks; its whole 5th–95th band is $19,100–$21,133. Its
+season was decided in weeks 1–3. Keep betting it — it is nearly free — but nothing
+about the rest of 2026 turns on it.
 
-**4. Correlation matters in the tail, not the middle.** The median is flat across
-ρ ($21,647 at 0, $21,644 at 0.10, $21,656 at 0.25) while the tail is not: the 1st
-percentile runs $11,968 → $10,997 → $9,703 and the worst expected week runs
-−$468 → −$945 → −$1,429. So across the plausible range, treating 590 mostly-unders
-as independent understates the bad week by roughly 2–3x. ρ is assumed; what is
-robust is the direction and rough magnitude, not a specific tail number.
+**4. The 1% / every-flag row is the one to distrust.** Median $29,161 (+45.8%) reads
+best on the table and is the least supported cell in it: 0.9% of paths pass through
+zero, 11.3% end down 25%+, and it compounds the unproven coverage transfer with a
+stake that puts ~49% of bankroll on one Saturday of ~85% same-direction unders.
 
-**5. The two legs can collide.** Week 2, Rice @ Notre Dame: over-zero published
-OVER 54.5, Greenline flagged UNDER 55.5. Same game, opposite sides — a hedge
-paying −110/−120 on both, not two bets. It was 1 of 11 over-zero picks that week
-and rare only because over-zero's early-season picks are FCS cupcakes PFF does not
-flag. As over-zero's remaining bets shift toward FBS matchups, collision frequency
-goes up. **"Combined" needs a stated conflict rule before this is bet.** None exists
-in the repo today.
+**5. Correlation still only bites the tail.** Median flat across ρ ($21,306 at 0.10,
+$21,305 at 0.25) while the 5th percentile runs $17,685 → $17,209 and the worst
+expected week −$833 → −$1,000. Direction and rough magnitude are robust; the specific
+tail number is not, because ρ is assumed.
 
 ## What this does not support
 
-- **Any claim that this combination is +EV.** Greenline drives it and its record is
-  27–22 on one graded week. 36% of paths lose money precisely because the data does
-  not rule out a losing strategy.
-- **The median as a forecast.** It is the median of a mixture that includes a 35%
-  chance the larger leg has no edge at all. Read the whole distribution.
-- **Anything about Greenline spreads or moneylines.** Totals only; spreads went
-  21–28 in week 2 and their stated probabilities were worse-calibrated than a coin.
-- **The Greenline volume assumption past a few weeks.** 49 and 57 flags are two
-  observations. If PFF's projection stops sitting below the market, the leg shrinks.
-- **Repriced results.** Greenline grades at PFF's captured number;
+- **Greenline as independently validated.** The pooled prior is 80% personal-betting
+  history of the same signal. It is prior evidence, not an outside check. The 2026
+  graded flags alone remain n=49, CI 41–68%.
+- **The "every flag" rows as achievable.** They assume the picked-flag win rate
+  transfers to the 87% that were passed on.
+- **Any claim about the selection rule.** The personal record is price-shopped and
+  hand-filtered by criteria this repo does not encode. "Bet at the historical rate"
+  is a volume assumption, not a reproducible strategy — there is no script that picks
+  which 6 of 49 flags to take.
+- **Greenline spreads or moneylines.** Totals only; spreads went 21–28 in week 2 with
+  worse-than-coin calibration.
+- **Repriced results.** Greenline grades at PFF's captured number and
   `match_greenline_books.py` shows books hang a different number on a third of the
-  slate. Real fills will differ.
-- **Ruin dynamics.** Flat stakes come off the fixed $20,000 with no stop-loss and no
-  bust rule. The "busts mid-season" column reports how often a path passes through
-  zero (8.7% at the 1% Greenline stake), but the percentiles for those rows still
-  assume betting continued — they flag the sizing problem rather than measuring
-  what a real, ruin-stopped bankroll would have done.
+  slate. The personal record, by contrast, is at prices actually taken.
+- **Ruin dynamics.** Flat stakes come off a fixed $20,000 with no stop-loss. The
+  "busts" column reports how often a path passes through zero; those rows' percentiles
+  still assume betting continued.
 
-## What would settle it
+## Open items
 
-The Greenline season review's own answer: four more graded weeks gets totals to
-n ≈ 250, where a true 56% separates from 52.38% about half the time; eight weeks
-gets there reliably. Keep capturing Wednesday
-(`scripts/pull_pff_scoreboard.py --greenline`), grading Monday
-(`research/totals/scripts/grade_greenline.py`), and rerun this simulation with the
-updated record — `GL_WINS` / `GL_LOSSES` at the top of the script are the only
-values that need to change.
+1. **No conflict rule exists.** Week 2, Rice @ Notre Dame: over-zero published OVER
+   54.5, Greenline flagged UNDER 55.5. Same game, opposite sides — a hedge paying
+   juice twice, not two bets. Rare so far only because over-zero's early picks are FCS
+   cupcakes PFF does not flag; that changes as its remaining bets move to FBS
+   matchups. **"Combined" needs a stated rule before it is bet.**
+2. **The selection rule is unencoded.** The single highest-value follow-up is joining
+   the 201 personal unders back to the flag lists that produced them to recover *which*
+   flags got bet. That would turn "13% coverage" from an assumption into a filter, and
+   would say whether the "every flag" rows are reachable.
+3. **Keep grading.** Four more graded weeks gets the 2026 flags to n ≈ 250 on their
+   own, at which point the prior stops doing the work. Capture Wednesday
+   (`scripts/pull_pff_scoreboard.py --greenline`), grade Monday
+   (`research/totals/scripts/grade_greenline.py`), rerun this script.
 
 ## Data and dates
 
-over-zero: 234 walk-forward graded bets, seasons 2016–2025, from
+over-zero: 234 walk-forward graded bets 2016–2025 from
 `models/over_zero/docs/backtest_bets.csv`; 2026 published record 17–8 through week 2
-from `models/over_zero/site/lib/weekly-results.json` (not used as a prior — the
-walk-forward record is). Greenline: 49 graded totals flags, 2026 week 2, from
-`data/ingest/pff_scoreboard/greenline_graded.csv`; week-3 volume from
-`data/ingest/pff_scoreboard/pff_greenline_2026_w3.csv`. Projection span: weeks 4–15,
-2026 regular season. Seed 20260917.
+from `models/over_zero/site/lib/weekly-results.json` (not used as a prior). Greenline:
+49 graded totals flags, 2026 week 2, `data/ingest/pff_scoreboard/greenline_graded.csv`;
+week-3 volume `data/ingest/pff_scoreboard/pff_greenline_2026_w3.csv`; 201 personal
+full-game unders 2023-08 → 2025-12, `data/ingest/bet_history/history.csv`. Projection
+span: weeks 4–15, 2026 regular season. Seed 20260917.
