@@ -32,8 +32,9 @@ full-game unders in the personal book export, 2023-08 to 2025-12**, which were m
 PFF Greenline flags — the same signal in earlier seasons. That drops the probability
 of drawing a losing Greenline win rate from 35% to 10%. But
 `research/totals/docs/under-selection-profile-2026-09-17.md` shows those 201 unders
-sit at a **median total of 58.5 against 54.5 for the 2026 flags**, so the two
-populations are not the same and the pooled prior probably overstates. Greenline's
+sit at a **median total of 58.5 against 52.5 for the 2026 under flags** — a six-point
+gap — so the two populations are not the same and the pooled prior probably
+overstates. Greenline's
 2023–25 flag distribution is unobserved, so how much it overstates cannot be settled
 from what exists. Plan between the two rows.
 
@@ -73,11 +74,11 @@ median by $439.
 The 201-bet record is **not** a record of betting every flag. In 2025 it covers ~92
 unders against roughly 690 flags at the current rate — about **13% by count, and at a
 materially different distribution of totals**, not a subset. The selection profile
-puts the bet unders at a median total of 58.5 against 54.5 for the 2026 flags, with
-30% of the bets in the 60–64.5 band where the flags put 6.3%, and finds the selection
+puts the bet unders at a median total of 58.5 against 52.5 for the 2026 under flags,
+with 39% of the bets at 60 or above where the flags put 5.7%, and finds the selection
 is a genuine rule: 78% of the bets are on totals of 55 or more against 31% of the
 available slate (z +13.1). A +0.47-point mean line-shopping edge does not close a
-~4-point gap. So the pooled 56.4% describes *a different, higher-total population of
+six-point gap. So the pooled 56.4% describes *a different, higher-total population of
 unders* than the one the Greenline leg would actually bet.
 
 So coverage is a scenario, not a constant:
@@ -116,6 +117,17 @@ totals and all 201 personal unders sat on half-point lines. Realised push rate: 
 compounded figures because simultaneous Saturday kickoffs make them unachievable.
 
 ## Results
+
+![Bankroll projection](figs/mc-combined-totals-2026-09-17.png)
+
+*Top row: the same bet under the two defensible Greenline priors. The gap between the
+two panels is unresolved evidence, not risk — it does not shrink by betting more
+carefully. Bottom left: the terminal distributions overlap heavily, which is the point.
+Bottom right: every scenario, median and 5th–95th; the one long whisker is the
+every-flag-at-1% row, which is also the least supported.*
+
+Regenerate with
+`python scripts/mc_combined_totals.py --paths 100000 --figs docs/figs/mc-combined-totals-2026-09-17.png`.
 
 100,000 paths, ρ = 0.10, over-zero at 1% ($200/bet) throughout.
 
@@ -183,8 +195,8 @@ tail number is not, because ρ is assumed.
 - **Greenline as independently validated.** The pooled prior is 80% personal-betting
   history of the same signal. It is prior evidence, not an outside check. The 2026
   graded flags alone remain n=49, CI 41–68%.
-- **The pooled prior as transferable in full.** The 201 unders sit ~4 points higher in
-  total than the 2026 flags and load a band (60–64.5) the flags barely touch. That is
+- **The pooled prior as transferable in full.** The 201 unders sit ~6 points higher in
+  total than the 2026 under flags and load a band (60+) the flags barely touch. That is
   a different population, so pooling probably overstates. By how much is unknowable
   from what exists — the 2023–25 flag distribution was never captured.
 - **The "every flag" rows as achievable.** They assume the picked-flag win rate
@@ -219,6 +231,10 @@ tail number is not, because ρ is assumed.
    own, at which point the prior stops doing the work. Capture Wednesday
    (`scripts/pull_pff_scoreboard.py --greenline`), grade Monday
    (`research/totals/scripts/grade_greenline.py`), rerun this script.
+
+The logging in item 2 now exists: `research/totals/scripts/greenline_bet_log.py` holds
+one row per totals flag per week, seeded from the captures. Weeks 2 and 3 of 2026 are
+seeded and **unmarked** — 106 flags waiting on which ones were bet.
 
 ## Data and dates
 

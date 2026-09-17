@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from scipy.special import erfinv, ndtr
@@ -67,6 +68,8 @@ GL_FLAGS_PER_WEEK = 49.0
 GL_COVERAGE_HISTORICAL = 0.13
 
 WEEKS_REMAINING = 12  # weeks 4-15 of the 2026 regular season
+
+PCTS = [5, 25, 50, 75, 95]  # the fan chart's bands
 
 # Prices. over-zero's operational rule is -120 or better; Greenline is graded -110.
 OZ_PRICE, GL_PRICE = -120, -110
@@ -134,6 +137,9 @@ def simulate(cfg: Config) -> dict:
     worst_week = np.zeros(n)
     running_min = np.zeros(n)  # deepest drawdown, for the mid-season bust check
     oz_remaining = oz_season.copy()
+    # Percentiles of the bankroll after each week. Keeping the quantiles rather than
+    # the paths is what makes a fan chart affordable at 100k paths.
+    fan = [np.percentile(np.full(n, cfg.bankroll), PCTS)]
 
     for w in range(WEEKS_REMAINING):
         shock = rng.standard_normal(n)
@@ -152,6 +158,7 @@ def simulate(cfg: Config) -> dict:
         turnover += gl_n * gl_stake + oz_n * oz_stake
         worst_week = np.minimum(worst_week, week_pnl)
         running_min = np.minimum(running_min, pnl)
+        fan.append(np.percentile(cfg.bankroll + pnl, PCTS))
 
     return {
         "config": dict(cfg.__dict__, weeks=WEEKS_REMAINING),
@@ -167,7 +174,138 @@ def simulate(cfg: Config) -> dict:
         # can go through zero and keep betting. Percentiles on such a path are
         # unreachable in reality -- report the rate rather than hiding it.
         "p_bust": float((cfg.bankroll + running_min <= 0).mean()),
+        "fan": np.array(fan),  # (weeks + 1, len(PCTS))
     }
+
+
+# ------------------------------------------------------------------ figures ---
+# Palette and axis treatment copied from models/over_zero/monitor/roi_report.py so
+# the two sets of figures read as one system.
+INK, MUTED, GRID = "#1a1d24", "#6b7280", "#d8dce3"
+BLUE, GREEN, RED, GOLD = "#2b5d8a", "#3e7d5a", "#a9384a", "#b7822a"
+
+
+def _style(ax):
+    ax.set_facecolor("white")
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    for sp in ("left", "bottom"):
+        ax.spines[sp].set_color(GRID)
+    ax.tick_params(colors=MUTED, labelsize=8.5, length=3, color=GRID)
+    ax.grid(alpha=0.5, color=GRID, lw=0.7)
+    ax.set_axisbelow(True)
+    ax.title.set_color(INK)
+    ax.xaxis.label.set_color(MUTED)
+    ax.yaxis.label.set_color(MUTED)
+
+
+def _short(label: str) -> str:
+    """Scenario labels are written for the table; the dot plot needs them narrow."""
+    lab = label.split(" -- ")[0]
+    for a, b in (("Pooled prior", "pooled"), ("n=49 prior (week 2 only)", "n=49"),
+                 ("n=49 prior", "n=49"), ("2024-25 window prior (72-50)", "2024-25 window"),
+                 (", bet at the historical rate (~6/wk),", ", ~6/wk,"),
+                 (", historical rate,", ", ~6/wk,"), (", historical rate", ", ~6/wk"),
+                 (", bet EVERY flag (~49/wk),", ", all 49/wk,"),
+                 (", bet EVERY flag,", ", all 49/wk,"), (", every flag at", ", all 49/wk at"),
+                 (" units", ""), ("Over-zero only (Greenline stood down)", "over-zero only"),
+                 ("Headline at rho=0.25", "headline, rho=0.25")):
+        lab = lab.replace(a, b)
+    return lab
+
+
+def _fan(ax, res, label, b0):
+    weeks = np.arange(WEEKS_REMAINING + 1) + 3  # week 3 is the last one played
+    f = res["fan"]
+    ax.fill_between(weeks, f[:, 0], f[:, 4], color=BLUE, alpha=0.14, lw=0,
+                    label="5-95%")
+    ax.fill_between(weeks, f[:, 1], f[:, 3], color=BLUE, alpha=0.28, lw=0,
+                    label="25-75%")
+    ax.plot(weeks, f[:, 2], color=BLUE, lw=2, label="median", zorder=3)
+    ax.axhline(b0, color=RED, lw=1.1, ls="--", zorder=2, label="start")
+    ax.set_title(label)
+    ax.set_xlabel("week")
+    ax.set_ylabel("bankroll ($)")
+    ax.yaxis.set_major_formatter(lambda v, _: f"${v / 1000:.0f}k")
+    _style(ax)
+
+
+def make_figures(base: Config, scenarios: list[tuple[str, Config]], path: Path) -> None:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec
+
+    plt.rcParams.update({"font.family": "DejaVu Sans", "axes.titlesize": 10.5,
+                         "axes.titleweight": "bold", "axes.labelsize": 9,
+                         "figure.facecolor": "white"})
+
+    def variant(**kw):
+        return Config(**dict(base.__dict__, **kw))
+
+    cov = GL_COVERAGE_HISTORICAL
+    pooled = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="pooled"))
+    thin = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="n49"))
+    b0 = base.bankroll
+
+    fig = plt.figure(figsize=(15.5, 10.2))
+    gs = GridSpec(2, 2, figure=fig, hspace=0.34, wspace=0.2,
+                  left=0.07, right=0.97, top=0.88, bottom=0.08)
+
+    # 1-2. the bracket, as two fan charts on a shared scale
+    ax1, ax2 = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1])
+    _fan(ax1, pooled, "Pooled prior (141-109)", b0)
+    _fan(ax2, thin, "Graded flags only (27-22)", b0)
+    lo = min(pooled["fan"][:, 0].min(), thin["fan"][:, 0].min())
+    hi = max(pooled["fan"][:, 4].max(), thin["fan"][:, 4].max())
+    for ax in (ax1, ax2):
+        ax.set_ylim(lo - 500, hi + 500)
+    ax1.legend(frameon=False, fontsize=8, labelcolor=MUTED, loc="upper left")
+
+    # 3. terminal distributions, overlaid
+    ax3 = fig.add_subplot(gs[1, 0])
+    bins = np.linspace(min(pooled["final"].min(), thin["final"].min()),
+                       max(np.percentile(pooled["final"], 99.5),
+                           np.percentile(thin["final"], 99.5)), 70)
+    for res, c, lab in ((thin, GOLD, "graded flags only"), (pooled, BLUE, "pooled")):
+        ax3.hist(res["final"], bins=bins, color=c, alpha=0.45, lw=0,
+                 label=f"{lab} (median ${np.median(res['final']):,.0f})")
+    ax3.axvline(b0, color=RED, lw=1.2, ls="--", label="start $20,000")
+    ax3.set_title("Ending bankroll, 100k paths")
+    ax3.set_xlabel("ending bankroll ($)")
+    ax3.set_ylabel("paths")
+    ax3.xaxis.set_major_formatter(lambda v, _: f"${v / 1000:.0f}k")
+    ax3.legend(frameon=False, fontsize=8, labelcolor=MUTED)
+    _style(ax3)
+
+    # 4. every scenario, median with a 5-95 whisker
+    ax4 = fig.add_subplot(gs[1, 1])
+    rows = [(lab, simulate(cfg)) for lab, cfg in scenarios]
+    ys = np.arange(len(rows))[::-1]
+    for y, (lab, res) in zip(ys, rows):
+        f = res["final"]
+        p5, p50, p95 = np.percentile(f, [5, 50, 95])
+        c = GREEN if p50 >= b0 else RED
+        ax4.plot([p5, p95], [y, y], color=GRID, lw=3, solid_capstyle="round", zorder=2)
+        ax4.plot([p50], [y], "o", color=c, ms=7, zorder=3)
+    ax4.axvline(b0, color=RED, lw=1.1, ls="--", zorder=1)
+    ax4.set_yticks(ys)
+    ax4.set_yticklabels([_short(lab) for lab, _ in rows], fontsize=8)
+    ax4.set_title("Every scenario: median, 5th-95th")
+    ax4.set_xlabel("ending bankroll ($)")
+    ax4.xaxis.set_major_formatter(lambda v, _: f"${v / 1000:.0f}k")
+    _style(ax4)
+
+    fig.text(0.07, 0.955, "$20,000 across over-zero OVERs and Greenline totals, "
+             "weeks 4-15 of 2026", fontsize=15, fontweight="bold", color=INK, va="top")
+    fig.text(0.07, 0.915,
+             "Win rates drawn per path from each leg's Beta posterior. The two fan "
+             "charts are the same bet at the two defensible Greenline priors -- the "
+             "spread between them is unresolved evidence, not risk.",
+             fontsize=9, color=MUTED, va="top")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=170, facecolor="white")
+    print(f"wrote {path}")
 
 
 def report(res: dict, label: str) -> str:
@@ -247,6 +385,11 @@ def self_check() -> None:
     hi = simulate(Config(paths=5_000, seed=3, gl_coverage=1.0))
     assert lo["mean_turnover"] < hi["mean_turnover"] / 3
     assert abs(lo["p_gl_mean"] - hi["p_gl_mean"]) < 0.005
+    # the fan must start at the starting bankroll and carry one row per week
+    f = fat["fan"]
+    assert f.shape == (WEEKS_REMAINING + 1, len(PCTS)), f.shape
+    assert np.allclose(f[0], Config().bankroll), f[0]
+    assert (np.diff(f, axis=1) >= 0).all(), "percentiles must be non-decreasing"
     print("self-check OK")
 
 
@@ -266,6 +409,7 @@ def main() -> None:
                     help="fraction of the weekly Greenline flags actually bet")
     ap.add_argument("--seed", type=int, default=20260917)
     ap.add_argument("--json", help="write the scenario table here")
+    ap.add_argument("--figs", help="write the four-panel figure here (.png)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
 
@@ -301,6 +445,9 @@ def main() -> None:
         ("Headline at rho=0.25 -- correlation sensitivity",
          variant(gl_coverage=cov, gl_unit=0.01, rho=0.25)),
     ]
+
+    if args.figs:
+        make_figures(base, scenarios, Path(args.figs))
 
     out, blob = [], {}
     for label, cfg in scenarios:
