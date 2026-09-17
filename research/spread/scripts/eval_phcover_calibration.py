@@ -49,6 +49,21 @@ def auc(y: np.ndarray, p: np.ndarray) -> float:
     return float((r[: len(pos)].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg)))
 
 
+def cluster_boot_stat(fn, clusters, n_boot=N_BOOT):
+    """Season-cluster bootstrap CI for any statistic fn(index_array)."""
+    uniq = np.unique(clusters)
+    if len(uniq) < base.MIN_CLUSTERS:
+        return (float("nan"), float("nan"))
+    idx = {c: np.flatnonzero(clusters == c) for c in uniq}
+    vals = []
+    for _ in range(n_boot):
+        take = np.concatenate([idx[c] for c in RNG.choice(uniq, len(uniq), replace=True)])
+        v = fn(take)
+        if np.isfinite(v):
+            vals.append(v)
+    return (float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5))) if vals else (float("nan"),) * 2
+
+
 def cluster_boot_auc(y, p, clusters, n_boot=N_BOOT):
     """Season-cluster bootstrap CI for AUC: resample whole seasons, not games."""
     uniq = np.unique(clusters)
@@ -110,8 +125,13 @@ def main() -> int:
     brier = float(((p - y) ** 2).mean())
     brier_base = float(((y.mean() - y) ** 2).mean())
     bss = 1 - brier / brier_base
-    out["brier"], out["brier_baserate"], out["brier_skill_score"] = brier, brier_base, float(bss)
-    print(f"  Brier {brier:.5f}   base-rate Brier {brier_base:.5f}   skill score {bss:+.5f}")
+    base_rate = y.mean()
+    lo_b, hi_b = cluster_boot_stat(
+        lambda i: 1 - ((p[i] - y[i]) ** 2).mean() / ((base_rate - y[i]) ** 2).mean(), seasons)
+    out["brier"], out["brier_baserate"] = brier, brier_base
+    out["brier_skill_score"] = {"bss": float(bss), "lo": lo_b, "hi": hi_b}
+    print(f"  Brier {brier:.5f}   base-rate Brier {brier_base:.5f}")
+    print(f"  skill score {bss:+.5f}  [{lo_b:+.5f}, {hi_b:+.5f}]  season clusters")
     print("  A skill score <= 0 means the constant base rate forecasts at least as well.")
 
     print("\n  decile of phcover      n   mean phcover   realized cover")
@@ -162,6 +182,34 @@ def main() -> int:
     above = sum(1 for r in per if r["auc"] > 0.5)
     print(f"  above 0.500 in {above} of {len(per)} seasons")
     out["seasons_auc_above_half"] = above
+
+    # POWER. A CI containing the null is only informative alongside what the test could have
+    # detected. Unlike the phwin study, the headline reads here (AUC, Brier) do NOT condition on
+    # the market, so they are not crippled by phcover's collinearity with `lineavg - line` --
+    # but the decile-gap read is a different matter and the numbers below say so.
+    print("")
+    print("POWER -- what could these tests have detected?")
+    se_auc = (hi - lo) / 3.92
+    se_gap = (ghi - glo) / 3.92
+    dis = (g.lineavg - g.line).to_numpy(float)
+    Xd = np.column_stack([np.ones(len(g)), dis])
+    bd, *_ = np.linalg.lstsq(Xd, p, rcond=None)
+    res_d = p - Xd @ bd
+    r2_d = 1 - (res_d**2).sum() / ((p - p.mean()) ** 2).sum()
+    out["power"] = {"se_auc": float(se_auc), "mde_auc_80": float(2.8 * se_auc),
+                    "se_decile_gap": float(se_gap), "mde_decile_gap_80": float(2.8 * se_gap),
+                    "r2_phcover_on_disagreement": float(r2_d),
+                    "sd_phcover": float(p.std()), "sd_residual_on_disagreement": float(res_d.std())}
+    print(f"  AUC:        SE {se_auc:.4f}, MDE at 80% power {2.8 * se_auc:.4f}")
+    print(f"              -> a true AUC of {0.5 + 2.8 * se_auc:.3f} or better would have been seen.")
+    print(f"              observed {a:.4f}, so real discrimination at that level is EXCLUDED.")
+    print(f"  decile gap: SE {se_gap:.4f}, MDE at 80% power {2.8 * se_gap:.4f}")
+    print(f"              observed {gap:+.4f}, below the MDE -- the inversion is UNRESOLVED,")
+    print(f"              not shown to be absent.")
+    print(f"  phcover is {r2_d:.4f} explained by (lineavg - line); sd {p.std():.4f} -> "
+          f"residual {res_d.std():.4f}")
+    print("              so any test CONDITIONING on the market has almost nothing to work with.")
+    print("              The AUC and Brier reads above do not condition, so they stand on their own.")
 
     OUT.write_text(json.dumps(out, indent=2))
     print(f"\nwrote {OUT}")

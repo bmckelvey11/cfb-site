@@ -49,9 +49,11 @@ backwards — it is simply uninformative. Per season it lands above 0.500 twice 
 |---|---|
 | Brier | 0.25754 |
 | Brier of the constant base rate (0.4951) | 0.24998 |
-| **Brier skill score** | **−0.030** |
+| **Brier skill score** | **−0.0303** [−0.0389, −0.0209] |
 
-A negative skill score means always answering "49.5%" forecasts better than `phcover` does.
+A negative skill score means always answering "49.5%" forecasts better than `phcover` does. The
+season-cluster interval excludes zero, so this is not a wash — `phcover` is *significantly*
+worse than a constant.
 
 Deciles of `phcover` against realized cover rate:
 
@@ -80,10 +82,40 @@ Betting the top decile's home side: 667 bets, **0.4693** ATS against the 0.5238 
 0.0009 above break-even. Even the best-looking slice of a 6,669-game sample lands exactly on
 the vig.
 
+### 4. What these tests could have detected
+
+A confidence interval containing the null only means something alongside the effect the test
+could have resolved. Added 2026-09-17, after the same question was raised about the companion
+`phwin` study.
+
+| test | SE | MDE at 80% power | observed | reading |
+|---|---|---|---|---|
+| AUC vs 0.500 | 0.0070 | **0.0196** | 0.4888 | a true AUC of **0.520 or better would have been seen**. Real discrimination at that level is **excluded**. |
+| decile gap (bottom − top) | 0.0343 | **0.0961** | +0.0555 | observed gap is **below** the MDE. The inversion is **unresolved**, not shown to be absent. |
+
+So the two headline reads have different standing, and the doc should not have presented them
+in the same voice:
+
+- **The AUC null is informative.** 6,669 games over 9 season clusters is enough to exclude any
+  discrimination worth acting on. Combined with the Brier interval above, "`phcover` carries no
+  usable signal" is supported.
+- **The decile-inversion null is not.** § 3 already said the inversion "is not established", and
+  that remains the right wording — but the reason is that the test cannot resolve a gap this
+  size, not that the gap was shown to be zero.
+
+**On the collinearity objection** that applies to the `phwin` study: `phcover` is 0.9945
+explained by `lineavg − line`, and its sd of 0.0767 collapses to a **0.0057** residual once that
+is removed. So any test *conditioning on the market* would have essentially nothing to work
+with. That objection does not bite here, because the AUC and Brier reads above are
+**unconditional** — `phcover` is scored directly against realized covers, with no regression on
+the line. They stand on their own.
+
 ## What this does not support
 
 - **Not a claim that `phcover` is systematically backwards.** Both the AUC interval and the
-  decile-gap interval contain the null. The finding is absence of signal, not reversed signal.
+  decile-gap interval contain the null, and per § 4 the decile test could not have resolved an
+  inversion of the observed size anyway. The finding is absence of *usable* signal, not reversed
+  signal.
 - **Not a claim about PT's other columns.** `phwin`, `lineavg`, `linestd` and the ~50 model
   columns are untested here.
 - **Not a version A or B read**, and it changes nothing about amendment B3's stopping rule.
