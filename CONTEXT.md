@@ -34,6 +34,17 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Key number** — a spread line on or adjacent to 3 or 7 (2.5–3.5, 6.5–7.5), where NFL/CFB final-margin mass concentrates and books shade hardest.
 - **Betting day** — the ET calendar date of kickoff (a 1am UTC kickoff belongs to the previous ET evening).
 
+## Bankroll
+
+- **Seed bankroll** — money given to fund a betting bankroll with nothing owed back. A gift, not an investment, loan, or security. Profit and bankroll stay in the operation.
+  _Avoid_: investment, seed money, stake (that word means bet size)
+- **Leg** — one strategy bet from a shared bankroll. Two legs today: over-zero OVERs and Greenline totals. A leg has its own record, price, and volume.
+- **Coverage** — the fraction of a leg's available flags that actually get bet. Historical Greenline coverage is ~13%. Coverage above that is conditional: the picked-flag record says nothing about the flags passed on.
+- **Prior** — the graded record a leg's win rate is drawn from. Where two records are both defensible (`pooled`, `n49`), projections carry both and the answer is a **bracket**, never one number.
+- **Bust** — a simulated path whose running bankroll passes through zero mid-season. Reported as a rate on every scenario; percentiles on a busting row are unreachable.
+- **Conflict** — the same game flagged on opposite sides by two legs. Rule: Greenline takes the game, over-zero skips it.
+- **Unit** — one flat bet as a fraction of the *starting* bankroll. Never compounded; Saturday kickoffs are simultaneous.
+
 ## Warehouse layers
 
 - **Pair** — one concept arriving from both CFBD APIs as two staging tables. Both live in `stg` since the 2026-09-10 collapse (ADR-0003); the GraphQL side carries a `_gql` suffix only where it would collide (`calendar_gql`, `draft_picks_gql`, `predicted_points_gql`). Different names and different column sets. A pair is two sources of the same subject, **not** a duplicate; measurement decides whether either side is redundant.
