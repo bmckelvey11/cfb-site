@@ -5,17 +5,18 @@
 
 Inputs: docs/seed-bankroll-proposal-2026-09-17.md, the two figures in docs/figs/,
 and the sweep CSV. Outputs, next to the markdown:
-    seed-bankroll-proposal-2026-09-17.pdf     markdown -> HTML -> Edge headless print
+    seed-bankroll-proposal-2026-09-17.pdf     markdown -> HTML -> Chrome headless print
     seed-bankroll-proposal-2026-09-17.pptx    python-pptx, numbers read from the CSV
 
 Needs `markdown` and `python-pptx` (system Python has both; the repo .venv does not)
-and Microsoft Edge for the PDF step.
+and Chrome (or Edge) for the PDF step.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import re
 import subprocess
 import sys
 import tempfile
@@ -26,7 +27,10 @@ STEM = "seed-bankroll-proposal-2026-09-17"
 SWEEP = DOCS / "bankroll-config-sweep-2026-09-17.csv"
 FIG_MC = DOCS / "figs" / "mc-combined-totals-2026-09-17.png"
 FIG_SWEEP = DOCS / "figs" / "bankroll-config-sweep-2026-09-17.png"
-EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
+# Chrome first: Edge headless on this machine intermittently prints a 1-page stray
+# render instead of the URL, even with an isolated profile. Chrome has not.
+BROWSERS = (Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+            Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"))
 
 INK, MUTED, BLUE, GREEN, RED = "1A1D24", "6B7280", "2B5D8A", "3E7D5A", "A9384A"
 
@@ -59,14 +63,18 @@ def build_pdf() -> Path:
     html_path.write_text(f"<html><head><meta charset='utf-8'><style>{CSS}</style></head>"
                          f"<body>{html}</body></html>", encoding="utf-8")
     pdf = DOCS / f"{STEM}.pdf"
-    # An isolated profile is required: without it Edge hands the job to any running
-    # instance, exits 0, and writes nothing.
-    profile = Path(tempfile.mkdtemp(prefix="edge-pdf-"))
-    subprocess.run([str(EDGE), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
-                    f"--user-data-dir={profile}", f"--print-to-pdf={pdf}", html_path.as_uri()],
-                   check=True, timeout=120)
+    # An isolated profile is required: without it the browser hands the job to any
+    # running instance, exits 0, and writes nothing.
+    browser = next(b for b in BROWSERS if b.exists())
+    profile = Path(tempfile.mkdtemp(prefix="pdf-profile-"))
+    pdf.unlink(missing_ok=True)
+    subprocess.run([str(browser), "--headless=new", "--disable-gpu", "--no-first-run",
+                    "--no-pdf-header-footer", f"--user-data-dir={profile}",
+                    f"--print-to-pdf={pdf}", html_path.as_uri()], check=True, timeout=120)
     html_path.unlink()
-    assert pdf.exists(), "Edge exited 0 but wrote no PDF"
+    # a stray render is 1 page; the proposal is several and carries one figure
+    pages = len(re.findall(rb"/Type\s*/Page[^s]", pdf.read_bytes()))
+    assert pages >= 3, f"{browser.name} wrote a {pages}-page PDF; expected the multi-page proposal"
     return pdf
 
 
