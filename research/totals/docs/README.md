@@ -59,11 +59,18 @@ compute on a week that still has blanks, because defaulting them to "no" manufac
 very number the ledger exists to measure.
 
 ```
-python research/totals/scripts/greenline_bet_log.py --seed        # after each capture
-python research/totals/scripts/greenline_bet_log.py --show 4      # review the week
+python research/totals/scripts/greenline_bet_log.py --seed          # after each capture
+python research/totals/scripts/greenline_bet_log.py --import-book   # after a book re-export
+python research/totals/scripts/greenline_bet_log.py --show 4        # review the week
 python research/totals/scripts/greenline_bet_log.py --mark 4 31190 31204   # or --none 4
 python research/totals/scripts/greenline_bet_log.py --coverage
 ```
+
+`--import-book` is the low-effort path: re-export the book to
+`data/ingest/bet_history/history.csv` and it marks a whole week in one pass — `y` for
+flags it finds a matching total on, `n` for the rest of that day's flags. It resolves
+both sides to CFBD team ids first, because PFF and the book disagree on 32 of 137
+abbreviations, and it only touches days the export actually covers.
 
 This is the only thing that can answer whether the personal under record transfers to
 Greenline's flags: no work on 2023-25 can, because no flag archive for those seasons
