@@ -41,7 +41,7 @@ BANDS = [
 ]
 
 COLUMNS = ["game_id", "kickoff", "away", "home", "line", "projection", "p_under", "value",
-           "band", "band_record", "band_roi", "band_n"]
+           "spread", "band", "band_record", "band_roi", "band_n"]
 
 
 def num(v):
@@ -55,10 +55,15 @@ def band(line: float) -> tuple:
     raise ValueError(line)
 
 
-def unders(flags: list[dict], max_edge: float | None = None, min_edge: float = 0.0) -> list[dict]:
+def unders(flags: list[dict], max_edge: float | None = None, min_edge: float = 0.0,
+           max_spread: float | None = None) -> list[dict]:
     """Positive-edge unders, ranked by PFF value. `max_edge` drops flags PFF prices ABOVE it:
     week 2's 4%+ bucket went 3-5 while the rest went 18-10, so the option exists -- on eight
-    games, so it is a choice, not a finding (see greenline_bet_bounds.py, edge sweep)."""
+    games, so it is a choice, not a finding (see greenline_bet_bounds.py, edge sweep).
+    `max_spread` drops flags where |market spread| exceeds it: unders on 14+ point favorites
+    went 31-36 vs 105-67 on the rest, same sign in both strata, Holm p 0.26
+    (docs/greenline-under-filters-2026-09-17.md). A choice, not a finding. A flag with no
+    spread is kept."""
     out = []
     for f in flags:
         line, value = num(f.get("market_over_under")), num(f.get("total_best_value"))
@@ -66,29 +71,34 @@ def unders(flags: list[dict], max_edge: float | None = None, min_edge: float = 0
             continue
         if value < min_edge or (max_edge is not None and value > max_edge):
             continue
+        spread = num(f.get("market_spread"))
+        if max_spread is not None and spread is not None and abs(spread) > max_spread:
+            continue
         b = band(line)
         out.append({"game_id": f["pff_game_id"], "kickoff": (f.get("kickoff_raw") or "")[:16],
                     "away": f.get("away_abbreviation"), "home": f.get("home_abbreviation"),
                     "line": line, "projection": num(f.get("greenline_total_projection")),
-                    "p_under": num(f.get("under_cover_probability")), "value": value,
+                    "p_under": num(f.get("under_cover_probability")), "value": value, "spread": spread,
                     "band": b[0], "band_record": b[3], "band_roi": b[4], "band_n": b[5]})
     return sorted(out, key=lambda r: -r["value"])
 
 
 def markdown(rows: list[dict], season: int, week: str, captured: str, n_flags: int, max_edge: float | None = None,
-             min_edge: float = 0.0) -> str:
+             min_edge: float = 0.0, max_spread: float | None = None) -> str:
     lines = [f"# PFF Greenline — positive-edge unders, {season} week {week}", "",
              f"Captured {captured} from a live PFF Pro session. {len(rows)} of {n_flags} flagged games. "
              "Lines are PFF's shown number at capture — reprice before betting."
              + (f" Only flags with PFF edge in the {min_edge * 100:.1f}-{max_edge * 100:.1f}% window are listed "
-                f"(week 2: inside 17-8, outside 4-7; see greenline_edge_window.py)." if max_edge else ""), "",
+                f"(week 2: inside 17-8, outside 4-7; see greenline_edge_window.py)." if max_edge else "")
+             + (f" Flags with |spread| > {max_spread} are dropped (big-favorite unders 31-36 pooled vs 105-67; "
+                "see greenline-under-filters-2026-09-17.md)." if max_spread is not None else ""), "",
              "`value` = PFF's win probability minus the 52.38% break-even at -110. Band record is YOUR",
              "under history 2023-08 → 2025-12 in that total range, not PFF's.", "",
-             "| # | kickoff | game | line | PFF proj | p(under) | edge | band | your record | band ROI |",
-             "|---:|---|---|---:|---:|---:|---:|---|---|---:|"]
+             "| # | kickoff | game | line | PFF proj | p(under) | edge | spread | band | your record | band ROI |",
+             "|---:|---|---|---:|---:|---:|---:|---:|---|---|---:|"]
     for i, r in enumerate(rows, 1):
         lines.append(f"| {i} | {r['kickoff']} | {r['away']} @ {r['home']} | {r['line']} | {r['projection']} | "
-                     f"{r['p_under'] * 100:.1f}% | **{r['value'] * 100:+.2f}%** | {r['band']} | "
+                     f"{r['p_under'] * 100:.1f}% | **{r['value'] * 100:+.2f}%** | {r['spread']} | {r['band']} | "
                      f"{r['band_record']} | {r['band_roi']} |")
     lines += ["", "## By band", "", "| band | picks | your history | your ROI | n |", "|---|---:|---|---:|---:|"]
     for b in BANDS:
@@ -102,10 +112,12 @@ def self_check() -> None:
     flags = [
         {"pff_game_id": "1", "kickoff_raw": "2026-09-19T12:00:00", "away_abbreviation": "A",
          "home_abbreviation": "B", "market_over_under": "55.5", "greenline_total_projection": "53.0",
-         "under_cover_probability": "0.58", "total_best_side": "under", "total_best_value": "0.03"},
+         "under_cover_probability": "0.58", "total_best_side": "under", "total_best_value": "0.03",
+         "market_spread": "-17.5"},
         {"pff_game_id": "2", "kickoff_raw": "2026-09-19T15:30:00", "away_abbreviation": "C",
          "home_abbreviation": "D", "market_over_under": "44.5", "greenline_total_projection": "42.0",
-         "under_cover_probability": "0.60", "total_best_side": "under", "total_best_value": "0.05"},
+         "under_cover_probability": "0.60", "total_best_side": "under", "total_best_value": "0.05",
+         "market_spread": "3.5"},
         {"pff_game_id": "3", "market_over_under": "50.5", "total_best_side": "over", "total_best_value": "0.04"},
         {"pff_game_id": "4", "market_over_under": "50.5", "total_best_side": "under", "total_best_value": "-0.01"},
         {"pff_game_id": "5", "market_over_under": "", "total_best_side": "under", "total_best_value": "0.02"},
@@ -115,6 +127,8 @@ def self_check() -> None:
     assert [r["game_id"] for r in unders(flags, max_edge=0.04)] == ["1"]   # the 5% flag is cut, the 3% kept
     assert [r["game_id"] for r in unders(flags, min_edge=0.04)] == ["2"]   # and the mirror
     assert unders(flags, max_edge=0.04, min_edge=0.035) == []
+    assert [r["game_id"] for r in unders(flags, max_spread=13.5)] == ["2"]   # the 17.5-point favorite is cut
+    assert rows[0]["spread"] == 3.5 and rows[1]["spread"] == -17.5
     assert rows[0]["band"] == "<45" and rows[1]["band"] == "55-59.5"
     assert band(45.0)[0] == "45-49.5" and band(64.5)[0] == "60-64.5" and band(65.0)[0] == "65+"
     md = markdown(rows, 2026, "3", "test", 5)
@@ -129,6 +143,7 @@ def main() -> None:
     ap.add_argument("--captured", default="", help="capture timestamp for the .md header")
     ap.add_argument("--max-edge", type=float, help="drop flags whose PFF value exceeds this (e.g. 0.04)")
     ap.add_argument("--min-edge", type=float, default=0.0, help="drop flags whose PFF value is below this (e.g. 0.02)")
+    ap.add_argument("--max-spread", type=float, help="drop flags whose |market spread| exceeds this (e.g. 13.5)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
@@ -140,16 +155,15 @@ def main() -> None:
     if not src.exists():
         raise SystemExit(f"{src} not found -- run scripts/pull_pff_scoreboard.py --greenline --week {args.week}")
     flags = list(csv.DictReader(src.open(encoding="utf-8")))
-    rows = unders(flags, args.max_edge, args.min_edge)
+    rows = unders(flags, args.max_edge, args.min_edge, args.max_spread)
     stem = GL_DIR / f"greenline_unders_{args.season}_w{args.week}"
     with stem.with_suffix(".csv").open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)
-    stem.with_suffix(".md").write_text(markdown(rows, args.season, args.week, args.captured or "n/a", len(flags), args.max_edge, args.min_edge),
-                                       encoding="utf-8")
-    cut = (f" (window {args.min_edge * 100:.1f}-{args.max_edge * 100:.1f}%: {len(unders(flags)) - len(rows)} cut)"
-           if (args.max_edge or args.min_edge) else "")
+    stem.with_suffix(".md").write_text(markdown(rows, args.season, args.week, args.captured or "n/a", len(flags),
+                                                args.max_edge, args.min_edge, args.max_spread), encoding="utf-8")
+    cut = f" ({len(unders(flags)) - len(rows)} cut)" if (args.max_edge or args.min_edge or args.max_spread is not None) else ""
     print(f"{len(rows)} positive-edge unders of {len(flags)} flags{cut} -> {stem}.csv / .md")
     for b in BANDS:
         k = sum(1 for r in rows if r["band"] == b[0])
