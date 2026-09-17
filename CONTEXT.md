@@ -34,6 +34,25 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Key number** — a spread line on or adjacent to 3 or 7 (2.5–3.5, 6.5–7.5), where NFL/CFB final-margin mass concentrates and books shade hardest.
 - **Betting day** — the ET calendar date of kickoff (a 1am UTC kickoff belongs to the previous ET evening).
 
+## Greenline evaluation
+
+- **Flag** — a game PFF Greenline shows a side on, in any of its three markets. An **under flag** is a total flag on the under; a **positive-edge flag** has a stated edge above zero. Flags are what gets captured and graded; bets are the subset in the ledger. (`research/totals/scripts/greenline_unders.py`)
+- **Stated edge** — PFF's `value`: its own win probability minus the 52.38% break-even. PFF's claim, not a measured edge; the graded record says it does not order outcomes. (`research/totals/docs/greenline-edge-cap-revisit-2026-09-17.md`)
+  _Avoid_: edge (bare) when PFF's number is meant
+- **Line in the capture** — the number PFF showed when the board was captured. Every grade is at that line, never at the close and never at a book's number; repricing is a separate step. (`research/totals/CLAUDE.md`)
+- **Pricing law** — PFF's under probability re-evaluated at any line: normal CDF of (line − projection) over a sigma that grows with the total. Used to reprice a flag at a book's number. One point of total is worth roughly four points of win probability at a 50s total. (`research/totals/scripts/match_greenline_books.py`)
+- **Repriced edge** — the pricing law at the book's actual line and price, minus that price's break-even. The number a bet decision runs on. (`greenline_unders_<season>_w<week>_<book>.csv`)
+- **Walk-away number** — the line at which a flag's repriced edge reaches zero at −110. A full point past it is a pass.
+- **Reference price** — Pinnacle. Greenline vs a retail book says what number you can get; Greenline vs Pinnacle says whether the projection disagrees with the sharpest opinion. Pinnacle is never "another book". (`research/totals/scripts/greenline_vs_pinnacle.py`)
+- **Pinnacle lean / move / disagree** — three Pinnacle features per flag: **lean** is Pinnacle's fair total minus its line (its juice), **move** is Pinnacle's line minus PFF's shown line (has the market moved first), **disagree** is PFF's projection minus Pinnacle fair (how hard PFF is fading the sharp number). None is a filter yet. (`research/totals/docs/greenline-pinnacle-shade-2026-09-17.md`)
+- **MDE** — minimum detectable win rate: the smallest true rate a sample of that size could distinguish from break-even (one-sided, α 0.05, power 0.8). Stated with every record. A split whose observed rate sits under its own MDE is **below floor**: not evidence either way. (`research/totals/scripts/greenline_season_review.py`)
+- **History unders** — the 2023–25 full-game unders in the book export, treated as Greenline under flags (decided 2026-09-17). Pooled with the graded 2026 flags for power and kept as a **stratum**: every table reports history / 2026 / pooled, and a pooled fit carries a source dummy plus a filter×source interaction. A split that shows in one stratum only is the population difference (history is a high-total selection), not a filter. (`research/totals/docs/greenline-under-filters-2026-09-17.md`)
+  _Avoid_: baseline, out-of-sample (for history)
+- **Pre-registered filter** — a pregame split fixed in the script's docstring before it runs, then tested as a record per stratum with Holm across the set. The six situational ones are line move, wind, pace, big favorite, night, short rest. Only the **big-favorite filter** (drop unders where |spread| exceeds 13.5) is applied to a live list, on Holm p 0.26: a choice, not a finding.
+- **Edge window** — the 2–4% cut on stated edge carried from week 2 into week 3. Dropped 2026-09-17: the bucket it rested on is nine games and the window's floor sits below break-even. (`research/totals/docs/greenline-edge-cap-revisit-2026-09-17.md`)
+- **Band** — the market-total ranges (<45, 45–49.5, 50–54.5, 55–59.5, 60–64.5, 65+) the under list is annotated by. Band ordering was withdrawn 2026-09-17: not significant, out-of-sample AUC 0.47. Context on the list, never a rule. (`research/totals/docs/greenline-band-significance-2026-09-17.md`)
+- **Ledger** — `greenline_bet_log.csv`: which flags were actually placed, seeded from every capture. `bet` is three-valued: `y`, `n`, or blank, and **blank means not yet marked**, not "no". Coverage refuses to compute on a week with blanks. A plan is not a mark; only a placed bet is `y`. (`research/bankroll/scripts/greenline_bet_log.py`)
+
 ## Bankroll
 
 - **Seed bankroll** — money given to fund a betting bankroll with nothing owed back. A gift, not an investment, loan, or security. Profit and bankroll stay in the operation.
