@@ -145,6 +145,45 @@ matches, and **37 keys (0.3%) are ambiguous** because the same pairing occurs tw
 a season (a conference-championship rematch). Those 37 need a tiebreak or dropping.
 Until that lands, the 55 non-outcome columns are unusable.
 
+## A third axis: scheme identity vs performance
+
+Lookahead is not the only filter. For classifying *what* an offense or defense does —
+as opposed to how well it does it — there is a separate question: does the column
+describe a choice, or a result of that choice?
+
+**Success rate, EPA/PPA, explosiveness and yardage should not be in a scheme feature
+set.** They measure quality, and clustering on quality rediscovers team strength
+rather than style. `docs/coach-playstyle-analysis.md` is the worked example: raw
+advanced stats produced a PC1 holding 42% of variance that was simply team quality,
+with Saban and Smart grouped together because they win, not because they coach alike.
+The same trap reappeared in the scheme work — `def_box_snap_share` correlates .421
+with SP+.
+
+The scheme-identity columns are the result-free ones: snap counts, alignment, usage
+rates, volume and deployment. 119 PFF columns qualify by the `result_informed` flag,
+but that flag answers the lookahead question, not this one, and it lets about a dozen
+performance measures through. These are result-free enough to window but are *not*
+scheme:
+
+`pass_rush_win_rate`, `pass_rush_wins` (`pff_defense_pass_rush`); `accuracy_percent`,
+`btt_rate`, `twp_rate`, `comp_pct_diff` (`pff_passing`); `caught_percent`
+(`pff_receiving`); `breakaway_percent` (`pff_rushing`); the `*_percent` make rates in
+`pff_field_goal`; `percent_returned` (`pff_kickoff`, `pff_punting`).
+
+Excluding those leaves roughly 105 genuine scheme columns, concentrated in eight
+tables: `pff_defense_summary` (14 alignment snap counts), `pff_blocking_alignment`
+(11), `pff_receiving` (11 slot/wide/inline deployment), `pff_passing_allowed_pressure`
+(9 pressure-location shares), `pff_defense_pass_rush` (6 usage), `pff_offense_summary`
+(6 pass/run snap splits), `pff_rushing` (gap/zone attempts), `pff_run_blocking` (3)
+and `pff_defense_coverage` (5, which the `split` dimension turns into man/zone).
+
+**CFBD contributes essentially nothing here.** Its play-calling rates —
+`offense_passingPlays_rate`, `rushingPlays_rate`, `standardDowns_rate`,
+`passingDowns_rate` — exist *only* in `advanced_season_stats`, which is season-final.
+`advanced_game_stats` carries no `*_rate` columns except `stuffRate`, and no pass/run
+play split, so the rates cannot be rebuilt at week grain. For pre-game scheme
+identity, PFF is the entire supply.
+
 ## What this does not support
 
 - **Passing both tests does not make a feature clean.** `def_dl_a_gap_share` passes
