@@ -6,6 +6,49 @@ running forward since 2026-08-31. Can its weekly slate be bet today?
 **Answer: no, and the blocker is structural, not statistical.** Two separate reasons, in order
 of how much they matter.
 
+## 0. The edge is the market's own move, sign-flipped
+
+This is the mechanism under §1 and §2; they are consequences of it, not separate objections.
+
+E4 predicts the close **anchored on the opener**. `weekly_slate.py` compares that prediction to
+the **current** book fair and calls the difference `edge`. But E4 barely leaves the opener — on
+the 2026-09-16 slate, mean |E4 − open_pt| = 0.51 against mean |E4 − book_fair| = 1.11. So the
+subtraction mostly reproduces the move the market already made, with the sign flipped:
+
+```
+57 games, predictor E4
+corr(edge, move since opener) = -0.908
+edge = +0.28 - 0.97 x (move since opener)
+```
+
+Each point the market has moved off the opener manufactures 0.97 points of "edge". The largest
+edges on the served slate are all the same trade:
+
+| matchup | opened | book fair | moved | E4 | edge |
+|---|---|---|---|---|---|
+| Ohio @ South Alabama | 3.5 | 7.0 | +3.5 | 3.3 | −3.7 |
+| BYU @ Colorado St. | −20.5 | −17.5 | +3.0 | −20.8 | −3.3 |
+| Georgia St. @ Central Florida | 20.5 | 17.5 | −2.0 | 20.6 | +3.1 |
+| Akron @ Minnesota | 26.5 | 23.5 | −3.0 | 26.5 | +3.0 |
+
+"Take Ohio +7" is not a read on Ohio. It is the claim that the market was wrong to move 3.5
+points and will retrace to its opener.
+
+**That inverts the registered finding.** Amendment A6's gamma (~0.25) says the move *from the
+opener* is partly predictable **measured at the opener**, before it happens — a momentum result.
+Applying the same fitted predictor to a line that has *already* moved converts it into a
+mean-reversion bet on that move. The archive never tested that trade and does not support it.
+
+It also explains §2's bet record without appealing to variance: fading real market moves is how
+a predictor gets ATS 0.442, beat-close 37.2%, and beat-close *falling* as edge rises — a larger
+edge is by construction a larger realized move to fade.
+
+Reproduce: `python research/spread/scripts/edge_vs_market_move.py`.
+
+**What this does not support:** a claim that E4 is broken, or that A6 is wrong. E4 fit at the
+opener is the registered, validated object. The defect is in reading its output against a later
+price, which is what the served `edge` column does.
+
 ## 1. There is not enough move left at the anchor to pay for the vig
 
 Version B grades E4's side at the week's anchor price against the real close. The total move
