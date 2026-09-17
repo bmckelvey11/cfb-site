@@ -37,7 +37,8 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eval_prediction_tracker_models as base  # noqa: E402
 
-OUT = base.OUT_DIR / "panel_ats.json"
+OUT_BY_CLUSTER = {"season": base.OUT_DIR / "panel_ats.json",
+                  "week": base.OUT_DIR / "panel_ats_week.json"}
 BREAKEVEN = 110 / 210
 THRESHOLDS = [1.0, 2.0, 3.0]
 N_BOOT = 1000
@@ -60,6 +61,12 @@ def cluster_se(x: np.ndarray, clusters: np.ndarray) -> float:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--min-bets", type=int, default=200)
+    ap.add_argument("--cluster", choices=["season", "week"], default="season",
+                    help="bootstrap cluster unit. 'week' makes short-lived models testable "
+                         "(one season is ~15 weeks) but is ANTI-CONSERVATIVE: it assumes "
+                         "independence across weeks within a season, so it understates "
+                         "season-regime correlation. A week-clustered survivor is weaker "
+                         "evidence than a season-clustered one.")
     a = ap.parse_args()
 
     df, models = base.load()
@@ -67,6 +74,8 @@ def main() -> int:
     line = d.line.to_numpy(float)
     y = d.y.to_numpy(float)
     seasons = d.season.to_numpy(int)
+    # `wk` is season*100 + pt_week, built by base.load()
+    clus = seasons if a.cluster == "season" else d.wk.to_numpy(int)
     edge_cover = y + line
     live = edge_cover != 0                       # drop pushes
     home_covers = (edge_cover > 0).astype(int)
@@ -83,11 +92,12 @@ def main() -> int:
                 continue
             bet_home = disagree[sel] < 0
             won = np.where(bet_home, home_covers[sel] == 1, home_covers[sel] == 0).astype(float)
-            se = cluster_se(won, seasons[sel])
+            se = cluster_se(won, clus[sel])
             z = (won.mean() - BREAKEVEN) / se if se and np.isfinite(se) and se > 0 else np.nan
             rows.append({"model": m, "thr": thr, "bets": int(sel.sum()),
                          "ats": float(won.mean()), "se": se, "z": float(z),
-                         "seasons": int(len(np.unique(seasons[sel])))})
+                         "seasons": int(len(np.unique(seasons[sel]))),
+                         "clusters": int(len(np.unique(clus[sel])))})
 
     t = pd.DataFrame(rows)
     # two-sided p from the cluster-bootstrap z, then BH across the whole family
@@ -97,8 +107,11 @@ def main() -> int:
     t = t.sort_values("ats", ascending=False).reset_index(drop=True)
     pd.set_option("display.width", 220)
 
-    print("%d model-threshold cells with >= %d bets (%d models)"
-          % (len(t), a.min_bets, t.model.nunique()))
+    print("%d model-threshold cells with >= %d bets (%d models), clustered by %s"
+          % (len(t), a.min_bets, t.model.nunique(), a.cluster))
+    if a.cluster == "week":
+        print("  NOTE: week clusters are anti-conservative -- they ignore season-regime")
+        print("  correlation, so these SEs are too small and these q-values too generous.")
     print("break-even at -110 = %.5f" % BREAKEVEN)
     print("")
     print("TOP 12 BY RAW ATS")
@@ -115,13 +128,15 @@ def main() -> int:
     print("pooled ATS across every cell: %.4f   median cell ATS: %.4f"
           % (float(np.average(t.ats, weights=t.bets)), float(t.ats.median())))
 
-    OUT.write_text(json.dumps({"breakeven": BREAKEVEN, "min_bets": a.min_bets,
+    out_path = OUT_BY_CLUSTER[a.cluster]
+    out_path.write_text(json.dumps({"breakeven": BREAKEVEN, "min_bets": a.min_bets,
+                               "cluster": a.cluster,
                                "n_cells": len(t), "n_models": int(t.model.nunique()),
                                "n_above_breakeven": int((t.ats > BREAKEVEN).sum()),
                                "n_bh_survivors": int(len(clears)),
                                "cells": t.to_dict("records")}, indent=2))
     print("")
-    print("wrote %s" % OUT)
+    print("wrote %s" % out_path)
     return 0
 
 

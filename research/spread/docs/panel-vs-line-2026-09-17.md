@@ -69,10 +69,10 @@ symmetric and averaged over every game; a bet needs only the sign of the disagre
 the games you choose, and only 52.381% of the time.** A column can be worse on RMSE and still
 have a sign edge at a threshold.
 
-`panel-ats-2026-09-17.md` runs that test directly — 141 models × 3 thresholds, BH-corrected. The
-broad null survives (2 of 330 testable cells above break-even, pooled 0.4981), but one column,
-`linecrunch`, is **3.2% worse than the line on RMSE** and still posts 0.5418 ATS over 1,185 bets
-with all three of its seasons above break-even. RMSE ranking would have discarded it.
+`panel-ats-2026-09-17.md` runs that test directly — 141 models x 3 thresholds, week-clustered so
+short-lived columns are testable, BH-corrected across the family. The broad null survives there
+too: **0 of 436 cells clear**, pooled ATS 0.4982. So the conclusion below happens to be right,
+but it is right because the ATS study says so, not because of the RMSE ranking.
 
 Read the measurements below as what they are — a description of point-estimate accuracy — and
 not as evidence about bettability. That question is answered in the ATS study.
