@@ -68,6 +68,42 @@ is flat (−0.004) and `phwin` is significantly negative.
 Mean overround on the median price is **1.0433** — a 4.3% hold, which is the bar both arms had to
 clear.
 
+## Follow-up: 2024–25 only, where the book panel is stable
+
+The pooled result above mixes seasons priced by one book with seasons priced by six or seven, so
+the unresolved +0.067 could have been line shopping rather than forecasting. Restricting to
+**2024–25**, where the panel sits at 6.49–6.56 books a game, isolates it. Two seasons is below
+the harness's 3-cluster floor, so the bootstrap clusters by **season-week instead — 43 clusters**
+(`--cluster` overrides; the fallback is automatic). 1,592 games, mean overround 1.0435.
+
+| price | rule | arm | bets | ROI | 95% CI (week clusters) |
+|---|---|---|---|---|---|
+| best | EV > 0 | phwin | 1,481 | +0.028 | [−0.056, +0.114] |
+| best | EV > 0 | spread | 1,282 | +0.061 | [−0.022, +0.150] |
+| best | EV > 2% | phwin | 1,394 | +0.015 | [−0.067, +0.098] |
+| **best** | **EV > 2%** | **spread** | 1,032 | **+0.092** | **[−0.004, +0.193]** |
+| median | EV > 0 | phwin | 1,118 | −0.035 | [−0.117, +0.044] |
+| median | EV > 0 | spread | 458 | **−0.030** | [−0.130, +0.068] |
+| median | EV > 2% | phwin | 973 | −0.036 | [−0.127, +0.057] |
+| median | EV > 2% | spread | 250 | **−0.016** | [−0.184, +0.146] |
+
+**This resolves the thread, and the answer is line shopping.** On the stable panel the spread arm
+returns +0.092 at the **best** price and **−0.016 at the median** price. The typical book loses.
+The entire positive number is the gap between the best of ~6.5 books and the middle one — which
+is a real thing a bettor can do, but it is not the spread out-forecasting the moneyline, and it
+would survive substituting any roughly-accurate probability for the model.
+
+Two further reasons not to bank the +0.092: its interval still touches zero (lower bound −0.004),
+and the per-season split remains unstable — 2024 at +0.149 against 2025 at +0.027 on the same
+book panel.
+
+`phwin` is negative at the median price in this window too (−0.035, −0.036), consistent with the
+pooled result.
+
+```bash
+python research/spread/scripts/eval_phwin_moneyline.py --from-season 2024 --to-season 2025
+```
+
 ## What this does not support
 
 - **Not a claim that moneylines are beatable by the spread.** The +0.067 has a CI containing zero

@@ -77,7 +77,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_phcover_calibration.py` | `phcover-accuracy-2026-09-17.md` | `processed/phcover_calibration.json` |
 | `eval_linestd_confidence.py` | `linestd-confidence-2026-09-17.md` | `processed/linestd_confidence.json` |
 | `eval_phwin_accuracy.py` | `phwin-accuracy-2026-09-17.md` | `processed/phwin_accuracy.json` |
-| `eval_phwin_moneyline.py` | `phwin-moneyline-2026-09-17.md` | `processed/phwin_moneyline.json` |
+| `eval_phwin_moneyline.py` [`--from-season`] [`--to-season`] [`--cluster`] | `phwin-moneyline-2026-09-17.md` | `processed/phwin_moneyline.json` |
 | `eval_model_columns_ats.py` | `model-columns-ats-2026-09-17.md` | `processed/model_columns_ats.json` |
 | `edge_vs_market_move.py` | `actionable-picks-2026-09-17.md` § 0: regresses the served `edge` on the move since the opener | stdout |
 | `version_b_ceiling.py` | `line-movement-results.md` § version B read of 2026-09-17: E\|close − anchor\| (the CLV ceiling) and each week's anchor ET weekday | stdout |

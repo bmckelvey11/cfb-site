@@ -28,6 +28,7 @@ printed beside it and the median series is reported as the stable comparison.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -99,16 +100,25 @@ def grade(p_model, dec_h, dec_a, won_home, seasons, thr):
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--from-season", type=int, default=2021)
+    ap.add_argument("--to-season", type=int, default=2025)
+    ap.add_argument("--cluster", choices=["season", "week"], default=None,
+                    help="bootstrap cluster level; default season, auto-falls to week when "
+                         "fewer than MIN_CLUSTERS seasons are in range")
+    a = ap.parse_args()
+
     df, _ = base.load()
-    d = df[df.phwin.notna() & df.line.notna() & df.season.between(2021, 2025)].copy()
+    d = df[df.phwin.notna() & df.line.notna()
+           & df.season.between(a.from_season, a.to_season)].copy()
 
     con = duckdb.connect(str(base.cfb_paths.DB_PATH), read_only=True)
     raw = con.execute(
         "select l.game_id, l.provider_key, l.moneyline_home, l.moneyline_away "
         "from core.fact_game_line l join core.fact_game f using(game_id) "
-        "where f.season between 2021 and 2025 "
-        "and l.moneyline_home is not null and l.moneyline_away is not null"
-    ).df()
+        "where f.season between ? and ? "
+        "and l.moneyline_home is not null and l.moneyline_away is not null",
+        [a.from_season, a.to_season]).df()
     raw["dec_h_cfbd"] = american_to_decimal(raw.moneyline_home)
     raw["dec_a_cfbd"] = american_to_decimal(raw.moneyline_away)
 
@@ -121,20 +131,25 @@ def main() -> int:
     f = (d.orientation_flipped == 1).to_numpy()
     assert f.sum() > 0, "no flipped rows in the joined sample -- the swap check never fired"
     for tag in ("best", "med"):
-        h = d[tag + "_h_cfbd"].to_numpy(float)
-        a = d[tag + "_a_cfbd"].to_numpy(float)
-        d[tag + "_h"] = np.where(f, a, h)          # PT-home side
-        d[tag + "_a"] = np.where(f, h, a)
+        dh_c = d[tag + "_h_cfbd"].to_numpy(float)
+        da_c = d[tag + "_a_cfbd"].to_numpy(float)
+        d[tag + "_h"] = np.where(f, da_c, dh_c)    # PT-home side
+        d[tag + "_a"] = np.where(f, dh_c, da_c)
 
     y = (d.y > 0).astype(int).to_numpy()           # PT-home won outright
-    seasons = d.season.to_numpy(int)
+    season_arr = d.season.to_numpy(int)
+    level = a.cluster or ("season" if d.season.nunique() >= base.MIN_CLUSTERS else "week")
+    # `wk` is season*100 + pt_week, already built by base.load()
+    seasons = season_arr if level == "season" else d.wk.to_numpy(int)
+    print("bootstrap clusters: %s (%d distinct)" % (level, len(np.unique(seasons))))
     phwin = d.phwin.to_numpy(float)
     line = d.line.to_numpy(float)
 
-    out = {"n": len(d), "seasons": [2021, 2025], "n_flipped": int(f.sum()),
-           "base_home_win_rate": float(y.mean())}
-    print("n = %d games (2021-2025), %d orientation-flipped and swapped"
-          % (len(d), int(f.sum())))
+    out = {"n": len(d), "seasons": [int(season_arr.min()), int(season_arr.max())],
+           "cluster_level": level, "n_clusters": int(len(np.unique(seasons))),
+           "n_flipped": int(f.sum()), "base_home_win_rate": float(y.mean())}
+    print("n = %d games (%d-%d), %d orientation-flipped and swapped"
+          % (len(d), season_arr.min(), season_arr.max(), int(f.sum())))
     print("PT-home win rate %.4f" % y.mean())
     print("")
     print("  season   games   mean books/game")
@@ -152,12 +167,12 @@ def main() -> int:
 
     # spread arm: walk-forward logit of home-win on the panel's own (PT-oriented) line
     mkt = np.full(len(d), np.nan)
-    for s in sorted(set(seasons)):
+    for s in sorted(set(season_arr)):
         hist = df[df.line.notna() & (df.season < s)]
         if len(hist) < 200:
             continue
         b = fit_logit(hist.line.to_numpy(float), (hist.y > 0).astype(int).to_numpy())
-        te = seasons == s
+        te = season_arr == s
         mkt[te] = logistic(b[0] + b[1] * line[te])
     assert np.isfinite(mkt).all(), "spread arm has unscored games"
 
@@ -185,8 +200,8 @@ def main() -> int:
     print("  season  books/gm   phwin bets      ROI    spread bets      ROI")
     rows = []
     dh, da = d["best_h"].to_numpy(float), d["best_a"].to_numpy(float)
-    for s in sorted(set(seasons)):
-        m0 = seasons == s
+    for s in sorted(set(season_arr)):
+        m0 = season_arr == s
         rec = {"season": int(s), "mean_books": float(d.n_books[m0].mean())}
         cells = []
         for nm, pm in [("phwin", phwin), ("spread", mkt)]:
