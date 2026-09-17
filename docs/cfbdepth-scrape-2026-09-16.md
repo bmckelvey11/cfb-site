@@ -123,20 +123,57 @@ Status codes are defined in-sheet: blank=Healthy, P, Q, D, O, OFS, S, OPT, GTD, 
 
 ## Reproduction
 
-No script written yet — scope is undecided. The registry file plus this URL
-pattern reproduces any single pull:
+`scripts/pull_cfbdepth.py` — reads the registry, walks teams x tabs, throttles
+at 0.4 s, retries 4x on the TLS drops this host provokes, and skips files
+already on disk unless `—force`.
 
-```
-https://docs.google.com/spreadsheets/d/<spreadsheetId>/export?format=csv&gid=<gid>
+```bash
+python scripts/pull_cfbdepth.py                      # all teams, all tabs
+python scripts/pull_cfbdepth.py —teams alabama uga
+python scripts/pull_cfbdepth.py —tabs injuryReport —force
 ```
 
-Alabama's seven tabs were pulled to the session scratchpad as
-`alabama_<tab>.csv`. If a recurring pull is chosen, it gets a reusable script
-under `scripts/` per the standing rule.
+Output: `$CFB_DATA_ROOT/ingest/cfbdepth/<YYYY-MM-DD>/<slug>_<tab>.csv`. INGEST,
+not RAW — the warehouse loader globs RAW and would turn each file into a
+permanent table.
+
+### Gotcha: line endings
+
+Google serves CRLF. Writing `response.text` in text mode on Windows translates
+the LF again, yielding `
+` and a phantom blank line between every row —
+which parses without error and silently doubles row counts. The script writes
+`response.content` as bytes to avoid it. The first run of 2026-09-16 hit this
+and was repaired in place before verification.
+
+## Full snapshot — 2026-09-16 (done)
+
+All 139 teams pulled: **973/973 files, 0 failures, 10.9 MB**, about 12 minutes.
+
+Verified after the newline repair — no HTML error pages, no short files, and
+row counts tight across every team, which is what a shared template predicts:
+
+| Tab | rows min / median / max |
+| —- | —- |
+| dashboard | 28 / 28 / 53 |
+| offense | 122 / 124 / 126 |
+| defense | 146 / 146 / 146 |
+| specialTeam | 127 / 127 / 127 |
+| injuryReport | 67 / 70 / 98 |
+| rosterBreakdown | 98 / 126 / 198 |
+| playerRating | 363 / 365 / 368 |
+
+Content spot-checked beyond structure: every one of the 139 offense tabs carries
+6 `Player,#,...` position blocks (zero empty), and dashboard rows carry real
+records and coaches across P5, G5 and independents (Alabama 2-0 DeBoer, Akron
+1-1 Moorhead, Army 1-1 Monken, Wyoming 1-1 Sawvel). This closes the earlier
+caveat that only the `dashboard` tab had been checked outside Alabama — all
+seven tabs are now confirmed populated for all 139 teams.
 
 ## Open decision
 
-1. **Alabama only, one-shot** — already done.
-2. **All 139 teams, one snapshot** — ~973 requests, a few minutes.
-3. **Recurring pull into the warehouse** — needs an explicit yes, given the
-   paid-product note above.
+1. ~~Alabama only, one-shot~~ — done 2026-09-16.
+2. ~~All 139 teams, one snapshot~~ — done 2026-09-16, see above.
+3. **Recurring pull into the warehouse** — still needs an explicit yes, given
+   the paid-product note above. Note the sheets are overwritten upstream, so
+   only repeated snapshots would build any history.
