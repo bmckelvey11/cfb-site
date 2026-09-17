@@ -1305,3 +1305,22 @@ def test_the_backfill_never_emits_a_bare_actionnetwork_book_id():
               / "duckdb_load.py").read_text(encoding="utf-8")
     assert "ELSE book_id + {_AN_ID_OFFSET} END" in source
     assert "ELSE book_id END" not in source
+
+
+def test_no_sql_here_uses_the_deprecated_lambda_arrow():
+    """DuckDB 2.0 rejects `x -> ...` outright (`Deprecated lambda arrow (->) detected`).
+
+    2026-09-17: the backfill's `list_transform`/`list_filter` still used the arrow, so
+    `backfill_gamelines_from_actionnetwork` returned a `BinderException` on any duckdb 2.0
+    build while passing on 1.5.5 -- which read as flaky, order-dependent test failure.
+    `lambda x:` is accepted by both, so the arrow has no reason to come back.
+    """
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "cfb_system_maker"
+              / "duckdb_load.py").read_text(encoding="utf-8")
+    for keyword in ("list_transform(", "list_filter(", "list_reduce("):
+        for idx, line in enumerate(source.splitlines(), 1):
+            if keyword in line:
+                assert "->" not in line, f"duckdb_load.py:{idx} uses the deprecated arrow"
+    assert " x -> " not in source and " t -> " not in source
