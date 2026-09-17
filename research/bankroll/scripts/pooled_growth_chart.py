@@ -20,27 +20,26 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mc_combined_totals import (  # noqa: E402
-    GL_COVERAGE_HISTORICAL, PCTS, WEEKS_REMAINING, Config, simulate,
+    PCTS, WEEKS_REMAINING, Config, simulate,
     BLUE, GREEN, GOLD, INK, MUTED, _style,
 )
 
-# (label, gl_unit, coverage, colour)
+# (label, gl_unit, colour); volume is the simulator default, 6-12 unders a week
 CONFIGS = (
-    ("0.5% x 13% of flags  (recommended)", 0.005, GL_COVERAGE_HISTORICAL, BLUE),
-    ("1.0% x 13% of flags", 0.01, GL_COVERAGE_HISTORICAL, GREEN),
-    ("0.25% x every flag  (conditional on coverage)", 0.0025, 1.0, GOLD),
+    ("0.5% unit, 6-12 unders/wk", 0.005, BLUE),
+    ("1.0% unit, 6-12 unders/wk", 0.01, GREEN),
+    ("1.5% unit, 6-12 unders/wk", 0.015, GOLD),
 )
 STEM = "pooled-bankroll-growth-2026-09-17"
 
 
-def run(paths: int, seed: int, bankroll: float, resize: bool = False) -> list[dict]:
+def run(paths: int, seed: int, bankroll: float, resize: bool = True) -> list[dict]:
     out = []
-    for label, unit, cov, colour in CONFIGS:
+    for label, unit, colour in CONFIGS:
         res = simulate(Config(bankroll=bankroll, paths=paths, gl_unit=unit,
-                              gl_prior="pooled", gl_coverage=cov, seed=seed,
-                              resize_weekly=resize))
+                              gl_prior="pooled", seed=seed, resize_weekly=resize))
         out.append(dict(label=label, colour=colour, fan=res["fan"], final=res["final"],
-                        p_bust=res["p_bust"], unit=unit, coverage=cov, resize=resize))
+                        p_bust=res["p_bust"], unit=unit, resize=resize))
     return out
 
 
@@ -59,14 +58,14 @@ def figure(runs: list[dict], bankroll: float, path: Path, resized: list[dict] | 
         row_axes[0].set_ylabel("bankroll, $")
         for ax, r in zip(row_axes, row_runs):
             _panel(ax, r, weeks, bankroll, lo, hi, q1, q3, med)
-            if r["resize"]:
-                ax.set_title(r["label"] + "\nunits re-sized weekly", fontsize=10.5)
+            ax.set_title(r["label"] + ("\nunits re-sized weekly" if r["resize"]
+                                       else "\nflat units off the start"), fontsize=10.5)
     axes[0, 0].legend(fontsize=8, frameon=False, loc="upper left")
     fig.suptitle(f"Bankroll by week, pooled Greenline prior (141–109, mean 56.4%), "
                  f"${bankroll:,.0f} start", fontsize=13, fontweight="bold", color=INK)
     sub = "Win rate drawn per path from the pooled posterior only. The n49 reading is in the MC doc and the sweep."
     if resized:
-        sub += " Top row: flat stakes off the starting bankroll. Bottom row: units re-sized off the bankroll each week."
+        sub += " Top row: units re-sized off the bankroll each week. Bottom row: flat stakes off the starting bankroll."
     fig.text(0.5, 0.905 if not resized else 0.95, sub, fontsize=9, color=MUTED, ha="center")
     fig.tight_layout(rect=(0, 0, 1, 0.9 if not resized else 0.94))
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -112,8 +111,8 @@ def self_check() -> None:
         assert np.allclose(r["fan"][0], 20_000)
         # the fan must widen over the season
         assert r["fan"][-1, -1] - r["fan"][-1, 0] > r["fan"][1, -1] - r["fan"][1, 0]
-    grow = run(paths=3_000, seed=1, bankroll=20_000, resize=True)
-    assert all(g["p_bust"] == 0.0 for g in grow)
+    flat = run(paths=3_000, seed=1, bankroll=20_000, resize=False)
+    assert all(g["p_bust"] == 0.0 for g in flat)
     print("self-check OK")
 
 
@@ -124,18 +123,18 @@ def main() -> None:
     ap.add_argument("--paths", type=int, default=50_000)
     ap.add_argument("--seed", type=int, default=20260917)
     ap.add_argument("--out", help="docs directory; writes figs/<stem>.png")
-    ap.add_argument("--resize-weekly", action="store_true",
-                    help="add a second row with units re-sized off the bankroll each week")
+    ap.add_argument("--flat-stakes", action="store_true",
+                    help="add a second row with flat units off the starting bankroll")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
         self_check()
         return
     runs = run(args.paths, args.seed, args.bankroll)
-    resized = run(args.paths, args.seed, args.bankroll, resize=True) if args.resize_weekly else None
-    print(table(runs + (resized or []), args.bankroll))
+    flat = run(args.paths, args.seed, args.bankroll, resize=False) if args.flat_stakes else None
+    print(table(runs + (flat or []), args.bankroll))
     if args.out:
-        figure(runs, args.bankroll, Path(args.out) / "figs" / f"{STEM}.png", resized)
+        figure(runs, args.bankroll, Path(args.out) / "figs" / f"{STEM}.png", flat)
 
 
 if __name__ == "__main__":

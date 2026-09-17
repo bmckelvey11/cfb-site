@@ -20,14 +20,14 @@ python research/bankroll/scripts/bankroll_config_sweep.py --paths 50000 --out re
 |---|---|
 | amount | **$20,000** |
 | horizon | weeks 4–15 of the 2026 regular season, September 24 to December 12. Twelve weeks. Week 3 (this weekend) is not in the projection |
-| what it funds | two totals strategies, both already running, at flat stakes |
-| expected bets | ~99: ~88 Greenline unders and ~11 over-zero overs |
-| recommended stake | Greenline **$100 per bet** (0.5%), over-zero **$200 per bet** (1%) |
+| what it funds | two totals strategies, both already running, units re-sized off the bankroll each week |
+| expected bets | ~118: 6–12 Greenline unders a week (~107) and ~11 over-zero overs |
+| recommended unit | Greenline **0.5% of bankroll per bet** ($100 at the start), over-zero **1%** ($200). Re-sized each Monday |
 | what happens after | bankroll and profit stay in the operation for 2027, where the larger of the two edges does most of its work |
 
 ## 2. The answer in one paragraph
 
-**Median outcome is a gain of $590 to $820 over twelve weeks. Roughly one season in
+**Median outcome is a gain of $670 to $950 over twelve weeks. Roughly one season in
 three ends below $20,000. No modeled path loses a quarter of the money, and none goes
 to zero.** The range is bracketed because the main strategy's win rate rests on two
 defensible readings of the record, and neither can be ruled out yet. Everything below
@@ -35,12 +35,13 @@ reports both.
 
 | Greenline prior | median | 90% band | P(down) | P(−25%) | busts |
 |---|---:|---|---:|---:|---:|
-| `pooled` (141–109) | **$20,821** (+4.1%) | $18,685 – $22,945 | 26.3% | 0.0% | 0.0% |
-| `n49` (27–22) | **$20,594** (+3.0%) | $17,818 – $23,297 | 36.2% | 0.0% | 0.0% |
+| `pooled` (141–109) | **$20,945** (+4.7%) | $18,598 – $23,541 | 26.0% | 0.0% | 0.0% |
+| `n49` (27–22) | **$20,673** (+3.4%) | $17,600 – $24,112 | 36.9% | 0.0% | 0.0% |
 
 ## 3. What gets bet
 
-Two strategies. One bankroll. Flat stakes off the starting $20,000, no compounding.
+Two strategies. One bankroll. Units re-sized off the bankroll at the start of each
+week, flat within the week.
 
 ### Over-zero (floor-bias OVERs)
 
@@ -71,7 +72,7 @@ market. Flags are captured Wednesday, graded Monday. ~85% of flags are unders.
 | 2023–25 personal unders, mostly the same flags | **114–87, 56.7%** (CI 49.8–63.4%), 201 bets | `bet-history-analysis-2023-2025.md` |
 | pooled prior | 141–109, posterior mean 56.4%, P(losing) 10% | `mc-combined-totals-2026-09-17.md` |
 | 2026-only prior | 27–22, posterior mean 55.0%, P(losing) 35% | same |
-| historical rate bet | ~13% of flags, **~7 a week**, ~88 over 12 weeks | same |
+| planned volume | **6–12 unders a week**, ~107 over 12 weeks. Mean 9 is ~16% of a typical slate, a little above the 13% rate the record was earned at | `bankroll_config_sweep.py` |
 | price | −110, break-even 52.38% | same |
 
 The 2023–25 record is the same signal in earlier seasons, bet by the same person. It
@@ -103,19 +104,22 @@ One simulated path is one whole remainder-of-season. 100,000 paths for the headl
   shock (Gaussian copula, ρ = 0.10 assumed, ρ = 0.25 as sensitivity). Because
   over-zero is all overs and Greenline is mostly unders, a high-scoring day helps one
   and hurts the other.
-- **Volume follows the schedule.** Greenline flags every FBS-vs-FBS game (week 2:
-  49 games, 49 flags; week 3: 57 and 57), so the weekly flag count is the slate:
-  56–67 games a week through week 14, then 9 in championship week, ~680 flags in
-  all. Bets are Poisson around 13% of that. Over-zero resamples its week-4+ history
+- **Volume is the plan: 6–12 unders a week**, drawn uniformly and capped by the
+  week's slate. Greenline flags every FBS-vs-FBS game (week 2: 49 games, 49 flags;
+  week 3: 57 and 57), and the slate runs 56–67 a week through week 14, then 9 in
+  championship week. Mean 9 a week is ~16% of flags, a little above the 13% rate
+  the personal record was earned at. Over-zero resamples its week-4+ history
   (8, 11, 9, 11, 14 bets in 2021–25).
-- **Flat stakes off the starting bankroll**, no stop-loss. A path can go through zero
-  and keep betting, so the bust rate is reported on every row.
+- **Units re-sized off the bankroll at the start of each week**, flat within the
+  week because Saturday kickoffs are simultaneous. No stop-loss; a path at zero stops.
+  The bust rate is reported on every row.
 - Pushes not modeled: zero realized on all 484 graded bets, all on half-point lines.
 
 ## 5. Choosing the stake: the sweep
 
-Greenline stake from 0.25% to 2% of bankroll, coverage from the historical 13% up to
-every flag, both priors. Over-zero held at 1%. Full grid in
+Greenline unit from 0.25% to 2% of bankroll at 6–12 unders a week, both priors.
+Over-zero held at 1%. The coverage grid (13% of flags up to every flag) is one flag
+away, `--gl-volume slate`. Full grid in
 [`bankroll-config-sweep-2026-09-17.md`](bankroll-config-sweep-2026-09-17.md).
 
 ![Stake by coverage sweep](figs/bankroll-config-sweep-2026-09-17.png)
@@ -125,47 +129,47 @@ none go through zero, under **both** priors.
 **Objective (b):** downside ratio = median gain ÷ (median − 5th percentile). Shown as
 a column; higher is better.
 
-Supported rows only (13% coverage, the population the record came from):
+Every row at 6–12 unders a week, units re-sized weekly:
 
 | GL stake | median (pooled / n49) | 5th pct (pooled / n49) | P(−25%) (pooled / n49) | ratio (pooled / n49) | passes (a) |
 |---:|---|---|---|---|:---:|
-| 0.25% | $20,480 / $20,367 | $19,144 / $18,750 | 0.0% / 0.0% | 0.36 / 0.23 | yes |
-| **0.50%** | **$20,821 / $20,594** | **$18,685 / $17,818** | **0.0% / 0.0%** | **0.38 / 0.21** | **yes** |
-| 1.00% | $21,502 / $21,052 | $17,479 / $15,736 | 0.4% / 3.0% | 0.37 / 0.20 | pooled only |
-| 1.50% | $22,182 / $21,503 | $16,197 / $13,591 | 2.4% / 8.9% | 0.36 / 0.19 | no |
-| 2.00% | $22,864 / $21,952 | $14,879 / $11,421 | 5.3% / 14.0% | 0.36 / 0.19 | no |
+| 0.25% | $20,544 / $20,405 | $19,124 / $18,652 | 0.0% / 0.0% | 0.38 / 0.23 | yes |
+| **0.50%** | **$20,945 / $20,673** | **$18,598 / $17,600** | **0.0% / 0.0%** | **0.40 / 0.22** | **yes** |
+| 1.00% | $21,714 / $21,157 | $17,296 / $15,432 | 0.4% / 3.6% | 0.39 / 0.20 | pooled only |
+| 1.50% | $22,431 / $21,565 | $15,949 / $13,426 | 2.7% / 10.4% | 0.38 / 0.19 | no |
+| 2.00% | $23,115 / $21,906 | $14,634 / $11,606 | 5.9% / 16.2% | 0.37 / 0.19 | no |
 
 Three things the grid says:
 
-1. **0.5% is the largest stake that passes under the conservative prior.** 1% passes
-   only if the pooled prior is right. Recommended: **$100 per Greenline bet**, with
-   $200 as the upgrade once the 2026 flags alone reach ~250 graded (four more weeks).
-2. **Stake does not change the downside ratio.** It runs 0.36–0.38 under pooled and
+1. **0.5% is the largest unit that passes under the conservative prior.** 1% passes
+   only if the pooled prior is right. Recommended: **0.5% of bankroll per Greenline
+   bet**, $100 at the start, with 1% as the upgrade once the 2026 flags alone reach
+   ~250 graded (four more weeks).
+2. **Stake does not change the downside ratio.** It runs 0.37–0.40 under pooled and
    0.19–0.23 under n49 at every stake. Staking more buys a bigger median and a
    bigger 5th-percentile loss in the same proportion. There is no free stake.
-3. **Coverage is what improves the ratio** (0.36 → 0.49 under pooled at 0.25%), and
-   coverage is exactly the assumption the record does not support. Betting more of
-   the flags is the lever, and it is unpriced until the ledger says which flags get
-   taken. With volume following the slate, every row above 13% coverage now fails
-   the risk limit under the conservative prior except 0.25% at 25%, which earns
-   less than the recommended row. So the conditional rows are shown for the
-   tradeoff and none is a candidate.
+3. **Volume is what improves the ratio, and it is the assumption to watch.** At
+   6–12 a week (~107 bets) the pooled ratio is 0.40 against 0.38 at the 13% rate
+   (~88 bets), because more bets average out the draw of the win rate. But 9 a week
+   is ~16% of flags, above the 13% the record was earned at, so a slice of every
+   week's bets falls on flags the record never covered. The ledger is what prices
+   that; until it does, treat the volume as a plan, not evidence.
 
 ## 6. Risk, stated plainly
 
-At the recommended $100 / $200 stakes:
+At the recommended 0.5% / 1% units, re-sized weekly:
 
 | measure | pooled | n49 |
 |---|---:|---:|
-| P(season ends below $20,000) | 26.3% | 36.2% |
+| P(season ends below $20,000) | 26.0% | 36.9% |
 | P(ends below $15,000) | 0.0% | 0.0% |
 | P(passes through $0) | 0.0% | 0.0% |
-| 5th-percentile ending bankroll | $18,685 | $17,818 |
-| worst single week, median | −$461 | −$509 |
-| total staked over 12 weeks | ~$10,900 | ~$10,900 |
+| 5th-percentile ending bankroll | $18,598 | $17,600 |
+| worst single week, median | −$534 | −$551 |
+| total staked over 12 weeks | ~$13,100 | ~$13,100 |
 
-The 5th percentile means one season in twenty ends worse than about −$1,300 to
-−$2,200. The
+The 5th percentile means one season in twenty ends worse than about −$1,400 to
+−$2,400. The
 30-ish percent chance of a losing season is mostly parameter uncertainty: the true
 Greenline win rate has a 10–35% chance of being below break-even, and the season is
 too short to average that away.
@@ -182,13 +186,14 @@ by a few hundred dollars. ρ is assumed, not measured.
   from what exists.
 - **Any coverage above 13%.** Every conditional row assumes the picked-flag win rate
   applies to flags that were passed on.
-- **A reproducible selection rule.** "Bet ~13% of the week's flags" is a volume
+- **A reproducible selection rule.** "Bet 6–12 of the week's flags" is a volume
   assumption. No script picks which six. The historical picks were hand-filtered and
   price-shopped.
 - **A 2027 projection.** Not modeled. Over-zero at full-season volume and a full
   graded Greenline season are what it needs, and neither exists yet.
-- **Compounded returns.** Simultaneous Saturday kickoffs make them unachievable;
-  every figure here is flat-staked.
+- **Within-week compounding.** Units re-size on Monday, not per bet; Saturday
+  kickoffs are simultaneous. Weekly re-sizing moves the twelve-week median by less
+  than $100 against flat stakes either way.
 
 ## 8. What the money does each week
 
@@ -196,9 +201,9 @@ by a few hundred dollars. ρ is assumed, not measured.
 |---|---|---|
 | Wednesday | capture Greenline flags | `scripts/pull_pff_scoreboard.py --greenline` |
 | Wednesday | seed the bet ledger | `research/bankroll/scripts/greenline_bet_log.py --seed` |
-| Thursday–Saturday | bet ~7 unders at −110 or better, over-zero board at −120 or better | `models/over_zero` site |
+| Thursday–Saturday | bet 6–12 unders at −110 or better, over-zero board at −120 or better | `models/over_zero` site |
 | Monday | grade flags, mark which were bet | `grade_greenline.py`; `greenline_bet_log.py --mark` |
-| Monday | rerun the projection with the new record | `mc_combined_totals.py` |
+| Monday | re-size units off the bankroll; rerun the projection with the new record | `mc_combined_totals.py` |
 
 Marking which flags get bet is the one step that is not automated and the one that
 resolves the biggest open question. Four more graded weeks gets the 2026 flags to
@@ -211,8 +216,9 @@ over-zero: 234 walk-forward bets 2016–2025, `models/over_zero/docs/backtest_be
 Greenline: 49 graded flags, 2026 week 2, `data/ingest/pff_scoreboard/greenline_graded.csv`;
 201 personal unders 2023-08 to 2025-12, `data/ingest/bet_history/history.csv`.
 Projection span weeks 4–15, 2026. Seeds 20260917. Sweep: 50,000 paths per cell,
-40 cells; headline table §2 from the sweep's 0.5% rows. Greenline volume per week
-from `core.fact_game` FBS-vs-FBS counts (weeks 14–15 from 2025), queried 2026-09-17.
+10 cells; headline table §2 from the sweep's 0.5% rows. Greenline volume 6–12 a
+week, uniform, capped by the FBS-vs-FBS slate from `core.fact_game` (weeks 14–15
+from 2025), queried 2026-09-17. Units re-sized weekly.
 
 Related: [`mc-combined-totals-2026-09-17.md`](mc-combined-totals-2026-09-17.md),
 [`under-selection-profile-2026-09-17.md`](under-selection-profile-2026-09-17.md),

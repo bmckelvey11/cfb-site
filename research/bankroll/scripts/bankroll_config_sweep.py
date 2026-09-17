@@ -4,23 +4,23 @@
     python research/bankroll/scripts/bankroll_config_sweep.py --paths 50000 --out research/bankroll/docs
     python research/bankroll/scripts/bankroll_config_sweep.py --self-check
 
-Runs mc_combined_totals.simulate over a grid of Greenline unit size x coverage x
+Runs mc_combined_totals.simulate over a grid of Greenline unit size x volume x
 prior and scores every cell two ways:
 
   (a) max median gain subject to P(-25%) <= 1% and mid-season bust = 0%
   (b) ratio = median gain / (median - 5th pct), a Sharpe-like downside ratio
 
-The recommended row is (a) restricted to the supported coverage (13%, the rate
-the 201-bet record was earned at) and required to hold under BOTH priors. Rows at
-higher coverage are conditional on the picked-flag win rate transferring to the
-flags that were passed on, which nothing in the data establishes -- they are shown,
-flagged, and never recommended.
+Volume is the operator's plan by default: 6-12 unders a week (GL_BETS_RANGE),
+drawn uniformly and capped at the week's slate. --gl-volume slate restores the
+coverage grid (13% supported, 25/50/100% conditional on the picked-flag win rate
+transferring to flags that were passed on). The recommended row must pass (a)
+under BOTH priors; with the slate grid it is also restricted to 13% coverage.
 
 Over-zero stays at 1% throughout: it contributes ~11 bets and cannot move the
 answer at any sane stake (see mc-combined-totals-2026-09-17.md).
 
-Greenline volume follows the FBS-vs-FBS slate week by week (GL_FLAGS_BY_WEEK,
-~680 flags over weeks 4-15), not a constant 49. Greenline flags every such game.
+Stakes are re-sized off the bankroll at the start of each week (the simulator's
+default); --flat-stakes keeps them fixed off the starting bankroll.
 """
 
 from __future__ import annotations
@@ -34,25 +34,36 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mc_combined_totals import (  # noqa: E402
-    GL_COVERAGE_HISTORICAL, GL_FLAGS_BY_WEEK, WEEKS_REMAINING, Config, simulate,
+    GL_BETS_RANGE, GL_COVERAGE_HISTORICAL, GL_FLAGS_BY_WEEK, WEEKS_REMAINING, Config, simulate,
     BLUE, GREEN, RED, GOLD, INK, MUTED, GRID, _style,
 )
 
 GL_UNITS = (0.0025, 0.005, 0.01, 0.015, 0.02)
 COVERAGES = (GL_COVERAGE_HISTORICAL, 0.25, 0.50, 1.0)
+RANGE_KEY = -1.0  # the coverage column's value for a range-volume row
 PRIORS = ("pooled", "n49")
 
 MAX_P_M25 = 0.01   # constraint (a): at most 1% of paths end down 25%+
 MAX_BUST = 0.0     # constraint (a): no path passes through zero
 
 
-def run_grid(paths: int, seed: int, bankroll: float) -> list[dict]:
+def expected_range_bets() -> float:
+    lo, hi = GL_BETS_RANGE
+    return sum(sum(min(k, f) for k in range(lo, hi + 1)) / (hi - lo + 1)
+               for f in GL_FLAGS_BY_WEEK)
+
+
+def run_grid(paths: int, seed: int, bankroll: float, volume: str = "range",
+             resize: bool = True) -> list[dict]:
     rows = []
+    covs = (RANGE_KEY,) if volume == "range" else COVERAGES
     for prior in PRIORS:
-        for cov in COVERAGES:
+        for cov in covs:
             for unit in GL_UNITS:
                 res = simulate(Config(bankroll=bankroll, paths=paths, gl_unit=unit,
-                                      gl_prior=prior, gl_coverage=cov, seed=seed))
+                                      gl_prior=prior, gl_volume=volume, resize_weekly=resize,
+                                      gl_coverage=(1.0 if cov == RANGE_KEY else cov),
+                                      seed=seed))
                 f = res["final"]
                 med, p5, p95 = np.percentile(f, [50, 5, 95])
                 gain = med - bankroll
@@ -60,8 +71,9 @@ def run_grid(paths: int, seed: int, bankroll: float) -> list[dict]:
                     "prior": prior,
                     "gl_unit": unit,
                     "coverage": cov,
-                    "supported": cov == GL_COVERAGE_HISTORICAL,
-                    "gl_bets": round(sum(GL_FLAGS_BY_WEEK) * cov),
+                    "supported": cov in (GL_COVERAGE_HISTORICAL, RANGE_KEY),
+                    "gl_bets": round(expected_range_bets() if cov == RANGE_KEY
+                                     else sum(GL_FLAGS_BY_WEEK) * cov),
                     "staked": res["mean_turnover"],
                     "median": med,
                     "median_pct": gain / bankroll,
@@ -117,16 +129,18 @@ def to_markdown(rows: list[dict], bankroll: float) -> str:
         for r in rows:
             if r["prior"] != prior:
                 continue
-            cov = f"{r['coverage']:.0%}" + ("" if r["supported"] else " *")
+            cov = (f"{GL_BETS_RANGE[0]}-{GL_BETS_RANGE[1]}/wk" if r["coverage"] == RANGE_KEY
+                   else f"{r['coverage']:.0%}" + ("" if r["supported"] else " *"))
             out.append(
                 f"| {r['gl_unit']:.2%} | {cov} | ~{r['gl_bets']} | ${r['staked']/1000:,.1f}k | "
                 f"${r['median']:,.0f} ({r['median_pct']:+.1%}) | ${r['p5']:,.0f} | "
                 f"${r['p95']:,.0f} | {r['p_down']:.1%} | {r['p_m25']:.1%} | "
                 f"{r['p_bust']:.1%} | {r['ratio']:.2f} | {'yes' if r['passes_a'] else 'no'} |")
         out.append("")
-    out.append("`*` coverage above the historical 13% is conditional on the picked-flag "
-               "win rate transferring to flags that were passed on. Not supported by the "
-               "record; shown so the tradeoff is visible.\n")
+    if any(not r["supported"] for r in rows):
+        out.append("`*` coverage above the historical 13% is conditional on the picked-flag "
+                   "win rate transferring to flags that were passed on. Not supported by the "
+                   "record; shown so the tradeoff is visible.\n")
     return "\n".join(out)
 
 
@@ -136,14 +150,18 @@ def figure(rows: list[dict], bankroll: float, path: Path) -> None:
     import matplotlib.pyplot as plt
 
     colors = dict(zip(COVERAGES, (BLUE, GREEN, GOLD, RED)))
+    colors[RANGE_KEY] = BLUE
+    covs = sorted({r["coverage"] for r in rows})
     fig, axes = plt.subplots(2, 2, figsize=(11, 7.5))
     for j, prior in enumerate(PRIORS):
         top, bot = axes[0, j], axes[1, j]
-        for cov in COVERAGES:
+        for cov in covs:
             rs = [r for r in rows if r["prior"] == prior and r["coverage"] == cov]
             x = [r["gl_unit"] * 100 for r in rs]
+            label = (f"{GL_BETS_RANGE[0]}-{GL_BETS_RANGE[1]} unders a week" if cov == RANGE_KEY
+                     else f"{cov:.0%} of flags" + ("" if cov == GL_COVERAGE_HISTORICAL else " (conditional)"))
             top.plot(x, [r["median_pct"] * 100 for r in rs], "-o", color=colors[cov],
-                     lw=1.8, ms=4, label=f"{cov:.0%} of flags" + ("" if cov == GL_COVERAGE_HISTORICAL else " (conditional)"))
+                     lw=1.8, ms=4, label=label)
             top.fill_between(x, [(r["p5"] / bankroll - 1) * 100 for r in rs],
                              [(r["p95"] / bankroll - 1) * 100 for r in rs],
                              color=colors[cov], alpha=0.08, lw=0)
@@ -154,13 +172,14 @@ def figure(rows: list[dict], bankroll: float, path: Path) -> None:
                  fontsize=8, ha="right")
         for ax in (top, bot):
             _style(ax)
-            ax.set_xlabel("Greenline stake, % of starting bankroll")
+            ax.set_xlabel("Greenline stake, % of bankroll (re-sized weekly)")
         top.set_ylabel("median ending gain, %  (band = 5th-95th)")
         bot.set_ylabel("P(end down 25% or more), %")
         top.set_title(f"`{prior}` prior", fontsize=11)
         if j == 0:
             top.legend(fontsize=8, frameon=False, loc="upper left")
-    fig.suptitle("Stake x coverage sweep, $%s, weeks 4-15 of 2026" % f"{bankroll:,.0f}",
+    what = "Unit sweep" if RANGE_KEY in covs else "Stake x coverage sweep"
+    fig.suptitle("%s, $%s, weeks 4-15 of 2026" % (what, f"{bankroll:,.0f}"),
                  fontsize=14, fontweight="bold", color=INK)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,7 +188,7 @@ def figure(rows: list[dict], bankroll: float, path: Path) -> None:
 
 
 def self_check() -> None:
-    rows = run_grid(paths=3_000, seed=1, bankroll=20_000)
+    rows = run_grid(paths=3_000, seed=1, bankroll=20_000, volume="slate", resize=False)
     assert len(rows) == len(PRIORS) * len(COVERAGES) * len(GL_UNITS)
     # stake scales spread, not sign: 95th-5th must widen with the unit
     for prior in PRIORS:
@@ -183,6 +202,12 @@ def self_check() -> None:
     assert rec is not None and rec["supported"]
     assert cond is not None
     assert cond["median"] >= rec["median"]
+    # range volume: one coverage key, every row supported, ~108 bets
+    rows = run_grid(paths=3_000, seed=1, bankroll=20_000)
+    assert len(rows) == len(PRIORS) * len(GL_UNITS)
+    assert all(r["supported"] and r["coverage"] == RANGE_KEY for r in rows)
+    assert 100 < rows[0]["gl_bets"] < 116, rows[0]["gl_bets"]
+    assert recommend(rows)[0] is not None
     print("self-check OK")
 
 
@@ -193,22 +218,26 @@ def main() -> None:
     ap.add_argument("--paths", type=int, default=20_000)
     ap.add_argument("--seed", type=int, default=20260917)
     ap.add_argument("--out", help="directory: writes sweep .csv, .md and figs/ .png")
+    ap.add_argument("--gl-volume", choices=("range", "slate"), default="range",
+                    help="range: 6-12 unders a week (default); slate: the coverage grid")
+    ap.add_argument("--flat-stakes", action="store_true",
+                    help="flat units off the starting bankroll instead of weekly re-sizing")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
         self_check()
         return
 
-    rows = run_grid(args.paths, args.seed, args.bankroll)
+    rows = run_grid(args.paths, args.seed, args.bankroll, args.gl_volume, not args.flat_stakes)
     rec, cond = recommend(rows)
     print(to_markdown(rows, args.bankroll))
-    for label, r in (("RECOMMENDED (supported coverage, (a) under both priors)", rec),
+    for label, r in (("RECOMMENDED (supported volume, (a) under both priors)", rec),
                      ("best if coverage transfer held (conditional, not recommended)", cond)):
         if r is None:
             print(f"{label}: no row passes")
             continue
-        print(f"{label}: GL unit {r['gl_unit']:.2%}, coverage {r['coverage']:.0%}, "
-              f"~{r['gl_bets']} bets")
+        vol = ("6-12/wk" if r["coverage"] == RANGE_KEY else f"coverage {r['coverage']:.0%}")
+        print(f"{label}: GL unit {r['gl_unit']:.2%}, {vol}, ~{r['gl_bets']} bets")
         for p in PRIORS:
             print(f"  {p}: median ${r['median_by_prior'][p]:,.0f} "
                   f"({r['median_by_prior'][p] / args.bankroll - 1:+.1%}), "

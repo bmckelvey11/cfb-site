@@ -23,7 +23,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mc_combined_totals import GL_COVERAGE_HISTORICAL, GL_FLAGS_BY_WEEK, OZ_WEEK4PLUS_HISTORY  # noqa: E402
+from mc_combined_totals import GL_BETS_RANGE, GL_FLAGS_BY_WEEK, OZ_WEEK4PLUS_HISTORY  # noqa: E402
 
 OZ_TOTAL = sum(OZ_WEEK4PLUS_HISTORY) / len(OZ_WEEK4PLUS_HISTORY)  # ~10.6 bets, weeks 4-15
 DOCS = Path(__file__).resolve().parents[1] / "docs"
@@ -155,9 +155,9 @@ def build_pptx() -> Path:
         ["item", "value"],
         ["amount", "$20,000"],
         ["horizon", "weeks 4–15 of the 2026 regular season, Sept 24 to Dec 12 (12 weeks)"],
-        ["what it funds", "two totals strategies already running, flat stakes off the starting bankroll"],
-        ["expected bets", "~99: ~88 Greenline unders, ~11 over-zero overs"],
-        ["recommended stake", "Greenline $100 per bet (0.5%), over-zero $200 per bet (1%)"],
+        ["what it funds", "two totals strategies already running, units re-sized off the bankroll each week"],
+        ["expected bets", "~118: 6–12 Greenline unders a week (~107), ~11 over-zero overs"],
+        ["recommended unit", "Greenline 0.5% of bankroll per bet ($100 at the start), over-zero 1% ($200), re-sized each Monday"],
         ["afterwards", "bankroll and profit stay in the operation for 2027"],
     ], col_w=[3, 9], size=14)
 
@@ -170,7 +170,7 @@ def build_pptx() -> Path:
         ["record", "151–83, 64.5% (58.2–70.4%), walk-forward 2016–25", "27–22, 55.1% (41–68%), 2026 wk 2; + 114–87 personal unders 2023–25"],
         ["planning win rate", "58.2%, the interval floor", "bracket: 55.0% (2026 only) to 56.4% (pooled)"],
         ["price", "−120 or better", "−110"],
-        ["bets left in 2026", "~11, median +$133", "~13% of each week's flags, ~7 a week, ~88 total"],
+        ["bets left in 2026", "~11, median +$133", "6–12 a week by plan, ~108 total (~16% of flags)"],
         ["role", "better evidence, nearly spent for 2026; matters in 2027", "carries the whole 2026 projection"],
     ], col_w=[2.3, 4.9, 4.9], size=12)
     text(s, 0.6, 5.6, 12, 1.2, [
@@ -179,25 +179,30 @@ def build_pptx() -> Path:
     ], 13, color=MUTED)
 
     # 3b bets per week
+    lo_b, hi_b = GL_BETS_RANGE
     s = slide("Bets per week",
-              "Greenline flags every FBS-vs-FBS game, so weekly volume is the schedule. "
-              "13% of flags at $100; over-zero ~11 bets spread across the span at $200.")
-    rows_w = [["week", "FBS games (= flags)", "Greenline bets", "over-zero bets", "staked"]]
+              f"Plan: {lo_b}–{hi_b} Greenline unders a week, capped by that week's FBS-vs-FBS slate "
+              "(Greenline flags every such game). Over-zero ~11 bets spread across the span.")
+    rows_w = [["week", "FBS games (= flags)", "Greenline unders", "over-zero bets", "staked at start units"]]
     oz_per_week = OZ_TOTAL / len(GL_FLAGS_BY_WEEK)
+    gl_tot = 0.0
     for i, flags in enumerate(GL_FLAGS_BY_WEEK):
-        gl = flags * GL_COVERAGE_HISTORICAL
-        rows_w.append([str(4 + i), str(flags), f"{gl:.0f}", f"{oz_per_week:.1f}",
-                       money(gl * 100 + oz_per_week * 200)])
-    gl_tot = sum(GL_FLAGS_BY_WEEK) * GL_COVERAGE_HISTORICAL
+        mean = sum(min(k, flags) for k in range(lo_b, hi_b + 1)) / (hi_b - lo_b + 1)
+        gl_tot += mean
+        rng_txt = f"{lo_b}–{hi_b} (mean {mean:.0f})" if flags >= hi_b else f"{min(lo_b, flags)}–{flags} (mean {mean:.0f})"
+        rows_w.append([str(4 + i), str(flags), rng_txt, f"{oz_per_week:.1f}",
+                       money(mean * 100 + oz_per_week * 200)])
     rows_w.append(["total", str(sum(GL_FLAGS_BY_WEEK)), f"~{gl_tot:.0f}", f"~{OZ_TOTAL:.0f}",
                    money(gl_tot * 100 + OZ_TOTAL * 200)])
-    table(s, 0.6, 1.7, 8.2, rows_w, col_w=[1.0, 2.2, 1.8, 1.7, 1.5], size=11)
-    text(s, 9.2, 1.8, 3.8, 5, [
-        "About 8 Greenline unders plus 1 over-zero over in a typical week. 9 to 10 in November. One in championship week.",
+    table(s, 0.6, 1.7, 8.6, rows_w, col_w=[1.0, 2.2, 2.2, 1.6, 1.6], size=11)
+    text(s, 9.6, 1.8, 3.5, 5, [
+        f"{lo_b} to {hi_b} unders plus about 1 over-zero over in a typical week. "
+        "Championship week has only 9 games, so 6 to 9.",
         "",
-        "Each week's count is drawn Poisson around these means, so a real week can be 4 or 12.",
+        "Each week's count is drawn uniformly from the range, so volume is the plan, not a forecast.",
         "",
-        "A typical week stakes about $1,000. Weeks 14 and 15 use 2025's schedule; 2026 is not scheduled that far yet.",
+        "A typical week stakes $1,000 to $1,100 at the starting units; units re-size each Monday. "
+        "Weeks 14 and 15 use 2025's schedule.",
     ], 13)
 
     # 4 projection
@@ -207,10 +212,10 @@ def build_pptx() -> Path:
 
     # 5 sweep + recommendation
     s = slide("Choosing the stake",
-              "Largest median gain such that ≤1% of paths end down 25% and none go to zero, under both priors.")
+              "Largest median gain such that ≤1% of paths end down 25% and none go to zero, under both priors. 6–12 unders a week, units re-sized weekly.")
     s.shapes.add_picture(str(FIG_SWEEP), Inches(0.4), Inches(1.6), height=Inches(5.6))
     text(s, 8.7, 1.7, 4.3, 5.5, [
-        "Recommended: Greenline 0.5% ($100), over-zero 1% ($200).",
+        "Recommended: Greenline 0.5% of bankroll ($100 at the start), over-zero 1% ($200), re-sized each Monday.",
         f"Median {money(rec_p['median'])} pooled / {money(rec_n['median'])} 2026-only.",
         f"5th pct {money(rec_p['p5'])} / {money(rec_n['p5'])}. P(−25%) 0% under both.",
         "",
@@ -218,11 +223,11 @@ def build_pptx() -> Path:
         f"(median {money(up_p['median'])} / {money(up_n['median'])}; P(−25%) "
         f"{up_p['p_m25']:.1%} / {up_n['p_m25']:.1%}). Upgrade path once four more weeks are graded.",
         "",
-        "Stake does not change the downside ratio. Coverage does, and coverage is the unproven assumption. Conditional rows are shown, not recommended.",
+        "Unit size does not change the downside ratio. Volume does, and 6–12 a week is a little above the 13% rate the record was earned at. The ledger prices that.",
     ], 13)
 
     # 6 risk
-    s = slide("Risk, stated plainly", "At the recommended $100 / $200 stakes. Flat stakes, no stop-loss.")
+    s = slide("Risk, stated plainly", "At the recommended 0.5% / 1% units, re-sized weekly. No stop-loss.")
     table(s, 0.6, 1.7, 8, [
         ["measure", "pooled prior", "2026-only prior"],
         ["P(season ends below $20,000)", f"{rec_p['p_down']:.1%}", f"{rec_n['p_down']:.1%}"],
@@ -250,7 +255,7 @@ def build_pptx() -> Path:
         "• Any coverage above 13%. Every 'bet more flags' row assumes the picked-flag win rate applies to flags that were passed on.",
         "• A reproducible selection rule. 'Bet ~6 of 49 a week' is a volume assumption; no script picks which six.",
         "• A 2027 projection. Not modeled yet. Needs over-zero at full-season volume and a full graded Greenline season.",
-        "• Compounded returns. Simultaneous kickoffs make them unachievable; everything here is flat-staked.",
+        "• Within-week compounding. Units re-size on Monday, not per bet; Saturday kickoffs are simultaneous. Re-sizing moves the 12-week median by under $100 either way.",
     ], 15)
 
     # 8 cadence
@@ -258,8 +263,8 @@ def build_pptx() -> Path:
     table(s, 0.6, 1.6, 12, [
         ["day", "step"],
         ["Wednesday", "capture Greenline flags; seed the bet ledger"],
-        ["Thursday–Saturday", "bet ~6 unders at −110 or better; over-zero board at −120 or better"],
-        ["Monday", "grade flags; mark which were bet; rerun the projection with the new record"],
+        ["Thursday–Saturday", "bet 6–12 unders at −110 or better; over-zero board at −120 or better"],
+        ["Monday", "grade flags; mark which were bet; re-size units off the bankroll; rerun the projection"],
     ], col_w=[2.5, 9.5], size=15)
     text(s, 0.6, 3.6, 12, 3, [
         "Marking which flags get bet is the one manual step and the one that resolves the biggest open question (coverage).",
