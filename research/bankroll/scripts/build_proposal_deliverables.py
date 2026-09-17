@@ -133,7 +133,7 @@ def build_pptx() -> Path:
         return t
 
     def money(v):
-        return f"${v:,.0f}"
+        return f"−${abs(v):,.0f}" if v < 0 else f"${v:,.0f}"
 
     # 1 title
     s = prs.slides.add_slide(blank)
