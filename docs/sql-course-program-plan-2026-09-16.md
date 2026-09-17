@@ -120,9 +120,9 @@ def parse_course(text: str) -> list[Module]: ...
 def parse_blocks(text: str) -> list[Block]: ...   # moved from the audit script unchanged
 ```
 
-- [ ] Copy the course: `cp "/c/Users/mckel/Downloads/cfb_sql_course.md" learning/sql_course/cfb_sql_course.md`.
-- [ ] Apply the two audit fixes in the copy: B5 worked block and hints for B5-2/B5-3 use `cfb.core.fact_game`; intro paragraph gains one sentence "Inside `CREATE VIEW`/`CREATE MACRO` in `sandbox`, qualify warehouse tables as `cfb.core.…`". C5 worked block and C1 exercise 1 replace `width_bucket` as in the audit table.
-- [ ] Write the failing test first:
+- [x] Copy the course: `cp "/c/Users/mckel/Downloads/cfb_sql_course.md" learning/sql_course/cfb_sql_course.md`.
+- [x] Apply the two audit fixes in the copy: B5 worked block and hints for B5-2/B5-3 use `cfb.core.fact_game`; intro paragraph gains one sentence "Inside `CREATE VIEW`/`CREATE MACRO` in `sandbox`, qualify warehouse tables as `cfb.core.…`". C5 worked block and C1 exercise 1 replace `width_bucket` as in the audit table.
+- [x] Write the failing test first:
 
 ```python
 from learning.sql_course.course_parse import parse_course, parse_blocks
@@ -139,11 +139,11 @@ def test_parse_course_shape():
     assert len(parse_blocks(COURSE)) == 20
 ```
 
-- [ ] Run `python -m pytest tests/test_sql_course.py -v`; expect ImportError.
-- [ ] Implement `course_parse.py`: walk lines, open a module on `^## ([A-C]\d) — (.+)$` or `^# Part D`, switch section on `^### ` headings, collect `- ` bullets under goals/mistakes, paragraphs under concepts, `^\d\. (.+?) \*Hint: (.+)\*$` under exercises, and reuse `parse_blocks` for worked solutions (first block whose `line` falls inside the module's line range).
-- [ ] Rewire the audit script to `from learning.sql_course.course_parse import parse_blocks` and rerun it against the in-repo copy.
-- [ ] **Check:** `python -m pytest tests/test_sql_course.py` passes, and the audit reports `20 blocks: 19 ok, 0 mismatch/error/missing, 1 unverifiable` (B5 and C5 now pass).
-- [ ] Commit: `feat(learning): move SQL course in-repo with shared parser`
+- [x] Run `python -m pytest tests/test_sql_course.py -v`; expect ImportError.
+- [x] Implement `course_parse.py`: walk lines, open a module on `^## ([A-C]\d) — (.+)$` or `^# Part D`, switch section on `^### ` headings, collect `- ` bullets under goals/mistakes, paragraphs under concepts, `^\d\. (.+?) \*Hint: (.+)\*$` under exercises, and reuse `parse_blocks` for worked solutions (first block whose `line` falls inside the module's line range).
+- [x] Rewire the audit script to `from learning.sql_course.course_parse import parse_blocks` and rerun it against the in-repo copy.
+- [x] **Check:** `python -m pytest tests/test_sql_course.py` passes, and the audit reports `20 blocks: 19 ok, 0 mismatch/error/missing, 1 unverifiable` (B5 and C5 now pass).
+- [x] Commit: `feat(learning): move SQL course in-repo with shared parser`
 
 Estimate: about 2 hours.
 
@@ -156,7 +156,7 @@ Estimate: about 2 hours.
 
 **Interfaces:** `render_module(m: Module) -> str` returns a full HTML document; `build_all(course_path: Path, out_dir: Path) -> list[Path]`.
 
-- [ ] Test first:
+- [x] Test first:
 
 ```python
 def test_build_slides(tmp_path):
@@ -168,11 +168,11 @@ def test_build_slides(tmp_path):
     assert "ROWS BETWEEN" not in html or "A6" in html    # no cross-module bleed
 ```
 
-- [ ] Run it; expect ImportError.
-- [ ] Implement: one `TEMPLATE` string with reveal.js CSS/JS `<link>`/`<script>` from `https://cdn.jsdelivr.net/npm/reveal.js@5/dist/` plus `plugin/markdown/markdown.js`; `render_module` yields one `<section data-markdown><textarea data-template>…</textarea></section>` per slide from the Module fields in the order listed under **Slides** above; escape `</textarea>` if it ever appears. Index page is a plain `<ul>` of links with module titles.
-- [ ] Run `python learning/sql_course/build_slides.py` to regenerate `slides/`.
-- [ ] **Check:** test passes, and opening `learning/sql_course/slides/B2.html` in a browser shows the Standard → DuckDB table rendered as an HTML table on slide 2 and the `QUALIFY` worked solution as a highlighted code slide.
-- [ ] Commit: `feat(learning): generate reveal.js slides from the SQL course`
+- [x] Run it; expect ImportError.
+- [x] Implement: one `TEMPLATE` string with reveal.js CSS/JS `<link>`/`<script>` from `https://cdn.jsdelivr.net/npm/reveal.js@5/dist/` plus `plugin/markdown/markdown.js`; `render_module` yields one `<section data-markdown><textarea data-template>…</textarea></section>` per slide from the Module fields in the order listed under **Slides** above; escape `</textarea>` if it ever appears. Index page is a plain `<ul>` of links with module titles.
+- [x] Run `python learning/sql_course/build_slides.py` to regenerate `slides/`.
+- [x] **Check:** test passes, and opening `learning/sql_course/slides/B2.html` in a browser shows the Standard → DuckDB table rendered as an HTML table on slide 2 and the `QUALIFY` worked solution as a highlighted code slide.
+- [x] Commit: `feat(learning): generate reveal.js slides from the SQL course`
 
 Estimate: about 1.5 hours.
 
@@ -192,7 +192,7 @@ def run_sql(con, sql: str) -> tuple[list[str], list[tuple]]:   # column names, r
 
 CLI: `course.py list` (modules and exercise texts), `course.py show A3` (goals, concepts, exercises with hints), `course.py run A3 --worked --answer my.sql`, `course.py run A3 2 --answer my.sql` (Phase 4 enables the numbered form).
 
-- [ ] Grader tests first, using `connect(md=False, fresh=True)` from `scripts/sql_sandbox.py`:
+- [x] Grader tests first, using `connect(md=False, fresh=True)` from `scripts/sql_sandbox.py`:
 
 ```python
 def test_grade_identical_passes(con):
@@ -206,11 +206,11 @@ def test_grade_row_count_mismatch(con):
     assert not ok and "row count" in why
 ```
 
-- [ ] Run; expect ImportError.
-- [ ] Implement `run_sql` as `con.sql(f"SELECT * FROM ({sql.rstrip(';')}) ORDER BY ALL LIMIT {sample}")` plus a separate `count(*)`; `grade` checks count, then `set(map(str.lower, cols))`, then row tuples with floats rounded to 4 places. Multi-statement answers (B5, C7 style) execute all but the last statement first, then grade the last.
-- [ ] Implement the CLI with `argparse` subparsers; `run --worked` takes the reference from `Module.worked.sql`.
-- [ ] **Check:** tests pass; `python learning/sql_course/course.py run A1 --worked --answer /tmp/a1.sql` where `a1.sql` is the A1 worked solution prints `PASS`, and the same file with `LIMIT 10` appended prints `FAIL: row count 10 != 3747`.
-- [ ] Commit: `feat(learning): add SQL course runner with worked-solution grading`
+- [x] Run; expect ImportError.
+- [x] Implement `run_sql` as `con.sql(f"SELECT * FROM ({sql.rstrip(';')}) ORDER BY ALL LIMIT {sample}")` plus a separate `count(*)`; `grade` checks count, then `set(map(str.lower, cols))`, then row tuples with floats rounded to 4 places. Multi-statement answers (B5, C7 style) execute all but the last statement first, then grade the last.
+- [x] Implement the CLI with `argparse` subparsers; `run --worked` takes the reference from `Module.worked.sql`.
+- [x] **Check:** tests pass; `python learning/sql_course/course.py run A1 --worked --answer /tmp/a1.sql` where `a1.sql` is the A1 worked solution prints `PASS`, and the same file with `LIMIT 10` appended prints `FAIL: row count 10 != 3747`.
+- [x] Commit: `feat(learning): add SQL course runner with worked-solution grading`
 
 Estimate: about 2 hours.
 
@@ -233,11 +233,11 @@ SELECT table_schema, table_name FROM information_schema.tables WHERE table_schem
 ...
 ```
 
-- [ ] Test first: parametrize over all 20 modules; for each numbered exercise, assert a solution exists, `check` is `exact` or `manual`, and the SQL executes without error against `connect(md=False, fresh=True)`.
-- [ ] Author solutions module by module in course order (A1→C8). Each must follow the exercise text and its hint, use `sandbox.main.` for anything created, qualify `cfb.core.…` inside views and macros, and carry `-- check: manual` only for the nine prose/random/side-effect exercises listed under **Grading rule**. Run the test after each module.
-- [ ] Extend `course.py run MODULE N` to grade against `load_solutions`.
-- [ ] **Check:** `python -m pytest tests/test_sql_course.py -k solution` passes for 100 exercises, and `course.py run A4 2 --answer x.sql` passes when `x.sql` is the A4-2 solution.
-- [ ] Commit per part: `feat(learning): reference solutions for Part A`, then B, then C.
+- [x] Test first: parametrize over all 20 modules; for each numbered exercise, assert a solution exists, `check` is `exact` or `manual`, and the SQL executes without error against `connect(md=False, fresh=True)`.
+- [x] Author solutions module by module in course order (A1→C8). Each must follow the exercise text and its hint, use `sandbox.main.` for anything created, qualify `cfb.core.…` inside views and macros, and carry `-- check: manual` only for the nine prose/random/side-effect exercises listed under **Grading rule**. Run the test after each module.
+- [x] Extend `course.py run MODULE N` to grade against `load_solutions`.
+- [x] **Check:** `python -m pytest tests/test_sql_course.py -k solution` passes for 100 exercises, and `course.py run A4 2 --answer x.sql` passes when `x.sql` is the A4-2 solution.
+- [x] Commit per part: `feat(learning): reference solutions for Part A`, then B, then C.
 
 Estimate: about 6 hours total (Part A 1.5, Part B 2, Part C 2.5). This is the long phase and can be split across sessions by part.
 
@@ -247,10 +247,10 @@ Estimate: about 6 hours total (Part A 1.5, Part B 2, Part C 2.5). This is the lo
 - Modify: `learning/sql_course/course.py` (`record`, `progress` subcommand)
 - Modify: `tests/test_sql_course.py` (add `test_progress_upsert`)
 
-- [ ] Test first: with `fresh=True`, `record(con, "A1", "worked", "pass")` twice then `progress_rows(con)` has exactly one row with status `pass`.
-- [ ] Implement `CREATE TABLE IF NOT EXISTS sandbox.main.course_progress(module TEXT, exercise TEXT, status TEXT, attempted_at TIMESTAMPTZ, PRIMARY KEY (module, exercise))` and `INSERT OR REPLACE`. `run` calls `record` after grading with `pass`, `fail`, or `manual`. `progress` prints the grid.
-- [ ] **Check:** test passes; after `course.py run A1 --worked --answer a1.sql`, `python scripts/sql_sandbox.py -c "FROM sandbox.main.course_progress"` shows one `A1 | worked | pass` row, and running it again does not add a second.
-- [ ] Commit: `feat(learning): track SQL course progress in the sandbox`
+- [x] Test first: with `fresh=True`, `record(con, "A1", "worked", "pass")` twice then `progress_rows(con)` has exactly one row with status `pass`. (2026-09-17)
+- [x] Implement `CREATE TABLE IF NOT EXISTS sandbox.main.course_progress(module TEXT, exercise TEXT, status TEXT, attempted_at TIMESTAMPTZ, PRIMARY KEY (module, exercise))` and `INSERT OR REPLACE`. `run` calls `record` after grading with `pass`, `fail`, or `manual`. `progress` prints the grid. (2026-09-17)
+- [x] **Check:** test passes; after `course.py run A1 --worked --answer a1.sql`, `python scripts/sql_sandbox.py -c "FROM sandbox.main.course_progress"` shows one `A1 | worked | pass` row, and running it again does not add a second. (2026-09-17)
+- [x] Commit: `feat(learning): track SQL course progress in the sandbox`
 
 Estimate: about 45 minutes.
 

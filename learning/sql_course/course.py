@@ -31,6 +31,16 @@ TIMEOUT_S = 10.0
 BYTE_BUDGET = 200 * 1024 * 1024
 FETCH_BATCH = 5000
 DISPLAY_CAP = 20
+LOCK_MSG = "progress not recorded: sandbox.duckdb is locked by another process"
+PROGRESS_DDL = """
+CREATE TABLE IF NOT EXISTS sandbox.main.course_progress (
+    module TEXT NOT NULL,
+    exercise TEXT NOT NULL,
+    status TEXT,
+    attempted_at TIMESTAMPTZ,
+    PRIMARY KEY (module, exercise)
+)
+"""
 
 
 class RunSqlError(Exception):
@@ -190,6 +200,44 @@ def grade(
     return True, ""
 
 
+def _ensure_progress(con: duckdb.DuckDBPyConnection) -> None:
+    con.execute(PROGRESS_DDL)
+
+
+def record(con: duckdb.DuckDBPyConnection, module: str, exercise: str, status: str) -> None:
+    _ensure_progress(con)
+    con.execute(
+        """
+        INSERT OR REPLACE INTO sandbox.main.course_progress
+            (module, exercise, status, attempted_at)
+        VALUES (?, ?, ?, now())
+        """,
+        [module, exercise, status],
+    )
+
+
+def progress_rows(con: duckdb.DuckDBPyConnection) -> list[tuple]:
+    _ensure_progress(con)
+    return con.execute(
+        "SELECT module, exercise, status, attempted_at "
+        "FROM sandbox.main.course_progress ORDER BY ALL"
+    ).fetchall()
+
+
+def persist_progress(module: str, exercise: str, status: str) -> None:
+    try:
+        con = sandbox_connect(md=False, fresh=False)
+    except duckdb.IOException:
+        print(LOCK_MSG)
+        return
+    try:
+        record(con, module, exercise, status)
+    except duckdb.IOException:
+        print(LOCK_MSG)
+    finally:
+        con.close()
+
+
 def load_course() -> list[Module]:
     return parse_course(COURSE_PATH.read_text(encoding="utf-8"))
 
@@ -297,7 +345,9 @@ def cmd_run(code: str, exercise: int | None, worked: bool, answer: Path, md: boo
         finally:
             learner_con.close()
             ref_con.close()
-        return _print_verdict(ok, why)
+        rc = _print_verdict(ok, why)
+        persist_progress(code, "worked", "pass" if ok else "fail")
+        return rc
     if exercise is None:
         raise SystemExit("pass --worked or an exercise number")
     sols = load_solutions(code)
@@ -306,22 +356,58 @@ def cmd_run(code: str, exercise: int | None, worked: bool, answer: Path, md: boo
     sol = sols[exercise]
     learner_con = connect_grading(md=md)
     ref_con = connect_grading(md=md)
+    status: str | None = None
+    rc = 1
     try:
         if sol.check == "manual":
             try:
                 run_sql(learner_con, answer_sql)
             except RunSqlError as exc:
-                return _print_verdict(False, str(exc))
-            print("manual")
-            return 0
-        if sol.check == "probe":
+                rc = _print_verdict(False, str(exc))
+                status = "fail"
+            else:
+                print("manual")
+                rc = 0
+                status = "manual"
+        elif sol.check == "probe":
             ok, why = _grade_probe(learner_con, answer_sql, ref_con, sol)
+            status = "pass" if ok else "fail"
+            rc = _print_verdict(ok, why)
         else:
             ok, why = grade(learner_con, answer_sql, sol.sql, ref_con=ref_con)
+            status = "pass" if ok else "fail"
+            rc = _print_verdict(ok, why)
     finally:
         learner_con.close()
         ref_con.close()
-    return _print_verdict(ok, why)
+    if status is not None:
+        persist_progress(code, str(exercise), status)
+    return rc
+
+
+_PROGRESS_MARK = {"pass": "✓", "fail": "x", "manual": "m"}
+
+
+def cmd_progress() -> None:
+    try:
+        con = sandbox_connect(md=False, fresh=False)
+    except duckdb.IOException:
+        print(LOCK_MSG)
+        return
+    try:
+        rows = progress_rows(con)
+    finally:
+        con.close()
+    by = {(r[0], r[1]): r[2] for r in rows}
+    print("     w 1 2 3 4 5")
+    for m in load_course():
+        if m.code == "D":
+            continue
+        cells = [
+            _PROGRESS_MARK.get(by.get((m.code, label), ""), ".")
+            for label in ("worked", "1", "2", "3", "4", "5")
+        ]
+        print(f"{m.code:<3}  " + " ".join(cells))
 
 
 def _grade_probe(
@@ -360,6 +446,8 @@ def main() -> None:
     run_p.add_argument("--answer", type=Path, required=True)
     run_p.add_argument("--md", action="store_true")
 
+    sub.add_parser("progress", help="module x exercise grid")
+
     args = ap.parse_args()
     if args.cmd == "list":
         cmd_list()
@@ -367,6 +455,8 @@ def main() -> None:
         cmd_show(args.module)
     elif args.cmd == "run":
         raise SystemExit(cmd_run(args.module, args.exercise, args.worked, args.answer, args.md))
+    elif args.cmd == "progress":
+        cmd_progress()
 
 
 if __name__ == "__main__":

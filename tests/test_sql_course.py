@@ -224,3 +224,15 @@ def test_every_solution_runs(code, con):
             run_sql(con, sol.sql)
         except RunSqlError as exc:
             pytest.fail(f"{code}-{n}: {exc}")
+
+
+def test_progress_upsert(con):
+    from learning.sql_course.course import progress_rows, record
+
+    record(con, "A1", "worked", "pass")
+    record(con, "A1", "worked", "pass")
+    rows = progress_rows(con)
+    assert len(rows) == 1
+    assert rows[0][0] == "A1"
+    assert rows[0][1] == "worked"
+    assert rows[0][2] == "pass"
