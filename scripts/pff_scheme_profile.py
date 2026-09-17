@@ -52,7 +52,7 @@ with cov as (  -- man/zone: coverage-defender snaps, not plays. 'all' excluded:
     select franchise_id,
            sum(snap_counts_coverage) filter (where split = 'man')  as man_snaps,
            sum(snap_counts_coverage) filter (where split = 'zone') as zone_snaps
-    from stg.pff_defense_coverage where season = ? group by 1
+    from stg.pff_defense_coverage where season = ? and week between ? and ? group by 1
 ),
 dsum as (  -- defensive alignment: where the 11 line up
     select franchise_id,
@@ -66,20 +66,20 @@ dsum as (  -- defensive alignment: where the 11 line up
            sum(snap_counts_dl_b_gap)      as dl_b_gap,
            sum(snap_counts_dl_over_t)     as dl_over_t,
            sum(snap_counts_dl_outside_t)  as dl_outside_t
-    from stg.pff_defense_summary where season = ? group by 1
+    from stg.pff_defense_summary where season = ? and week between ? and ? group by 1
 ),
 rb as (  -- run-block scheme. The equivalent from pff_rushing gap/zone_attempts
          -- is r = 0.9997 with this, so only one of the two is carried.
     select franchise_id,
            sum(snap_counts_run_block) filter (where split = 'gap')  as gap_rb,
            sum(snap_counts_run_block) filter (where split = 'zone') as zone_rb
-    from stg.pff_run_blocking where season = ? group by 1
+    from stg.pff_run_blocking where season = ? and week between ? and ? group by 1
 ),
 osum as (
     select franchise_id,
            sum(snap_counts_total_pass) as off_pass_snaps,
            sum(snap_counts_total_run)  as off_run_snaps
-    from stg.pff_offense_summary where season = ? group by 1
+    from stg.pff_offense_summary where season = ? and week between ? and ? group by 1
 ),
 pass as (  -- QB-view splits. blitz/pressure here are what the offense FACED.
     select franchise_id,
@@ -98,14 +98,14 @@ pass as (  -- QB-view splits. blitz/pressure here are what the offense FACED.
            sum(attempts)  filter (where split = 'short')          as att_short,
            sum(attempts)  filter (where split = 'medium')         as att_medium,
            sum(attempts)  filter (where split = 'deep')           as att_deep
-    from stg.pff_passing where season = ? group by 1
+    from stg.pff_passing where season = ? and week between ? and ? group by 1
 ),
 recv as (  -- receiver deployment; split='all' carries the alignment snaps
     select franchise_id,
            sum(slot_snaps)   as wr_slot_snaps,
            sum(wide_snaps)   as wr_wide_snaps,
            sum(inline_snaps) as wr_inline_snaps
-    from stg.pff_receiving where season = ? and split = 'all' group by 1
+    from stg.pff_receiving where season = ? and week between ? and ? and split = 'all' group by 1
 ),
 dir as (  -- run direction. The QB* direction codes are kneels/sneaks/scrambles,
           -- NOT designed QB runs -- a designed keep is coded to its gap.
@@ -113,7 +113,7 @@ dir as (  -- run direction. The QB* direction codes are kneels/sneaks/scrambles,
            sum(attempts) filter (where direction in ('LG','ML','MR','RG')) as run_interior,
            sum(attempts) filter (where direction in ('LT','RT'))           as run_tackle,
            sum(attempts) filter (where direction in ('LE','RE'))           as run_edge
-    from stg.pff_rushing_direction where season = ? group by 1
+    from stg.pff_rushing_direction where season = ? and week between ? and ? group by 1
 ),
 qbrun as (  -- designed QB runs = QB carries less scrambles, via the position join
     select r.franchise_id,
@@ -123,7 +123,7 @@ qbrun as (  -- designed QB runs = QB carries less scrambles, via the position jo
     from stg.pff_rushing r
     join stg.pff_player_season ps
       on ps.season = r.season and ps.player_id = r.player_id
-    where r.season = ? group by 1
+    where r.season = ? and r.week between ? and ? group by 1
 )
 select
     f.team_name,
@@ -204,7 +204,7 @@ def inventory(con: duckdb.DuckDBPyConnection, season: int) -> pd.DataFrame:
     frames = [
         con.execute(
             f"select '{table}' as tbl, split, count(*) as n_rows "
-            f"from stg.{table} where season = ? group by 1, 2 order by 2",
+            f"from stg.{table} where season = ? and week between ? and ? group by 1, 2 order by 2",
             [season],
         ).df()
         for table in INVENTORY_TABLES
@@ -212,8 +212,14 @@ def inventory(con: duckdb.DuckDBPyConnection, season: int) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def profile(con: duckdb.DuckDBPyConnection, season: int) -> pd.DataFrame:
-    return con.execute(SQL, [season] * N_SEASON_PARAMS).df()
+def profile(con: duckdb.DuckDBPyConnection, season: int,
+            weeks: tuple[int, int] = (0, 99)) -> pd.DataFrame:
+    """One row per team. `weeks` narrows to a week window, which is what makes
+    a split-half persistence test possible."""
+    params = []
+    for _ in range(N_SEASON_PARAMS):
+        params += [season, weeks[0], weeks[1]]
+    return con.execute(SQL, params).df()
 
 
 def main() -> None:
@@ -222,6 +228,8 @@ def main() -> None:
     ap.add_argument("--db", default=None, help="path to cfb.duckdb")
     ap.add_argument("--out", default=None, help="output CSV path")
     ap.add_argument("--inventory", action="store_true", help="print split inventory and exit")
+    ap.add_argument("--week-min", type=int, default=0)
+    ap.add_argument("--week-max", type=int, default=99)
     args = ap.parse_args()
 
     con = duckdb.connect(args.db or str(DB_PATH), read_only=True)
@@ -230,7 +238,7 @@ def main() -> None:
         print(inventory(con, args.season).to_string(index=False))
         return
 
-    df = profile(con, args.season)
+    df = profile(con, args.season, (args.week_min, args.week_max))
     out = Path(args.out or PROCESSED / f"pff_scheme_profile_{args.season}.csv")
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)
@@ -251,6 +259,13 @@ def _selftest() -> None:
     assert df[rate_cols].min().min() >= 0 and df[rate_cols].max().max() <= 1, "rate out of [0,1]"
     top3 = set(df.nlargest(3, "off_qb_designed_run_rate")["team_name"])
     assert top3 == {"Army Black Knights", "Navy Midshipmen", "Air Force Falcons"}, top3
+
+    # the windowed path binds 3 params per CTE; a CTE added without a week
+    # window would desync the count, so exercise it explicitly
+    h1 = profile(con, 2025, (0, 7))
+    assert len(h1) == 136, f"windowed profile returned {len(h1)} teams"
+    assert not h1["def_dl_a_gap_share"].equals(df["def_dl_a_gap_share"]), \
+        "week window had no effect -- CTEs are not filtering on week"
     print("selftest ok")
 
 
