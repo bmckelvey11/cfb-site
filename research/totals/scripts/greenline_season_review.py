@@ -88,6 +88,7 @@ def grade_flag(f: dict, g: dict, finals: list[dict], lines: dict) -> list[dict]:
         return []
     away, home = final
     base = {"source": "pff", "season": int(f.get("season") or 0), "week": f["pff_week"],
+            "pff_game_id": f["pff_game_id"],
             "date": (f.get("kickoff_raw") or "")[:10], "game": f"{f['away_abbreviation']}@{f['home_abbreviation']}"}
     out = []
 
