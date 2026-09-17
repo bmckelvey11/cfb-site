@@ -144,8 +144,9 @@ Two further traps, avoided in the script and worth naming:
 ## What this does not support
 
 - **No scheme taxonomy.** These are continuous rates. Nothing here says a team runs
-  Air Raid or a 3-4. Turning 21 rates into named schemes requires a clustering step
-  that has not been run and would need its own validation — and the existing
+  Air Raid or a 3-4. Turning 21 rates into named schemes requires a clustering step —
+  **since run, see the appended section below: it does not support a taxonomy on
+  either side of the ball** — and the existing
   precedent is discouraging: `coach_style_cluster`
   (`docs/coach-playstyle-analysis.md`) found exactly one discrete style out of five,
   labels that hold for under half a coach's own seasons, and no edge surviving
@@ -179,3 +180,138 @@ Two further traps, avoided in the script and worth naming:
 | `data/processed/pff_scheme_profile_2025.csv` | 136 teams × 26 columns (not committed) |
 | `docs/pff-endpoint-reference.md` | the PFF endpoints, incl. `coverage_scheme` / `receiving/scheme` |
 | `docs/coach-playstyle-analysis.md` | prior art: CFBD-based coach style clusters, and why they are quarantined |
+
+---
+
+# Do the rates cluster into "types"? — 2026-09-16
+
+**Question.** The inventory above says a scheme taxonomy "has not been run." This runs
+it: k-means on the 2025 rates, offense and defense clustered separately.
+
+**Answer. The rates are stable team properties; the cluster boundaries are not.**
+Between the first and second half of 2025, `def_dl_a_gap_share` correlates .918 with
+itself and `off_gap_run_rate` .810 — these measure something real and persistent. But
+labels fit independently on the two halves agree at ARI .243 (offense) and .441
+(defense). Neither side supports a taxonomy. Use the continuous rates as features and
+do not ship a cluster id.
+
+```bash
+export CFB_DATA_ROOT=C:/Users/mckel/dev/cfb/data
+python scripts/pff_scheme_profile.py --season 2025 --week-min 0 --week-max 7 \
+    --out data/processed/pff_scheme_profile_2025_h1.csv
+python scripts/pff_scheme_profile.py --season 2025 --week-min 8 --week-max 99 \
+    --out data/processed/pff_scheme_profile_2025_h2.csv
+python scripts/pff_scheme_clusters.py --season 2025 --drop-quality --split-half
+```
+
+## Method
+
+136 FBS teams, 2025. Features z-scored, k-means (`n_init=25`, `random_state=0`),
+offense and defense fitted separately. The two `_faced` rates are excluded from both
+sets — opponent behaviour, not the team's own type. `def_corner_snap_share` (sd .005)
+and `def_slot_db_share` (sd .009) are excluded as near-constant across FBS. That
+leaves 11 offensive and 6 defensive features.
+
+Five diagnostics, because "k-means returned k clusters" is not evidence that k types
+exist:
+
+| Diagnostic | What it answers |
+|---|---|
+| \|r\| with SP+ overall, per feature | is this style, or team quality in costume? |
+| silhouette, k = 2..8 | are the groups separated at all? |
+| out-of-bag bootstrap ARI (100 resamples) | do the cut lines survive resampling the teams? |
+| ARI vs a cut on the lead PC1 feature | did k-means find k types, or one axis? |
+| split-half ARI (weeks 0–7 vs 8+) | does a label describe the team, or its sample? |
+
+The bootstrap scores held-out teams only. Scoring the full sample compares
+nearest-centroid assignments — centroid drift, not partition stability — and the
+duplicate rows in a resample pull centroids toward dense regions, which inflates it.
+The single-axis baseline reproduces k-means' own cluster sizes rather than equal
+quantiles, so a 100/36 k-means split is not compared against a forced 68/68 cut.
+
+## Quality contamination: offense clean, defense not
+
+Offense has no feature above \|r\| = .25 with SP+ (max .226, `off_play_action_rate`),
+so the residualization `coach_style_cluster` needed does not apply. Defense has two:
+`def_box_snap_share` (r = .421) and `def_fs_snap_share` (r = .382). Dropping them
+improves every defensive diagnostic, so the four-feature set is used throughout below.
+
+## Result
+
+| | offense (11 feats) | defense (4 feats, SP+-clean) |
+|---|---:|---:|
+| PC1 / PC2 | 30.7% / 20.9% | 41.7% / 24.8% |
+| best silhouette | **0.180** at k=2 | **0.323** at k=2 |
+| OOB bootstrap ARI at k=2 | **0.272** | **0.591** |
+| ARI vs lead-feature cut | 0.252 (`off_pass_snap_rate`) | **0.561** (`def_dl_a_gap_share`) |
+| split-half label ARI | **0.243** | **0.441** |
+| face validity | passes | passes |
+
+Every k from 3 to 8 is worse than k=2 on both sides (offense .129–.142, defense
+.182–.257). There is no evidence for a five-type or four-type taxonomy at any k.
+
+**Offense is a continuum.** Silhouette 0.18 is not separation, and OOB bootstrap ARI
+0.272 means resampling the teams reshuffles most of the partition. The k=2 split it
+produces is the ground/air axis — cluster 0 (n=39) is −0.80 z on pass rate, +0.78
+gap-run, +0.65 designed-QB-run, +0.57 inline TE; cluster 1 (n=97) is the mirror. Face
+validity passes (Army/Navy/Air Force all in 0; Hawaii/MTSU/FAU all in 1), but that
+confirms the *axis* is measured correctly, not that there is a boundary on it. The
+academies are the tail of a distribution, not a species.
+
+**Defense is one axis, not a type.** Its diagnostics are better than offense's on
+every line, and the 36-team minority cluster is a recognisable A-gap-anchored front:
+
+| Feature | majority (n=100) | minority (n=36) |
+|---|---:|---:|
+| `def_dl_a_gap_share` | .072 | **.157** |
+| `def_dl_outside_t_share` | .487 | .424 |
+| `def_dl_snap_share` | .384 | .365 |
+| `def_man_rate` | .307 | .257 |
+
+Members include Iowa State, TCU, Cincinnati, Houston, West Virginia, Kentucky,
+Illinois, Virginia Tech, Memphis, Tulane, App State, Coastal Carolina and Troy — a
+list of long-running 3-down/odd-front programs.
+
+But the partition agrees at ARI .561 with a simple cut on `def_dl_a_gap_share` alone,
+so k-means did not find a multivariate type; it found a threshold on one rate. And
+that rate correlates .918 with itself across halves of the season while the *labels*
+only reach .441. The stable object is the number, not the group.
+
+Offensive and defensive labels are near-independent: the minority defensive cluster is
+26% of the pass-leaning offensive group and 26% of the ground-leaning one.
+
+## What this does not support
+
+- **No taxonomy on either side, at any k.** If scheme is wanted as a feature, use the
+  continuous rates — `def_dl_a_gap_share`, `off_pass_snap_rate`,
+  `off_qb_designed_run_rate`, `off_gap_run_rate` — not a cluster id. The labels CSV is
+  written for inspection, not for use as a feature.
+- **Split-half is not season-over-season.** PFF's warehouse holds only 2025 and a
+  partial 2026, so the test that killed `coach_style_cluster` — does a label survive
+  into the next season, across coaching turnover — cannot be run at all here. The
+  earlier draft of this doc suggested running `--season 2024`; that data does not
+  exist. Split-half rules out one-sample artifacts and nothing more.
+- **Halves are not independent in the way a season boundary is.** Same coach, same
+  roster, same scheme install, so this test isolates sample noise from real change and
+  nothing else. A season boundary adds coaching and roster turnover, which this cannot
+  see. Which of the two numbers is larger is not something these data settle — in-season
+  drift from injuries, coordinator adjustments and opponent adaptation cuts the other way.
+- **`off_deep_attempt_rate` barely persists** (split-half r = .256) and
+  `off_quick_game_rate` (.575) and `off_behind_los_rate` (.581) are middling. Those
+  three are weaker team properties than the rest and should carry less weight.
+- **Feature selection touched SP+.** The two dropped defensive features were chosen by
+  correlation with a full-season outcome measure, in-sample on 2025. The labels
+  themselves use only pre-game-observable play-calling rates, but a shipped version
+  must fix the feature set on prior seasons or inherit `result_lookahead`.
+- **No outcome test of any kind.** Nothing was run against margin, total, or the line.
+  No edge is claimed or implied.
+- **k-means only.** No GMM, HDBSCAN or hierarchical alternative was tried. The low
+  silhouettes are unlikely to be an artifact of that choice, but it is untested.
+
+## Files
+
+| Path | What |
+|---|---|
+| `scripts/pff_scheme_clusters.py` | the clustering run and its five diagnostics |
+| `scripts/pff_scheme_profile.py` | `--week-min/--week-max` build the split-half inputs |
+| `data/processed/pff_scheme_clusters_2025.csv` | 136 teams, `offense_cluster` + `defense_cluster` (not committed, inspection only) |
