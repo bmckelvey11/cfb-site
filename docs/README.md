@@ -50,6 +50,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [warehouse-drop-superseded-2026-09-10.md](warehouse-drop-superseded-2026-09-10.md) | Dropping Bucket A REST sides and 7 dead columns |
 | [team-name-mapping-2026-09-10.md](team-name-mapping-2026-09-10.md) | Do the four vendor name maps need consolidating? |
 | [graphql-dump-staleness-2026-09-11.md](graphql-dump-staleness-2026-09-11.md) | How stale are the GraphQL dumps? |
+| [cfb-warehouse-dive-2026-09-16.md](cfb-warehouse-dive-2026-09-16.md) | Can `md:cfb` be browsed from a saved MotherDuck Dive, and what does the mirror hold? |
 
 ## Odds and lines ingest
 
@@ -64,6 +65,11 @@ Each answers one question against the live warehouse; keep for provenance.
 | [lines-spread-sign-2026-09-10.md](lines-spread-sign-2026-09-10.md) | Does every book quote a home-relative spread? |
 | [line-timing-collector.md](line-timing-collector.md) | Line-timing collector runbook |
 | [data-line-floor.md](data-line-floor.md) | CFBD betting-line floor (earliest usable season) |
+| [cfbd-lines-coverage-2026-09-17.md](cfbd-lines-coverage-2026-09-17.md) | How far back CFBD lines go (2013 is CFBD's floor) and which book posted each era |
+| [pre-2013-lines-sources-2026-09-17.md](pre-2013-lines-sources-2026-09-17.md) | What fills lines before 2013: Prediction Tracker spreads already in-repo; totals still open |
+| [sbr-ncaaf-lines-2026-09-17.md](sbr-ncaaf-lines-2026-09-17.md) | Pre-2013 totals and moneylines from the Sportsbook Reviews archive (2007–2012) |
+| [ncaadata-csv-backfill-2026-09-17.md](ncaadata-csv-backfill-2026-09-17.md) | Can `NCAAData_1980-2020.csv` backfill lines? No — it has none |
+| [median-line-2026-09-17.md](median-line-2026-09-17.md) | The system builder now grades against the median line across books, not one provider |
 
 ## PFF
 
@@ -76,6 +82,9 @@ Each answers one question against the live warehouse; keep for provenance.
 | [pff-methodology-research.md](pff-methodology-research.md) | What PFF's public methodology does and does not support |
 | [research-prompts/pff-advanced-metrics.md](research-prompts/pff-advanced-metrics.md) | The prompt that produced the doc above |
 | [pff-sample-schema.sql](pff-sample-schema.sql) | Sample DDL |
+| [pff-scheme-inventory-2026-09-16.md](pff-scheme-inventory-2026-09-16.md) | Does PFF carry scheme labels? No — 21 scheme rates are computable instead |
+| [pregame-feature-eligibility-2026-09-16.md](pregame-feature-eligibility-2026-09-16.md) | Which PFF and CFBD stats are usable pre-game (the grain decides, not the stat) |
+| [pff-team-report-sample-georgia-2026.md](pff-team-report-sample-georgia-2026.md) | Sample rendered team report from the PFF API (Georgia, 2026) |
 
 ## CFBD source reference
 
@@ -101,6 +110,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [seasonal-totals-backtest.md](seasonal-totals-backtest.md) | Seasonal totals effect, 13k games |
 | [totals-model.md](totals-model.md), [totals-early-weeks.md](totals-early-weeks.md) | Totals model and early-season behaviour |
 | [wind-orientation-totals.md](wind-orientation-totals.md) | Crosswind vs head/tail wind and scoring |
+| [ppa-opponent-adjusted-ratings-2026-09-16.md](ppa-opponent-adjusted-ratings-2026-09-16.md) | Opponent-adjusted team PPA ratings early in the season (mixed-effects, v1.0) |
 
 > **Caution on the unders docs:** per project memory, the 2023-25 `history.csv` unders are
 > mostly Greenline flags, not independent picks. Pool them as prior evidence, never as a
@@ -119,6 +129,11 @@ Each answers one question against the live warehouse; keep for provenance.
 | [methodology/todo-system.md](methodology/todo-system.md) | How `TODO.md` works |
 | [intent/new-system-type-catalog.md](intent/new-system-type-catalog.md) | Intent: New System type catalog |
 | [reminders.md](reminders.md) | Loose reminders (scratch-adjacent) |
+| [models-organization-2026-09-16.md](models-organization-2026-09-16.md) | Plan for organizing `models/` and `research/`, and the safe sequence |
+| [fetch-venv-2026-09-17.md](fetch-venv-2026-09-17.md) | Why CFBD fetches need `.venv-cfbd` (pydantic 2 breaks the vendored client) |
+| [cfbdepth-scrape-2026-09-16.md](cfbdepth-scrape-2026-09-16.md) | What cfbdepth.com exposes and whether to scrape it (scope open) |
+| [sql-course-perplexity-prompt-2026-09-16.md](sql-course-perplexity-prompt-2026-09-16.md) | The prompt that generated the SQL course on the warehouse |
+| [sql-course-program-plan-2026-09-16.md](sql-course-program-plan-2026-09-16.md) | Plan to turn the SQL course into slides, a grading CLI, and progress tracking |
 | [img/](img/) | Figures for the README and coach-playstyle doc |
 
 ## Not docs — tool state, do not treat as documentation

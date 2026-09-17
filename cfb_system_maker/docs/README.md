@@ -21,6 +21,10 @@ investigations). This directory holds what is specific to *this* unit's code.
 | [data-audit-2026-09-11.md](data-audit-2026-09-11.md) | Data folder and warehouse audit. Reproduce with `python scripts/audit_data_hygiene.py --out <report.md> --json <findings.json>` (read-only; `--strict` exits 1 on any FAIL). |
 | [refresh-break-2026-09-11.md](refresh-break-2026-09-11.md) | Why the daily refresh broke — `_merge_game_lines` hard-depended on an optional column. **Closed**; proximate cause fixed and verified in production, upstream OOM tracked separately. |
 | [warehouse-catalog-regeneration-2026-09-16.md](warehouse-catalog-regeneration-2026-09-16.md) | What changed in the warehouse since the catalog was last hand-built on 2026-08-29, and whether it can be regenerated rather than re-written. |
+| [data-currency-check-2026-09-16.md](data-currency-check-2026-09-16.md) | Are CFBD and PFF current through week 2? Yes; six stale GraphQL dumps re-pulled. |
+| [line-coverage-2026-09-16.md](line-coverage-2026-09-16.md) | Which books, markets, and seasons the warehouse has lines for, counted in distinct games. Reproduce with `python scripts/audit_line_coverage.py --min-season 2012`. |
+| [app-vs-warehouse-read-path-2026-09-16.md](app-vs-warehouse-read-path-2026-09-16.md) | Should the app read `cfb.duckdb` instead of the processed files? **No.** Retiring unread `core` tables stays open. |
+| [sites-hosting-fit-2026-09-16.md](sites-hosting-fit-2026-09-16.md) | Can the Flask app run on Sites unchanged? No; options for a Sites interface over a separately hosted Python service. |
 
 ## Shipped UI and feature work
 

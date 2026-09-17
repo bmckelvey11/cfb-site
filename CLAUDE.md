@@ -13,6 +13,13 @@ human-facing product intent. None should duplicate another file's rules.
 
 - Every analysis gets written up in a markdown file — not just chat. Lands in the owning unit's `docs/` (`research/spread/docs/`, `models/totals/docs/`, ...), else root `docs/`; name it `<topic>-<YYYY-MM-DD>.md` unless it updates an existing doc. Minimum: the question, the method, the data and date range used, the numbers, and what the result does *not* support. Point at the script that reproduces it. Applies to ad-hoc digging too — if it took real work to find out, the finding is written down.
 
+- Docs lifecycle (`tests/test_docs_index.py` enforces the first point):
+  - **Check first.** Before writing a doc, grep its `docs/README.md` for the topic. If a doc already answers the question, update it or supersede it — don't write a sibling.
+  - **Index.** Every `.md` in a `docs/` dir gets a row in that dir's `README.md`: one line, what question it answers. Unindexed doc = task not done.
+  - **Dated docs are records.** Never rewrite `<topic>-<date>.md` after the fact. A new answer to the same question is a new dated doc.
+  - **Supersede, don't accumulate.** When a doc supersedes an older one, put `**Superseded by** [new](path)` as the old doc's first line and `git mv` it to `archive/docs/`. Delete its README row.
+  - **Undated docs are living.** Guides, specs, and plans must match the code. When the code changes, fix the doc in the same commit or archive it.
+
 ## Units
 
 | Unit | Home | Instructions |
