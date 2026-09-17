@@ -99,3 +99,105 @@ def test_build_slides(tmp_path):
     assert "| Standard SQL" in b2
     assert "QUALIFY" in b2
     assert "cdn.jsdelivr.net/npm/reveal.js@5/" in html
+
+
+import pytest
+
+from scripts.sql_sandbox import connect as sandbox_connect
+
+
+@pytest.fixture
+def con():
+    c = sandbox_connect(md=False, fresh=True)
+    yield c
+    c.close()
+
+
+def test_grade_identical_passes(con):
+    from learning.sql_course.course import grade
+
+    ok, why = grade(con, "select 1 as a, 2.00001 as b", "select 1 as a, 2.00004 as b")
+    assert ok, why
+
+
+def test_grade_column_set_mismatch(con):
+    from learning.sql_course.course import grade
+
+    ok, why = grade(con, "select 1 as a", "select 1 as b")
+    assert not ok and "column" in why
+
+
+def test_grade_row_count_mismatch(con):
+    from learning.sql_course.course import grade
+
+    ok, why = grade(con, "select 1 union all select 2", "select 1")
+    assert not ok and "row count" in why
+
+
+def test_grade_column_reorder_passes(con):
+    from learning.sql_course.course import grade
+
+    ok, why = grade(con, "select 1 as a, 2 as b", "select 2 as b, 1 as a")
+    assert ok, why
+
+
+def test_grade_duplicate_labels_fail(con):
+    from learning.sql_course.course import grade
+
+    ok, why = grade(con, "select 1 as a, 2 as a", "select 1 as a, 2 as a")
+    assert not ok
+    assert "ambiguous duplicate column labels" in why
+
+
+def test_grade_catches_difference_past_row_20(con):
+    from learning.sql_course.course import grade
+
+    ok, why = grade(
+        con,
+        "select range as n from range(25)",
+        "select case when range = 20 then -1 else range end as n from range(25)",
+    )
+    assert not ok
+
+
+def test_grade_null_match_and_mismatch(con):
+    from learning.sql_course.course import grade
+
+    same = "select 1 as id, null as x union all select 2, 3.0"
+    ok, why = grade(con, same, same)
+    assert ok, why
+    ok, why = grade(con, same, "select 1 as id, 0 as x union all select 2, 3.0")
+    assert not ok
+
+
+def test_grade_nan_match_and_mismatch(con):
+    from learning.sql_course.course import grade
+
+    nan_sql = "select 1 as id, 'NaN'::DOUBLE as x union all select 2, 3.0"
+    ok, why = grade(con, nan_sql, nan_sql)
+    assert ok, why
+    # NaN must not compare equal to NULL
+    ok, why = grade(con, nan_sql, "select 1 as id, null as x union all select 2, 3.0")
+    assert not ok
+
+
+def test_grade_struct_match_and_mismatch(con):
+    from learning.sql_course.course import grade
+
+    s = "select struct_pack(spread := 3.5, total := 50) as s"
+    ok, why = grade(con, s, "select struct_pack(total := 50, spread := 3.5) as s")
+    assert ok, why
+    ok, why = grade(con, s, "select struct_pack(spread := 3.5, total := 51) as s")
+    assert not ok
+
+
+def test_grade_list_match_and_mismatch(con):
+    from learning.sql_course.course import grade
+
+    lst = "select [1, null, 3] as xs"
+    ok, why = grade(con, lst, lst)
+    assert ok, why
+    ok, why = grade(con, lst, "select [1, 0, 3] as xs")
+    assert not ok
+    ok, why = grade(con, lst, "select [3, null, 1] as xs")
+    assert not ok
