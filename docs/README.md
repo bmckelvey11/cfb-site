@@ -13,6 +13,8 @@ Unit-specific docs live in that unit's `docs/`:
 | Bankroll, staking, combined-strategy projection | [`research/bankroll/docs/`](../research/bankroll/docs/) |
 | Superseded, never cited as current | [`archive/`](../archive/README.md) |
 
+Cross-unit reference: [`methods.md`](methods.md) holds the formulas and assumptions behind every record and projection; [`../CONTEXT.md`](../CONTEXT.md) holds the vocabulary and points here.
+
 The warehouse/ingest cluster below is **correctly** at root: 33 files under `scripts/`,
 `cfb_system_maker/`, and `tests/` cite a doc that lives here, 16 of them the warehouse
 cluster specifically, and these docs describe the shared `cfb.duckdb` warehouse rather
