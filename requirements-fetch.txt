@@ -1,0 +1,16 @@
+# Dependencies for the CFBD fetch venv (.venv-cfbd), built by scripts/make_fetch_venv.cmd.
+#
+# Exists because the main .venv cannot run the vendored CFBD client: cfbd-python
+# pins pydantic <2, while anthropic (and pydantic-ai) in requirements.txt require
+# pydantic >=2, so the resolver installs 2.x and the client fails at import with
+# "`const` is removed, use `Literal` instead". Rather than downgrade the shared
+# venv and break anthropic, the network-fetch paths get their own interpreter.
+#
+# Only what `upcoming` and scripts/refresh_cfbd.py actually import -- this is not
+# a second copy of requirements.txt.
+-r cfbd-python/requirements.txt
+numpy>=1.26,<3
+scipy>=1.11,<2
+duckdb>=1.1,<2
+pytz
+tzdata

@@ -7,12 +7,20 @@ REM
 REM   refresh_cfbd.cmd
 REM   refresh_cfbd.cmd --season 2026
 REM
-REM Override PYTHON to use a different interpreter (defaults to this repo's venv,
-REM which has cfbd/duckdb installed -- the system Python used by collect_line_timing.cmd
-REM does not). CFB_DATA_ROOT is inherited from the user environment.
+REM Override PYTHON to use a different interpreter. Defaults to .venv-cfbd, the
+REM fetch venv (scripts/make_fetch_venv.cmd): the main .venv resolves pydantic to 2.x
+REM for anthropic, which the vendored CFBD client cannot import. Falls back to .venv
+REM so an un-built fetch venv degrades to the old behaviour instead of hard-failing.
+REM CFB_DATA_ROOT is inherited from the user environment.
 setlocal
 set "REPO=%~dp0.."
-if "%PYTHON%"=="" set "PYTHON=%REPO%\.venv\Scripts\python.exe"
+if "%PYTHON%"=="" (
+  if exist "%REPO%\.venv-cfbd\Scripts\python.exe" (
+    set "PYTHON=%REPO%\.venv-cfbd\Scripts\python.exe"
+  ) else (
+    set "PYTHON=%REPO%\.venv\Scripts\python.exe"
+  )
+)
 if "%CFB_DATA_ROOT%"=="" set "CFB_DATA_ROOT=%REPO%\data"
 set "LOGDIR=%CFB_DATA_ROOT%\logs"
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"

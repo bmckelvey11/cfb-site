@@ -9,7 +9,10 @@ follows from it.
 `phwin` is PT's published probability that the home team wins outright. Is it accurate, and does
 it beat the market line sitting in the same row?
 
-## Answer: it is a genuinely good forecast — and the market line beats it anyway.
+## Answer: it is a genuinely good forecast — and the market line beats it head-to-head.
+
+Whether it carries *any* independent information on top of the line is **not settled here**; see
+§ 4, corrected.
 
 This is **not** the `phcover` result. `phcover` was pinned near 0.50 and carried no signal.
 `phwin` is a real forecast with real spread (sd 0.242, range 0.006–0.997) and it works. It is
@@ -55,22 +58,50 @@ the market is never handed in-sample information `phwin` did not have.
 Both intervals exclude zero. `phwin` ranks worse and scores worse than the closing number it is
 published beside.
 
-### 4. And the line encompasses it
+### 4. The encompassing test is inconclusive, not negative
 
-Head-to-head says which is better; the encompassing regression says whether `phwin` carries
-anything the market does not. Logit of home-win on `[line, logit(phwin)]`:
+**Corrected 2026-09-17** — this section first claimed "the market encompasses `phwin`". That was
+overstated, and the reason is worth stating plainly: `phwin` is built from `lineavg`, and the
+vendor panel is itself largely tracking the market, so the encompassing regression is asking
+whether a near-copy adds to the original.
+
+Logit of home-win on `[line, logit(phwin)]`:
 
 | regressor | coefficient | 95% CI (season clusters) |
 |---|---|---|
 | `line` | −0.0997 | [−0.1185, −0.0802] |
-| `logit(phwin)` | +0.1496 | **[−0.0508, +0.3691]** ← contains 0 |
+| `logit(phwin)` | +0.1496 | [−0.0508, +0.3691] ← contains 0 |
 
-Given the line, `phwin` adds nothing measurable. The market encompasses it.
+The coefficient itself is **not** distorted by the collinearity: by Frisch–Waugh, regressing on
+the part of `logit(phwin)` orthogonal to `line` returns the identical +0.1496. What the
+collinearity destroys is **power**:
+
+| | value |
+|---|---|
+| R²(`logit(phwin)` ~ `line`) | **0.9367** |
+| VIF in the joint regression | **15.8** |
+| sd(`logit(phwin)`) → sd(residual) | 1.342 → 0.337 (**25.2%** independent) |
+| SE of the encompassing coefficient | 0.107 |
+| **MDE at 80% power** | **0.300** |
+| `phwin` alone, coefficient on `logit(phwin)` | +1.1037 [+1.0473, +1.1537] |
+
+The interval rules out `phwin`'s independent part carrying anything like **full** information —
+a fully informative residual would sit near its solo coefficient of 1.10, far outside
+[−0.05, +0.37]. It does **not** rule out a modest contribution of 0.1–0.3. Read this as
+**inconclusive at this sample size**, not as a null.
+
+(The solo coefficient of 1.10, with an interval excluding 1.0, is a real finding in its own
+right: `phwin` is mildly **under**-confident on its own scale, matching the decile table above.)
 
 ## What this does not support
 
 - **Not "phwin is bad."** AUC 0.80 and a +0.26 Brier skill score are a real forecast. Anyone
-  without a line would find it useful. The finding is that it is **redundant**, not wrong.
+  without a line would find it useful.
+- **Not a demonstration that `phwin` is redundant.** It loses head-to-head (§ 3), which is
+  measured and holds. But the encompassing question — does its non-market component add anything
+  — is underpowered by construction (§ 4), because only a quarter of `phwin`'s variation is
+  independent of the line. A larger sample, or a design that does not regress a near-copy on its
+  original, would be needed to settle it.
 - **Not a moneyline betting result.** The panel carries no moneyline prices, so nothing here is
   an ROI or a break-even test. Losing to the line on Brier and AUC makes a profitable moneyline
   play unlikely, but that was not measured.

@@ -176,6 +176,33 @@ def main() -> int:
     out["encompassing"] = {"coef_line": float(b_joint[1]), "coef_logit_phwin": float(b_joint[2]),
                            "ci_line": lo_hi["line"], "ci_logit_phwin": lo_hi["logit(phwin)"]}
 
+    # POWER. logit(phwin) is ~94% explained by `line`, so the encompassing coefficient is
+    # estimated off the ~25% of its variation that survives. Frisch-Waugh means that does not
+    # BIAS the coefficient -- orthogonalizing gives the identical number -- but it does gut the
+    # power, and a CI containing 0 must not be read as "adds nothing" without saying what the
+    # test could have detected. This prints that.
+    print("")
+    print("POWER -- what could the encompassing test actually have detected?")
+    Xl = np.column_stack([np.ones(len(d)), line])
+    bl, *_ = np.linalg.lstsq(Xl, lg, rcond=None)
+    resid = lg - Xl @ bl
+    r2_lg = 1 - (resid**2).sum() / ((lg - lg.mean()) ** 2).sum()
+    b_solo = fit_logit_multi(lg.reshape(-1, 1), y)
+    lo_s, hi_s = cluster_boot(lambda i: fit_logit_multi(lg[i].reshape(-1, 1), y[i])[1], seasons)
+    se = (lo_hi["logit(phwin)"][1] - lo_hi["logit(phwin)"][0]) / 3.92
+    out["power"] = {"r2_logit_phwin_on_line": float(r2_lg), "vif": float(1 / (1 - r2_lg)),
+                    "sd_logit_phwin": float(lg.std()), "sd_residual": float(resid.std()),
+                    "coef_phwin_alone": float(b_solo[1]), "ci_phwin_alone": [lo_s, hi_s],
+                    "se_encompassing": float(se), "mde_80": float(2.8 * se)}
+    print(f"  R2(logit(phwin) ~ line) = {r2_lg:.4f}   VIF = {1 / (1 - r2_lg):.1f}")
+    print(f"  sd(logit phwin) {lg.std():.3f} -> residual {resid.std():.3f} "
+          f"({100 * resid.std() / lg.std():.1f}% of the variation is independent of the line)")
+    print(f"  phwin ALONE: coef {b_solo[1]:+.4f} [{lo_s:+.4f}, {hi_s:+.4f}] "
+          f"(1.0 = right on its own scale; >1 = under-confident)")
+    print(f"  encompassing SE {se:.4f}, MDE at 80% power {2.8 * se:.4f}")
+    print("  So a FULLY informative residual (near the solo coefficient) is excluded; a modest")
+    print("  contribution of 0.1-0.3 is NOT. Do not read the interval as 'adds nothing'.")
+
     OUT.write_text(json.dumps(out, indent=2))
     print("")
     print(f"wrote {OUT}")
