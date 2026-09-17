@@ -24,6 +24,7 @@ projection is a Greenline projection, and Greenline's record supports a median o
 
 | Doc | What it reports |
 | --- | --- |
+| [mc-method-2026-09-17.md](mc-method-2026-09-17.md) | The full method for outside review: every input, distribution, correlation formula, staking rule, output, and the unit-size decision rule, with pseudocode and a list of things to challenge |
 | [mc-combined-totals-2026-09-17.md](mc-combined-totals-2026-09-17.md) | $20,000 across both legs, weeks 4–15 of 2026. 100k paths, win rates drawn per path, nine scenarios, both Greenline priors side by side |
 | [under-selection-profile-2026-09-17.md](under-selection-profile-2026-09-17.md) | Which unders got bet 2023–25, against every FBS game on the same days. The selection is a high-total rule, and the bet unders sit six points above where Greenline flags |
 | [seed-bankroll-proposal-2026-09-17.md](seed-bankroll-proposal-2026-09-17.md) | The family-facing ask: $20,000 as a gift, what it funds, the bracketed projection, the recommended 0.5%/1% units at 6–12 unders a week, and what the numbers do not support. PDF and 9-slide deck alongside |
