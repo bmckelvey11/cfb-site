@@ -65,20 +65,55 @@ Candidates checked for a pre-2013 over/under, all on 2026-09-17:
 | Candidate | Earliest season | Book or model | Access | Verdict |
 | --- | --- | --- | --- | --- |
 | Prediction Tracker (on disk) | 2001 | market line, book unnamed | local, already built | **spread only — no O/U** |
-| Sportsbook Reviews Online | 2007 (per search result text) | book (offshore + Nevada) | site returns **404** | dead; Wayback unverifiable, see below |
+| **Sportsbook Reviews Online** | **2007** | **book (offshore + Nevada)** | **live HTML tables, scrape** | **verified — closes 2007–2012, see below** |
 | Sunshine Forecast (repole.com) | — | — | domain is now a personal homelab | gone |
 | `jackschooley/cfb-betting` (GitHub) | **2014** | book (SBR-derived) | public repo | fails the 2013 test |
 | Killersports / SDQL | unknown | book | query page returns no table rows to a plain GET; JS-driven | unverified, scrape-hostile |
 | sports-statistics.com CFB Games | unknown | "opening spread/OU when available" | per-dataset pages | unverified, field text suggests CFBD upstream |
 | BigDataBall, SportsDataIO | unknown | book | paid | not priced |
 
-Sportsbook Reviews Online was the standard free archive — search results describe it as
-carrying "moneylines, 2nd half lines, opening and closing point spreads and totals" from
-offshore and Nevada books, with a Perma.cc capture dated 2022-02-20. **The live site now
-404s, and archive.org was returning "Temporarily Offline" during this session**, so neither
-its season range nor the retrievability of its files could be verified. It is the single
-best lead for pre-2013 totals and should be retried against the Wayback Machine when the
-Internet Archive is back up.
+### Sportsbook Reviews Online is live — corrected 2026-09-17
+
+An earlier pass in this session recorded the archive as dead on a 404. That was wrong:
+the site **404s unrecognised user agents**. With a browser user-agent string the index and
+every season page return HTTP 200. `robots.txt` disallows only `/go/` and allows
+`/scoresoddsarchives/`, so reading the archive is permitted.
+
+Index: `/scoresoddsarchives/ncaafootball/ncaafootballoddsarchives.htm`. It links **16
+season pages**, `ncaa-football-2007-08` through `ncaa-football-2022-23` — so 2007 is the
+floor, and **six seasons (2007–2012) fall inside the gap**.
+
+Measured by `scripts/probe_sbr_ncaaf_archive.py`:
+
+| season | rows | games | Open | Close | ML | 2H |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2007 | 1424 | 712 | 1421 | 1423 | 1388 | 1414 |
+| 2008 | 1436 | 718 | 1436 | 1436 | 1428 | 1436 |
+| 2009 | 1540 | 770 | 1484 | 1485 | 1436 | 1430 |
+| 2010 | 1616 | 808 | 1526 | 1601 | 1584 | 1558 |
+| 2011 | 1624 | 812 | 1528 | 1584 | 1418 | 1503 |
+| 2012 | 1674 | 837 | 1564 | 1567 | 1610 | 1518 |
+
+~4,457 games, near-total field fill. Game counts line up closely with CFBD's own
+(CFBD 2010/2011 = 808/812 against SBR's 808/812), which is a good sign for the join.
+
+Columns are `Date, Rot, VH, Team, 1st, 2nd, 3rd, 4th, Final, Open, Close, ML, 2H` — so
+opening and closing prices, a moneyline, and a second-half line, from real books rather
+than aggregators. **This is the only verified pre-2013 source of totals and moneylines.**
+
+Three costs to price before building anything on it:
+
+1. **No file download.** Each season is an inline HTML table; this is a scrape, not a
+   fetch. 16 pages total, so the volume is trivial.
+2. **Spread and total are not labelled.** Two rows per game (V then H). Within a pair,
+   one row's `Open`/`Close` is the spread and the other's is the game total, and *nothing
+   in the markup says which*. The usual heuristic is that the larger absolute value is
+   the total, but 2007 LSU–Mississippi State carries `Open 16.5 / Close 19.5` against
+   `Open 27 / Close 44`, which that rule reads wrong. This is the real work in the task,
+   not the fetching.
+3. **Team names are unspaced** (`MiamiOhio`, `MississippiSt`, `BuffaloU`) and need a
+   crosswalk to CFBD names before a `game_id` join. `build_prediction_tracker.py` already
+   solves the same problem for a different vendor's spellings and is the model to copy.
 
 ## Recommendation
 
@@ -88,10 +123,15 @@ Internet Archive is back up.
    "no lines". The join to `game_id` is already done, but this is **not an insert**:
    `core.fact_game_line` is rebuilt by `build_core` on every refresh, so it needs a
    loader entry plus a decision on what `provider_key` an unnamed market line gets.
-2. **Totals:** retry the Sportsbook Reviews Online archive through the Wayback Machine
-   once the Internet Archive is reachable. If its files come back, it covers spread,
-   total, and moneyline together and would supersede point 1 as well.
-3. **2006:** nothing to re-pull — the upstream file is identical to the local copy and
+2. **Totals and moneylines, 2007–2012:** scrape the Sportsbook Reviews Online archive.
+   It is verified live, permitted by robots.txt, and carries open/close spread, total, ML
+   and a 2H line for ~4,457 games. Because it also carries spreads from real books, it is
+   a *better* pre-2013 spread source than PT for 2007 onward and would partly supersede
+   point 1. Budget the effort against the spread-vs-total disambiguation and the team-name
+   crosswalk, not the download.
+3. **Totals, 2001–2006:** still no source. SBR starts at 2007 and PT has no over/under
+   at any date, so these six seasons remain spread-only.
+4. **2006:** nothing to re-pull — the upstream file is identical to the local copy and
    covers only weeks 1–6 (see above). Either accept 2006 as a partial season or try the
    Wayback Machine for an older capture once the Internet Archive is reachable.
 
@@ -116,9 +156,12 @@ Internet Archive is back up.
 
 ## What this does not support
 
-- No claim that pre-2013 totals are unobtainable — only that no *reachable, verified*
-  source was found in this session, with the best lead blocked by an Internet Archive
-  outage rather than by absence.
+- **No parse of the SBR archive was performed.** Coverage was counted from the HTML
+  tables; no row was converted into a spread or total, and the spread-vs-total
+  disambiguation above is an unsolved problem, not a described solution. The field-fill
+  numbers say a value is present, not that it is correct or correctly attributed.
+- No source of any kind was found for 2001–2006 totals. That is an absence of evidence
+  from this session's searches, not evidence that none exists.
 - No pricing on the paid options. BigDataBall and SportsDataIO were not contacted and
   their pre-2013 coverage was not established.
 - No value-level validation of PT's pre-2013 spreads against an independent source. The
