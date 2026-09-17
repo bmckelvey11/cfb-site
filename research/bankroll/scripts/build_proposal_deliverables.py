@@ -219,7 +219,7 @@ def build_pptx() -> Path:
     # 5 sweep + recommendation
     s = slide("Choosing the unit",
               "Rule: the smaller of quarter Kelly off the planning prior and the largest unit at which ≤3% of seasons end down 25%. 6–12 unders a week, re-sized weekly.")
-    s.shapes.add_picture(str(FIG_SWEEP), Inches(0.4), Inches(1.6), height=Inches(5.6))
+    s.shapes.add_picture(str(FIG_SWEEP), Inches(0.4), Inches(2.4), width=Inches(8.4))
     text(s, 8.7, 1.7, 4.3, 5.5, [
         f"Quarter Kelly off the planning prior ({p_plan:.1%}), shrunk for 9 simultaneous bets: {qk:.2%}.",
         f"The 3% cap binds first: 1% has P(−25%) {plan10['p_m25']:.1%}; 1.5% fails at 3.8%. Unit today: 1%.",
