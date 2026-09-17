@@ -314,4 +314,30 @@ Offensive and defensive labels are near-independent: the minority defensive clus
 |---|---|
 | `scripts/pff_scheme_clusters.py` | the clustering run and its five diagnostics |
 | `scripts/pff_scheme_profile.py` | `--week-min/--week-max` build the split-half inputs |
+| `scripts/pff_scheme_team_tables.py` | the two per-side team tables below |
 | `data/processed/pff_scheme_clusters_2025.csv` | 136 teams, `offense_cluster` + `defense_cluster` (not committed, inspection only) |
+
+## Per-side team tables
+
+`scripts/pff_scheme_team_tables.py` writes one file per side of the ball, each one
+row per FBS team, carrying every rate that went into the analysis plus the
+team-season context the warehouse already holds:
+
+```bash
+python scripts/pff_scheme_team_tables.py --season 2025
+```
+
+| File | Shape | Contents |
+|---|---|---|
+| `data/processed/pff_scheme_offense_2025.csv` | 136 × 51 | 11 scheme rates, 2 faced rates, `offense_cluster`, dropbacks, then tempo (`off_plays_per_game`, `off_drives_per_game`), PPA, success rate, explosiveness, points per opportunity, line/second-level/open-field yards, power success, stuff rate allowed, havoc allowed, standard/passing-downs splits, opponent-adjusted EPA and success rate, SP+ offense, FPI offense |
+| `data/processed/pff_scheme_defense_2025.csv` | 136 × 49 | 6 scheme rates plus the 2 near-constant ones, `defense_cluster`, snap volumes, then tempo faced, PPA allowed, success/explosiveness allowed, havoc (total, front-seven, DB), stuff rate, line yards allowed, opponent-adjusted EPA allowed, SP+ defense, FPI defense |
+
+Both carry `conference`, `games`, `wins`, `sp_overall`, `fpi` and `elo` so either
+stands alone. The team key is `stg.pff_franchise.cfbd_team_id` → `core.dim_team` →
+the CFBD feeds; all 136 teams join with no nulls in any column.
+
+Tempo is plays per game and drives per game — CFBD carries no seconds-per-play, so
+that is the closest available measure.
+
+**The `*_cluster` columns are for inspection only.** Per the diagnostics above the
+labels do not persist (split-half ARI .243 / .441); model on the continuous rates.
