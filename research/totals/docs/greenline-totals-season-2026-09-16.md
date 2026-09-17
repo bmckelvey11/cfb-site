@@ -151,6 +151,8 @@ Market Brier uses 0.5 for spreads and totals (a flag is a bet against a -110 lin
 
 **Operating rule for week 3 (2-4% window).** The week 3 list is built with `--min-edge 0.02 --max-edge 0.04`: 27 of 45 positive-edge unders (capture 14:26 ET), 23 still positive at DraftKings, 11 of them in the 55-59.5 band. The window is the best of 21 ranges on 36 games (inside 17-8, outside 4-7; see "PFF edge window" below), so it is a bet-selection choice, not a tested rule. All 57 flags are graded Monday regardless, which is what tests it: the 18 cut flags are the control.
 
+**Band ordering for week 3 (added 2026-09-17).** Within the window, order the slate by market-total band before DK edge: 55-59.5 first (the one split whose 95% floor clears break-even, 53.4%, and the one named before week 2 was graded), then <45 and 45-49.5, then 60-64.5; 50-54.5 last (pooled 10-17, floor 21.5%). Bands order the queue, they do not change the unit: every bet stays at the same stake and the bankroll projection assumes the same p for every flag. The three 50-54.5 unders with the largest DK edge (NDSU @ SAC, LAT @ BAY, FRES @ SJSU) are left out this week; at ~4% edge and $200 a bet that forgoes about $25 of expected value if the band pattern is noise, against a full-stake loss rate of 63% if it is real. Cost of being wrong is asymmetric, so skip. Ordering is a lean on 98 + 27 games, not a rule; Monday's grades of all 57 flags test it either way.
+
 **What settles it.** Four more graded weeks brings 2026 flags to n~250 (MDE 60%); with the history pooled, n~450 (MDE 58%). The band split needs the 50-54.5 cell to keep losing and 55-59.5 to keep winning for another ~50 games each before it is more than a lean. Week 3 grades Monday.
 
 **Reproduce**

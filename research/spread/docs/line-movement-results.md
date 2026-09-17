@@ -597,3 +597,82 @@ the stopping rule (B3) is unchanged. It does say the week-1 read was not a previ
 the second week's slope has the opposite sign and its bets lost CLV, and the pooled slope is
 now indistinguishable from zero. The pooled interval still contains the archive's gamma (~0.25)
 and also contains zero.
+
+### Read of 2026-09-17 — the ceiling at the anchor, and what the anchor actually is (`version_b_ceiling.py`)
+
+Re-ran `eval_version_b.py` and `version_b_by_week.py` on the 2026-09-16 forward log: unchanged
+from the 2026-09-15 read (16 snapshots, 147 anchored, 91 graded, 2 week clusters, E4 slope
++0.026 [−0.090, +0.142], `read_status: pre_season_end`). Week 3's games had not kicked.
+
+A fresh `collect_line_timing.py snapshot` on 2026-09-17 09:55 ET returned *unchanged* — PT's
+live CSV is byte-identical (sha256 `22d2c752…`, 19,269 bytes, 57 rows of week 4) to the
+Wed 2026-09-16 12:30 ET capture. `collector_health.py` reports STALE at 21.4 h, but the scheduled
+task is firing on time; the stall is upstream at PT, and the dedupe is a sha256 of a freshly
+downloaded body, so nothing was missed. There were no new lines to pull for this read.
+
+Two things the re-run did not measure, both from `version_b_ceiling.py`:
+
+**1. The ceiling.** With perfect foresight of `sign(close − anchor)`, mean CLV is E|close − anchor|:
+
+| bet bucket | games | E\|move\| | sd(move) |
+|---|---|---|---|
+| all | 91 | 0.69 | 0.94 |
+| \|edge\| ≥ 1 | 43 | 0.76 | 0.98 |
+| \|edge\| ≥ 2 | 18 | 0.67 | 0.78 |
+
+That is the most **any** forecast anchored here can win before vig — an oracle knowing the
+close exactly earns 0.76 points at |edge| ≥ 1. A forecast capturing fraction *f* of the move
+earns *f* × 0.76. At the measured slope (0.026) that is 0.02 points; at the archive's opener
+gamma (~0.25–0.30) it is 0.19–0.23 points.
+
+Scale those against this tree's own measured CLV↔ATS pairs rather than any imported
+points-to-win-rate constant — "Closing line value at the opener" above warns explicitly against
+the line-shopping study's 3.2 points-per-point, and `eval_ats_vs_breakeven.py` exists because an
+earlier version of this file over-converted. Those pairs: **+1.32 points of CLV bought 52.5% ATS
+[49.6, 55.2]** — an interval straddling the 52.381% break-even at −110 — and it took +2.33 points
+(E6 ≥ 2) to reach 57.8%. The oracle ceiling at the anchor, 0.76 points, is **below the CLV level
+that already failed to clear break-even** in this repo's own opener data. The caveat that keeps
+this an argument and not a proof: those pairs are opener bets over a different spread
+distribution, so the mapping transfers in order of magnitude, not exactly.
+
+The archive's 2–4 points of CLV are not shrunken by the anchor — they are **absent from it**.
+Only ~0.7 points of move exist between the anchor and the close at all, so no model quality
+recovers them. This is the same mechanism amendment A5 found past PT's last capture, measured
+at the other end of the window.
+
+This ceiling bounds **CLV, not ATS**. A bet can win against the spread without the line moving
+at all, so nothing here caps the ATS case; that case is bounded by the bet record in the
+2026-09-15 read and below, not by this number.
+
+**2. Both graded weeks anchor on Tuesday, not Monday.** Amendment B2's `mon` bucket is empty
+(`games_per_bucket_before_fixed_set: {mon: 0, tue: 91, wed: 91, thu+: 91}`):
+
+| week | first anchor capture | anchor weekdays present |
+|---|---|---|
+| 2026-08-31 | Tue 2026-09-01 18:30 ET | Tuesday |
+| 2026-09-07 | Tue 2026-09-08 15:13 ET | Tuesday |
+
+So **the Monday anchor registered in B1 has never been graded** — every version B number above
+and in the 2026-09-15 read is a Tuesday-or-later anchor, one to two days closer to the close
+than the prereg specifies. The ceiling in (1) is measured at that later anchor and is therefore
+a lower bound on the Monday ceiling, by an unknown amount.
+
+The cause is **not** the collector's schedule, which has run four snapshots a day (00:30 / 06:30
+/ 12:30 / 18:30 ET) including Mondays since 2026-08-29 (`data/logs/line_timing.log`, 100
+invocations). It is two separate one-off gaps, both already closed:
+
+| week | Monday | what happened |
+|---|---|---|
+| 2026-08-31 | Mon 08-31 | Snapshot **captured** (15:05 ET, on disk in `ingest/pt_snapshots/`) but never appended to the forward log — `weekly_slate.py` only began logging from Tue 09-01. Recoverable by replaying that snapshot. |
+| 2026-09-07 | Mon 09-07 | No snapshot: collector outage from Fri 09-04 06:30 ET to Tue 09-08 02:31 ET (~3.8 days). Unrecoverable — PT overwrites in place. |
+| 2026-09-14 | Mon 09-14 | **Monday anchor present and logged** (18:30 ET); week not yet graded (games kick 09-19). |
+
+So the `mon` bucket is empty by history, not by design, and it self-corrects from week 3 onward.
+What this calls for is uptime monitoring (`collector_health.py` already exits 1 on a >12 h gap),
+not a schedule change.
+
+What this does not support: a verdict (B3 unchanged — 2 clusters, season live), any claim about
+the Monday anchor's ceiling, or a conclusion that the opener edge is not real. It does establish
+that the served anchor cannot carry the archive's CLV regardless of the slope version B
+eventually measures, and that B2's capture-decay read is missing its earliest bucket by
+collector schedule rather than by data.

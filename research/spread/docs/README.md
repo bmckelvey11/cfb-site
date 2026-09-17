@@ -52,6 +52,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `plan-2026-09-08-hardened.md` | absorbed | Contract the master absorbed; audit history of the claudex-loop. |
 | `plan-review-log-2026-09-08.md` | absorbed | The three-round adversarial argument (claudex-loop) that produced the hardened plan. |
 | `build-brief-2026-09-08.md` | appendix | Parallel execution of the hardened plan: waves, file ownership, per-agent acceptance checks. |
+| `actionable-picks-2026-09-17.md` | review | Can the slate be bet today? No — the anchor holds ~0.7 pt of move total, and beat-close inverts with edge. Points at the results doc. |
 | `review-2026-09-02-composite-spread.md` | dated record | The pivot from margin to movement; §5–6 set the direction. Cites archived files. |
 | `session-guide-2026-09-02.md` | dated record | Narrative of the 2026-09-02 session. Paths and numbers are as of that day; see its banner. |
 
@@ -68,6 +69,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_line_shopping.py` | `prereg-line-shopping.md` | `processed/line_shopping_sides.csv`, `line_shopping.json` |
 | `check_pt_line_is_close.py` | `line-movement-results.md` § target, amendment A5 | `processed/pt_line_vs_an_close.json` |
 | `model_publish_times.py` | `line-movement-results.md` § when the constituents publish | `processed/model_publish_times.csv` |
+| `version_b_ceiling.py` | `line-movement-results.md` § version B read of 2026-09-17: E\|close − anchor\| (the CLV ceiling) and each week's anchor ET weekday | stdout |
 
 Estimator core, imported by all of the above and not run on its own for live work:
 `eval_prediction_tracker_models.py` (loader, `MARKET_LINES`, prior skill, wild cluster
