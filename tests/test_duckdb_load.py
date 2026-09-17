@@ -1312,15 +1312,37 @@ def test_no_sql_here_uses_the_deprecated_lambda_arrow():
 
     2026-09-17: the backfill's `list_transform`/`list_filter` still used the arrow, so
     `backfill_gamelines_from_actionnetwork` returned a `BinderException` on any duckdb 2.0
-    build while passing on 1.5.5 -- which read as flaky, order-dependent test failure.
+    build while passing on 1.5.5 -- which read as an order-dependent test failure.
     `lambda x:` is accepted by both, so the arrow has no reason to come back.
+
+    Checked over string literals rather than raw lines: the SQL is built by f-string and
+    the offending arrows sat on *continuation* lines of a triple-quoted block, so any
+    grep anchored to the `list_filter(` line misses them. Docstrings and `#` comments are
+    excluded -- several of them legitimately write `a -> b` as prose.
     """
+    import ast
+    import re
     from pathlib import Path
 
     source = (Path(__file__).resolve().parents[1] / "cfb_system_maker"
               / "duckdb_load.py").read_text(encoding="utf-8")
-    for keyword in ("list_transform(", "list_filter(", "list_reduce("):
-        for idx, line in enumerate(source.splitlines(), 1):
-            if keyword in line:
-                assert "->" not in line, f"duckdb_load.py:{idx} uses the deprecated arrow"
-    assert " x -> " not in source and " t -> " not in source
+    tree = ast.parse(source)
+    docstrings = {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+        and isinstance(node.body[0].value.value, str)
+    }
+    arrow = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\s*->")
+    offenders = [
+        (node.lineno, arrow.search(node.value).group())
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+        and arrow.search(node.value)
+    ]
+    assert not offenders, f"deprecated lambda arrow in SQL: {offenders}"
