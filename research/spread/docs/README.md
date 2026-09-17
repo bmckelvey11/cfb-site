@@ -56,6 +56,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `phcover-accuracy-2026-09-17.md` | review | EXPLORATORY: PT's published P(home covers). AUC 0.489, Brier skill negative, and 99.45% a transform of `lineavg - line`. No signal. |
 | `linestd-confidence-2026-09-17.md` | review | EXPLORATORY: PT's panel dispersion. No volatility content; no quintile rescues the panel signal, which goes 0.4943 ATS over 2003-2025. |
 | `phwin-accuracy-2026-09-17.md` | review | EXPLORATORY: PT's P(home wins). A real forecast (AUC 0.80) but beaten by the line on AUC and Brier, and encompassed by it. |
+| `model-columns-ats-2026-09-17.md` | review | EXPLORATORY: all 109 screened PT model columns bet ATS against the close. Walk-forward selection lands at 0.5001; no model's CI clears the vig. |
 | `review-2026-09-02-composite-spread.md` | dated record | The pivot from margin to movement; §5–6 set the direction. Cites archived files. |
 | `session-guide-2026-09-02.md` | dated record | Narrative of the 2026-09-02 session. Paths and numbers are as of that day; see its banner. |
 
@@ -75,6 +76,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_phcover_calibration.py` | `phcover-accuracy-2026-09-17.md` | `processed/phcover_calibration.json` |
 | `eval_linestd_confidence.py` | `linestd-confidence-2026-09-17.md` | `processed/linestd_confidence.json` |
 | `eval_phwin_accuracy.py` | `phwin-accuracy-2026-09-17.md` | `processed/phwin_accuracy.json` |
+| `eval_model_columns_ats.py` | `model-columns-ats-2026-09-17.md` | `processed/model_columns_ats.json` |
 | `edge_vs_market_move.py` | `actionable-picks-2026-09-17.md` § 0: regresses the served `edge` on the move since the opener | stdout |
 | `version_b_ceiling.py` | `line-movement-results.md` § version B read of 2026-09-17: E\|close − anchor\| (the CLV ceiling) and each week's anchor ET weekday | stdout |
 
