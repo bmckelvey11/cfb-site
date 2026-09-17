@@ -94,6 +94,7 @@ class Config:
     oz_haircut: bool = True     # apply the guide's selection haircut to over-zero p
     gl_prior: str = "pooled"    # key into GL_PRIORS
     gl_coverage: float = 1.0    # fraction of weekly Greenline flags actually bet
+    resize_weekly: bool = False # stake off the bankroll at the start of each week
     seed: int = 20260917
 
 
@@ -143,6 +144,13 @@ def simulate(cfg: Config) -> dict:
 
     for w in range(WEEKS_REMAINING):
         shock = rng.standard_normal(n)
+        if cfg.resize_weekly:
+            # Weekly compounding: units re-sized off the bankroll as it stands before
+            # the week's slate. Within a week stakes are still flat -- Saturday
+            # kickoffs are simultaneous. A path at or below zero stops betting.
+            live = np.maximum(cfg.bankroll + pnl, 0.0)
+            oz_stake = live * cfg.oz_unit
+            gl_stake = live * cfg.gl_unit
 
         gl_n = rng.poisson(GL_FLAGS_PER_WEEK * cfg.gl_coverage, n)
         gl_wins = _copula_wins(rng, gl_n, shock, z_gl, a, c, upper=False)
@@ -390,6 +398,14 @@ def self_check() -> None:
     assert f.shape == (WEEKS_REMAINING + 1, len(PCTS)), f.shape
     assert np.allclose(f[0], Config().bankroll), f[0]
     assert (np.diff(f, axis=1) >= 0).all(), "percentiles must be non-decreasing"
+    # weekly resizing must lift the upper tail, and at a unit where one week's
+    # slate cannot exceed the bankroll (0.25% x ~49 flags = 12%) it cannot bust.
+    # Within a week stakes are still flat, so a 2% unit CAN bust on one Saturday.
+    flat = simulate(Config(paths=5_000, seed=4, gl_unit=0.0025))
+    grow = simulate(Config(paths=5_000, seed=4, gl_unit=0.0025, resize_weekly=True))
+    assert grow["p_bust"] == 0.0, grow["p_bust"]
+    assert grow["final"].min() > 0
+    assert np.percentile(grow["final"], 95) > np.percentile(flat["final"], 95)
     print("self-check OK")
 
 
@@ -405,6 +421,8 @@ def main() -> None:
                     help="skip the MODEL_GUIDE selection haircut on over-zero p")
     ap.add_argument("--gl-prior", choices=sorted(GL_PRIORS), default="pooled",
                     help="which Greenline record to draw the win rate from")
+    ap.add_argument("--resize-weekly", action="store_true",
+                    help="re-size units off the bankroll at the start of each week")
     ap.add_argument("--gl-coverage", type=float, default=1.0,
                     help="fraction of the weekly Greenline flags actually bet")
     ap.add_argument("--seed", type=int, default=20260917)
@@ -420,7 +438,8 @@ def main() -> None:
     base = Config(bankroll=args.bankroll, paths=args.paths, rho=args.rho,
                   oz_unit=args.oz_unit, gl_unit=args.gl_unit,
                   oz_haircut=not args.no_haircut, gl_prior=args.gl_prior,
-                  gl_coverage=args.gl_coverage, seed=args.seed)
+                  gl_coverage=args.gl_coverage, resize_weekly=args.resize_weekly,
+                  seed=args.seed)
 
     def variant(**kw):
         return Config(**dict(base.__dict__, **kw))
