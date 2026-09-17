@@ -772,8 +772,8 @@ def _backfill_gamelines(
     )
     loc = """list_first(list_transform(list_filter(
               TRY_CAST(teams AS JSON[]),
-              t -> TRY_CAST(json_extract(t, '$.id') AS BIGINT) = {tid}
-            ), t -> json_extract_string(t, '$.location')))"""
+              lambda t: TRY_CAST(json_extract(t, '$.id') AS BIGINT) = {tid}
+            ), lambda t: json_extract_string(t, '$.location')))"""
     home_loc = loc.format(tid="home_team_id")
     away_loc = loc.format(tid="away_team_id")
 
@@ -1498,7 +1498,7 @@ def _path_populated_predicate(path: str) -> str:
         return (
             f"json_extract(payload, '{path}') IS NOT NULL"
             f" AND len(list_filter(json_extract(payload, '{path}')::JSON[],"
-            f" x -> json_type(x) <> 'NULL')) > 0"
+            f" lambda x: json_type(x) <> 'NULL')) > 0"
         )
     return f"json_type(payload, '{path}') <> 'NULL'"
 
