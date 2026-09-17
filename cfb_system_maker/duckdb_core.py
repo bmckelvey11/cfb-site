@@ -540,7 +540,7 @@ def _merge_game_lines(con: duckdb.DuckDBPyConnection) -> bool:
 
     ``has_line`` on ``core.fact_game`` stays REST-defined. It is computed by
     ``_select_line`` over ``stg.lines`` and drives ``selected_spread``/``selected_total``,
-    which the spread model reads; redefining it here would move the model's inputs. The
+    which the pred-tracker-model reads; redefining it here would move the model's inputs. The
     consequence is named rather than hidden: after this merge 90 line rows on 16 games sit
     under ``has_line = false``, so that flag means "no REST line the selector accepted",
     not "no line row exists".

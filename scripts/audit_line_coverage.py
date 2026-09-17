@@ -4,7 +4,7 @@ Row counts do not answer "can I model this season". Three things do, and they
 arrived at different times:
 
 * a **closing** line (grades a bet),
-* an **opening** line (the other end of the movement the spread model predicts),
+* an **opening** line (the other end of the movement the pred-tracker-model predicts),
 * **tick** history (when the move happened, so CLV has a timestamp).
 
 This reports all three per season, plus the book panel, because the panel is not

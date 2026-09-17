@@ -162,7 +162,7 @@ absent:
 | `dim_conference` | `stg.conferences` + `stg.conference` | |
 | `dim_team` | `raw.teams` + `raw.fbs_teams` | opponents outside CFBD's team table get name-derived ids; LEFT JOIN to `dim_team` |
 | `dim_venue` | `stg.venues` | |
-| `fact_game` | REST games 2012+, selected close per provider | `has_line`, `selected_spread`, `selected_total` are REST-defined; the spread model reads them |
+| `fact_game` | REST games 2012+, selected close per provider | `has_line`, `selected_spread`, `selected_total` are REST-defined; the pred-tracker-model reads them |
 | `fact_game_line` | unnest of `stg.lines.lines` at `(game_id, provider_key)` | then `_merge_game_lines` full-outer-joins the `stg.game_lines` tape (`period='game'`); REST wins conflicts, `_source` ∈ {`rest`, `gql`, `both`}, disagreements kept in `fact_game_line_conflicts` |
 | `dim_lines_provider` | distinct books on the merged tape | DraftKings aliases collapse to one key |
 | `fact_game_team` | running stats over `fact_game` | same code path as the app's `running_stats` |

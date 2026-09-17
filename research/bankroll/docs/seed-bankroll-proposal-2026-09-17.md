@@ -93,7 +93,7 @@ skips it.**
 
 ### Excluded, for now
 
-The spread model in `research/spread/` is research, not a bet. Greenline spreads and
+The pred-tracker-model in `research/spread/` is research, not a bet. Greenline spreads and
 moneylines went 21–28 and 21–25 in week 2 and are not funded. **Golf** enters at zero
 until it has a graded record, then at the same rule as every other leg.
 

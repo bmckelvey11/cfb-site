@@ -9,6 +9,10 @@ The earlier question — can the panel out-forecast the closing line as a margin
 closed and archived: `archive/spread-margin-era/` (never cite as current). What it left behind
 that the live tree still uses is listed in that folder's README.
 
+The forecaster this tree serves is the **pred-tracker-model** (E4 and its siblings, via
+`weekly_slate.py`) — distinct from **The Prediction Tracker** / **PT**, the upstream vendor
+panel it reads. Renamed from "the spread model" on 2026-09-17.
+
 ## Current position, in three sentences
 
 Anchored on the opener, the screened consensus (E4) anticipates about 15% of the open→close

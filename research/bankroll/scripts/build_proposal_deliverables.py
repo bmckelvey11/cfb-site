@@ -180,7 +180,7 @@ def build_pptx() -> Path:
     ], col_w=[2.3, 4.9, 4.9], size=12)
     text(s, 0.6, 5.6, 12, 1.2, [
         "Conflict rule: same game flagged on opposite sides → Greenline takes it, over-zero skips it.",
-        "Excluded: the spread model (research, not a bet); Greenline spreads and moneylines (21–28 and 21–25 in week 2).",
+        "Excluded: the pred-tracker-model (research, not a bet); Greenline spreads and moneylines (21–28 and 21–25 in week 2).",
     ], 13, color=MUTED)
 
     # 3b bets per week

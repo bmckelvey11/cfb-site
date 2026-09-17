@@ -6,6 +6,11 @@ data, archive, and no-lookahead rules live in root `CLAUDE.md`.
 
 `docs/README.md` indexes every document, script, and data artifact in this tree. Start there.
 
+**Name.** This unit's forecaster is the **pred-tracker-model** — E4 and its siblings as served
+by `weekly_slate.py`. It is not "the spread model" (retired 2026-09-17) and not **The Prediction
+Tracker** / **PT**, which is the upstream vendor panel it reads. PT is the input; the
+pred-tracker-model is what we fit on it.
+
 - Raw Prediction Tracker source belongs under `$CFB_DATA_ROOT/ingest/prediction_tracker/`.
 - Preserve preregistration order: `prereg-line-movement.md` and its amendments are binding;
   an amendment overrides only the rules it names. Results go in `line-movement-results.md`;
