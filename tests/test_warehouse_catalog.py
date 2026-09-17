@@ -192,9 +192,7 @@ def test_sampling_is_deterministic():
     db = Path(os.environ.get("CFB_DATA_ROOT", "")) / "cfb.duckdb"
     if not db.exists():
         pytest.skip("no live CFB_DATA_ROOT warehouse")
-    import duckdb
-
-    con = duckdb.connect(str(db), read_only=True)
+    con = bwc.connect()
     try:
         # The tables that tie on every scalar column, so only a total order fixes them.
         for schema, name in (

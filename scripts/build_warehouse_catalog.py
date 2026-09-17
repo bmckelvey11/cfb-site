@@ -388,9 +388,23 @@ def render(data: dict) -> str:
     return "\n" + "\n".join(lines)
 
 
+def connect() -> duckdb.DuckDBPyConnection:
+    """Read-only warehouse connection with a capped buffer pool.
+
+    Sampling touches every table, so DuckDB's default limit (80% of RAM, 12.5
+    GiB here) lets the buffer pool grow to hold most of the 5.3 GB file. Under a
+    full test run the machine is already short on memory and the next allocation
+    fails outright. Capping it makes DuckDB evict instead; the sample queries are
+    streaming top-N, so nothing here needs the headroom.
+    """
+    con = duckdb.connect(str(cfb_paths.DB_PATH), read_only=True)
+    con.execute("set memory_limit='1GB'")
+    return con
+
+
 def build(html: str) -> tuple[str, dict, dict]:
     seed = parse_data(html)
-    con = duckdb.connect(str(cfb_paths.DB_PATH), read_only=True)
+    con = connect()
     try:
         data = introspect(con, seed)
     finally:
