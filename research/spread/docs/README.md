@@ -54,6 +54,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `build-brief-2026-09-08.md` | appendix | Parallel execution of the hardened plan: waves, file ownership, per-agent acceptance checks. |
 | `actionable-picks-2026-09-17.md` | review | Can the slate be bet today? No — the anchor holds ~0.7 pt of move total, and beat-close inverts with edge. Points at the results doc. |
 | **`pt-findings-summary-2026-09-17.md`** | **index** | **Start here for the 2026-09-17 PT studies.** Connects all six, the mechanism they share, and what is still open. Restates no numbers. |
+| `tick-anchored-model-infeasible-2026-09-17.md` | review | Why the current-line anchor cannot be built: the archive's only line IS the target, an_market has no timestamp, the 275 tick paths are all inside the forward-test period, and AN does not retain settled paths. |
 | `phcover-accuracy-2026-09-17.md` | review | EXPLORATORY: PT's published P(home covers). AUC 0.489, Brier skill negative, and 99.45% a transform of `lineavg - line`. No signal. |
 | `linestd-confidence-2026-09-17.md` | review | EXPLORATORY: PT's panel dispersion. No volatility content; no quintile rescues the panel signal, which goes 0.4943 ATS over 2003-2025. |
 | `phwin-accuracy-2026-09-17.md` | review | EXPLORATORY: PT's P(home wins). A real forecast (AUC 0.80) but beaten by the line on AUC and Brier, and encompassed by it. |

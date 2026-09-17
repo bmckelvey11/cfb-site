@@ -146,7 +146,10 @@ BOOK_SET_VERSION = 4
 # the opener. Re-anchoring E4 on the current line is the fix, but it CANNOT be fitted on this
 # archive: `fit_movement_models` targets -hist["line"], so making `line` the anchor makes the
 # anchor identical to the target (gamma collapses to 0.000, live edge to ~0). A real re-anchor
-# needs the Action Network tick tape (stg.an_market, 2024-2026) and its own walk-forward test.
+# needs a tick tape anchored at slate time, and no such dataset exists or can be obtained:
+# stg.an_market has no timestamp column, the 275 Action Network tick paths on disk are all inside
+# the 2026 forward-test period, and AN does not retain the path of a settled event, so it cannot
+# be backfilled. Full argument: docs/tick-anchored-model-infeasible-2026-09-17.md.
 #
 # This stamp exists so that when the definition does change, version B can separate the eras
 # instead of silently pooling two different bet sets -- the same mechanism amendment S2 used for
