@@ -22,12 +22,14 @@ Selection: the 20 test files matching `grep -ln duckdb tests/*.py`. A control ru
 on 1.5.5 — newest in the pin range — established that a failure is attributable to
 the DuckDB version and not to running on 3.13 instead of 3.14.
 
-Reproduce:
+Reproduce (Git Bash, from repository root; `V` is any scratch path):
 
 ```
-py -3.13 -m venv /tmp/v && /tmp/v/Scripts/python -m pip install -r requirements.txt
-/tmp/v/Scripts/python -m pip install duckdb==<version>
-CFB_DATA_ROOT=C:/Users/mckel/dev/cfb/data /tmp/v/Scripts/python -m pytest $(grep -ln duckdb tests/*.py) -q
+V=/c/Users/mckel/AppData/Local/Temp/duckdb-floor-venv
+py -3.13 -m venv "$V"
+"$V/Scripts/python.exe" -m pip install -r requirements.txt
+"$V/Scripts/python.exe" -m pip install "duckdb==1.4.5"   # or 1.3.0, 1.5.0, ...
+CFB_DATA_ROOT=C:/Users/mckel/dev/cfb/data "$V/Scripts/python.exe"   -m pytest $(grep -ln duckdb tests/*.py) -q
 ```
 
 ## Result
