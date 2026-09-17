@@ -56,3 +56,15 @@ idea that has no code yet, belongs here.
   strand has been implemented or tested here. Treat every claim in it as a hypothesis to
   test against the warehouse, not as a result, and do not cite it as a finding.
 - Anything from this strand that gets built and backtested belongs in `models/totals/`.
+
+## Not in this unit
+
+- **Which flags actually got bet** is a staking question, not a "does Greenline win"
+  question, so the ledger lives in `research/bankroll/` (`greenline_bet_log.py`). It
+  reads this unit's captures and never writes to them. Seed it after every capture —
+  an unmarked week cannot be recovered later, which is exactly why the 2023-25
+  coverage question has no answer.
+- **Bankroll, staking, and any projection that combines Greenline with another
+  strategy** belong to `research/bankroll/` as well. A question about whether
+  Greenline's picks win belongs here; a question about how much to bet on them
+  does not.

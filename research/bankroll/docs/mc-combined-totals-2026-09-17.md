@@ -3,7 +3,7 @@
 Completed September 17, 2026. Revised the same day to pool the personal under history
 into the Greenline prior, then again to bracket the headline between the pooled and
 graded-flags-only priors. Reproduce with
-`python scripts/mc_combined_totals.py --paths 100000`
+`python research/bankroll/scripts/mc_combined_totals.py --paths 100000`
 (`--self-check` runs the copula, prior and coverage assertions).
 
 ## The question
@@ -31,7 +31,7 @@ Neither is the answer on its own. The pooled prior adds **114–87 from the 201
 full-game unders in the personal book export, 2023-08 to 2025-12**, which were mostly
 PFF Greenline flags — the same signal in earlier seasons. That drops the probability
 of drawing a losing Greenline win rate from 35% to 10%. But
-`research/totals/docs/under-selection-profile-2026-09-17.md` shows those 201 unders
+[`under-selection-profile-2026-09-17.md`](under-selection-profile-2026-09-17.md) shows those 201 unders
 sit at a **median total of 58.5 against 52.5 for the 2026 under flags** — a six-point
 gap — so the two populations are not the same and the pooled prior probably
 overstates. Greenline's
@@ -56,7 +56,7 @@ The personal unders come from `data/ingest/bet_history/history.csv` —
 the Greenline leg stays priced at −110. By season: 2023 42–37, 2024 18–12,
 2025 54–38. Summarised in `docs/bet-history-analysis-2023-2025.md` (114-87, 56.7%,
 CI 49.8–63.4, +19.0u) and profiled game by game in
-`research/totals/docs/under-selection-profile-2026-09-17.md`.
+[`under-selection-profile-2026-09-17.md`](under-selection-profile-2026-09-17.md).
 
 **This is pooled as prior evidence, not as independent confirmation.** Those unders
 were mostly PFF Greenline flags — the same signal in earlier seasons, bet by the same
@@ -127,7 +127,10 @@ Bottom right: every scenario, median and 5th–95th; the one long whisker is the
 every-flag-at-1% row, which is also the least supported.*
 
 Regenerate with
-`python scripts/mc_combined_totals.py --paths 100000 --figs docs/figs/mc-combined-totals-2026-09-17.png`.
+```
+python research/bankroll/scripts/mc_combined_totals.py --paths 100000 \
+  --figs research/bankroll/docs/figs/mc-combined-totals-2026-09-17.png
+```
 
 100,000 paths, ρ = 0.10, over-zero at 1% ($200/bet) throughout.
 
@@ -232,7 +235,7 @@ tail number is not, because ρ is assumed.
    (`scripts/pull_pff_scoreboard.py --greenline`), grade Monday
    (`research/totals/scripts/grade_greenline.py`), rerun this script.
 
-The logging in item 2 now exists: `research/totals/scripts/greenline_bet_log.py` holds
+The logging in item 2 now exists: [`../scripts/greenline_bet_log.py`](../scripts/greenline_bet_log.py) holds
 one row per totals flag per week, seeded from the captures. Weeks 2 and 3 of 2026 are
 seeded and **unmarked** — 106 flags waiting on which ones were bet.
 

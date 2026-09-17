@@ -22,6 +22,7 @@ human-facing product intent. None should duplicate another file's rules.
 | Over-zero models and floor-bias research | `models/over_zero/` | `models/over_zero/CLAUDE.md` |
 | Spread forecast research | `research/spread/` | `research/spread/CLAUDE.md` |
 | Totals research not yet in the harness (Greenline evaluation, modeling reading) | `research/totals/` | `research/totals/CLAUDE.md` |
+| Bankroll, staking, and combined-strategy projection | `research/bankroll/` | `research/bankroll/CLAUDE.md` |
 
 ## Shared rules
 

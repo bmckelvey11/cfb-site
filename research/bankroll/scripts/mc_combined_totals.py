@@ -1,8 +1,8 @@
 """Monte Carlo projection for the rest of the 2026 season: over-zero OVERs + Greenline totals.
 
-    python scripts/mc_combined_totals.py
-    python scripts/mc_combined_totals.py --paths 100000 --rho 0.15
-    python scripts/mc_combined_totals.py --self-check
+    python research/bankroll/scripts/mc_combined_totals.py
+    python research/bankroll/scripts/mc_combined_totals.py --paths 100000
+    python research/bankroll/scripts/mc_combined_totals.py --self-check
 
 Two legs, very different shapes. Over-zero (floor bias, bias > 1.75) fires ~11
 times across weeks 4-15 -- its volume is front-loaded into the FCS-cupcake weeks

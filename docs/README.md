@@ -10,6 +10,7 @@ Unit-specific docs live in that unit's `docs/`:
 | Over-zero models, floor-bias research | [`models/over_zero/docs/`](../models/over_zero/docs/) |
 | Spread forecast research | [`research/spread/docs/`](../research/spread/docs/) |
 | Totals research | [`research/totals/docs/`](../research/totals/docs/) |
+| Bankroll, staking, combined-strategy projection | [`research/bankroll/docs/`](../research/bankroll/docs/) |
 | Superseded, never cited as current | [`archive/`](../archive/README.md) |
 
 The warehouse/ingest cluster below is **correctly** at root: 33 files under `scripts/`,

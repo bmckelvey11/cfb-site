@@ -1,14 +1,14 @@
 """Record which Greenline flags actually got bet, week by week.
 
-    python research/totals/scripts/greenline_bet_log.py --seed            # add new weeks
-    python research/totals/scripts/greenline_bet_log.py --import-book      # from history.csv
-    python research/totals/scripts/greenline_bet_log.py --show 2          # review a week
-    python research/totals/scripts/greenline_bet_log.py --mark 2 31104 31122 --line 54.5
-    python research/totals/scripts/greenline_bet_log.py --none 2          # bet nothing
-    python research/totals/scripts/greenline_bet_log.py --coverage
-    python research/totals/scripts/greenline_bet_log.py --self-check
+    python research/bankroll/scripts/greenline_bet_log.py --seed        # add new weeks
+    python research/bankroll/scripts/greenline_bet_log.py --import-book # from history.csv
+    python research/bankroll/scripts/greenline_bet_log.py --show 2      # review a week
+    python research/bankroll/scripts/greenline_bet_log.py --mark 2 31104 --line 54.5
+    python research/bankroll/scripts/greenline_bet_log.py --none 2      # bet nothing
+    python research/bankroll/scripts/greenline_bet_log.py --coverage
+    python research/bankroll/scripts/greenline_bet_log.py --self-check
 
-`research/totals/docs/under-selection-profile-2026-09-17.md` could not answer the
+`../docs/under-selection-profile-2026-09-17.md` could not answer the
 question it set out to: which flags get bet. The 2023-25 bet history has no matching
 Greenline capture, and no archive of the 2023-25 flags exists. From 2026 week 2
 forward both sides exist in the same week, so the answer is a logging problem rather
