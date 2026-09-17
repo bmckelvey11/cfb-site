@@ -201,3 +201,26 @@ def test_grade_list_match_and_mismatch(con):
     assert not ok
     ok, why = grade(con, lst, "select [3, null, 1] as xs")
     assert not ok
+
+
+MODULES = [
+    "A1", "A2", "A3", "A4", "A5", "A6", "A7",
+    "B1", "B2", "B3", "B4", "B5",
+    "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8",
+]
+
+
+@pytest.mark.parametrize("code", MODULES)
+def test_every_solution_runs(code, con):
+    from learning.sql_course.course import RunSqlError, load_solutions, run_sql
+
+    sols = load_solutions(code)
+    assert set(sols) == {1, 2, 3, 4, 5}, f"{code} expected exercises 1-5, got {sorted(sols)}"
+    for n, sol in sorted(sols.items()):
+        assert sol.check in {"exact", "probe", "manual"}, f"{code}-{n} bad check {sol.check!r}"
+        if sol.check == "probe":
+            assert sol.probes, f"{code}-{n} probe check needs -- probe: lines"
+        try:
+            run_sql(con, sol.sql)
+        except RunSqlError as exc:
+            pytest.fail(f"{code}-{n}: {exc}")
