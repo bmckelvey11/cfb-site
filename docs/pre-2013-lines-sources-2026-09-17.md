@@ -26,7 +26,7 @@ The spread research has been running on it since at least 2026-09-02.
 | 2005 | 665 | 665 | 662 | 661 |
 | 2006 | 281 | 281 | 281 | 280 |
 | 2007 | 712 | 712 | 712 | 712 |
-| 2008 | 718 | 718 | 718 | 712 |
+| 2008 | 718 | 718 | 718 | 716 |
 | 2009 | 714 | 714 | 714 | 714 |
 | 2010 | 718 | 718 | 718 | 716 |
 | 2011 | 715 | 715 | 715 | 715 |
@@ -67,9 +67,12 @@ Internet Archive is back up.
 
 ## Recommendation
 
-1. **Spreads:** stop looking. Promote the existing Prediction Tracker tape into the
-   warehouse as a `_source`-tagged provider in `core.fact_game_line` so 2001–2012 stops
-   reading as "no lines". The join to `game_id` is already done.
+1. **Spreads:** stop looking. The proposed next task — not done here, and not yet
+   agreed — is to promote the existing Prediction Tracker tape into
+   `core.fact_game_line` as a `_source`-tagged provider so 2001–2012 stops reading as
+   "no lines". The join to `game_id` is already done, but this is **not an insert**:
+   `core.fact_game_line` is rebuilt by `build_core` on every refresh, so it needs a
+   loader entry plus a decision on what `provider_key` an unnamed market line gets.
 2. **Totals:** retry the Sportsbook Reviews Online archive through the Wayback Machine
    once the Internet Archive is reachable. If its files come back, it covers spread,
    total, and moneyline together and would supersede point 1 as well.
@@ -84,6 +87,10 @@ Internet Archive is back up.
   [cfbd-lines-coverage doc](cfbd-lines-coverage-2026-09-17.md) already notes that even
   CFBD's 2013–2017 rows are aggregators and model lines rather than real sportsbooks, so
   a provider-naive pre-2013 series is consistent with the era, not an anomaly.
+- **`line` is *treated as* the close, not proven to be one.** The repo inherited that
+  reading from `research/spread/docs/session-guide-2026-09-02.md`; nothing here
+  establishes whether the pre-2013 values are true closing numbers or a stale midweek
+  snapshot.
 - **`lineopen` is a look-ahead number for early-season games**, posted months ahead.
   `research/spread/docs/session-guide-2026-09-02.md` already flags this, along with the
   UCLA–California `lineopen = −55.0` typo. Anything using the opener as a bettable anchor
