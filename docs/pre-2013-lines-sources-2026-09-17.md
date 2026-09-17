@@ -38,6 +38,21 @@ Match quality is high: 17,731 of 17,755 rows across 2001–2025 are `matched`, 2
 Two known holes: **2006 is 281 rows against ~700 elsewhere**, and **2001 has no opening
 line at all**.
 
+### 2006 is an upstream gap, not a truncated download (checked 2026-09-17)
+
+Re-pulled `https://www.thepredictiontracker.com/ncaa2006.csv` (HTTP 200, 141,620 bytes).
+It is **byte-identical** to the copy on disk — both 281 rows, MD5
+`bef9c98b5fdc8f2372f5a7a45ba4787b`. The season file upstream simply stops early:
+
+| CFBD week | 1 | 2 | 3 | 4 | 5 | 6 | 7–9 | 10 | 11+ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| games | 44 | 50 | 50 | 49 | 50 | 34 | 0 | 4 | 0 |
+
+Weeks 1–5 run at the same rate as 2005 and 2007, week 6 is half, weeks 7–9 are empty, and
+four stray games sit at week 10. So 2006 is usable for weeks 1–6 and absent afterwards —
+not a file to re-fetch. Whether an older, fuller capture exists could not be checked: the
+Internet Archive was returning "Temporarily Offline" throughout this session.
+
 ## The totals half has no source
 
 The Prediction Tracker tape carries **no over/under, in any season**. Its `total` column
@@ -76,8 +91,9 @@ Internet Archive is back up.
 2. **Totals:** retry the Sportsbook Reviews Online archive through the Wayback Machine
    once the Internet Archive is reachable. If its files come back, it covers spread,
    total, and moneyline together and would supersede point 1 as well.
-3. **2006:** re-pull `ncaa2006.csv` from upstream before promoting anything — 281 rows is
-   a truncated file, not a thin season.
+3. **2006:** nothing to re-pull — the upstream file is identical to the local copy and
+   covers only weeks 1–6 (see above). Either accept 2006 as a partial season or try the
+   Wayback Machine for an older capture once the Internet Archive is reachable.
 
 ## Caveats that survive any of the above
 
