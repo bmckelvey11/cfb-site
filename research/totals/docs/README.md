@@ -19,6 +19,7 @@ PFF showed, and accumulate until the sample can answer.
 | --- | --- |
 | [greenline-season-review-2026-09-16.md](greenline-season-review-2026-09-16.md) | Season to date, all three markets — record, Wilson intervals, units, ROI, CLV, calibration, and the minimum detectable win rate for each sample |
 | [greenline-totals-season-2026-09-16.md](greenline-totals-season-2026-09-16.md) | The same review narrowed to totals, with the CLV section against the PFF board close |
+| [greenline-band-significance-2026-09-17.md](greenline-band-significance-2026-09-17.md) | Is the market-total band split real? Chi-square, Fisher, best-of-six correction, trend, and out-of-sample ordering test. Not significant; band ordering withdrawn |
 | [greenline-w2-grade-2026-09-15.md](greenline-w2-grade-2026-09-15.md) | Week 2's 36 positive-edge unders graded, including the six flags that needed a score or line fallback |
 | [../../bankroll/docs/under-selection-profile-2026-09-17.md](../../bankroll/docs/under-selection-profile-2026-09-17.md) *(in `research/bankroll/`)* | Which unders got bet, 2023-25, against every FBS game on the same days — the selection is a high-total rule, and the bet unders sit six points above where Greenline flags |
 
