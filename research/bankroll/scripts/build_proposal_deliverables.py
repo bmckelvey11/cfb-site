@@ -170,7 +170,7 @@ def build_pptx() -> Path:
         ["record", "151–83, 64.5% (58.2–70.4%), walk-forward 2016–25", "27–22, 55.1% (41–68%), 2026 wk 2; + 114–87 personal unders 2023–25"],
         ["planning win rate", "58.2%, the interval floor", "bracket: 55.0% (2026 only) to 56.4% (pooled)"],
         ["price", "−120 or better", "−110"],
-        ["bets left in 2026", "~11, median +$133", "6–12 a week by plan, ~108 total (~16% of flags)"],
+        ["bets left in 2026", "~11, median +$133", "6–12 a week by plan, ~107 total (~16% of flags)"],
         ["role", "better evidence, nearly spent for 2026; matters in 2027", "carries the whole 2026 projection"],
     ], col_w=[2.3, 4.9, 4.9], size=12)
     text(s, 0.6, 5.6, 12, 1.2, [
