@@ -271,6 +271,18 @@ def shop(quotes: dict) -> dict:
                     "best_home_odds": quotes[b.idxmax()][1],
                     "best_away_an": b.min(), "best_away_book": b.idxmin(),
                     "best_away_odds": quotes[b.idxmin()][1]})
+    else:
+        # No BETTABLE book has posted -- normal near kickoff, when DraftKings and FanDuel pull
+        # their numbers while the offshore books stay up. Emit the keys as empty rather than
+        # omitting them: if NO game on the slate has a bettable quote, omitting leaves the
+        # best_* COLUMNS absent from the frame entirely, and the SHOP block then raises
+        # AttributeError. That killed the whole run before append_forward_log, costing the
+        # Sun 2026-09-13 12:30 ET capture. The fair still uses every book; only the slip is
+        # restricted, so an empty slip is a valid row, not a missing one.
+        out.update({"best_home_an": np.nan, "best_home_book": "",
+                    "best_home_odds": np.nan,
+                    "best_away_an": np.nan, "best_away_book": "",
+                    "best_away_odds": np.nan})
     return out
 
 
@@ -532,6 +544,18 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
         # must still exist as float NaN or every downstream arithmetic turns object-dtype.
         for c in ("fair_an", "best_home_an", "best_away_an"):
             t[c.replace("_an", "_pt")] = -t[c] if c in t else np.nan
+        # The book and odds columns need the same backfill and did not have it. shop() returns
+        # {} outright for a game with fewer than two quotes, so when NO game on the slate clears
+        # that bar these columns are absent from the frame entirely -- and the SHOP block
+        # dereferences them as attributes (r.best_home_book), which raises AttributeError rather
+        # than yielding NaN. Because write_xlsx runs before append_forward_log, that killed the
+        # whole run and cost version B the Sun 2026-09-13 12:30 ET capture.
+        for c in ("best_home_book", "best_away_book"):
+            if c not in t:
+                t[c] = ""
+        for c in ("best_home_odds", "best_away_odds"):
+            if c not in t:
+                t[c] = np.nan
         for c in ("range", "n_books", "event_id"):
             if c not in t:
                 t[c] = np.nan
@@ -803,6 +827,16 @@ def main() -> int:
     except PermissionError:      # the workbook is open in Excel; the CSV and forward log still land
         print(f"  weekly_slate_latest{suffix}.xlsx is open elsewhere -- workbook not refreshed",
               file=sys.stderr)
+    except Exception as exc:
+        # The workbook is a CONVENIENCE; the forward log below is version B's registered dataset
+        # and a missed snapshot is unrecoverable, because PT overwrites its CSV in place. Before
+        # this guard an exception here killed main() before append_forward_log ever ran, so a
+        # display bug silently cost a capture. Observed 2026-09-17: near kickoff the books stop
+        # posting, `best_home_book` is never created, and the SHOP block raises AttributeError.
+        # Report loudly, keep going.
+        print(f"  weekly_slate_latest{suffix}.xlsx NOT written -- {type(exc).__name__}: {exc}",
+              file=sys.stderr)
+        print("  (the CSV and the forward log are unaffected)", file=sys.stderr)
     # A snapshot with no book match is a stale slate (PT still serving last week's games after
     # they kicked off); logging it would add ungradable rows to version B's dataset. A --book
     # run is a view, not new data.
@@ -852,7 +886,14 @@ def _check() -> None:
     q = {"68": (-7.5, -110), "69": (-7.0, -110), "71": (18.0, -110)}
     s = shop(q)
     assert s["n_books"] == 2 and s["fair_an"] == -7.25, s   # BetRivers' 18 was guarded out
-    assert "best_home_an" not in s, s                       # no bettable book posted -> no best
+    # No bettable book posted -> the best_* keys are PRESENT and empty, never omitted. Omitting
+    # them used to leave the columns absent from the whole frame when no game had a bettable
+    # quote, which crashed the SHOP block and cost a capture (see `shop`).
+    assert set(s) >= {"best_home_an", "best_home_book", "best_away_an", "best_away_book"}, s
+    assert np.isnan(s["best_home_an"]) and np.isnan(s["best_away_an"]), s
+    assert s["best_home_book"] == "" and s["best_away_book"] == "", s
+    # and the columns survive into a frame built only from rows like this
+    assert "best_home_book" in pd.DataFrame([s, s]).columns
     # fair over every book, best only at a bettable one: Pinnacle's -6.5 sets neither side's best
     q = {"DraftKings": (-7.5, -110), "FanDuel": (-7.0, -105), "Pinnacle": (-6.5, -108), "Bovada": (-7.5, -110)}
     s = shop(q)
