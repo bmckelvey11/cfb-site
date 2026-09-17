@@ -58,8 +58,14 @@ OZ_SELECTION_HAIRCUT = (OZ_WINS / (OZ_WINS + OZ_LOSSES)) - 0.582  # ~0.063
 # Volume, weeks 4-15. over-zero week-4+ counts by season: 2021..2025 = 8,11,9,11,14.
 OZ_WEEK4PLUS_HISTORY = (8, 11, 9, 11, 14)
 # Greenline: 49 gradeable totals flags in week 2, 57 flagged in week 3. 49 is the
-# graded count and the conservative floor of the two, so that is what is used.
+# graded count and the conservative floor of the two; it is the `constant` volume.
 GL_FLAGS_PER_WEEK = 49.0
+# But Greenline flags EVERY FBS-vs-FBS game: week 2 had 49 such games and 49 flags,
+# week 3 had 57 and 57. So the weekly count is the slate, and the slate is known.
+# core.fact_game, 2026 regular season, both teams is_fbs, weeks 4-13; weeks 14-15
+# are not scheduled in the warehouse yet, so they take 2025's counts (67, 9).
+# Queried 2026-09-17. This is the `slate` volume and the default.
+GL_FLAGS_BY_WEEK = (58, 56, 58, 59, 56, 56, 62, 67, 66, 65, 67, 9)
 
 # What fraction of the flags actually gets bet. The 201-bet personal record came
 # from roughly 92 unders in 2025 against ~690 flags at this rate -- about 13%.
@@ -94,6 +100,7 @@ class Config:
     oz_haircut: bool = True     # apply the guide's selection haircut to over-zero p
     gl_prior: str = "pooled"    # key into GL_PRIORS
     gl_coverage: float = 1.0    # fraction of weekly Greenline flags actually bet
+    gl_volume: str = "slate"    # "slate": flags follow the FBS-vs-FBS schedule; "constant": 49/wk
     resize_weekly: bool = False # stake off the bankroll at the start of each week
     seed: int = 20260917
 
@@ -152,7 +159,8 @@ def simulate(cfg: Config) -> dict:
             oz_stake = live * cfg.oz_unit
             gl_stake = live * cfg.gl_unit
 
-        gl_n = rng.poisson(GL_FLAGS_PER_WEEK * cfg.gl_coverage, n)
+        flags = GL_FLAGS_BY_WEEK[w] if cfg.gl_volume == "slate" else GL_FLAGS_PER_WEEK
+        gl_n = rng.poisson(flags * cfg.gl_coverage, n)
         gl_wins = _copula_wins(rng, gl_n, shock, z_gl, a, c, upper=False)
         week_pnl = gl_wins * gl_stake * gl_b - (gl_n - gl_wins) * gl_stake
 
@@ -388,6 +396,12 @@ def self_check() -> None:
     fat = simulate(Config(paths=5_000, seed=2, gl_prior="pooled"))
     assert fat["p_gl_below_breakeven"] < 0.20, fat["p_gl_below_breakeven"]
 
+    # slate volume must carry ~15% more flags than 49/wk and be week-shaped
+    assert len(GL_FLAGS_BY_WEEK) == WEEKS_REMAINING
+    assert 1.1 < sum(GL_FLAGS_BY_WEEK) / (GL_FLAGS_PER_WEEK * WEEKS_REMAINING) < 1.2
+    sl = simulate(Config(paths=5_000, seed=5, gl_volume="slate"))
+    ct = simulate(Config(paths=5_000, seed=5, gl_volume="constant"))
+    assert sl["mean_turnover"] > ct["mean_turnover"] * 1.1
     # coverage must scale volume, not the win rate
     lo = simulate(Config(paths=5_000, seed=3, gl_coverage=GL_COVERAGE_HISTORICAL))
     hi = simulate(Config(paths=5_000, seed=3, gl_coverage=1.0))
@@ -421,6 +435,8 @@ def main() -> None:
                     help="skip the MODEL_GUIDE selection haircut on over-zero p")
     ap.add_argument("--gl-prior", choices=sorted(GL_PRIORS), default="pooled",
                     help="which Greenline record to draw the win rate from")
+    ap.add_argument("--gl-volume", choices=("slate", "constant"), default="slate",
+                    help="weekly flag count: the FBS-vs-FBS schedule (default) or 49 flat")
     ap.add_argument("--resize-weekly", action="store_true",
                     help="re-size units off the bankroll at the start of each week")
     ap.add_argument("--gl-coverage", type=float, default=1.0,
@@ -439,7 +455,7 @@ def main() -> None:
                   oz_unit=args.oz_unit, gl_unit=args.gl_unit,
                   oz_haircut=not args.no_haircut, gl_prior=args.gl_prior,
                   gl_coverage=args.gl_coverage, resize_weekly=args.resize_weekly,
-                  seed=args.seed)
+                  gl_volume=args.gl_volume, seed=args.seed)
 
     def variant(**kw):
         return Config(**dict(base.__dict__, **kw))

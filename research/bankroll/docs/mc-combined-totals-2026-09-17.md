@@ -3,8 +3,15 @@
 Completed September 17, 2026. Revised the same day to pool the personal under history
 into the Greenline prior, then again to bracket the headline between the pooled and
 graded-flags-only priors. Reproduce with
-`python research/bankroll/scripts/mc_combined_totals.py --paths 100000`
+`python research/bankroll/scripts/mc_combined_totals.py --paths 100000 --gl-volume constant`
 (`--self-check` runs the copula, prior and coverage assertions).
+
+**Volume note, later the same day.** Every table here assumes a constant 49 Greenline
+flags a week. Greenline in fact flags every FBS-vs-FBS game, so the weekly count is the
+slate (56–67 through week 14, 9 in championship week, ~680 in all). The simulator's
+default is now `--gl-volume slate`; the tables below reproduce with `constant`. The
+re-swept numbers are in [bankroll-config-sweep-2026-09-17.md](bankroll-config-sweep-2026-09-17.md)
+and the proposal. Medians rise ~$100–200 at 13% coverage; the conclusions do not move.
 
 ## The question
 

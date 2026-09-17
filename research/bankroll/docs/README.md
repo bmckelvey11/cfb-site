@@ -28,7 +28,7 @@ projection is a Greenline projection, and Greenline's record supports a median o
 | [under-selection-profile-2026-09-17.md](under-selection-profile-2026-09-17.md) | Which unders got bet 2023–25, against every FBS game on the same days. The selection is a high-total rule, and the bet unders sit six points above where Greenline flags |
 | [seed-bankroll-proposal-2026-09-17.md](seed-bankroll-proposal-2026-09-17.md) | The family-facing ask: $20,000 as a gift, what it funds, the bracketed projection, the recommended $100/$200 stakes, and what the numbers do not support. PDF and 8-slide deck alongside |
 | [pooled-bankroll-growth-2026-09-17.md](pooled-bankroll-growth-2026-09-17.md) | Week-by-week fan charts under the pooled prior only, three configs. Deliberately unbracketed; says so |
-| [bankroll-config-sweep-2026-09-17.md](bankroll-config-sweep-2026-09-17.md) | Stake × coverage × prior grid, 40 cells. 0.5% is the largest Greenline stake that keeps P(−25%) ≤ 1% under both priors; the downside ratio is flat in stake and rises only with coverage |
+| [bankroll-config-sweep-2026-09-17.md](bankroll-config-sweep-2026-09-17.md) | Stake × coverage × prior grid, 40 cells, Greenline volume following the FBS-vs-FBS slate (~680 flags). 0.5% is the largest Greenline stake that keeps P(−25%) ≤ 1% under both priors; the downside ratio is flat in stake and rises only with coverage |
 
 ### Figures
 

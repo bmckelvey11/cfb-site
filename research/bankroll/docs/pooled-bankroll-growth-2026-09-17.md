@@ -24,12 +24,15 @@ week stakes are flat either way, because Saturday kickoffs are simultaneous.
 
 | config | staking | median | 5th | 25th | 75th | 95th | P(down) | busts |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| 0.5% x 13% of flags  (recommended) | flat | $20,721 (+3.6%) | $18,758 | $19,918 | $21,524 | $22,670 | 27.3% | 0.0% |
-| 1.0% x 13% of flags | flat | $21,306 (+6.5%) | $17,685 | $19,812 | $22,785 | $24,888 | 27.7% | 0.0% |
-| 0.25% x every flag  (conditional on coverage) | flat | $22,400 (+12.0%) | $17,597 | $20,429 | $24,323 | $27,083 | 20.6% | 0.0% |
-| 0.5% x 13% of flags  (recommended) | weekly re-size | $20,706 (+3.5%) | $18,766 | $19,890 | $21,550 | $22,810 | 28.0% | 0.0% |
-| 1.0% x 13% of flags | weekly re-size | $21,251 (+6.3%) | $17,720 | $19,722 | $22,867 | $25,366 | 29.2% | 0.0% |
-| 0.25% x every flag  (conditional on coverage) | weekly re-size | $22,402 (+12.0%) | $17,615 | $20,309 | $24,633 | $28,210 | 21.8% | 0.0% |
+| 0.5% x 13% of flags  (recommended) | flat | $20,815 (+4.1%) | $18,679 | $19,945 | $21,697 | $22,942 | 26.2% | 0.0% |
+| 1.0% x 13% of flags | flat | $21,494 (+7.5%) | $17,479 | $19,861 | $23,139 | $25,470 | 26.9% | 0.0% |
+| 0.25% x every flag  (conditional on coverage) | flat | $22,770 (+13.8%) | $17,156 | $20,495 | $24,997 | $28,138 | 20.6% | 0.0% |
+| 0.5% x 13% of flags  (recommended) | weekly re-size | $20,799 (+4.0%) | $18,685 | $19,915 | $21,732 | $23,112 | 27.1% | 0.0% |
+| 1.0% x 13% of flags | weekly re-size | $21,431 (+7.2%) | $17,516 | $19,749 | $23,253 | $26,077 | 28.4% | 0.0% |
+| 0.25% x every flag  (conditional on coverage) | weekly re-size | $22,770 (+13.9%) | $17,184 | $20,327 | $25,413 | $29,623 | 22.1% | 0.0% |
+
+Greenline volume follows the FBS-vs-FBS slate week by week (~680 flags over weeks
+4–15), not a constant 49.
 
 ## Reading
 
@@ -38,11 +41,11 @@ week stakes are flat either way, because Saturday kickoffs are simultaneous.
 - Doubling the stake at 13% coverage doubles the median gain and doubles the 5th
   percentile loss. P(down) does not move (27.3% → 27.7%).
 - Betting every flag at a quarter stake is the only config that lowers P(down), to
-  20.6%, because ~590 bets average out the draw of the win rate. That row assumes the
+  20.6%, because ~680 bets average out the draw of the win rate. That row assumes the
   56.4% applies to the 87% of flags the record never bet.
 - **Weekly re-sizing changes almost nothing over twelve weeks.** Median moves by
-  −$15 to −$55 (volatility drag on a small edge), the 95th percentile rises by $140
-  to $1,130, the 5th percentile is unchanged within $40, and P(down) rises about one
+  $0 to −$65 (volatility drag on a small edge), the 95th percentile rises by $170
+  to $1,490, the 5th percentile is unchanged within $40, and P(down) rises about one
   point. At a 3–6% seasonal edge there is not enough growth to compound. It would
   matter across seasons, not within one.
 

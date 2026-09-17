@@ -18,6 +18,9 @@ flagged, and never recommended.
 
 Over-zero stays at 1% throughout: it contributes ~11 bets and cannot move the
 answer at any sane stake (see mc-combined-totals-2026-09-17.md).
+
+Greenline volume follows the FBS-vs-FBS slate week by week (GL_FLAGS_BY_WEEK,
+~680 flags over weeks 4-15), not a constant 49. Greenline flags every such game.
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mc_combined_totals import (  # noqa: E402
-    GL_COVERAGE_HISTORICAL, GL_FLAGS_PER_WEEK, WEEKS_REMAINING, Config, simulate,
+    GL_COVERAGE_HISTORICAL, GL_FLAGS_BY_WEEK, WEEKS_REMAINING, Config, simulate,
     BLUE, GREEN, RED, GOLD, INK, MUTED, GRID, _style,
 )
 
@@ -58,7 +61,7 @@ def run_grid(paths: int, seed: int, bankroll: float) -> list[dict]:
                     "gl_unit": unit,
                     "coverage": cov,
                     "supported": cov == GL_COVERAGE_HISTORICAL,
-                    "gl_bets": round(GL_FLAGS_PER_WEEK * cov * WEEKS_REMAINING),
+                    "gl_bets": round(sum(GL_FLAGS_BY_WEEK) * cov),
                     "staked": res["mean_turnover"],
                     "median": med,
                     "median_pct": gain / bankroll,
