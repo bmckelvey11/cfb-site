@@ -4,14 +4,14 @@
     python research/bankroll/scripts/bankroll_stress.py --self-check
 
 Answers the outside review of mc-method-2026-09-17.md: does 0.5% still pass the
-risk limit (P(-25%) <= 1%, no busts) when
+risk limit (P(-25%) <= 3%, no busts) when
   - the over-zero selection haircut is uncertain (extra sd) or larger (center 56.5%),
   - the Greenline prior is partially pooled (kappa in 0..1) instead of two endpoints,
   - Greenline bets beyond 6 a week win at p - d (marginal-bet degradation),
   - same-slate correlation rho runs 0 to 0.5,
   - all of the skeptical settings are applied together?
 
-Every scenario is run at Greenline units 0.5% and 1.0%, over-zero 1%, 6-12 unders a
+Every scenario is run at Greenline units 0.5%, 1.0% and 1.2% (quarter Kelly off the planning prior), over-zero 1%, 6-12 unders a
 week, weekly re-sizing. Path-dependent risk (max drawdown, weeks under water,
 expected shortfall) is reported alongside the terminal numbers.
 """
@@ -27,28 +27,29 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mc_combined_totals import Config, simulate  # noqa: E402
 
-UNITS = (0.005, 0.01)
-MAX_P_M25, MAX_BUST = 0.01, 0
+UNITS = (0.005, 0.01, 0.012)
+MAX_P_M25, MAX_BUST = 0.03, 0   # growth frame: 3% per horizon, no busts
 
 # (group, label, config overrides). gl_prior is used when gl_kappa is None.
 SCENARIOS = [
-    ("base", "pooled prior", dict(gl_prior="pooled")),
-    ("base", "n49 prior", dict(gl_prior="n49")),
-    ("over-zero", "center 56.5%, pooled", dict(gl_prior="pooled", oz_center=0.565)),
-    ("over-zero", "haircut sd +3pt, pooled", dict(gl_prior="pooled", oz_extra_sd=0.03)),
-    ("over-zero", "center 56.5% + sd 4pt, n49", dict(gl_prior="n49", oz_center=0.565, oz_extra_sd=0.04)),
+    ("base", "planning prior kappa 0.5", dict(gl_kappa=0.5)),
+    ("base", "pooled prior", dict(gl_kappa=None, gl_prior="pooled")),
+    ("base", "n49 prior", dict(gl_kappa=None, gl_prior="n49")),
+    ("over-zero", "center 56.5%, pooled", dict(gl_kappa=None, gl_prior="pooled", oz_center=0.565)),
+    ("over-zero", "haircut sd +3pt, pooled", dict(gl_kappa=None, gl_prior="pooled", oz_extra_sd=0.03)),
+    ("over-zero", "center 56.5% + sd 4pt, n49", dict(gl_kappa=None, gl_prior="n49", oz_center=0.565, oz_extra_sd=0.04)),
 ] + [
-    ("kappa", f"kappa {k:.2f}", dict(gl_kappa=k)) for k in (0.0, 0.25, 0.5, 0.75, 1.0)
+    ("kappa", f"kappa {k:.2f}", dict(gl_kappa=k)) for k in (0.0, 0.25, 0.75, 1.0)
 ] + [
-    ("marginal", f"bets 7-12 at p-{d}pt, pooled", dict(gl_prior="pooled", gl_marginal_penalty=d / 100))
+    ("marginal", f"bets 7-12 at p-{d}pt, pooled", dict(gl_kappa=None, gl_prior="pooled", gl_marginal_penalty=d / 100))
     for d in (1, 2, 3)
 ] + [
-    ("marginal", f"bets 7-12 at p-{d}pt, n49", dict(gl_prior="n49", gl_marginal_penalty=d / 100))
+    ("marginal", f"bets 7-12 at p-{d}pt, n49", dict(gl_kappa=None, gl_prior="n49", gl_marginal_penalty=d / 100))
     for d in (2,)
 ] + [
-    ("rho", f"rho {r:.2f}, pooled", dict(gl_prior="pooled", rho=r)) for r in (0.0, 0.05, 0.2, 0.35, 0.5)
+    ("rho", f"rho {r:.2f}, pooled", dict(gl_kappa=None, gl_prior="pooled", rho=r)) for r in (0.0, 0.05, 0.2, 0.35, 0.5)
 ] + [
-    ("rho", f"rho {r:.2f}, n49", dict(gl_prior="n49", rho=r)) for r in (0.2, 0.35, 0.5)
+    ("rho", f"rho {r:.2f}, n49", dict(gl_kappa=None, gl_prior="n49", rho=r)) for r in (0.2, 0.35, 0.5)
 ] + [
     ("combined", "kappa 0.5, p-2pt, oz 56.5%+sd3, rho 0.2",
      dict(gl_kappa=0.5, gl_marginal_penalty=0.02, oz_center=0.565, oz_extra_sd=0.03, rho=0.2)),
@@ -118,6 +119,7 @@ def self_check() -> None:
     # kappa endpoints reproduce the named priors' means
     assert abs(by[("kappa 0.00", 0.005)]["p_gl"] - by[("n49 prior", 0.005)]["p_gl"]) < 0.01
     assert abs(by[("kappa 1.00", 0.005)]["p_gl"] - by[("pooled prior", 0.005)]["p_gl"]) < 0.01
+    assert abs(by[("planning prior kappa 0.5", 0.005)]["p_gl"] - 0.561) < 0.01
     # the worst combined case must be worse than base n49 at the same unit
     assert by[("kappa 0, p-3pt, oz 56.5%+sd4, rho 0.5  (worst)", 0.01)]["median"] < by[("n49 prior", 0.01)]["median"]
     assert all(r["es5"] <= r["p5"] for r in rows)

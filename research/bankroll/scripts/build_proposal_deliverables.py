@@ -23,13 +23,16 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mc_combined_totals import GL_BETS_RANGE, GL_FLAGS_BY_WEEK, OZ_WEEK4PLUS_HISTORY  # noqa: E402
+from mc_combined_totals import (GL_BETS_RANGE, GL_FLAGS_BY_WEEK, OZ_WEEK4PLUS_HISTORY,  # noqa: E402
+                                kelly_unit, planning_p_gl)
+
+GL_UNIT_TODAY = 0.01   # the rule's answer today: min(quarter Kelly 1.31%, 3% cap -> 1%)
 
 OZ_TOTAL = sum(OZ_WEEK4PLUS_HISTORY) / len(OZ_WEEK4PLUS_HISTORY)  # ~10.6 bets, weeks 4-15
 DOCS = Path(__file__).resolve().parents[1] / "docs"
 STEM = "seed-bankroll-proposal-2026-09-17"
 SWEEP = DOCS / "bankroll-config-sweep-2026-09-17.csv"
-FIG_MC = DOCS / "figs" / "mc-combined-totals-2026-09-17.png"
+FIG_GROWTH = DOCS / "figs" / "pooled-bankroll-growth-2026-09-17.png"
 FIG_SWEEP = DOCS / "figs" / "bankroll-config-sweep-2026-09-17.png"
 # Chrome first: Edge headless on this machine intermittently prints a 1-page stray
 # render instead of the URL, even with an isolated profile. Chrome has not.
@@ -49,13 +52,13 @@ img{max-width:100%}hr{border:0;border-top:1px solid #d8dce3}
 
 
 def sweep_rows() -> dict[tuple[str, float], dict]:
-    """Recommended (0.5%) and 1% rows at supported coverage, keyed by (prior, unit)."""
+    """0.5% and 1% rows for every prior, keyed by (prior, unit)."""
     out = {}
     for r in csv.DictReader(open(SWEEP, encoding="utf-8")):
         if r["supported"] == "True" and float(r["gl_unit"]) in (0.005, 0.01):
             out[(r["prior"], float(r["gl_unit"]))] = {k: float(v) for k, v in r.items()
                                                         if k not in ("prior", "supported", "passes_a")}
-    assert len(out) == 4, out.keys()
+    assert len(out) == 6, out.keys()
     return out
 
 
@@ -88,8 +91,10 @@ def build_pptx() -> Path:
     from pptx.util import Inches, Pt
 
     rows = sweep_rows()
-    rec_p, rec_n = rows[("pooled", 0.005)], rows[("n49", 0.005)]
-    up_p, up_n = rows[("pooled", 0.01)], rows[("n49", 0.01)]
+    plan10, plan05 = rows[("k0.5", 0.01)], rows[("k0.5", 0.005)]
+    n49_10, pooled10 = rows[("n49", 0.01)], rows[("pooled", 0.01)]
+    p_plan = planning_p_gl(0.5)
+    qk = kelly_unit(p_plan, -110)
 
     prs = Presentation()
     prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)
@@ -141,9 +146,9 @@ def build_pptx() -> Path:
 
     # 1 title
     s = prs.slides.add_slide(blank)
-    text(s, 0.8, 2.2, 11.5, 1.2, "Seed bankroll: $20,000 for the rest of the 2026 season", 36, True)
+    text(s, 0.8, 2.2, 11.5, 1.2, "Seed bankroll: $20,000 to grow across seasons", 36, True)
     text(s, 0.8, 3.5, 11.5, 1.5, [
-        "A gift that funds a betting bankroll. Nothing is owed back.",
+        "A gift that seeds a betting bankroll meant to compound: the rest of 2026, all of 2027, golf once graded. Nothing is owed back.",
         "Not an investment, not a loan, not a security.",
         "Every number here comes from a script in the repository and carries its uncertainty.",
     ], 18, color=MUTED)
@@ -154,11 +159,11 @@ def build_pptx() -> Path:
     table(s, 0.6, 1.6, 12, [
         ["item", "value"],
         ["amount", "$20,000"],
-        ["horizon", "weeks 4–15 of the 2026 regular season, Sept 24 to Dec 12 (12 weeks)"],
-        ["what it funds", "two totals strategies already running, units re-sized off the bankroll each week"],
-        ["expected bets", "~118: 6–12 Greenline unders a week (~107), ~11 over-zero overs"],
-        ["recommended unit", "Greenline 0.5% of bankroll per bet ($100 at the start), over-zero 1% ($200), re-sized each Monday"],
-        ["afterwards", "bankroll and profit stay in the operation for 2027"],
+        ["horizon", "rest of 2026 (Sept 24 to Dec 12), then 2027 and onward. Bowls excluded"],
+        ["what it funds", "two totals strategies already running, units re-sized off the bankroll each Monday; golf once graded"],
+        ["expected bets", "rest of 2026 ~118 (6–12 Greenline unders a week + ~11 over-zero); 2027 ~250"],
+        ["unit today", f"Greenline {GL_UNIT_TODAY:.0%} of bankroll per bet (${20000 * GL_UNIT_TODAY:,.0f} at the start), over-zero 1%. Re-derived each Monday"],
+        ["profit", "stays in the bankroll"],
     ], col_w=[3, 9], size=14)
 
     # 3 two legs
@@ -168,10 +173,10 @@ def build_pptx() -> Path:
         ["", "Over-zero (floor-bias OVERs)", "Greenline totals (PFF flags, ~85% unders)"],
         ["what it is", "in-house model: totals pinned too low against heavy favorites", "vendor projection disagreeing with the market"],
         ["record", "151–83, 64.5% (58.2–70.4%), walk-forward 2016–25", "27–22, 55.1% (41–68%), 2026 wk 2; + 114–87 personal unders 2023–25"],
-        ["planning win rate", "58.2%, the interval floor", "bracket: 55.0% (2026 only) to 56.4% (pooled)"],
+        ["planning win rate", "58.2%, the interval's lower endpoint", f"{p_plan:.1%}: 2026 flags + 2023–25 unders at half weight. Bracket 55.0% to 56.4%"],
         ["price", "−120 or better", "−110"],
-        ["bets left in 2026", "~11, median +$133", "6–12 a week by plan, ~107 total (~16% of flags)"],
-        ["role", "better evidence, nearly spent for 2026; matters in 2027", "carries the whole 2026 projection"],
+        ["bets left in 2026", "~11, median +$133; 30–51 in a full season", "6–12 a week by plan, ~107 in 2026, ~134 in 2027"],
+        ["role", "better evidence, nearly spent for 2026; ~a third of 2027's profit", "carries the 2026 projection"],
     ], col_w=[2.3, 4.9, 4.9], size=12)
     text(s, 0.6, 5.6, 12, 1.2, [
         "Conflict rule: same game flagged on opposite sides → Greenline takes it, over-zero skips it.",
@@ -183,7 +188,8 @@ def build_pptx() -> Path:
     s = slide("Bets per week",
               f"Plan: {lo_b}–{hi_b} Greenline unders a week, capped by that week's FBS-vs-FBS slate "
               "(Greenline flags every such game). Over-zero ~11 bets spread across the span.")
-    rows_w = [["week", "FBS games (= flags)", "Greenline unders", "over-zero bets", "staked at start units"]]
+    rows_w = [["week", "FBS games (= flags)", "Greenline unders", "over-zero bets", "staked at today's units"]]
+    gl_dollars = 20000 * GL_UNIT_TODAY
     oz_per_week = OZ_TOTAL / len(GL_FLAGS_BY_WEEK)
     gl_tot = 0.0
     for i, flags in enumerate(GL_FLAGS_BY_WEEK):
@@ -191,9 +197,9 @@ def build_pptx() -> Path:
         gl_tot += mean
         rng_txt = f"{lo_b}–{hi_b} (mean {mean:.0f})" if flags >= hi_b else f"{min(lo_b, flags)}–{flags} (mean {mean:.0f})"
         rows_w.append([str(4 + i), str(flags), rng_txt, f"{oz_per_week:.1f}",
-                       money(mean * 100 + oz_per_week * 200)])
+                       money(mean * gl_dollars + oz_per_week * 200)])
     rows_w.append(["total", str(sum(GL_FLAGS_BY_WEEK)), f"~{gl_tot:.0f}", f"~{OZ_TOTAL:.0f}",
-                   money(gl_tot * 100 + OZ_TOTAL * 200)])
+                   money(gl_tot * gl_dollars + OZ_TOTAL * 200)])
     table(s, 0.6, 1.7, 8.6, rows_w, col_w=[1.0, 2.2, 2.2, 1.6, 1.6], size=11)
     text(s, 9.6, 1.8, 3.5, 5, [
         f"{lo_b} to {hi_b} unders plus about 1 over-zero over in a typical week. "
@@ -201,63 +207,63 @@ def build_pptx() -> Path:
         "",
         "Each week's count is drawn uniformly from the range, so volume is the plan, not a forecast.",
         "",
-        "A typical week stakes $1,000 to $1,100 at the starting units; units re-size each Monday. "
+        f"A typical week stakes about ${9 * gl_dollars + 200:,.0f} at today's units; units re-size each Monday. "
         "Weeks 14 and 15 use 2025's schedule.",
     ], 13)
 
     # 4 projection
-    s = slide("The projection: bracketed, not resolved",
-              "100,000 paths, win rates drawn per path from each record. Two panels = the two defensible Greenline priors.")
-    s.shapes.add_picture(str(FIG_MC), Inches(0.5), Inches(1.6), height=Inches(5.7))
+    s = slide("The projection: rest of 2026 and through 2027",
+              "100,000 paths, win rate drawn per path from the planning prior. Top row re-sized weekly, bottom row flat. Week 12 = end of 2026.")
+    s.shapes.add_picture(str(FIG_GROWTH), Inches(0.5), Inches(1.6), height=Inches(5.7))
 
     # 5 sweep + recommendation
-    s = slide("Choosing the stake",
-              "Largest median gain such that ≤1% of paths end down 25% and none go to zero, under both priors. 6–12 unders a week, units re-sized weekly.")
+    s = slide("Choosing the unit",
+              "Rule: the smaller of quarter Kelly off the planning prior and the largest unit at which ≤3% of seasons end down 25%. 6–12 unders a week, re-sized weekly.")
     s.shapes.add_picture(str(FIG_SWEEP), Inches(0.4), Inches(1.6), height=Inches(5.6))
     text(s, 8.7, 1.7, 4.3, 5.5, [
-        "Recommended: Greenline 0.5% of bankroll ($100 at the start), over-zero 1% ($200), re-sized each Monday.",
-        f"Median {money(rec_p['median'])} pooled / {money(rec_n['median'])} 2026-only.",
-        f"5th pct {money(rec_p['p5'])} / {money(rec_n['p5'])}. P(−25%) 0% under both.",
+        f"Quarter Kelly off the planning prior ({p_plan:.1%}), shrunk for 9 simultaneous bets: {qk:.2%}.",
+        f"The 3% cap binds first: 1% has P(−25%) {plan10['p_m25']:.1%}; 1.5% fails at 3.8%. Unit today: 1%.",
         "",
-        "1% ($200) passes only under the pooled prior "
-        f"(median {money(up_p['median'])} / {money(up_n['median'])}; P(−25%) "
-        f"{up_p['p_m25']:.1%} / {up_n['p_m25']:.1%}). Upgrade path once four more weeks are graded.",
+        f"At 1%: median {money(plan10['median'])} planning / {money(n49_10['median'])} n49 / {money(pooled10['median'])} pooled. "
+        f"5th pct {money(plan10['p5'])}. P(−25%) {plan10['p_m25']:.1%} / {n49_10['p_m25']:.1%} / {pooled10['p_m25']:.1%}.",
         "",
-        "Unit size does not change the downside ratio. Volume does, and 6–12 a week is a little above the 13% rate the record was earned at. The ledger prices that.",
+        f"0.5% is the all-weather fallback: median {money(plan05['median'])}, P(−25%) {plan05['p_m25']:.2%}.",
+        "",
+        "Unit size does not change the downside ratio; volume does. The unit is re-derived every Monday and heads toward 1.3% if the 2026 record holds.",
     ], 13)
 
     # 6 risk
-    s = slide("Risk, stated plainly", "At the recommended 0.5% / 1% units, re-sized weekly. No stop-loss.")
-    table(s, 0.6, 1.7, 8, [
-        ["measure", "pooled prior", "2026-only prior"],
-        ["P(season ends below $20,000)", f"{rec_p['p_down']:.1%}", f"{rec_n['p_down']:.1%}"],
-        ["P(ends below $15,000)", f"{rec_p['p_m25']:.1%}", f"{rec_n['p_m25']:.1%}"],
-        ["P(passes through $0)", "0 of 50,000", "0 of 50,000"],
-        ["median ending bankroll", money(rec_p["median"]), money(rec_n["median"])],
-        ["5th percentile", money(rec_p["p5"]), money(rec_n["p5"])],
-        ["95th percentile", money(rec_p["p95"]), money(rec_n["p95"])],
-        ["worst single week, median", money(rec_p["worst_week_med"]), money(rec_n["worst_week_med"])],
-        ["total staked, 12 weeks", money(rec_p["staked"]), money(rec_n["staked"])],
-    ], col_w=[3.6, 2.2, 2.2], size=14)
-    text(s, 9.0, 1.8, 3.9, 5, [
-        "Roughly one season in three ends below $20,000. That is mostly not knowing the true win rate, which a 12-week season cannot average away.",
+    s = slide("Risk, stated plainly", "At 1% / 1% units, re-sized weekly, rest of 2026. No stop-loss.")
+    table(s, 0.6, 1.7, 8.4, [
+        ["measure", "planning prior", "n49 bracket", "pooled bracket"],
+        ["P(season ends below $20,000)", f"{plan10['p_down']:.1%}", f"{n49_10['p_down']:.1%}", f"{pooled10['p_down']:.1%}"],
+        ["P(ends below $15,000)", f"{plan10['p_m25']:.1%}", f"{n49_10['p_m25']:.1%}", f"{pooled10['p_m25']:.1%}"],
+        ["P(passes through $0)", "0 of 50,000", "0 of 50,000", "0 of 50,000"],
+        ["median ending bankroll", money(plan10["median"]), money(n49_10["median"]), money(pooled10["median"])],
+        ["5th percentile", money(plan10["p5"]), money(n49_10["p5"]), money(pooled10["p5"])],
+        ["95th percentile", money(plan10["p95"]), money(n49_10["p95"]), money(pooled10["p95"])],
+        ["worst single week, median", money(plan10["worst_week_med"]), money(n49_10["worst_week_med"]), money(pooled10["worst_week_med"])],
+        ["total staked, 12 weeks", money(plan10["staked"]), money(n49_10["staked"]), money(pooled10["staked"])],
+    ], col_w=[3.2, 1.8, 1.7, 1.7], size=13)
+    text(s, 9.3, 1.8, 3.7, 5, [
+        "About three seasons in ten end below $20,000. That is mostly not knowing the true win rate, which one season cannot average away.",
         "",
-        "One season in twenty ends worse than about −$1,900.",
+        "A 10% mid-season drawdown happens in about a third of seasons at 1%; a 20% drawdown in one in twenty.",
         "",
-        "Same-Saturday correlation is assumed (ρ = 0.10), not measured. It moves the tail by a few hundred dollars and the median not at all.",
+        "Same-Saturday correlation is assumed (ρ = 0.10), not measured.",
         "",
-        "Stress-tested: 0.5% passes all 25 skeptical scenarios (weaker priors, weaker marginal bets, correlation to 0.5, all at once). 1% fails 13 of them.",
+        "Stress-tested under the 3% cap: 1% passes 15 of 25 skeptical scenarios and the combined case on the planning prior; 0.5% passes all 25.",
     ], 13)
 
     # 7 does not support
     s = slide("What the numbers do not support")
     text(s, 0.6, 1.5, 12, 5.5, [
-        "• Greenline as independently validated. n=49 in 2026, interval 41–68%. The pooled record is 80% the same signal bet in earlier seasons.",
-        "• The pooled prior transferring in full. The 201 past unders sat ~6 points higher in total than the 2026 flags. Pooling probably overstates.",
-        "• Any coverage above 13%. Every 'bet more flags' row assumes the picked-flag win rate applies to flags that were passed on.",
-        "• A reproducible selection rule. 'Bet ~6 of 49 a week' is a volume assumption; no script picks which six.",
-        "• A 2027 projection. Not modeled yet. Needs over-zero at full-season volume and a full graded Greenline season.",
-        "• Within-week compounding. Units re-size on Monday, not per bet; Saturday kickoffs are simultaneous. Re-sizing moves the 12-week median by under $100 either way.",
+        "• Greenline as independently validated. n=49 in 2026, interval 41–68%. The planning prior is half personal history of the same signal.",
+        "• The 2027 numbers as a forecast. They assume the edge persists unchanged on 2025's schedule.",
+        "• Golf. No record, no price, no volume. A placeholder leg until graded.",
+        "• A reproducible selection rule. 'Bet 6–12 of the week's flags' is a volume plan; no script picks which ones.",
+        "• Kelly as today's rule. Quarter Kelly is 1.3%; the 3% drawdown cap binds at 1%. That is where the unit is headed if the record holds.",
+        "• The negative cross-leg correlation as a hedge. A common model-or-market failure that hurts both legs is not modeled.",
     ], 15)
 
     # 8 cadence
@@ -266,11 +272,11 @@ def build_pptx() -> Path:
         ["day", "step"],
         ["Wednesday", "capture Greenline flags; seed the bet ledger"],
         ["Thursday–Saturday", "bet 6–12 unders at −110 or better; over-zero board at −120 or better"],
-        ["Monday", "grade flags; mark which were bet; re-size units off the bankroll; rerun the projection"],
+        ["Monday", "grade flags; mark which were bet; re-derive the unit (min of quarter Kelly and the 3% cap); re-size off the bankroll"],
     ], col_w=[2.5, 9.5], size=15)
     text(s, 0.6, 3.6, 12, 3, [
-        "Marking which flags get bet is the one manual step and the one that resolves the biggest open question (coverage).",
-        "Four more graded weeks puts the 2026 flags at n≈250 on their own. The prior stops doing the work and the stake decision gets revisited then.",
+        "The planning prior is fixed: 2026 flags plus the 2023–25 unders at half weight. The unit moves only by the Monday rule. Golf enters with a graded record, at the same rule.",
+        "Marking which flags get bet is the one manual step. It turns '6–12 a week' from a plan into evidence.",
     ], 15)
 
     out = DOCS / f"{STEM}.pptx"
@@ -283,7 +289,7 @@ def self_check() -> None:
     rec = rows[("pooled", 0.005)], rows[("n49", 0.005)]
     assert all(r["p_m25"] <= 0.01 and r["p_bust"] == 0 for r in rec), rec
     assert all(r["median"] > 20_000 for r in rec)
-    assert FIG_MC.exists() and FIG_SWEEP.exists()
+    assert FIG_GROWTH.exists() and FIG_SWEEP.exists()
     assert "gift" in (DOCS / f"{STEM}.md").read_text(encoding="utf-8").lower()
     print("self-check OK")
 

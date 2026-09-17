@@ -40,7 +40,8 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
   _Avoid_: investment, seed money, stake (that word means bet size)
 - **Leg** — one strategy bet from a shared bankroll. Two legs today: over-zero OVERs and Greenline totals. A leg has its own record, price, and volume.
 - **Coverage** — the fraction of a leg's available flags that actually get bet. Historical Greenline coverage is ~13%. Coverage above that is conditional: the picked-flag record says nothing about the flags passed on.
-- **Prior** — the graded record a leg's win rate is drawn from. Where two records are both defensible (`pooled`, `n49`), projections carry both and the answer is a **bracket**, never one number.
+- **Prior** — the graded record a leg's win rate is drawn from. The Greenline **planning prior** is the half-pooled record (κ = 0.5: the 2026 flags plus the 2023–25 unders at half weight); `n49` and `pooled` are the **bracket** around it, reported alongside and never the planning number.
+- **Growth vehicle** — the bankroll's purpose: compounded across seasons and strategies (golf to be added once graded), not defended over one stretch. Sizing is fractional Kelly off the planning prior; the per-season drawdown cap is a constraint, not the objective.
 - **Bust** — a simulated path whose running bankroll passes through zero mid-season. Reported as a rate on every scenario; percentiles on a busting row are unreachable.
 - **Conflict** — the same game flagged on opposite sides by two legs. Rule: Greenline takes the game, over-zero skips it.
 - **Unit** — one flat bet as a fraction of the *starting* bankroll. Never compounded; Saturday kickoffs are simultaneous.

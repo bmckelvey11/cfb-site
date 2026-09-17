@@ -34,36 +34,41 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mc_combined_totals import (  # noqa: E402
-    GL_BETS_RANGE, GL_COVERAGE_HISTORICAL, GL_FLAGS_BY_WEEK, WEEKS_REMAINING, Config, simulate,
+    GL_BETS_RANGE, GL_COVERAGE_HISTORICAL, GL_FLAGS_BY_WEEK, GL_FLAGS_FULL_SEASON, WEEKS_REMAINING,
+    Config, simulate, kelly_unit, planning_p_gl,
     BLUE, GREEN, RED, GOLD, INK, MUTED, GRID, _style,
 )
 
 GL_UNITS = (0.0025, 0.005, 0.01, 0.015, 0.02)
 COVERAGES = (GL_COVERAGE_HISTORICAL, 0.25, 0.50, 1.0)
 RANGE_KEY = -1.0  # the coverage column's value for a range-volume row
-PRIORS = ("pooled", "n49")
+# planning prior first; n49 and pooled are the bracket, reported but not decisive
+PRIORS = ("k0.5", "n49", "pooled")
+PRIOR_KW = {"k0.5": dict(gl_kappa=0.5), "n49": dict(gl_kappa=None, gl_prior="n49"),
+            "pooled": dict(gl_kappa=None, gl_prior="pooled")}
+PLANNING = "k0.5"
 
-MAX_P_M25 = 0.01   # constraint (a): at most 1% of paths end down 25%+
+MAX_P_M25 = 0.03   # constraint (a): at most 3% of paths end a season down 25%+ (growth frame)
 MAX_BUST = 0.0     # constraint (a): no path passes through zero
 
 
-def expected_range_bets() -> float:
+def expected_range_bets(weeks=GL_FLAGS_BY_WEEK) -> float:
     lo, hi = GL_BETS_RANGE
-    return sum(sum(min(k, f) for k in range(lo, hi + 1)) / (hi - lo + 1)
-               for f in GL_FLAGS_BY_WEEK)
+    return sum(sum(min(k, f) for k in range(lo, hi + 1)) / (hi - lo + 1) for f in weeks)
 
 
 def run_grid(paths: int, seed: int, bankroll: float, volume: str = "range",
-             resize: bool = True) -> list[dict]:
+             resize: bool = True, seasons: int = 1, max_p_m25: float = MAX_P_M25) -> list[dict]:
     rows = []
     covs = (RANGE_KEY,) if volume == "range" else COVERAGES
+    weeks = GL_FLAGS_BY_WEEK + GL_FLAGS_FULL_SEASON * (seasons - 1)
     for prior in PRIORS:
         for cov in covs:
             for unit in GL_UNITS:
                 res = simulate(Config(bankroll=bankroll, paths=paths, gl_unit=unit,
-                                      gl_prior=prior, gl_volume=volume, resize_weekly=resize,
+                                      gl_volume=volume, resize_weekly=resize,
                                       gl_coverage=(1.0 if cov == RANGE_KEY else cov),
-                                      seed=seed))
+                                      seasons=seasons, seed=seed, **PRIOR_KW[prior]))
                 f = res["final"]
                 med, p5, p95 = np.percentile(f, [50, 5, 95])
                 gain = med - bankroll
@@ -72,8 +77,8 @@ def run_grid(paths: int, seed: int, bankroll: float, volume: str = "range",
                     "gl_unit": unit,
                     "coverage": cov,
                     "supported": cov in (GL_COVERAGE_HISTORICAL, RANGE_KEY),
-                    "gl_bets": round(expected_range_bets() if cov == RANGE_KEY
-                                     else sum(GL_FLAGS_BY_WEEK) * cov),
+                    "gl_bets": round(expected_range_bets(weeks) if cov == RANGE_KEY
+                                     else sum(weeks) * cov),
                     "staked": res["mean_turnover"],
                     "median": med,
                     "median_pct": gain / bankroll,
@@ -87,7 +92,7 @@ def run_grid(paths: int, seed: int, bankroll: float, volume: str = "range",
                     # median itself is a loss
                     "ratio": gain / (med - p5) if med > p5 else 0.0,
                     "passes_a": res["p_bust"] <= MAX_BUST
-                                and float((f < bankroll * 0.75).mean()) <= MAX_P_M25,
+                                and float((f < bankroll * 0.75).mean()) <= max_p_m25,
                 })
     return rows
 
@@ -95,8 +100,9 @@ def run_grid(paths: int, seed: int, bankroll: float, volume: str = "range",
 def recommend(rows: list[dict]) -> tuple[dict | None, dict | None]:
     """(recommended, best_conditional).
 
-    recommended: supported coverage only, constraint (a) under BOTH priors,
-    ranked by the mean of the two priors' medians.
+    recommended: supported coverage only, constraint (a) under the PLANNING prior,
+    ranked by the planning prior's median. n49 and pooled rows ride along as the
+    bracket.
     best_conditional: same rule without the coverage restriction -- what the
     grid would pick if the coverage transfer held. Reported, never recommended.
     """
@@ -104,8 +110,9 @@ def recommend(rows: list[dict]) -> tuple[dict | None, dict | None]:
         by_key = {}
         for r in candidates:
             by_key.setdefault((r["gl_unit"], r["coverage"]), []).append(r)
-        ok = [(np.mean([r["median"] for r in rs]), rs) for rs in by_key.values()
-              if len(rs) == len(PRIORS) and all(r["passes_a"] for r in rs)]
+        ok = [(next(r["median"] for r in rs if r["prior"] == PLANNING), rs)
+              for rs in by_key.values()
+              if len(rs) == len(PRIORS) and all(r["passes_a"] for r in rs if r["prior"] == PLANNING)]
         if not ok:
             return None
         _, rs = max(ok, key=lambda t: t[0])
@@ -152,7 +159,7 @@ def figure(rows: list[dict], bankroll: float, path: Path) -> None:
     colors = dict(zip(COVERAGES, (BLUE, GREEN, GOLD, RED)))
     colors[RANGE_KEY] = BLUE
     covs = sorted({r["coverage"] for r in rows})
-    fig, axes = plt.subplots(2, 2, figsize=(11, 7.5))
+    fig, axes = plt.subplots(2, len(PRIORS), figsize=(5.5 * len(PRIORS), 7.5))
     for j, prior in enumerate(PRIORS):
         top, bot = axes[0, j], axes[1, j]
         for cov in covs:
@@ -168,14 +175,14 @@ def figure(rows: list[dict], bankroll: float, path: Path) -> None:
             bot.plot(x, [r["p_m25"] * 100 for r in rs], "-o", color=colors[cov], lw=1.8, ms=4)
         top.axhline(0, color=MUTED, lw=0.8, ls="--")
         bot.axhline(MAX_P_M25 * 100, color=RED, lw=0.8, ls="--")
-        bot.text(GL_UNITS[-1] * 100, MAX_P_M25 * 100 + 0.3, "1% limit", color=RED,
+        bot.text(GL_UNITS[-1] * 100, MAX_P_M25 * 100 + 0.3, f"{MAX_P_M25:.0%} limit", color=RED,
                  fontsize=8, ha="right")
         for ax in (top, bot):
             _style(ax)
             ax.set_xlabel("Greenline stake, % of bankroll (re-sized weekly)")
         top.set_ylabel("median ending gain, %  (band = 5th-95th)")
         bot.set_ylabel("P(end down 25% or more), %")
-        top.set_title(f"`{prior}` prior", fontsize=11)
+        top.set_title(f"`{prior}` prior" + ("  (planning)" if prior == PLANNING else "  (bracket)"), fontsize=11)
         if j == 0:
             top.legend(fontsize=8, frameon=False, loc="upper left")
     what = "Unit sweep" if RANGE_KEY in covs else "Stake x coverage sweep"
@@ -188,7 +195,7 @@ def figure(rows: list[dict], bankroll: float, path: Path) -> None:
 
 
 def self_check() -> None:
-    rows = run_grid(paths=3_000, seed=1, bankroll=20_000, volume="slate", resize=False)
+    rows = run_grid(paths=3_000, seed=1, bankroll=20_000, volume="slate", resize=False, max_p_m25=0.01)
     assert len(rows) == len(PRIORS) * len(COVERAGES) * len(GL_UNITS)
     # stake scales spread, not sign: 95th-5th must widen with the unit
     for prior in PRIORS:
@@ -202,12 +209,15 @@ def self_check() -> None:
     assert rec is not None and rec["supported"]
     assert cond is not None
     assert cond["median"] >= rec["median"]
-    # range volume: one coverage key, every row supported, ~108 bets
+    # range volume: one coverage key, every row supported, ~107 bets
     rows = run_grid(paths=3_000, seed=1, bankroll=20_000)
     assert len(rows) == len(PRIORS) * len(GL_UNITS)
     assert all(r["supported"] and r["coverage"] == RANGE_KEY for r in rows)
     assert 100 < rows[0]["gl_bets"] < 116, rows[0]["gl_bets"]
     assert recommend(rows)[0] is not None
+    # two seasons roughly doubles the bets
+    rows2 = run_grid(paths=2_000, seed=1, bankroll=20_000, seasons=2)
+    assert 220 < rows2[0]["gl_bets"] < 250, rows2[0]["gl_bets"]
     print("self-check OK")
 
 
@@ -222,13 +232,22 @@ def main() -> None:
                     help="range: 6-12 unders a week (default); slate: the coverage grid")
     ap.add_argument("--flat-stakes", action="store_true",
                     help="flat units off the starting bankroll instead of weekly re-sizing")
+    ap.add_argument("--seasons", type=int, default=1, help="1 = rest of 2026; 2 adds full 2027")
+    ap.add_argument("--max-p-m25", type=float, default=MAX_P_M25,
+                    help="constraint (a): max share of paths ending down 25%% or more")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
         self_check()
         return
 
-    rows = run_grid(args.paths, args.seed, args.bankroll, args.gl_volume, not args.flat_stakes)
+    rows = run_grid(args.paths, args.seed, args.bankroll, args.gl_volume, not args.flat_stakes,
+                    args.seasons, args.max_p_m25)
+    p_plan = planning_p_gl(0.5)
+    print(f"planning prior kappa 0.5: mean {p_plan:.1%}; quarter Kelly per bet, 9 simultaneous: "
+          f"{kelly_unit(p_plan, -110):.2%}  (single-bet quarter Kelly {kelly_unit(p_plan, -110, n_simul=1):.2%})")
+    print(f"constraint (a): P(-25%) <= {args.max_p_m25:.0%}, no busts, under the planning prior; "
+          f"{args.seasons} season(s)\n")
     rec, cond = recommend(rows)
     print(to_markdown(rows, args.bankroll))
     for label, r in (("RECOMMENDED (supported volume, (a) under both priors)", rec),
@@ -238,6 +257,12 @@ def main() -> None:
             continue
         vol = ("6-12/wk" if r["coverage"] == RANGE_KEY else f"coverage {r['coverage']:.0%}")
         print(f"{label}: GL unit {r['gl_unit']:.2%}, {vol}, ~{r['gl_bets']} bets")
+        rs = [x for x in rows if x["gl_unit"] == r["gl_unit"] and x["coverage"] == r["coverage"]]
+        r["median_by_prior"] = {x["prior"]: x["median"] for x in rs}
+        r["p_down_by_prior"] = {x["prior"]: x["p_down"] for x in rs}
+        r["p5_by_prior"] = {x["prior"]: x["p5"] for x in rs}
+        r["p95_by_prior"] = {x["prior"]: x["p95"] for x in rs}
+        r["ratio_by_prior"] = {x["prior"]: x["ratio"] for x in rs}
         for p in PRIORS:
             print(f"  {p}: median ${r['median_by_prior'][p]:,.0f} "
                   f"({r['median_by_prior'][p] / args.bankroll - 1:+.1%}), "

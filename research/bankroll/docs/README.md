@@ -12,11 +12,13 @@ in [`../CLAUDE.md`](../CLAUDE.md).
 Two totals strategies. One bankroll. Betting both, at what size, gets you where by the
 end of the season — and how much of that answer is evidence rather than assumption?
 
-The short version, as of 2026-09-17: **the answer is bracketed, not resolved.** Over-zero
-contributes a median of +$133 across the rest of the season and cannot contribute more
-at any sane stake — its volume is front-loaded into weeks already played. So the
-projection is a Greenline projection, and Greenline's record supports a median of either
-+6.5% or +4.7% depending on which of two defensible priors you take. Neither is wrong.
+The short version, as of 2026-09-17 (end of day): **the bankroll is a multi-season
+growth vehicle, the Greenline planning prior is the half-pooled record (κ = 0.5), and
+the unit is the smaller of quarter Kelly off that prior and the largest unit under a 3%
+per-season chance of a 25% loss.** Today that is 1% for Greenline, 1% for over-zero.
+Median +8% for the rest of 2026, +21% through 2027; the n49 and pooled priors are the
+bracket around every number. Over-zero is ~11 bets for the rest of 2026 and about a
+third of 2027's expected profit.
 
 ---
 
@@ -24,13 +26,13 @@ projection is a Greenline projection, and Greenline's record supports a median o
 
 | Doc | What it reports |
 | --- | --- |
-| [bankroll-stress-2026-09-17.md](bankroll-stress-2026-09-17.md) | Answer to the outside review: 0.5% passes all 25 skeptical scenarios (uncertain haircut, partial pooling κ, marginal-bet penalty, ρ to 0.5, all at once); 1% fails 13. Drawdown and expected-shortfall added. Full grid in `bankroll-stress-table-2026-09-17.md` |
+| [bankroll-stress-2026-09-17.md](bankroll-stress-2026-09-17.md) | Answer to the outside review, plus the Kelly comparison. Under the 3% cap: 0.5% passes all 25 skeptical scenarios, 1% passes 15, quarter Kelly 13. Drawdown and expected shortfall on every row. Full grid in `bankroll-stress-table-2026-09-17.md` |
 | [mc-method-2026-09-17.md](mc-method-2026-09-17.md) | The full method for outside review: every input, distribution, correlation formula, staking rule, output, and the unit-size decision rule, with pseudocode and a list of things to challenge |
 | [mc-combined-totals-2026-09-17.md](mc-combined-totals-2026-09-17.md) | $20,000 across both legs, weeks 4–15 of 2026. 100k paths, win rates drawn per path, nine scenarios, both Greenline priors side by side |
 | [under-selection-profile-2026-09-17.md](under-selection-profile-2026-09-17.md) | Which unders got bet 2023–25, against every FBS game on the same days. The selection is a high-total rule, and the bet unders sit six points above where Greenline flags |
-| [seed-bankroll-proposal-2026-09-17.md](seed-bankroll-proposal-2026-09-17.md) | The family-facing ask: $20,000 as a gift, what it funds, the bracketed projection, the recommended 0.5%/1% units at 6–12 unders a week, and what the numbers do not support. PDF and 9-slide deck alongside |
-| [pooled-bankroll-growth-2026-09-17.md](pooled-bankroll-growth-2026-09-17.md) | Week-by-week fan charts under the pooled prior only, three units at 6–12 unders a week, re-sized weekly and flat. Deliberately unbracketed; says so |
-| [bankroll-config-sweep-2026-09-17.md](bankroll-config-sweep-2026-09-17.md) | Unit × prior grid at 6–12 unders a week, re-sized weekly (`--gl-volume slate` restores the coverage grid). 0.5% is the largest Greenline unit that keeps P(−25%) ≤ 1% under both priors; the downside ratio is flat in unit and rises only with volume |
+| [seed-bankroll-proposal-2026-09-17.md](seed-bankroll-proposal-2026-09-17.md) | The family-facing ask: $20,000 as a gift seeding a multi-season bankroll, what it funds, the planning prior and its bracket, the Monday unit rule (1% today), the two-season projection, risk, and what the numbers do not support. PDF and 9-slide deck alongside |
+| [pooled-bankroll-growth-2026-09-17.md](pooled-bankroll-growth-2026-09-17.md) | Week-by-week fan charts over two seasons under the planning prior, three units (0.5%, 1%, quarter Kelly), re-sized weekly and flat |
+| [bankroll-config-sweep-2026-09-17.md](bankroll-config-sweep-2026-09-17.md) | Unit × prior grid (planning, n49, pooled) at 6–12 unders a week, re-sized weekly, 3% cap. 1% is the largest unit under the cap on the planning prior; quarter Kelly is 1.3%. `--seasons 2` for the two-season grid, `--gl-volume slate` for the coverage grid |
 
 ### Figures
 

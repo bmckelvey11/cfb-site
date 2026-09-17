@@ -34,9 +34,17 @@ shortfall at 5% (mean of the worst 5% of endings). Busts are now reported as cou
 
 ## Results
 
-50,000 paths per cell, seed 20260917, both units.
+50,000 paths per cell, seed 20260917.
 
-**0.5%: passes 25 of 25.** **1%: passes 12 of 25.**
+**Under the growth frame adopted later the same day** (planning prior κ = 0.5, cap
+P(−25%) ≤ 3%, units 0.5% / 1.0% / 1.2%): **0.5% passes 25 of 25; 1.0% passes 15 of
+25; 1.2% (≈ quarter Kelly) passes 13 of 25.** 1.0% fails when the prior is n49 alone
+or ρ ≥ 0.35, and passes the combined skeptical case built on the planning prior
+(P(−25%) 1.7%). 1.2% fails that combined case (3.4%). The regenerated full table uses
+the 3% cap and includes a `planning prior kappa 0.5` base row.
+
+Under the original 1% cap that the review was written against: **0.5%: passes 25 of
+25. 1%: passes 12 of 25.** The selected rows below keep that cap's pass column.
 
 Selected rows (full table linked above):
 

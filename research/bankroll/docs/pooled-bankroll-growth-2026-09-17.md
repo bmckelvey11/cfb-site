@@ -1,63 +1,63 @@
-# Bankroll growth by week, pooled Greenline prior only
+# Bankroll growth by week, two seasons, planning prior
 
-Generated 2026-09-17 by `research/bankroll/scripts/pooled_growth_chart.py --paths 100000 --flat-stakes`.
-
-**This chart conditions on one prior.** The unit rule is to bracket the pooled
-(141–109) and 2026-only (27–22) readings; this was asked for as the pooled edge
-charted on its own. The bracketed figures are in
-[mc-combined-totals-2026-09-17.md](mc-combined-totals-2026-09-17.md) and
-[bankroll-config-sweep-2026-09-17.md](bankroll-config-sweep-2026-09-17.md).
+Generated 2026-09-17 by
+`research/bankroll/scripts/pooled_growth_chart.py --paths 100000 --seasons 2 --flat-stakes`.
+Earlier the same day this chart was pooled-prior, one season; it now runs on the
+planning prior (κ = 0.5) over the rest of 2026 plus a full 2027-style season.
 
 ## Question
 
-Starting from $20,000 before week 4, drawing the Greenline win rate from the pooled
-posterior (mean 56.4%, P(below break-even) 10%), betting 6–12 unders a week with units
-re-sized off the bankroll each Monday, what does the bankroll path look like week by
-week at three unit sizes? And does re-sizing matter against flat stakes?
+Starting from $20,000 before week 4 of 2026, drawing the Greenline win rate from the
+planning posterior (84.5–65.5, mean 56.1%), betting 6–12 unders a week with units
+re-sized off the bankroll each Monday, what does the bankroll path look like across
+the rest of 2026 and all of 2027 at three unit sizes? And does re-sizing matter?
 
-![Pooled bankroll growth](figs/pooled-bankroll-growth-2026-09-17.png)
+![Bankroll growth, two seasons](figs/pooled-bankroll-growth-2026-09-17.png)
 
-## Numbers (100,000 paths, ρ = 0.10, over-zero at 1%)
+## Numbers (100,000 paths, ρ = 0.10, over-zero at 1%, 27 weeks)
 
-Top row of the figure: units re-sized off the bankroll at the start of each week (the
-simulator's default). Bottom row: flat units off the starting $20,000 (`--flat-stakes`).
-Within a week stakes are flat either way, because Saturday kickoffs are simultaneous.
-Greenline volume is 6–12 unders a week, uniform, capped by the FBS-vs-FBS slate
-(~107 bets over weeks 4–15).
+Top row: units re-sized each week (the simulator's default). Bottom row: flat units
+off the starting $20,000. Within a week stakes are flat either way. The dotted line
+at week 12 is the end of the 2026 regular season; 2027 runs on 2025's schedule with
+over-zero at full-season volume (30–51 bets, two-thirds in weeks 1–3).
 
 | config | staking | median | 5th | 25th | 75th | 95th | P(down) | busts |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| 0.5% unit, 6-12 unders/wk | weekly re-size | $20,945 (+4.7%) | $18,586 | $19,947 | $21,981 | $23,568 | 26.2% | 0.0% |
-| 1.0% unit, 6-12 unders/wk | weekly re-size | $21,718 (+8.6%) | $17,280 | $19,782 | $23,818 | $27,141 | 27.6% | 0.0% |
-| 1.5% unit, 6-12 unders/wk | weekly re-size | $22,444 (+12.2%) | $15,928 | $19,513 | $25,740 | $31,200 | 28.8% | 0.0% |
-| 0.5% unit, 6-12 unders/wk | flat | $20,964 (+4.8%) | $18,579 | $19,985 | $21,933 | $23,342 | 25.3% | 0.0% |
-| 1.0% unit, 6-12 unders/wk | flat | $21,788 (+8.9%) | $17,236 | $19,918 | $23,648 | $26,303 | 25.9% | 0.0% |
-| 1.5% unit, 6-12 unders/wk | flat | $22,615 (+13.1%) | $15,806 | $19,815 | $25,382 | $29,333 | 26.4% | 0.0% |
+| 0.5% unit | weekly re-size | $22,447 (+12.2%) | $17,675 | $20,361 | $24,716 | $28,337 | 21.2% | 0 |
+| 1.0% unit | weekly re-size | $24,249 (+21.2%) | $15,668 | $20,276 | $28,902 | $36,907 | 23.4% | 0 |
+| 1.2% unit (≈ quarter Kelly) | weekly re-size | $24,944 (+24.7%) | $14,819 | $20,157 | $30,737 | $41,138 | 24.3% | 0 |
+| 0.5% unit | flat | $22,424 (+12.1%) | $17,648 | $20,470 | $24,358 | $27,121 | 20.2% | 0 |
+| 1.0% unit | flat | $24,197 (+21.0%) | $15,470 | $20,609 | $27,733 | $32,700 | 21.5% | 0 |
+| 1.2% unit | flat | $24,904 (+24.5%) | $14,521 | $20,623 | $29,107 | $35,038 | 22.0% | 0 |
 
 ## Reading
 
-- The median grows close to a straight line either way. A 5–13% seasonal edge has
-  almost nothing to compound over twelve weeks.
-- **Weekly re-sizing changes almost nothing.** Median moves by −$20 to −$170
-  (volatility drag on a small edge), the 95th percentile rises by $230 to $1,870,
-  the 5th percentile is unchanged within $130, and P(down) rises one to two points
-  because losing paths shrink their units and recover more slowly. It would matter
-  across seasons, not within one.
-- Doubling the unit doubles both the median gain and the 5th-percentile loss.
-  P(down) barely moves. There is no free unit size.
-- 1.5% is shown for the shape only. It fails the proposal's risk limit under the
-  2026-only prior (P(−25%) 10.4%, sweep doc).
+- **The median is a straight line with a kink at week 12.** The kink is over-zero
+  coming back at full volume in 2027's first three weeks. Over the rest of 2026 it is
+  ~11 bets; in 2027 it is 30–51.
+- **Re-sizing starts to matter over two seasons.** Medians are flat (+$50 to +$40),
+  but the 95th percentile rises by $1,200 to $6,100 and the 5th percentile falls by
+  $30 to $300. Within one season it was noise; across two it is the compounding the
+  bankroll exists for.
+- **P(down) falls with horizon** (28–30% for 2026 alone, 21–24% through 2027) because
+  more bets average out the draw of the win rate. P(−25%) at the end of two seasons at
+  1% is 3.6%, above the 3% per-season cap, which is why the unit is re-derived weekly
+  rather than fixed.
+- **1.2% is the quarter-Kelly neighborhood** (1.31% exactly, off the planning prior
+  with the simultaneous-bets shrink). It buys +3.5 points of median over 1% through
+  2027 for a 5th percentile $850 lower.
 
 ## What this does not support
 
-- The pooled 56.4% as the true rate. It is the ceiling reading; the 2026-only prior
-  gives 55.0% with a 35% chance of being below break-even.
-- 6–12 a week as the population the record measures. Mean 9 is ~16% of a typical
-  slate against the 13% the 201-bet record was earned at.
-- Any per-bet compounding or Kelly figure.
+- The planning prior's 56.1% as the true rate. n49 gives 55.0%, pooled 56.4%; the
+  sweep doc carries both.
+- 2027 as a forecast. It is 2025's schedule with the current record's win-rate draws.
+  Nothing about the edge is re-estimated, and golf is not in it.
+- Any per-bet compounding or full-Kelly figure.
 
 ## Data
 
-Same inputs as `mc_combined_totals.py`: 234 over-zero walk-forward bets 2016–25,
-49 graded 2026 Greenline flags, 201 personal unders 2023–25; FBS-vs-FBS slate per
-week from `core.fact_game` (weeks 14–15 from 2025). Seed 20260917.
+Same inputs as `mc_combined_totals.py`: 234 over-zero walk-forward bets 2016–25 and
+the 2022–25 season counts, 49 graded 2026 Greenline flags, 201 personal unders 2023–25;
+FBS-vs-FBS slate per week from `core.fact_game` (2026 weeks 4–13; 2025 for the rest and
+for 2027). Seed 20260917.

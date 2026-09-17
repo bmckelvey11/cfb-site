@@ -70,6 +70,13 @@ GL_FLAGS_BY_WEEK = (58, 56, 58, 59, 56, 56, 62, 67, 66, 65, 67, 9)
 # closed interval and capped at that week's slate. 6-12 is the operator's plan;
 # its mean of 9 is ~16% of a typical slate, a little above the 13% historical rate.
 GL_BETS_RANGE = (6, 12)
+# A full later season (2027+): the 2025 FBS-vs-FBS slate, weeks 1-15, from
+# core.fact_game (the 1-game week 16 dropped). Bowls and the playoff excluded.
+GL_FLAGS_FULL_SEASON = (48, 51, 47, 50, 51, 50, 56, 59, 53, 52, 51, 58, 60, 67, 9)
+# over-zero full-season counts, 2022-2025 (ROI_HITRATE.md), and their weekly
+# shape: ~68% of a season's bets land in weeks 1-3 (2024: 19 of 30; 2025: 37 of 51).
+OZ_SEASON_HISTORY = (37, 40, 30, 51)
+OZ_EARLY_SHARE, OZ_EARLY_WEEKS = 0.68, 3
 
 # What fraction of the flags actually gets bet. The 201-bet personal record came
 # from roughly 92 unders in 2025 against ~690 flags at this rate -- about 13%.
@@ -94,6 +101,22 @@ def breakeven(american: int) -> float:
     return 1.0 / (1.0 + payout(american))
 
 
+def kelly_unit(p: float, american: int, fraction: float = 0.25, n_simul: float = 9.0,
+               rho_outcome: float = 0.063) -> float:
+    """Fractional Kelly for one bet, then shrunk for n_simul simultaneous bets that
+    share outcome correlation rho_outcome: f / (1 + (n-1) rho). Small-edge approx."""
+    b = payout(american)
+    f = max((p * b - (1 - p)) / b, 0.0)
+    return fraction * f / (1 + (n_simul - 1) * rho_outcome)
+
+
+def planning_p_gl(kappa: float = 0.5) -> float:
+    """Posterior mean of the planning prior."""
+    w = GL_PRIORS["n49"][0] + kappa * 114 + 0.5
+    l = GL_PRIORS["n49"][1] + kappa * 87 + 0.5
+    return w / (w + l)
+
+
 @dataclass
 class Config:
     bankroll: float = 20_000.0
@@ -102,7 +125,7 @@ class Config:
     oz_unit: float = 0.01       # fraction of STARTING bankroll per over-zero bet
     gl_unit: float = 0.0025     # fraction of STARTING bankroll per Greenline bet
     oz_haircut: bool = True     # apply the guide's selection haircut to over-zero p
-    gl_prior: str = "pooled"    # key into GL_PRIORS
+    gl_prior: str = "pooled"    # key into GL_PRIORS, used only when gl_kappa is None
     gl_coverage: float = 1.0    # fraction of weekly Greenline flags actually bet
     gl_volume: str = "range"    # "range": GL_BETS_RANGE unders/wk; "slate": coverage x schedule; "constant": coverage x 49
     gl_range: tuple = GL_BETS_RANGE
@@ -111,7 +134,8 @@ class Config:
     # --- stress knobs (bankroll_stress.py); defaults reproduce the base model ---
     oz_center: float | None = None   # override the post-haircut over-zero mean (e.g. 0.565)
     oz_extra_sd: float = 0.0         # add N(0, sd) to each path's over-zero haircut
-    gl_kappa: float | None = None    # discounted-history prior: Beta(27.5 + k*114, 22.5 + k*87)
+    gl_kappa: float | None = 0.5     # PLANNING PRIOR: Beta(27.5 + k*114, 22.5 + k*87); None -> gl_prior
+    seasons: int = 1                 # 1 = rest of 2026; each extra season is a full 15-week 2027-style season
     gl_marginal_penalty: float = 0.0 # Greenline bets beyond GL_MARGINAL_BASE a week win at p - d
     gl_marginal_base: int = 6        # the first N bets a week keep the full p
 
@@ -162,8 +186,20 @@ def simulate(cfg: Config) -> dict:
     z_gl = -np.sqrt(2) * erfinv(2 * (1 - p_gl) - 1)  # UNDER wins when S <  z_gl
     z_gl_marg = -np.sqrt(2) * erfinv(2 * (1 - p_gl_marg) - 1)
 
-    oz_season = rng.poisson(rng.choice(OZ_WEEK4PLUS_HISTORY, n)).astype(np.int64)
     a, c = np.sqrt(cfg.rho), np.sqrt(1.0 - cfg.rho)
+    # One entry per simulated week: (Greenline slate, over-zero thinning weight,
+    # season index). Season 0 is the rest of 2026; later seasons are full.
+    schedule = [(f, 1.0, 0) for f in GL_FLAGS_BY_WEEK]
+    for s_ix in range(1, cfg.seasons):
+        nw = len(GL_FLAGS_FULL_SEASON)
+        early = OZ_EARLY_SHARE / OZ_EARLY_WEEKS
+        late = (1 - OZ_EARLY_SHARE) / (nw - OZ_EARLY_WEEKS)
+        schedule += [(f, early if i < OZ_EARLY_WEEKS else late, s_ix)
+                     for i, f in enumerate(GL_FLAGS_FULL_SEASON)]
+    n_weeks = len(schedule)
+    oz_by_season = [rng.poisson(rng.choice(OZ_WEEK4PLUS_HISTORY, n)).astype(np.int64)]
+    oz_by_season += [rng.poisson(rng.choice(OZ_SEASON_HISTORY, n)).astype(np.int64)
+                     for _ in range(1, cfg.seasons)]
 
     pnl = np.zeros(n)
     turnover = np.zeros(n)
@@ -172,12 +208,19 @@ def simulate(cfg: Config) -> dict:
     peak = np.zeros(n)         # running peak of cumulative pnl, for max drawdown
     max_dd = np.zeros(n)       # largest peak-to-trough fall, in dollars
     weeks_under = np.zeros(n)  # weeks ending below the starting bankroll
-    oz_remaining = oz_season.copy()
+    oz_remaining = oz_by_season[0].copy()
+    cur_season = 0
     # Percentiles of the bankroll after each week. Keeping the quantiles rather than
     # the paths is what makes a fan chart affordable at 100k paths.
     fan = [np.percentile(np.full(n, cfg.bankroll), PCTS)]
 
-    for w in range(WEEKS_REMAINING):
+    for w, (flags_w, oz_wt, s_ix) in enumerate(schedule):
+        if s_ix != cur_season:
+            cur_season = s_ix
+            oz_remaining = oz_by_season[s_ix].copy()
+        # this week's share of the season's remaining over-zero bets
+        wts_left = [wt for f, wt, s in schedule[w:] if s == s_ix]
+        oz_p = oz_wt / sum(wts_left)
         shock = rng.standard_normal(n)
         if cfg.resize_weekly:
             # Weekly compounding: units re-sized off the bankroll as it stands before
@@ -189,9 +232,9 @@ def simulate(cfg: Config) -> dict:
 
         if cfg.gl_volume == "range":
             lo, hi = cfg.gl_range
-            gl_n = np.minimum(rng.integers(lo, hi + 1, n), GL_FLAGS_BY_WEEK[w])
+            gl_n = np.minimum(rng.integers(lo, hi + 1, n), flags_w)
         else:
-            flags = GL_FLAGS_BY_WEEK[w] if cfg.gl_volume == "slate" else GL_FLAGS_PER_WEEK
+            flags = flags_w if cfg.gl_volume == "slate" else GL_FLAGS_PER_WEEK
             gl_n = rng.poisson(flags * cfg.gl_coverage, n)
         if cfg.gl_marginal_penalty > 0:
             base_n = np.minimum(gl_n, cfg.gl_marginal_base)
@@ -202,7 +245,7 @@ def simulate(cfg: Config) -> dict:
         week_pnl = gl_wins * gl_stake * gl_b - (gl_n - gl_wins) * gl_stake
 
         # over-zero's few bets thinned uniformly across the weeks that remain
-        oz_n = rng.binomial(oz_remaining, 1.0 / (WEEKS_REMAINING - w))
+        oz_n = rng.binomial(oz_remaining, oz_p)
         oz_remaining -= oz_n
         oz_wins = _copula_wins(rng, oz_n, shock, z_oz, a, c, upper=True)
         week_pnl += oz_wins * oz_stake * oz_b - (oz_n - oz_wins) * oz_stake
@@ -217,10 +260,11 @@ def simulate(cfg: Config) -> dict:
         fan.append(np.percentile(cfg.bankroll + pnl, PCTS))
 
     return {
-        "config": dict(cfg.__dict__, weeks=WEEKS_REMAINING),
+        "config": dict(cfg.__dict__, weeks=n_weeks),
+        "n_weeks": n_weeks,
         "p_oz_mean": float(p_oz.mean()),
         "p_gl_mean": float(p_gl.mean()),
-        "gl_prior": "%d-%d" % (gl_w, gl_l),
+        "gl_prior": ("kappa %.2f: " % cfg.gl_kappa if cfg.gl_kappa is not None else "") + "%.1f-%.1f" % (gl_w, gl_l),
         "p_gl_below_breakeven": float((p_gl < breakeven(GL_PRICE)).mean()),
         "p_oz_below_breakeven": float((p_oz < breakeven(OZ_PRICE)).mean()),
         "mean_turnover": float(turnover.mean()),
@@ -303,8 +347,8 @@ def make_figures(base: Config, scenarios: list[tuple[str, Config]], path: Path) 
         return Config(**dict(base.__dict__, **kw))
 
     cov = GL_COVERAGE_HISTORICAL
-    pooled = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="pooled"))
-    thin = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="n49"))
+    pooled = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="pooled", gl_kappa=None))
+    thin = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="n49", gl_kappa=None))
     b0 = base.bankroll
 
     fig = plt.figure(figsize=(15.5, 10.2))
@@ -432,11 +476,11 @@ def self_check() -> None:
 
     # the n=49 posterior must keep real mass below break-even, or the sim has
     # smuggled in an edge that one graded week does not establish
-    thin = simulate(Config(paths=5_000, seed=2, gl_prior="n49"))
+    thin = simulate(Config(paths=5_000, seed=2, gl_prior="n49", gl_kappa=None))
     assert 0.25 < thin["p_gl_below_breakeven"] < 0.50, thin["p_gl_below_breakeven"]
 
     # pooling the 201 personal unders must actually tighten it, not just relabel
-    fat = simulate(Config(paths=5_000, seed=2, gl_prior="pooled"))
+    fat = simulate(Config(paths=5_000, seed=2, gl_prior="pooled", gl_kappa=None))
     assert fat["p_gl_below_breakeven"] < 0.20, fat["p_gl_below_breakeven"]
 
     # slate volume must carry ~15% more flags than 49/wk and be week-shaped
@@ -460,6 +504,13 @@ def self_check() -> None:
     # the fan must start at the starting bankroll and carry one row per week
     f = fat["fan"]
     assert f.shape == (WEEKS_REMAINING + 1, len(PCTS)), f.shape
+    # two seasons: 12 + 15 weeks, more turnover, over-zero front-loaded in season 2
+    two = simulate(Config(paths=5_000, seed=8, seasons=2))
+    assert two["fan"].shape == (WEEKS_REMAINING + 15 + 1, len(PCTS))
+    assert two["mean_turnover"] > fat["mean_turnover"] * 1.8
+    # planning prior default is kappa 0.5
+    assert Config().gl_kappa == 0.5 and abs(planning_p_gl(0.5) - 0.5614) < 0.002
+    assert 0.010 < kelly_unit(planning_p_gl(0.5), -110) < 0.014
     assert np.allclose(f[0], Config().bankroll), f[0]
     assert (np.diff(f, axis=1) >= 0).all(), "percentiles must be non-decreasing"
     # weekly resizing must lift the upper tail, and at a unit where one week's
@@ -480,7 +531,7 @@ def self_check() -> None:
     assert np.median(pen["final"]) < np.median(base["final"])
     wide = simulate(Config(paths=5_000, seed=7, oz_extra_sd=0.03))
     assert wide["p_oz_below_breakeven"] > base["p_oz_below_breakeven"]
-    assert base["max_dd"].min() >= 0 and base["weeks_under"].max() <= WEEKS_REMAINING
+    assert base["max_dd"].min() >= 0 and base["weeks_under"].max() <= base["n_weeks"]
     print("self-check OK")
 
 
@@ -494,7 +545,11 @@ def main() -> None:
     ap.add_argument("--gl-unit", type=float, default=0.0025)
     ap.add_argument("--no-haircut", action="store_true",
                     help="skip the MODEL_GUIDE selection haircut on over-zero p")
-    ap.add_argument("--gl-prior", choices=sorted(GL_PRIORS), default="pooled",
+    ap.add_argument("--gl-kappa", type=float, default=0.5,
+                    help="planning prior weight on the 2023-25 unders (0=n49, 1=pooled); default 0.5")
+    ap.add_argument("--seasons", type=int, default=1,
+                    help="1 = rest of 2026; 2 adds a full 2027-style season, and so on")
+    ap.add_argument("--gl-prior", choices=sorted(GL_PRIORS), default=None,
                     help="which Greenline record to draw the win rate from")
     ap.add_argument("--gl-volume", choices=("range", "slate", "constant"), default="range",
                     help="range: GL_BETS_RANGE unders a week (default); slate: coverage x "
@@ -517,7 +572,9 @@ def main() -> None:
 
     base = Config(bankroll=args.bankroll, paths=args.paths, rho=args.rho,
                   oz_unit=args.oz_unit, gl_unit=args.gl_unit,
-                  oz_haircut=not args.no_haircut, gl_prior=args.gl_prior,
+                  oz_haircut=not args.no_haircut,
+                  gl_prior=args.gl_prior or "pooled",
+                  gl_kappa=None if args.gl_prior else args.gl_kappa, seasons=args.seasons,
                   gl_coverage=args.gl_coverage, resize_weekly=not args.flat_stakes,
                   gl_volume=args.gl_volume, gl_range=tuple(args.gl_range), seed=args.seed)
 

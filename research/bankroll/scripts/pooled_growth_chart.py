@@ -20,7 +20,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mc_combined_totals import (  # noqa: E402
-    PCTS, WEEKS_REMAINING, Config, simulate,
+    PCTS, Config, simulate,
     BLUE, GREEN, GOLD, INK, MUTED, _style,
 )
 
@@ -28,16 +28,16 @@ from mc_combined_totals import (  # noqa: E402
 CONFIGS = (
     ("0.5% unit, 6-12 unders/wk", 0.005, BLUE),
     ("1.0% unit, 6-12 unders/wk", 0.01, GREEN),
-    ("1.5% unit, 6-12 unders/wk", 0.015, GOLD),
+    ("1.2% unit (quarter Kelly), 6-12 unders/wk", 0.012, GOLD),
 )
 STEM = "pooled-bankroll-growth-2026-09-17"
 
 
-def run(paths: int, seed: int, bankroll: float, resize: bool = True) -> list[dict]:
+def run(paths: int, seed: int, bankroll: float, resize: bool = True, seasons: int = 1) -> list[dict]:
     out = []
     for label, unit, colour in CONFIGS:
         res = simulate(Config(bankroll=bankroll, paths=paths, gl_unit=unit,
-                              gl_prior="pooled", seed=seed, resize_weekly=resize))
+                              seed=seed, resize_weekly=resize, seasons=seasons))
         out.append(dict(label=label, colour=colour, fan=res["fan"], final=res["final"],
                         p_bust=res["p_bust"], unit=unit, resize=resize))
     return out
@@ -48,7 +48,8 @@ def figure(runs: list[dict], bankroll: float, path: Path, resized: list[dict] | 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    weeks = np.arange(3, 3 + WEEKS_REMAINING + 1)  # week 3 = start, before week 4 bets
+    n_weeks = runs[0]["fan"].shape[0] - 1
+    weeks = np.arange(n_weeks + 1)  # 0 = now (after week 3 of 2026); 12 = end of 2026
     rows = [runs] + ([resized] if resized else [])
     fig, axes = plt.subplots(len(rows), len(runs), figsize=(15, 5.2 * len(rows)),
                              sharey=True, squeeze=False)
@@ -61,9 +62,9 @@ def figure(runs: list[dict], bankroll: float, path: Path, resized: list[dict] | 
             ax.set_title(r["label"] + ("\nunits re-sized weekly" if r["resize"]
                                        else "\nflat units off the start"), fontsize=10.5)
     axes[0, 0].legend(fontsize=8, frameon=False, loc="upper left")
-    fig.suptitle(f"Bankroll by week, pooled Greenline prior (141–109, mean 56.4%), "
+    fig.suptitle(f"Bankroll by week, planning prior (kappa 0.5: 84.5–65.5, mean 56.1%), "
                  f"${bankroll:,.0f} start", fontsize=13, fontweight="bold", color=INK)
-    sub = "Win rate drawn per path from the pooled posterior only. The n49 reading is in the MC doc and the sweep."
+    sub = "Win rate drawn per path from the half-pooled posterior. n49 and pooled readings are in the sweep."
     if resized:
         sub += " Top row: units re-sized off the bankroll each week. Bottom row: flat stakes off the starting bankroll."
     fig.text(0.5, 0.905 if not resized else 0.95, sub, fontsize=9, color=MUTED, ha="center")
@@ -81,8 +82,10 @@ def _panel(ax, r, weeks, bankroll, lo, hi, q1, q3, med):
     ax.axhline(bankroll, color=MUTED, lw=0.8, ls="--")
     _style(ax)
     ax.set_title(r["label"], fontsize=10.5)
-    ax.set_xlabel("week of the 2026 season")
-    ax.set_xticks(weeks[::2])
+    ax.set_xlabel("weeks from now  (12 = end of 2026 regular season)")
+    ax.set_xticks(weeks[::3])
+    if len(weeks) > 14:
+        ax.axvline(12, color=MUTED, lw=0.8, ls=":")
     end = f[-1]
     ax.text(weeks[-1], end[med], f"  ${end[med]:,.0f}", color=r["colour"], fontsize=9,
             va="center", fontweight="bold")
@@ -107,7 +110,7 @@ def self_check() -> None:
     runs = run(paths=3_000, seed=1, bankroll=20_000)
     assert len(runs) == len(CONFIGS)
     for r in runs:
-        assert r["fan"].shape == (WEEKS_REMAINING + 1, len(PCTS))
+        assert r["fan"].shape[1] == len(PCTS)
         assert np.allclose(r["fan"][0], 20_000)
         # the fan must widen over the season
         assert r["fan"][-1, -1] - r["fan"][-1, 0] > r["fan"][1, -1] - r["fan"][1, 0]
@@ -125,13 +128,14 @@ def main() -> None:
     ap.add_argument("--out", help="docs directory; writes figs/<stem>.png")
     ap.add_argument("--flat-stakes", action="store_true",
                     help="add a second row with flat units off the starting bankroll")
+    ap.add_argument("--seasons", type=int, default=1)
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
         self_check()
         return
-    runs = run(args.paths, args.seed, args.bankroll)
-    flat = run(args.paths, args.seed, args.bankroll, resize=False) if args.flat_stakes else None
+    runs = run(args.paths, args.seed, args.bankroll, seasons=args.seasons)
+    flat = run(args.paths, args.seed, args.bankroll, resize=False, seasons=args.seasons) if args.flat_stakes else None
     print(table(runs + (flat or []), args.bankroll))
     if args.out:
         figure(runs, args.bankroll, Path(args.out) / "figs" / f"{STEM}.png", flat)

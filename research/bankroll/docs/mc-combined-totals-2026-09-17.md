@@ -10,8 +10,9 @@ graded-flags-only priors. Reproduce with
 49 Greenline flags a week and flat stakes off the starting bankroll. Greenline in fact
 flags every FBS-vs-FBS game, so the weekly count is the slate (56–67 through week 14,
 9 in championship week); and the plan is 6–12 unders a week with units re-sized each
-Monday. The simulator's defaults are now `--gl-volume range` and weekly re-sizing; the
-tables below reproduce with `--gl-volume constant --flat-stakes`. The re-swept numbers
+Monday. The simulator's defaults are now `--gl-volume range`, weekly re-sizing, and the
+half-pooled planning prior (κ = 0.5); the tables below reproduce with
+`--gl-volume constant --flat-stakes --gl-prior pooled` (or `n49`). The re-swept numbers
 are in [bankroll-config-sweep-2026-09-17.md](bankroll-config-sweep-2026-09-17.md) and
 the proposal. Medians rise ~$200 at the recommended unit; the conclusions do not move.
 
