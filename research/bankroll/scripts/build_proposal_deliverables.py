@@ -1,4 +1,4 @@
-"""Render the seed-bankroll proposal to PDF and an 8-slide deck.
+"""Render the seed-bankroll proposal to PDF and a 9-slide deck.
 
     python research/bankroll/scripts/build_proposal_deliverables.py
     python research/bankroll/scripts/build_proposal_deliverables.py --self-check
@@ -22,6 +22,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mc_combined_totals import GL_COVERAGE_HISTORICAL, GL_FLAGS_BY_WEEK, OZ_WEEK4PLUS_HISTORY  # noqa: E402
+
+OZ_TOTAL = sum(OZ_WEEK4PLUS_HISTORY) / len(OZ_WEEK4PLUS_HISTORY)  # ~10.6 bets, weeks 4-15
 DOCS = Path(__file__).resolve().parents[1] / "docs"
 STEM = "seed-bankroll-proposal-2026-09-17"
 SWEEP = DOCS / "bankroll-config-sweep-2026-09-17.csv"
@@ -173,6 +177,28 @@ def build_pptx() -> Path:
         "Conflict rule: same game flagged on opposite sides → Greenline takes it, over-zero skips it.",
         "Excluded: the spread model (research, not a bet); Greenline spreads and moneylines (21–28 and 21–25 in week 2).",
     ], 13, color=MUTED)
+
+    # 3b bets per week
+    s = slide("Bets per week",
+              "Greenline flags every FBS-vs-FBS game, so weekly volume is the schedule. "
+              "13% of flags at $100; over-zero ~11 bets spread across the span at $200.")
+    rows_w = [["week", "FBS games (= flags)", "Greenline bets", "over-zero bets", "staked"]]
+    oz_per_week = OZ_TOTAL / len(GL_FLAGS_BY_WEEK)
+    for i, flags in enumerate(GL_FLAGS_BY_WEEK):
+        gl = flags * GL_COVERAGE_HISTORICAL
+        rows_w.append([str(4 + i), str(flags), f"{gl:.0f}", f"{oz_per_week:.1f}",
+                       money(gl * 100 + oz_per_week * 200)])
+    gl_tot = sum(GL_FLAGS_BY_WEEK) * GL_COVERAGE_HISTORICAL
+    rows_w.append(["total", str(sum(GL_FLAGS_BY_WEEK)), f"~{gl_tot:.0f}", f"~{OZ_TOTAL:.0f}",
+                   money(gl_tot * 100 + OZ_TOTAL * 200)])
+    table(s, 0.6, 1.7, 8.2, rows_w, col_w=[1.0, 2.2, 1.8, 1.7, 1.5], size=11)
+    text(s, 9.2, 1.8, 3.8, 5, [
+        "About 8 Greenline unders plus 1 over-zero over in a typical week. 9 to 10 in November. One in championship week.",
+        "",
+        "Each week's count is drawn Poisson around these means, so a real week can be 4 or 12.",
+        "",
+        "A typical week stakes about $1,000. Weeks 14 and 15 use 2025's schedule; 2026 is not scheduled that far yet.",
+    ], 13)
 
     # 4 projection
     s = slide("The projection: bracketed, not resolved",
