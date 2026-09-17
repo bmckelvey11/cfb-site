@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Georgia Bulldogs 2026 — PFF team report (sample)</title>
+<style>
+:root {
+  --bg: #fbfaf8; --panel: #ffffff; --ink: #1b1a18; --muted: #6a6560;
+  --line: #e4e0da; --line-strong: #cbc5bc; --accent: #a0000b; --code-bg: #f2efe9;
+  --row-alt: #faf8f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14130f; --panel: #1b1a16; --ink: #ece8e0; --muted: #9b958c;
+    --line: #2e2c26; --line-strong: #423f37; --accent: #e06a72; --code-bg: #22201b;
+    --row-alt: #1f1d19;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14130f; --panel: #1b1a16; --ink: #ece8e0; --muted: #9b958c;
+  --line: #2e2c26; --line-strong: #423f37; --accent: #e06a72; --code-bg: #22201b;
+  --row-alt: #1f1d19;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.55 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+main { max-width: 1120px; margin: 0 auto; padding: 48px 16px 96px; }
+header { border-bottom: 2px solid var(--accent); padding-bottom: 18px; margin-bottom: 28px; }
+h1 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.1rem); line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.02em; }
+.sub { color: var(--muted); font-size: 0.9rem; margin: 0; }
+h2 {
+  font-size: 1.1rem; letter-spacing: 0.04em; text-transform: uppercase;
+  margin: 44px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line-strong);
+}
+p { margin: 0 0 14px; }
+.lede { font-size: 1.02rem; }
+.meta, .note { color: var(--muted); font-size: 0.87rem; }
+a { color: var(--accent); }
+code { background: var(--code-bg); border-radius: 3px; padding: 0.1em 0.35em; font-size: 0.86em;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.tw { margin: 0 0 8px; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
+thead th {
+  position: sticky; top: 0; background: var(--panel); text-align: right;
+  font-weight: 600; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.05em;
+  text-transform: uppercase; padding: 9px 10px; border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+thead th:first-child { text-align: left; }
+td { padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td.n { text-align: left; font-weight: 500; }
+td.t { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:nth-child(even) { background: var(--row-alt); }
+tbody tr:last-child td { border-bottom: none; }
+.limits { padding-left: 20px; }
+.limits li { margin-bottom: 10px; }
+footer { margin-top: 56px; padding-top: 14px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>PFF team report — Georgia Bulldogs, 2026 <span class="sub">(sample)</span></h1>
+  <p class="sub">Season 2026 · 2 games played · pulled 2026-09-16 · PFF Developer API</p>
+</header>
+<p class="lede">Sample of what the PFF Developer API returns for one team, rendered as a readable report. Pulled 2026-09-16 through Restish (<code>ci</code> API-key profile). <strong>2 games played</strong> — every rate below rests on that sample, so denominators are printed in every row. Two blowouts also mean deep rotation: 54 players graded on offense, 51 on defense, most of them under 30 snaps.</p>
+<p class="meta">Endpoints: <code>team-summary ncaa 2026 173</code> (/v1, per game) and <code>team-report ncaa georgia-bulldogs &lt;report&gt; --season 2026 --week-group REG</code> (/v2, per player) for offense, defense, passing, rushing, receiving, special-teams. See <a href="pff-cli.md">docs/pff-cli.md</a>.</p>
+<h2 id="game-log">Game log</h2>
+<p>Team grades, one row per game. 0–100, where 60 is roughly average.</p>
+<figure class="tw"><div class="scroll"><table><thead><tr><th>Wk</th><th>Opp</th><th>H/A</th><th>Score</th><th>Overall</th><th>Off</th><th>Def</th><th>Pass</th><th>Run</th><th>Pass blk</th><th>Coverage</th></tr></thead><tbody><tr><td class="n">1</td><td class="t">TENNST</td><td class="t">H</td><td class="t">63–3</td><td class="t">98</td><td class="t">95.2</td><td class="t">92.1</td><td class="t">88.2</td><td class="t">93.2</td><td class="t">88.6</td><td class="t">80.4</td></tr><tr><td class="n">2</td><td class="t">WKUHIL</td><td class="t">H</td><td class="t">70–20</td><td class="t">91.7</td><td class="t">80.1</td><td class="t">81.7</td><td class="t">72.1</td><td class="t">77.1</td><td class="t">81.3</td><td class="t">85.2</td></tr></tbody></table></div></figure>
+<p class="note">Remaining 10 scheduled games come back <code>locked</code> with null grades: wk3 ARKANS, wk4 OKLAHO, wk5 VANDYC, wk6 BAMACT, wk7 AUBURN, wk9 UFGATO, wk10 OLEMIS, wk11 MIZZOU, wk12 SOUTHC, wk13 GEOTEC.</p>
+<h2 id="qb">Quarterbacks</h2>
+<p>Source: <code>passing</code>. EPA columns are PFF's own; <code>npaEpa</code> excludes penalties, <code>noScreenEpa</code> excludes screens.</p>
+<figure class="tw"><div class="scroll"><table><thead><tr><th>Player</th><th>Gm</th><th>Dropbacks</th><th>Att</th><th>Cmp%</th><th>Yds</th><th>TD</th><th>INT</th><th>Grade (pass)</th><th>BTT%</th><th>TWP%</th><th>aDOT</th><th>TTT</th><th>EPA</th></tr></thead><tbody><tr><td class="n">Gunner Stockton</td><td class="t">2</td><td class="t">33</td><td class="t">32</td><td class="t">87.5</td><td class="t">436</td><td class="t">8</td><td class="t">0</td><td class="t">86.4</td><td class="t">6.1</td><td class="t">0</td><td class="t">6.6</td><td class="t">2.34</td><td class="t">1</td></tr><tr><td class="n">Ryan Puglisi</td><td class="t">2</td><td class="t">19</td><td class="t">18</td><td class="t">50</td><td class="t">128</td><td class="t">1</td><td class="t">0</td><td class="t">72.1</td><td class="t">0</td><td class="t">10.5</td><td class="t">10.4</td><td class="t">2.54</td><td class="t">-0.1</td></tr><tr><td class="n">Ryan Montgomery</td><td class="t">2</td><td class="t">7</td><td class="t">6</td><td class="t">50</td><td class="t">66</td><td class="t">1</td><td class="t">0</td><td class="t">83.6</td><td class="t">16.7</td><td class="t">14.3</td><td class="t">7.4</td><td class="t">2.5</td><td class="t">0.3</td></tr><tr><td class="n">Hezekiah Millender</td><td class="t">1</td><td class="t">3</td><td class="t">1</td><td class="t">100</td><td class="t">17</td><td class="t">0</td><td class="t">0</td><td class="t">60.4</td><td class="t">0</td><td class="t">0</td><td class="t">-1</td><td class="t">4.27</td><td class="t">1.1</td></tr><tr><td class="n">Drew Miller</td><td class="t">1</td><td class="t">1</td><td class="t">1</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">55.7</td><td class="t">0</td><td class="t">100</td><td class="t">—</td><td class="t">3.8</td><td class="t">-1.5</td></tr></tbody></table></div></figure>
+<p class="note">BTT = big-time throws, TWP = turnover-worthy plays, both as a share of dropbacks. TTT = average time to throw (s).</p>
+<h2 id="backfield">Backfield</h2>
+<p>Source: <code>rushing</code>. Ordered by carries, not by grade — a 10-carry elusive rating swings wildly.</p>
+<figure class="tw"><div class="scroll"><table><thead><tr><th>Player</th><th>Gm</th><th>Att</th><th>Yds</th><th>YPA</th><th>TD</th><th>YCO</th><th>YCO/att</th><th>MTF</th><th>Brk%</th><th>Rec</th><th>Rec yds</th><th>Grade (run)</th></tr></thead><tbody><tr><td class="n">Bo Walker</td><td class="t">2</td><td class="t">11</td><td class="t">49</td><td class="t">4.5</td><td class="t">0</td><td class="t">26</td><td class="t">2.4</td><td class="t">3</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">67.1</td></tr><tr><td class="n">Nate Frazier</td><td class="t">2</td><td class="t">10</td><td class="t">127</td><td class="t">12.7</td><td class="t">4</td><td class="t">86</td><td class="t">8.6</td><td class="t">6</td><td class="t">66.1</td><td class="t">1</td><td class="t">5</td><td class="t">92.8</td></tr><tr><td class="n">Nick Peal</td><td class="t">2</td><td class="t">10</td><td class="t">46</td><td class="t">4.6</td><td class="t">0</td><td class="t">43</td><td class="t">4.3</td><td class="t">5</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">86.3</td></tr><tr><td class="n">Jae Lamar</td><td class="t">2</td><td class="t">6</td><td class="t">26</td><td class="t">4.3</td><td class="t">1</td><td class="t">17</td><td class="t">2.8</td><td class="t">3</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">61</td></tr><tr><td class="n">Chauncey Bowens</td><td class="t">2</td><td class="t">5</td><td class="t">28</td><td class="t">5.6</td><td class="t">0</td><td class="t">9</td><td class="t">1.8</td><td class="t">1</td><td class="t">64.3</td><td class="t">4</td><td class="t">77</td><td class="t">65.5</td></tr><tr><td class="n">Hezekiah Millender</td><td class="t">2</td><td class="t">5</td><td class="t">23</td><td class="t">4.6</td><td class="t">0</td><td class="t">10</td><td class="t">2</td><td class="t">1</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">67.6</td></tr><tr><td class="n">Dwight Phillips Jr.</td><td class="t">2</td><td class="t">4</td><td class="t">29</td><td class="t">7.3</td><td class="t">0</td><td class="t">17</td><td class="t">4.2</td><td class="t">1</td><td class="t">51.7</td><td class="t">1</td><td class="t">4</td><td class="t">81.5</td></tr><tr><td class="n">Landon Roldan</td><td class="t">2</td><td class="t">2</td><td class="t">13</td><td class="t">6.5</td><td class="t">1</td><td class="t">1</td><td class="t">0.5</td><td class="t">0</td><td class="t">0</td><td class="t">1</td><td class="t">17</td><td class="t">60.8</td></tr></tbody></table></div></figure>
+<p class="note">YCO = yards after contact. MTF = missed tackles forced. Brk% = share of yards on breakaway runs (15+).</p>
+<h2 id="receivers">Receivers</h2>
+<p>Source: <code>receiving</code>. Route count is the denominator that matters — YPRR on 20 routes is noise.</p>
+<figure class="tw"><div class="scroll"><table><thead><tr><th>Player</th><th>Pos</th><th>Gm</th><th>Routes</th><th>Tgt</th><th>Tgt%</th><th>Rec</th><th>Yds</th><th>TD</th><th>YPRR</th><th>aDOT</th><th>YAC/rec</th><th>Slot%</th><th>Grade (route)</th></tr></thead><tbody><tr><td class="n">Isiah Canion</td><td class="t">WR</td><td class="t">2</td><td class="t">31</td><td class="t">5</td><td class="t">8.9</td><td class="t">3</td><td class="t">28</td><td class="t">0</td><td class="t">0.9</td><td class="t">10</td><td class="t">10.7</td><td class="t">3.1</td><td class="t">55.5</td></tr><tr><td class="n">Chauncey Bowens</td><td class="t">HB</td><td class="t">2</td><td class="t">21</td><td class="t">4</td><td class="t">7.1</td><td class="t">4</td><td class="t">77</td><td class="t">1</td><td class="t">3.67</td><td class="t">-3.5</td><td class="t">22.8</td><td class="t">9.5</td><td class="t">82.9</td></tr><tr><td class="n">Talyn Taylor</td><td class="t">WR</td><td class="t">2</td><td class="t">17</td><td class="t">5</td><td class="t">8.9</td><td class="t">5</td><td class="t">59</td><td class="t">2</td><td class="t">3.47</td><td class="t">4</td><td class="t">8.8</td><td class="t">41.2</td><td class="t">83.1</td></tr><tr><td class="n">London Humphreys</td><td class="t">WR</td><td class="t">2</td><td class="t">17</td><td class="t">4</td><td class="t">7.1</td><td class="t">2</td><td class="t">11</td><td class="t">1</td><td class="t">0.65</td><td class="t">14.3</td><td class="t">4.5</td><td class="t">27.8</td><td class="t">54.1</td></tr><tr><td class="n">Jaden Reddell</td><td class="t">TE</td><td class="t">2</td><td class="t">17</td><td class="t">2</td><td class="t">3.6</td><td class="t">2</td><td class="t">38</td><td class="t">1</td><td class="t">2.24</td><td class="t">12.5</td><td class="t">6.5</td><td class="t">45</td><td class="t">74.1</td></tr><tr><td class="n">Tyler J. Williams</td><td class="t">WR</td><td class="t">2</td><td class="t">14</td><td class="t">4</td><td class="t">7.1</td><td class="t">2</td><td class="t">33</td><td class="t">0</td><td class="t">2.36</td><td class="t">7.3</td><td class="t">7</td><td class="t">92.9</td><td class="t">65.4</td></tr><tr><td class="n">Jeremy Bell</td><td class="t">WR</td><td class="t">2</td><td class="t">14</td><td class="t">1</td><td class="t">1.8</td><td class="t">1</td><td class="t">54</td><td class="t">1</td><td class="t">3.86</td><td class="t">35</td><td class="t">19</td><td class="t">21.4</td><td class="t">71.1</td></tr><tr><td class="n">Lawson Luckie</td><td class="t">TE</td><td class="t">2</td><td class="t">14</td><td class="t">1</td><td class="t">1.8</td><td class="t">1</td><td class="t">4</td><td class="t">0</td><td class="t">0.29</td><td class="t">1</td><td class="t">3</td><td class="t">41.2</td><td class="t">53.5</td></tr><tr><td class="n">Sacovie White-Helton</td><td class="t">WR</td><td class="t">2</td><td class="t">13</td><td class="t">4</td><td class="t">7.1</td><td class="t">4</td><td class="t">104</td><td class="t">1</td><td class="t">8</td><td class="t">3.8</td><td class="t">22.3</td><td class="t">76.9</td><td class="t">82.7</td></tr><tr><td class="n">Craig Dandridge</td><td class="t">WR</td><td class="t">2</td><td class="t">12</td><td class="t">5</td><td class="t">8.9</td><td class="t">4</td><td class="t">92</td><td class="t">0</td><td class="t">7.67</td><td class="t">14.8</td><td class="t">5.8</td><td class="t">100</td><td class="t">85.3</td></tr></tbody></table></div></figure>
+<h2 id="ol">Offensive line</h2>
+<p>Source: <code>offense</code>, linemen only, ordered by snaps.</p>
+<figure class="tw"><div class="scroll"><table><thead><tr><th>Player</th><th>Pos</th><th>Snaps</th><th>Pass blk snaps</th><th>Run blk snaps</th><th>Grade (pass blk)</th><th>Grade (run blk)</th><th>Pen</th></tr></thead><tbody><tr><td class="n">Ekene Ogboko</td><td class="t">T</td><td class="t">89</td><td class="t">47</td><td class="t">42</td><td class="t">62.7</td><td class="t">74.2</td><td class="t">0</td></tr><tr><td class="n">Zykie Helton</td><td class="t">G</td><td class="t">73</td><td class="t">44</td><td class="t">29</td><td class="t">72.5</td><td class="t">60.5</td><td class="t">0</td></tr><tr><td class="n">Jahzare Jackson</td><td class="t">T</td><td class="t">56</td><td class="t">31</td><td class="t">25</td><td class="t">84.4</td><td class="t">79.1</td><td class="t">0</td></tr><tr><td class="n">Drew Bobo</td><td class="t">C</td><td class="t">53</td><td class="t">35</td><td class="t">18</td><td class="t">69.2</td><td class="t">71.2</td><td class="t">0</td></tr><tr><td class="n">Dontrell Glover</td><td class="t">G</td><td class="t">52</td><td class="t">30</td><td class="t">22</td><td class="t">83.5</td><td class="t">69.2</td><td class="t">1</td></tr><tr><td class="n">Juan Gaston</td><td class="t">T</td><td class="t">46</td><td class="t">28</td><td class="t">18</td><td class="t">82.8</td><td class="t">74.6</td><td class="t">0</td></tr><tr><td class="n">Marcus Harrison</td><td class="t">G</td><td class="t">45</td><td class="t">19</td><td class="t">26</td><td class="t">84.8</td><td class="t">63.5</td><td class="t">0</td></tr><tr><td class="n">Daniel Calhoun</td><td class="t">T</td><td class="t">41</td><td class="t">20</td><td class="t">21</td><td class="t">84.1</td><td class="t">60.1</td><td class="t">1</td></tr><tr><td class="n">Michael Uini</td><td class="t">G</td><td class="t">40</td><td class="t">17</td><td class="t">23</td><td class="t">81.2</td><td class="t">68</td><td class="t">0</td></tr><tr><td class="n">Malachi Toliver</td><td class="t">C</td><td class="t">38</td><td class="t">19</td><td class="t">19</td><td class="t">72.8</td><td class="t">66.6</td><td class="t">1</td></tr></tbody></table></div></figure>
+<h2 id="defense">Defense</h2>
+<p>Source: <code>defense</code>, 20+ snaps, ordered by snaps. Nobody is past 60 snaps this season.</p>
+<figure class="tw"><div class="scroll"><table><thead><tr><th>Player</th><th>Pos</th><th>Gm</th><th>Snaps</th><th>Rush</th><th>Cov</th><th>Tkl</th><th>Stops</th><th>MT</th><th>Prs</th><th>Sk</th><th>Grade</th><th>Run def</th><th>Coverage</th><th>Pass rush</th></tr></thead><tbody><tr><td class="n">Tyriq Green</td><td class="t">S</td><td class="t">2</td><td class="t">68</td><td class="t">0</td><td class="t">38</td><td class="t">2</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">57.2</td><td class="t">59.5</td><td class="t">56.3</td><td class="t">—</td></tr><tr><td class="n">Braylon Conley</td><td class="t">CB</td><td class="t">2</td><td class="t">57</td><td class="t">1</td><td class="t">32</td><td class="t">2</td><td class="t">2</td><td class="t">0</td><td class="t">1</td><td class="t">0</td><td class="t">74.3</td><td class="t">69.3</td><td class="t">70.9</td><td class="t">65.4</td></tr><tr><td class="n">Blake Stewart</td><td class="t">CB</td><td class="t">2</td><td class="t">55</td><td class="t">5</td><td class="t">24</td><td class="t">2</td><td class="t">0</td><td class="t">1</td><td class="t">2</td><td class="t">0</td><td class="t">62.5</td><td class="t">58.3</td><td class="t">56</td><td class="t">86.9</td></tr><tr><td class="n">Rasean Dinkins</td><td class="t">S</td><td class="t">2</td><td class="t">48</td><td class="t">0</td><td class="t">22</td><td class="t">2</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">64.8</td><td class="t">71</td><td class="t">60.8</td><td class="t">—</td></tr><tr><td class="n">Chris Cole</td><td class="t">LB</td><td class="t">2</td><td class="t">45</td><td class="t">16</td><td class="t">13</td><td class="t">3</td><td class="t">3</td><td class="t">0</td><td class="t">3</td><td class="t">0</td><td class="t">90.3</td><td class="t">83.9</td><td class="t">71.8</td><td class="t">83.8</td></tr><tr><td class="n">Khalil Barnes</td><td class="t">CB</td><td class="t">2</td><td class="t">43</td><td class="t">1</td><td class="t">30</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">63.4</td><td class="t">62.5</td><td class="t">63</td><td class="t">60</td></tr><tr><td class="n">KJ Bolden</td><td class="t">S</td><td class="t">2</td><td class="t">43</td><td class="t">0</td><td class="t">32</td><td class="t">2</td><td class="t">1</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">68.8</td><td class="t">68.1</td><td class="t">67</td><td class="t">—</td></tr><tr><td class="n">Gentry Williams</td><td class="t">CB</td><td class="t">2</td><td class="t">40</td><td class="t">0</td><td class="t">23</td><td class="t">1</td><td class="t">1</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">69.5</td><td class="t">70</td><td class="t">67.2</td><td class="t">—</td></tr><tr><td class="n">Demello Jones</td><td class="t">CB</td><td class="t">2</td><td class="t">40</td><td class="t">0</td><td class="t">23</td><td class="t">1</td><td class="t">1</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">79.8</td><td class="t">70.6</td><td class="t">83.2</td><td class="t">—</td></tr><tr><td class="n">Todd Robinson</td><td class="t">S</td><td class="t">2</td><td class="t">39</td><td class="t">0</td><td class="t">20</td><td class="t">4</td><td class="t">2</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">71.1</td><td class="t">73.3</td><td class="t">67.4</td><td class="t">—</td></tr><tr><td class="n">Zayden Walker</td><td class="t">LB</td><td class="t">2</td><td class="t">38</td><td class="t">10</td><td class="t">15</td><td class="t">2</td><td class="t">1</td><td class="t">1</td><td class="t">2</td><td class="t">0</td><td class="t">69.7</td><td class="t">61.3</td><td class="t">63.5</td><td class="t">75.6</td></tr><tr><td class="n">Terrell Foster</td><td class="t">LB</td><td class="t">2</td><td class="t">37</td><td class="t">3</td><td class="t">15</td><td class="t">7</td><td class="t">4</td><td class="t">1</td><td class="t">1</td><td class="t">0</td><td class="t">89.9</td><td class="t">80.2</td><td class="t">87.3</td><td class="t">55.9</td></tr><tr><td class="n">Ellis Robinson IV</td><td class="t">CB</td><td class="t">2</td><td class="t">37</td><td class="t">0</td><td class="t">21</td><td class="t">4</td><td class="t">1</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">73.5</td><td class="t">62.5</td><td class="t">73.3</td><td class="t">—</td></tr><tr><td class="n">Caden Harris</td><td class="t">CB</td><td class="t">2</td><td class="t">36</td><td class="t">0</td><td class="t">17</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">0</td><td class="t">70.6</td><td class="t">62.9</td><td class="t">70.6</td><td class="t">—</td></tr></tbody></table></div></figure>
+<p class="note">Prs = total pressures (hurries + hits + sacks). MT = missed tackles.</p>
+<h2 id="st">Special teams</h2>
+<p>Source: <code>special-teams</code>. Specialists only; 72 rows in the raw table once coverage units are included.</p>
+<figure class="tw"><div class="scroll"><table><thead><tr><th>Player</th><th>Pos</th><th>Snaps</th><th>FG/XP</th><th>Kickoff</th><th>Punt</th><th>Long snap</th><th>Kick ret</th><th>Punt ret</th><th>Misc ST</th></tr></thead><tbody><tr><td class="n">Peyton Woodring</td><td class="t">K</td><td class="t">35</td><td class="t">72.2</td><td class="t">81.8</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">61.7</td></tr><tr><td class="n">Will Snellings</td><td class="t">LS</td><td class="t">25</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">79.5</td><td class="t">—</td><td class="t">—</td><td class="t">63.5</td></tr><tr><td class="n">Tyriq Green</td><td class="t">S</td><td class="t">18</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">82.7</td><td class="t">—</td><td class="t">61.4</td></tr><tr><td class="n">Sacovie White-Helton</td><td class="t">WR</td><td class="t">16</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">61.8</td><td class="t">50.1</td><td class="t">60.4</td></tr><tr><td class="n">Craig Dandridge</td><td class="t">WR</td><td class="t">7</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">65</td><td class="t">60</td></tr><tr><td class="n">Drew Miller</td><td class="t">P</td><td class="t">6</td><td class="t">—</td><td class="t">—</td><td class="t">63</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">60.3</td></tr><tr><td class="n">Harran Zureikat</td><td class="t">K</td><td class="t">6</td><td class="t">60</td><td class="t">67.8</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">60</td></tr><tr><td class="n">Bo Walker</td><td class="t">HB</td><td class="t">2</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">58</td><td class="t">—</td><td class="t">60</td></tr></tbody></table></div></figure>
+<h2 id="limits">What this does not support</h2>
+<ul class="limits">
+<li><strong>Two games.</strong> Nothing here separates a player from the sample. Frazier's elusive
+rating is 469 on 10 carries; over 145 carries in 2025 it was 74.5. Treat every rate as provisional
+until ~4 games.</li>
+<li><strong>Opponent quality is not adjusted.</strong> Tennessee State (FCS) and Western Kentucky,
+both at home, both blowouts. PFF grades are play-by-play judgments, not strength-adjusted.</li>
+<li><strong>Grades are a result of the game.</strong> Using these as pre-game features means rolling
+earlier weeks only — see the no-lookahead rule in the root <code>CLAUDE.md</code>.</li>
+<li><strong><code>team-summary</code> and <code>team-report</code> cover different scopes once a
+postseason exists.</strong> <code>team-summary</code> has no <code>--week-group</code> and returns
+every game; these <code>team-report</code> pulls are <code>REG</code>. For 2026 to date they agree
+because there is no postseason yet. For 2025 they do not.</li>
+<li><strong>This is not the warehouse path.</strong> <code>pull_pff_modeling.py --team-reports</code>
+no longer pulls <code>team-report</code> (<code>TEAM_REPORTS = ()</code>, dropped 2026-09-10 as
+redundant with the weekly leaderboards). This sample came from direct Restish calls and nothing was
+written under <code>data/</code>.</li>
+</ul>
+<h2 id="reproduce">Reproduce</h2>
+<pre><code>export PFF_API=$(grep -E '^PFF_API=' env.env | cut -d= -f2- | tr -d '\r')
+restish pff team-summary ncaa 2026 173 -p ci -o json --rsh-print b &gt; team_summary_2026.json
+for rep in offense defense passing rushing receiving special-teams; do
+  restish pff team-report ncaa georgia-bulldogs $rep --season 2026 --week-group REG \
+    -p ci -o json --rsh-print b &gt; report_$rep.json
+  sleep 0.7
+done</code></pre>
+<p>Franchise id 173 and slug <code>georgia-bulldogs</code> come from <code>team-directory ncaa --season 2026</code>.</p>
+<footer>
+Markdown twin: <code>docs/pff-team-report-sample-georgia-2026.md</code>. Vendor data is PFF's;
+nothing here is committed under <code>data/</code>.
+</footer>
+</main>
+</body>
+</html>
