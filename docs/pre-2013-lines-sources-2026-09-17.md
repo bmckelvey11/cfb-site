@@ -123,7 +123,11 @@ Three costs to price before building anything on it:
    "no lines". The join to `game_id` is already done, but this is **not an insert**:
    `core.fact_game_line` is rebuilt by `build_core` on every refresh, so it needs a
    loader entry plus a decision on what `provider_key` an unnamed market line gets.
-2. **Totals and moneylines, 2007–2012:** scrape the Sportsbook Reviews Online archive.
+2. **Totals and moneylines, 2007–2012: done** — see
+   [sbr-ncaaf-lines-2026-09-17.md](sbr-ncaaf-lines-2026-09-17.md).
+   `scripts/scrape_sbr_ncaaf_lines.py` writes 5,497 games to
+   `ingest/sbr_ncaaf_lines.csv` (bias −0.047 vs PT, median |diff| 0.50, 96.1% within 2
+   points). Originally scoped as: scrape the Sportsbook Reviews Online archive.
    It is verified live, permitted by robots.txt, and carries open/close spread, total, ML
    and a 2H line for ~4,457 games. Because it also carries spreads from real books, it is
    a *better* pre-2013 spread source than PT for 2007 onward and would partly supersede
