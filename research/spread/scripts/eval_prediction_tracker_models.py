@@ -48,7 +48,16 @@ CLEAN_COVERAGE = 0.95  # leaderboard restricts to model-seasons at/above this co
 RIDGE_ALPHA = 10.0
 N_BOOT = 2000
 RNG = np.random.default_rng(20260829)
-MIN_CLUSTERS = 3  # below this a cluster bootstrap is degenerate -- report no inference
+# Floor for a trustworthy cluster-bootstrap CI. Raised 3 -> 6 on 2026-09-17 after a measured
+# failure: a 3-season cell (`linecrunch`) returned an SE 2.5x too small and a BH q of 0.0026 that
+# vanished (q 0.22) once the same bets were clustered by week, 47 clusters. Checking every cell
+# in that sweep against a many-cluster benchmark, the season SE is off by more than 30% in 59% of
+# 3-season cells and 45% of 4-5 season cells, with worst cases 5.2x and 7.1x; from 6 seasons on
+# the worst case is 2.0x and the off-by-30% share halves. The break is at the worst case, not the
+# median. 6 is a judgment call on that evidence, not a derived threshold, and it is NOT amendment
+# B3's 8 -- B3 is a stopping rule for a confirmatory verdict, a different question.
+# See research/spread/docs/panel-ats-2026-09-17.md.
+MIN_CLUSTERS = 6
 
 
 # --------------------------------------------------------------------------- loading

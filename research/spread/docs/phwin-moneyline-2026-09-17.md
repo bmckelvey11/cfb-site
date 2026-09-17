@@ -9,18 +9,28 @@ no moneyline. This joins the warehouse's moneylines and asks the betting questio
 
 Betting `phwin` against real moneyline prices: does it make money?
 
-## Answer: no. It loses, significantly so at the median price.
+## Answer: no. It loses about 5-6 cents on the dollar at the median price.
 
-| price | rule | bets | ROI | 95% CI (season clusters) |
+| price | rule | bets | ROI | 95% CI (week clusters) |
 |---|---|---|---|---|
-| best across books | EV > 0 | 3,160 | −0.019 | [−0.074, +0.035] |
-| best across books | EV > 2% | 2,883 | −0.023 | [−0.076, +0.019] |
-| **median** | **EV > 0** | 2,720 | **−0.055** | **[−0.104, −0.015]** |
-| **median** | **EV > 2%** | 2,391 | **−0.061** | **[−0.124, −0.014]** |
+| best across books | EV > 0 | 3,160 | −0.019 | [−0.078, +0.040] |
+| best across books | EV > 2% | 2,883 | −0.023 | [−0.081, +0.033] |
+| **median** | **EV > 0** | 2,720 | **−0.055** | **[−0.110, +0.0001]** |
+| **median** | **EV > 2%** | 2,391 | **−0.061** | **[−0.119, +0.003]** |
 
-At the median price both intervals exclude zero: betting `phwin`'s +EV side loses about 5–6
-cents on the dollar. At the best price across books it is still negative, with intervals that
-include zero — the difference between the two columns is line shopping, not `phwin`.
+Betting `phwin`'s +EV side loses about 5–6 cents on the dollar at the median price. At the best
+price across books it is still negative — the difference between the two columns is line
+shopping, not `phwin`.
+
+> **Correction, 2026-09-17.** This table originally reported season-cluster intervals of
+> [−0.104, −0.015] and [−0.124, −0.014] on the two median-price rows and described them as
+> excluding zero. `base.MIN_CLUSTERS` was raised from 3 to 6 the same day (see
+> `panel-ats-2026-09-17.md`), and **five season clusters no longer supports a bootstrap CI** — so
+> this run now clusters by season-week, 96 clusters. The point estimates are unchanged; the
+> intervals widen and now just touch zero (+0.0001 and +0.003). **The word "significantly" is
+> withdrawn.** The data still points clearly one way — the upper bound is a hundredth of a cent —
+> but it no longer clears a two-sided 95% bar, and the original intervals were produced by the
+> same too-few-clusters bootstrap that generated the retracted `linecrunch` result.
 
 The bet set skews to underdogs (win rate 0.33–0.36, home share ~0.48), which is what a forecast
 that disagrees with prices in the tails produces.
@@ -32,12 +42,12 @@ that disagrees with prices in the tails produces.
 the spread arm taking its probability from a logit of home-win on the panel's own `line`, fit
 walk-forward on strictly prior seasons.
 
-| price | rule | bets | ROI | 95% CI |
+| price | rule | bets | ROI | 95% CI (week clusters) |
 |---|---|---|---|---|
-| best across books | EV > 0 | 2,125 | +0.040 | [−0.005, +0.094] |
-| best across books | EV > 2% | 1,558 | +0.067 | [−0.009, +0.143] |
-| median | EV > 0 | 1,166 | −0.004 | [−0.027, +0.025] |
-| median | EV > 2% | 672 | +0.022 | [−0.029, +0.118] |
+| best across books | EV > 0 | 2,125 | +0.040 | [−0.025, +0.106] |
+| best across books | EV > 2% | 1,558 | +0.067 | [−0.009, +0.154] |
+| median | EV > 0 | 1,166 | −0.004 | [−0.077, +0.072] |
+| median | EV > 2% | 672 | +0.022 | [−0.089, +0.142] |
 
 The spread arm's +6.7% at the best price is **not an established edge**, and it should not be
 read as one. Every interval contains zero, and the per-season path shows why:
@@ -111,8 +121,10 @@ python research/spread/scripts/eval_phwin_moneyline.py --from-season 2024 --to-s
 - **Not a generalizable ROI.** Moneyline coverage is a **book-chosen subset** — 48% of games in
   2021–22 rising to ~58% by 2025. Books price moneylines on the games they want action on, so
   nothing here transfers to a full slate.
-- **Five season clusters is thin.** It is above the harness's `MIN_CLUSTERS` of 3 but well under
-  what would settle a marginal effect; the wide intervals are honest about that.
+- **Five seasons is below the inference floor.** `base.MIN_CLUSTERS` is now 6, so the pooled run
+  clusters by week rather than by season. Week clusters ignore season-regime correlation and are
+  the less conservative unit; they are used because five season clusters cannot support a
+  bootstrap CI at all.
 - **Not a version A or B read.** Amendment B3's stopping rule is untouched.
 - **Not a test of E4.** `phwin` derives from `lineavg`, the raw unscreened panel mean.
 
@@ -131,8 +143,9 @@ Two corrections that materially change the answer if skipped:
    aggregation**. Averaging American odds across the ±100 discontinuity is meaningless.
 
 Bet rule: back whichever side the model makes +EV at the offered price,
-`p × (decimal − 1) − (1 − p) > threshold`; ROI is profit per unit staked. Season-cluster
-bootstrap for every interval.
+`p × (decimal − 1) − (1 − p) > threshold`; ROI is profit per unit staked. Cluster
+bootstrap for every interval, by season where the season count clears
+`base.MIN_CLUSTERS` and by season-week otherwise (`--cluster` overrides).
 
 ```bash
 python research/spread/scripts/eval_phwin_moneyline.py

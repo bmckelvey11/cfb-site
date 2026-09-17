@@ -51,7 +51,12 @@ import eval_prediction_tracker_models as base  # noqa: E402
 OUT = base.OUT_DIR / "model_columns_ats.json"
 BREAKEVEN = 110 / 210
 MIN_GAMES = 1000          # declared screen, not tuned
-MIN_SEASONS = base.MIN_CLUSTERS
+# Declared screen, deliberately NOT tied to base.MIN_CLUSTERS. This is a coverage floor -- how
+# many seasons a model must publish to be tested at all -- and it was declared at 3 before
+# scoring. base.MIN_CLUSTERS is an inference floor and was raised to 6 on 2026-09-17; borrowing
+# it here would retighten a pre-declared screen after seeing results, which this script exists to
+# avoid. The two numbers answer different questions and are now independent.
+MIN_SEASONS = 3
 
 
 def season_cluster_test(won, seasons):
