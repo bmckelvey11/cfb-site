@@ -1,14 +1,16 @@
 """Ingest a hand-filled bet sheet and attach everything the books already know.
 
-You type ten columns -- when you placed it, the game, the market, your side, the number
-and price you got, the stake, the book, and which system called it. Everything else is
-looked up: the game_id, the opener and close, CLV, the result, and the P&L.
+You type eleven columns -- when you placed it, the two teams, the market, your side, the
+number and price you got, the stake, the book, and which system called it. Everything else
+is looked up: the game_id, the opener and close, CLV, the result, and the P&L.
 
-    placed_at,game,market,side,line,odds,stake,book,source,notes
+    placed_at,away,home,market,side,line,odds,stake,book,source,notes
 
-`game` is loose: "East Carolina @ Alabama", away side first. It is matched on team-name
+`away` and `home` are loose: "East Carolina" / "Alabama". They are matched on team-name
 tokens against games kicking off within +/-7 days of `placed_at`, so abbreviations and
-mascots both work as long as one distinctive word survives.
+mascots both work as long as one distinctive word survives. Which column is which matters
+only for orienting the spread -- enter them the wrong way round and the row is reported as
+reversed rather than silently mis-graded.
 
 `line` is the number as YOU took it. For a spread that means from your side: taking the
 home team at -3.5 is `-3.5`, taking the away dog at +3.5 is `+3.5`. For a total it is the
@@ -67,8 +69,10 @@ MATCH_WINDOW = pd.Timedelta(days=7)
 MARKETS = {"spread", "total", "moneyline"}
 OVER_UNDER = {"OVER": "over", "UNDER": "under", "O": "over", "U": "under"}
 
+REQUIRED_COLS = ["placed_at", "away", "home", "market", "side", "line", "odds", "stake"]
+
 OUT_COLS = [
-    "placed_at", "game", "market", "side", "side_role", "line", "odds", "stake",
+    "placed_at", "away", "home", "market", "side", "side_role", "line", "odds", "stake",
     "book", "source", "notes",
     "game_id", "season", "week", "kickoff", "away_team", "home_team",
     "open_line", "close_line", "close_source", "clv", "clv_unit",
@@ -121,15 +125,6 @@ def settle(result: str, odds: float, stake: float) -> tuple[float, float, float]
 
 
 # --------------------------------------------------------------------------- matching
-
-def parse_game(text: str) -> tuple[str, str] | None:
-    """'East Carolina @ Alabama' -> ('East Carolina', 'Alabama'). Away side first."""
-    for sep in ("@", " at ", " vs ", " v "):
-        if sep in text:
-            away, home = text.split(sep, 1)
-            return away.strip(), home.strip()
-    return None
-
 
 def find_game(away: str, home: str, placed: pd.Timestamp, games: pd.DataFrame):
     """Unique games whose teams both share a distinctive token, near `placed`."""
@@ -268,9 +263,14 @@ def _num(value) -> float | None:
 
 def build(sheet: Path) -> pd.DataFrame:
     bets = pd.read_csv(sheet, dtype=str, keep_default_na=False)
-    bets = bets[bets["game"].str.strip() != ""]
+    missing = [c for c in REQUIRED_COLS if c not in bets.columns]
+    if missing:
+        extra = " (the single `game` column was split into `away` and `home`)" \
+            if "game" in bets.columns else ""
+        raise SystemExit(f"{sheet} is missing columns: {missing}{extra}")
+    bets = bets[(bets["away"].str.strip() != "") & (bets["home"].str.strip() != "")]
     if bets.empty:
-        raise SystemExit(f"{sheet} has no rows")
+        raise SystemExit(f"{sheet} has no rows with both teams filled in")
 
     con = duckdb.connect(str(DB_PATH), read_only=True)
     try:
@@ -279,7 +279,8 @@ def build(sheet: Path) -> pd.DataFrame:
         for rec in bets.to_dict("records"):
             row = {c: None for c in OUT_COLS}
             row.update({k: rec.get(k) for k in
-                        ("placed_at", "game", "market", "side", "book", "source", "notes")})
+                        ("placed_at", "away", "home", "market", "side",
+                         "book", "source", "notes")})
             row["line"] = _num(rec.get("line"))
             row["odds"] = _num(rec.get("odds"))
             row["stake"] = _num(rec.get("stake"))
@@ -301,14 +302,8 @@ def build(sheet: Path) -> pd.DataFrame:
                 staged.append((row, None))
                 continue
 
-            parsed = parse_game(str(rec.get("game", "")))
-            if parsed is None:
-                row["match_status"] = "invalid"
-                row["match_note"] = "game must read 'AWAY @ HOME'"
-                staged.append((row, None))
-                continue
-
-            game, status, note = find_game(parsed[0], parsed[1], placed, games)
+            game, status, note = find_game(
+                str(rec.get("away", "")), str(rec.get("home", "")), placed, games)
             row["match_status"], row["match_note"] = status, note
             if game is None:
                 staged.append((row, None))
@@ -370,8 +365,8 @@ def report(df: pd.DataFrame) -> None:
     bad = df[df["match_status"] != "matched"]
     print(f"  rows: {len(df)}   matched: {len(df) - len(bad)}")
     for r in bad.itertuples():
-        print(f"    {r.match_status.upper():<10} {r.game} ({r.market} {r.side}) "
-              f"-- {r.match_note}")
+        print(f"    {r.match_status.upper():<10} {r.away} @ {r.home} "
+              f"({r.market} {r.side}) -- {r.match_note}")
 
     graded = df[df["result"].isin(["win", "loss", "push"])]
     if graded.empty:

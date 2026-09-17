@@ -11,10 +11,10 @@ import pandas as pd
 import pytest
 
 from ledgers.ingest_bets import (
+    REQUIRED_COLS,
     american_payout,
     compute_clv,
     implied_prob,
-    parse_game,
     pick_close,
     settle,
     spread_result,
@@ -136,19 +136,22 @@ def test_clv_is_none_without_a_close():
     assert compute_clv("moneyline", "home", None, None, -110) == (None, "")
 
 
-# ------------------------------------------------------------------------ game parsing
+# --------------------------------------------------------------------- sheet contract
 
-@pytest.mark.parametrize("text,want", [
-    ("East Carolina @ Alabama", ("East Carolina", "Alabama")),
-    ("Colorado at TCU", ("Colorado", "TCU")),
-    ("Furman vs Tennessee", ("Furman", "Tennessee")),
-])
-def test_parse_game_accepts_the_common_separators(text, want):
-    assert parse_game(text) == want
+def test_the_two_teams_are_separate_required_columns():
+    """They are read straight from the sheet, so neither may be folded into the other."""
+    assert "away" in REQUIRED_COLS and "home" in REQUIRED_COLS
+    assert "game" not in REQUIRED_COLS
 
 
-def test_parse_game_rejects_a_bare_name():
-    assert parse_game("Alabama") is None
+def test_template_header_matches_the_required_columns():
+    from pathlib import Path
+
+    template = Path(__file__).resolve().parents[1] / "ledgers" / "manual_bets_template.csv"
+    header = template.read_text(encoding="utf-8").splitlines()[0].split(",")
+    assert header[:3] == ["placed_at", "away", "home"]
+    for col in REQUIRED_COLS:
+        assert col in header, col
 
 
 # ------------------------------------------------------------------- close-line lookup
