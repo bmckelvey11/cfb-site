@@ -103,17 +103,29 @@ def test_sample_cells_are_short_json_safe_and_carry_no_machine_paths():
 
 
 def test_the_committed_samples_leak_no_home_directory():
-    """A committed doc must not carry whoever built it's absolute paths."""
+    """A committed doc must not carry whoever built it's absolute paths.
+
+    Covers both sample rows (`d["s"]`) and the per-column min/max stats
+    (`d["c"][i][2:4]`) -- `min(_source_file)`/`max(_source_file)` are exactly
+    the kind of absolute path this guard exists for.
+    """
     data = bwc.parse_data(bwc.CATALOG.read_text(encoding="utf-8"))
     root = str(bwc.cfb_paths.DATA_ROOT)
     needles = {root.lower(), root.replace("\\", "/").lower()}
+
+    def check(key, cell):
+        if isinstance(cell, str):
+            low = cell.lower()
+            assert not any(n in low for n in needles), f"{key}: {cell}"
+            assert len(cell) <= bwc.CELL_CHARS, f"{key}: {cell}"
+
     for key, d in data["detail"].items():
         for row in d["s"]:
             for cell in row:
-                if isinstance(cell, str):
-                    low = cell.lower()
-                    assert not any(n in low for n in needles), f"{key}: {cell}"
-                    assert len(cell) <= bwc.CELL_CHARS, f"{key}: {cell}"
+                check(key, cell)
+        for c in d["c"]:
+            check(key, c[2])
+            check(key, c[3])
 
 
 def test_every_table_has_a_detail_entry():
@@ -142,11 +154,23 @@ def test_render_round_trips_through_the_parser():
         "named": [{"src": "team_stats", "name": "games", "cat": "team box", "n": 1953}],
         "detail": {
             "core.dim_team": {
-                "c": [["team_id", "INTEGER"], ["school", "VARCHAR"]],
+                # [name, type, min, max, ndistinct, nulls, nan] -- an extra
+                # 8th slot (glossary index) is added only for pff_* columns.
+                "c": [
+                    ["team_id", "INTEGER", 1, 703, 703, 0, None],
+                    ["school", "VARCHAR", "Air Force", "Yale", 703, 0, None],
+                ],
                 # A quote, a non-ASCII ellipsis, a null and a bool in one row.
                 "s": [[1, 'He said "hi"…'], [2, None], [3, True]],
             }
         },
+        # Empty-string grain is not emitted -- render() skips falsy values, so
+        # the fixture only carries the one table that has a computed grain.
+        "grain": {"core.dim_team": "One row per team_id"},
+        "pffGlossary": [
+            {"needle": "grade", "label": "PFF grade (0-100)",
+             "def": "A 0-100 transformed grade.", "src": "PFF grades"}
+        ],
         "domainOrder": ["core", "games"],
         # Quotes and a non-ASCII dash: both have to survive the string masker.
         "coreNote": {"dim_week": 'Season × week "grain"'},
@@ -176,11 +200,66 @@ def _structure(data: dict) -> dict:
         "wstats": data["wstats"],
         # `named` is emitted count-desc, so its order drifts too -- compare unordered.
         "named": {(n["src"], n["name"], n["cat"]) for n in data["named"]},
-        # Column lists are schema; sample rows are data, and move with the data.
-        "detail": {k: v["c"] for k, v in data["detail"].items()},
+        # Column [name, type, ...glossary_idx?] is schema; min/max/ndistinct/nulls
+        # are data and move with the data (same reason row counts are stripped
+        # above) -- keep name, type, and a pff column's glossary index (stable
+        # given the column name), drop the five stat slots between them.
+        "detail": {
+            k: [[c[0], c[1], *c[7:]] for c in v["c"]] for k, v in data["detail"].items()
+        },
+        # Computed from row uniqueness -- data, like row counts. Structure is
+        # whether a table's key-column *set* changed, not whether the current
+        # data happens to be unique on it. `render()` omits empty grain
+        # entries entirely (no point spelling out 150 "no key columns"
+        # blanks), so drop them here too rather than comparing "absent" to
+        # "present but False".
+        "grain": {k for k, v in data["grain"].items() if v},
+        "pffGlossary": data["pffGlossary"],
         "domainOrder": data["domainOrder"],
         "coreNote": data["coreNote"],
     }
+
+
+def test_column_stats_and_grain_on_synthetic_data():
+    """Unit-level check that doesn't need the live warehouse: an in-memory table
+    with a known duplicate and a known-unique key column."""
+    import duckdb
+
+    con = duckdb.connect(":memory:")
+    con.execute(
+        "create table t as select * from (values "
+        "(1, 10, 'a'), (2, 10, 'a'), (3, NULL, 'b')"
+        ") as v(game_id, week, school)"
+    )
+    cols = con.execute("describe t").fetchall()
+
+    stats = bwc.column_stats(con, "main", "t", cols)
+    assert stats["game_id"] == (1, 3, 3, 0, None)
+    # week has a null and a repeated value.
+    assert stats["week"] == (10, 10, 1, 1, None)
+
+    # game_id and week are both key-shaped (bwc.is_key); their tuple is unique
+    # here because game_id alone already is.
+    assert bwc.compute_grain(con, "main", "t", cols, 3) == "One row per game_id, week"
+
+    con.execute("create table dup as select * from (values (1), (1)) as v(game_id)")
+    dup_cols = con.execute("describe dup").fetchall()
+    assert bwc.compute_grain(con, "main", "dup", dup_cols, 2) == (
+        "Not unique on game_id (1 duplicate rows)"
+    )
+
+
+def test_pff_glossary_matches_are_specific_not_guessed():
+    assert bwc.pff_glossary_match("grades_pass") == 0
+    assert bwc.pff_glossary_match("avg_depth_of_target") is not None
+    assert bwc.pff_glossary_match("missed_tackle_rate") is not None
+    # A plain box-score count with no PFF-specific meaning stays unmatched --
+    # the glossary must not paraphrase a definition PFF hasn't published.
+    assert bwc.pff_glossary_match("completions") is None
+    # Every glossary entry that claims a formula isn't public must say so,
+    # not silently assert a number PFF has not disclosed.
+    war = next(g for g in bwc.PFF_GLOSSARY if g[0] == "war")
+    assert "no public formula" in war[2].lower()
 
 
 def test_sampling_is_deterministic():
@@ -202,8 +281,9 @@ def test_sampling_is_deterministic():
             ("raw", "win_probability"),
             ("stg", "pff_defense_pass_rush"),
         ):
-            first = bwc.sample_rows(con, schema, name)
-            assert first == bwc.sample_rows(con, schema, name), f"{schema}.{name}"
+            cols = con.execute(f'describe "{schema}"."{name}"').fetchall()
+            first = bwc.sample_rows(con, schema, name, cols)
+            assert first == bwc.sample_rows(con, schema, name, cols), f"{schema}.{name}"
     finally:
         con.close()
 
