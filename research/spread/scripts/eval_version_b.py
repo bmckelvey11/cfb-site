@@ -242,9 +242,18 @@ def main() -> int:
     if len(versions) > 1:
         print(f"WARNING: forward log mixes model_set_version {versions}; pred_close is not one "
               f"quantity across these rows. Recompute with weekly_slate.py --recompute-forward-log.")
+    # Same check for the edge/side DEFINITION. Rows written before the stamp existed are all
+    # definition 1 by construction -- nothing about edge/side had changed -- so a missing value
+    # is filled, not dropped. More than one definition means B5's bet set is two different
+    # trades and must not be pooled.
+    edge_defs = (sorted(int(v) for v in graded.edge_def_version.fillna(1).unique())
+                 if "edge_def_version" in graded else [1])
+    if len(edge_defs) > 1:
+        print(f"WARNING: forward log mixes edge_def_version {edge_defs}; the B5 bet set is not "
+              f"one trade across these rows. Grade the eras separately or recompute the log.")
     out = {"n_anchor": int(len(g)), "n_graded": int(len(graded)),
            "weeks": sorted(graded.week.unique().tolist()),
-           "model_set_version": versions, "verdict": None}
+           "model_set_version": versions, "edge_def_version": edge_defs, "verdict": None}
     if len(graded) < 30:
         print("fewer than 30 graded games -- nothing to estimate yet")
         OUT.write_text(json.dumps(out, indent=2))

@@ -29,7 +29,11 @@ What each column is (all spreads in Prediction Tracker's sign: POSITIVE = home f
   side_odds    the price at that book
   our_line     E4's predicted close as a home spread in BETTING sign (negative = home favored),
                i.e. -E4; the one number to compare against a posted home line
-  edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1
+  edge         |E4 - book fair| in points; the forward test grades bets at edge >= 1.
+               Tagged `edge_def_version` 1 on every forward-log row. NOTE: E4 is anchored on
+               the OPENER, so this difference largely reproduces the market's move since the
+               opener with the sign flipped -- see docs/actionable-picks-2026-09-17.md section 0.
+               Treat it as the registered signal to grade, not as a validated edge.
   Pinnacle_home / Pinnacle_odds / pin_limit   Pinnacle's full-game main line from the latest
                oddspapi snapshot (scripts/pull_oddspapi.py, daily), PT sign. Votes in book_fair
                as one book of up to eleven since amendment S3 (`book_set_version` 3).
@@ -131,6 +135,23 @@ BETTABLE = ("DraftKings", "FanDuel")
 # exists for those moments -- so each break is permanent and version B must either restrict to
 # one era or model the shift.
 BOOK_SET_VERSION = 4
+
+# Which DEFINITION of `edge`/`side` produced a forward-log row, and therefore which quantity
+# version B is grading. Version 1 is the original and current one: E4 (anchored on the OPENER)
+# minus the CURRENT book fair.
+#
+# That definition is under review. research/spread/docs/actionable-picks-2026-09-17.md section 0
+# shows it reproduces the market's own move since the opener with the sign flipped -- the served
+# edge is a retrace-to-opener trade, while amendment A6's gamma is a momentum result measured AT
+# the opener. Re-anchoring E4 on the current line is the fix, but it CANNOT be fitted on this
+# archive: `fit_movement_models` targets -hist["line"], so making `line` the anchor makes the
+# anchor identical to the target (gamma collapses to 0.000, live edge to ~0). A real re-anchor
+# needs the Action Network tick tape (stg.an_market, 2024-2026) and its own walk-forward test.
+#
+# This stamp exists so that when the definition does change, version B can separate the eras
+# instead of silently pooling two different bet sets -- the same mechanism amendment S2 used for
+# the book set. Bump it in the same commit that changes `add_side`, never separately.
+EDGE_DEF_VERSION = 1
 OUTLIER_PTS = 2.5          # a book > this far from the median of all books is ignored (n >= 3)
 ODDS_WINDOW = (-135, 125)
 KEY_NUMBERS = (3, 7)
@@ -606,6 +627,8 @@ def build(snapshot: Path, with_books: bool, book: str | None = None) -> pd.DataF
     t["model_set_version"] = MODEL_SET_VERSION
     # Which book set produced book_fair, and therefore side/side_line/edge and the bet set.
     t["book_set_version"] = BOOK_SET_VERSION if with_books else np.nan
+    # Which definition of edge/side produced the bet set -- see EDGE_DEF_VERSION.
+    t["edge_def_version"] = EDGE_DEF_VERSION
     return t
 
 
