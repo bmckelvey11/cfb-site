@@ -280,6 +280,40 @@ only reach .441. The stable object is the number, not the group.
 Offensive and defensive labels are near-independent: the minority defensive cluster is
 26% of the pass-leaning offensive group and 26% of the ground-leaning one.
 
+## What the four groups actually are
+
+| | n | profile (raw means vs the other group) |
+|---|---:|---|
+| **Offense 0** — gap-run, play-action, heavier personnel | 39 | pass rate .474 vs .565, gap-run .571 vs .414, play-action .403 vs .291, inline TE .169 vs .129, designed QB run .241 vs .157, runs to the edge more (interior .415 vs .508) |
+| **Offense 1** — spread, zone-run, quick game | 97 | the mirror; also more slot usage (.392 vs .357) |
+| **Defense 0** — outside-technique front | 100 | A-gap share .072 vs .157, outside-T .487 vs .424, more DL snaps (.384 vs .365), more man (.307 vs .257) |
+| **Defense 1** — A-gap-anchored front | 36 | the mirror; also more box defenders (.283 vs .258) |
+
+Offense 0 is not the academies-and-nobody-else group it might sound like. It holds Ohio
+State, Georgia, Texas, Penn State, Tennessee, Ole Miss, USC, Iowa, Kansas State, BYU and
+Utah alongside Army, Navy and Air Force — the common thread is gap blocking plus
+play-action out of heavier personnel, which in 2025 is as much a blue-blood profile as an
+option one.
+
+### The defensive split carries a level confound; the offensive one does not
+
+| | P4 share | mean SP+ overall |
+|---|---:|---:|
+| Offense 0 / Offense 1 | .462 / .505 | +4.0 / −1.6 |
+| Defense 0 / Defense 1 | **.570 / .278** | **+1.6 / −4.4** |
+
+The offensive groups are balanced on conference level, so the +5.6 SP+ gap between them is
+about those teams, not about who they play. The defensive groups are not: the
+A-gap-anchored group is 72% Group of Five (App State, Coastal, Georgia State, Louisiana,
+ULM, Marshall, Miami (OH), ODU, Rice, Sam Houston, San Jose State, South Alabama, Temple,
+Troy, UTEP, UTSA, Utah State), against ten P4 members (Cincinnati, Houston, Illinois, Iowa
+State, Kentucky, Miami (FL), Mississippi State, TCU, Virginia Tech, West Virginia).
+
+That survives dropping the two SP+-loaded features, because it is not really a quality
+effect — it is a roster-resource one. A program without two high-end edge defenders plays
+a nose over the centre. So `def_dl_a_gap_share` is partly measuring recruiting, and any
+model using it against a P4/G5 mixed slate should expect it to proxy for level.
+
 ## What this does not support
 
 - **No taxonomy on either side, at any k.** If scheme is wanted as a feature, use the
