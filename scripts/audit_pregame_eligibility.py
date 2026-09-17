@@ -129,7 +129,18 @@ VERDICT_NOTE = {
 }
 
 
-def classify_column(col: str) -> tuple[str, bool]:
+# Same column name, different meaning per table -- a name-only regex cannot tell
+# them apart. `core_ratings.offense` is an SP+ sub-rating; `drives.offense` is the
+# name of the team with the ball.
+TABLE_OVERRIDES: dict[tuple[str, str], tuple[str, bool]] = {
+    ("drives", "offense"): ("label", False),
+    ("drives", "defense"): ("label", False),
+}
+
+
+def classify_column(col: str, table: str | None = None) -> tuple[str, bool]:
+    if table is not None and (table, col) in TABLE_OVERRIDES:
+        return TABLE_OVERRIDES[(table, col)]
     for pattern, family, result_informed in FAMILIES:
         if re.search(pattern, col, flags=re.IGNORECASE):
             return family, result_informed
@@ -178,7 +189,7 @@ def build(con: duckdb.DuckDBPyConnection, tables: tuple[str, ...], source: str) 
             continue
         grain = table_grain(set(cols))
         for col in cols:
-            family, result_informed = classify_column(col)
+            family, result_informed = classify_column(col, table)
             rows.append({
                 "source": source,
                 "table": f"stg.{table}",
@@ -251,6 +262,10 @@ def _selftest() -> None:
     assert verdict("advanced_season_stats", "usage_rate", False, "season_final") == "lookahead_only"
     assert verdict("pff_passing", "play_outcome", True, "week") == "pregame_windowed"
     assert verdict("talent", "other", True, "season_final") == "pregame_direct"
+    # `offense`/`defense` is an SP+ sub-rating in one table and a team name in
+    # the other; only the table tells them apart
+    assert classify_column("offense", "core_ratings") == ("rating", True)
+    assert classify_column("offense", "drives") == ("label", False)
     print("selftest ok")
 
 

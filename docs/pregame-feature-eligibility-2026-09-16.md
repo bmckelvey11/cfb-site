@@ -4,18 +4,18 @@
 usable as features before kickoff.
 
 **Answer.** Almost no stat is forward-looking by itself; the *aggregation* is. Of
-1,043 columns across 42 tables, 567 are usable pre-game and 129 are not usable at
+1,043 columns across 42 tables, 565 are usable pre-game and 129 are not usable at
 all — and the dividing line is mostly the table's grain, not what the number
 measures.
 
 | Verdict | PFF | CFBD | Meaning |
 |---|---:|---:|---|
-| `pregame_windowed` | **476** | **76** | usable as a trailing sum/mean over prior weeks; the season total is lookahead |
+| `pregame_windowed` | **476** | **74** | usable as a trailing sum/mean over prior weeks; the season total is lookahead |
 | `pregame_direct` | 0 | **15** | fixed before the season starts; use as-is |
 | `needs_rekey` | 0 | 55 | per-game rows carrying no game key; rekey before use |
 | `lookahead_only` | **0** | **129** | season-final snapshot with no as-of date; unusable for in-season games |
 | `postgame` | 0 | 55 | encodes this game's result |
-| `metadata` | 121 | 116 | keys and labels |
+| `metadata` | 121 | 118 | keys and labels |
 
 **Every PFF stat column is usable**, because all 21 PFF tables are week-grain.
 **No CFBD rating is**, because we hold only season-final snapshots of them.
@@ -92,7 +92,7 @@ pre-game eligibility asks. Windowed, they are fine; the season grade is not.
 | Table | Grain | Verdict | Stat cols |
 |---|---|---|---:|
 | `advanced_game_stats` | week | `pregame_windowed` | 56 |
-| `drives` | drive, keyed to `gameId` | `pregame_windowed` (20) + `postgame` (4) | 24 |
+| `drives` | drive, keyed to `gameId` | `pregame_windowed` (18) + `postgame` (4) | 22 |
 | `returning_production` | preseason | `pregame_direct` | 12 |
 | `recruiting_teams` | preseason | `pregame_direct` | 2 |
 | `talent` | preseason | `pregame_direct` | 1 |
