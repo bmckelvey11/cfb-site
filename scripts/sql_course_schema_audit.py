@@ -21,13 +21,15 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import duckdb
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sql_sandbox import connect  # noqa: E402
+from learning.sql_course.course_parse import Block, parse_blocks  # noqa: E402
 
 SCHEMAS = "raw|stg|core|meta|marts|refs|staging|main"
 # `sandbox.main.x` is scratch, not warehouse: the lookbehind keeps it out of both regexes.
@@ -37,53 +39,7 @@ ALIAS_DEF = re.compile(
     rf"\b(?:FROM|JOIN)\s+({SCHEMAS})\.([A-Za-z_][A-Za-z0-9_]*)(?:\s+AS)?\s+([a-z][a-z0-9_]*)\b", re.I
 )
 COL_REF = re.compile(r"\b([a-z][a-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\b")
-MODULE = re.compile(r"^## ([A-D]\d) — ")
-ROWS = re.compile(r"^-- rows:\s*(\d[\d,]*)\s*$")
 NOT_ALIASES = {"as", "on", "where", "sandbox", "information_schema"}
-
-
-@dataclass
-class Block:
-    block_id: str
-    module: str
-    line: int
-    dialect: str
-    claimed: int | None
-    sql: str
-    tables: set[str] = field(default_factory=set)
-    columns: set[str] = field(default_factory=set)  # "schema.table.col"
-    missing: list[str] = field(default_factory=list)
-    local_rows: int | None = None
-    status: str = ""
-
-
-def parse_blocks(text: str) -> list[Block]:
-    blocks: list[Block] = []
-    module = "intro"
-    per_module: dict[str, int] = {}
-    lines = text.splitlines()
-    i = 0
-    while i < len(lines):
-        m = MODULE.match(lines[i])
-        if m:
-            module = m.group(1)
-        if lines[i].strip() == "```sql":
-            start = i + 1
-            j = start
-            while j < len(lines) and lines[j].strip() != "```":
-                j += 1
-            body = lines[start:j]
-            dialect = body[0].replace("--", "").strip() if body else ""
-            rm = ROWS.match(body[1]) if len(body) > 1 else None
-            claimed = int(rm.group(1).replace(",", "")) if rm else None
-            per_module[module] = per_module.get(module, 0) + 1
-            blocks.append(Block(f"{module}-{per_module[module]}", module, start + 1, dialect, claimed, "\n".join(body)))
-            i = j
-        i += 1
-    for b in blocks:  # single-block modules get the bare module id
-        if per_module[b.module] == 1:
-            b.block_id = b.module
-    return blocks
 
 
 def catalog(con: duckdb.DuckDBPyConnection) -> dict[str, set[str]]:
