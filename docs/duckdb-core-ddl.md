@@ -178,6 +178,36 @@ CREATE INDEX idx_fact_game_team_team_id ON core.fact_game_team (team_id);
 Do **not** add indexes that duplicate primary keys (`game_id`,
 `(game_id, provider_key)`, `(game_id, team_id)`).
 
+## Result-informed tables: the `_postgame` suffix
+
+Suffix a `core` table `_postgame` when **every** column in it is result-informed. A mixed
+table does not get the suffix: `fact_game` carries schedule, venue and teams (pre-game)
+alongside points (not), and correctly has no suffix. Today the suffix is on
+`fact_team_season_rating_postgame`, `fact_team_season_record_postgame` and
+`fact_team_ats_postgame`.
+
+`_final` is deliberately **not** used. `core_ratings` carries `throughWeek` because it is an
+as-of snapshot; the current season's rows are partial and move on every refresh. Carry the
+as-of column (`cr_through_week`) and let the suffix claim only what is true.
+
+Pinned by `tests/test_warehouse_dictionary.py`.
+
+## Team-season grain
+
+`(season, team_id)`, PK on all five: `fact_team_season_rating_postgame`,
+`fact_team_season_record_postgame`, `fact_team_ats_postgame`, `fact_team_recruiting`,
+`fact_team_returning_production`.
+
+`fact_team_season_rating_postgame` merges six rating systems side by side with per-source
+prefixes (`sp_`, `srs_`, `elo_`, `fpi_`, `cr_`, `gql_`) — `elo` exists in both the REST and
+GraphQL sources and they are different numbers. Built on a **union spine**, not anchored on
+one source: GraphQL `ratings` is the widest (1890+) but stops at 2025, while `sp`, `fpi` and
+`core_ratings` carry 2026. Extend it by appending to `_RATING_SOURCES`.
+
+Sources keyed by school name resolve through `dim_team.school`, which is safe only because no
+school name maps to two `team_id`s. See
+[core-expansion-2026-09-18.md](core-expansion-2026-09-18.md).
+
 ## Views
 
 ```sql

@@ -32,6 +32,7 @@ than any one unit.
 | [duckdb-rebuild-spec.md](duckdb-rebuild-spec.md) | Rebuild design spec |
 | [duckdb-core-ddl.md](duckdb-core-ddl.md) | `core` DDL contract (Phase 1) |
 | [warehouse-discovery-layer-2026-09-18.md](warehouse-discovery-layer-2026-09-18.md) | What makes 324 flat tables hard to navigate, and what `meta.table_dictionary` / `meta.relationship` / `core.v_game` do about it |
+| [core-expansion-2026-09-18.md](core-expansion-2026-09-18.md) | Which `stg` lookup and team-season tables were promoted into `core`, the six-system ratings merge, and why the suffix is `_postgame` and not `_final` |
 | [data-coverage.md](data-coverage.md) | CFBD data coverage — what we have and don't |
 | [raw-stg-classification.md](raw-stg-classification.md) | raw ↔ stg classification |
 | [schema-audit.md](schema-audit.md) | REST ↔ GraphQL join map |

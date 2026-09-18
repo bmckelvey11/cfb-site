@@ -89,6 +89,60 @@ TABLE_NOTES: dict[tuple[str, str], str] = {
     ("core", "dim_coach"): "One row per coach: id, first and last name.",
     ("core", "dim_recruit"): "One row per recruit (GraphQL).",
     ("core", "dim_draft_pick"): "One row per NFL draft pick: year x round x pick.",
+    ("core", "dim_athlete"): (
+        "One row per athlete (GraphQL). team_id is the athlete's CURRENT team and "
+        "685 sit outside dim_team, so LEFT JOIN. hometown_id dangles on purpose: "
+        "the GraphQL hometown dump ships no id field, so no dim_hometown exists."
+    ),
+    # -- lookup dims: vendor code tables, promoted verbatim --------------------
+    ("core", "dim_position"): "Player position codes. Joins dim_athlete.position_id.",
+    ("core", "dim_recruit_position"): "Recruit position codes and their position group.",
+    ("core", "dim_draft_position"): (
+        "NFL draft position codes. Joins dim_draft_pick.position_id."
+    ),
+    ("core", "dim_draft_team"): (
+        "NFL franchises. Joins dim_draft_pick.nfl_team_id. Not a CFB team -- do "
+        "not confuse with dim_team."
+    ),
+    ("core", "dim_play_type"): "Play type codes. Joins stg.plays.",
+    ("core", "dim_play_stat_type"): "Play-stat type codes. Joins stg.play_stats.",
+    ("core", "dim_poll_type"): "Poll codes (AP, Coaches, CFP, ...).",
+    ("core", "dim_weather_condition"): (
+        "Weather condition codes. Joins stg.game_weather.weatherConditionCode."
+    ),
+    ("core", "dim_stat_category"): "Box-score stat category vocabulary.",
+    # -- team-season facts ----------------------------------------------------
+    ("core", "fact_team_season_rating_postgame"): (
+        "One row per season x team with every rating system side by side, "
+        "prefixed by source (sp_, srs_, elo_, fpi_, cr_, gql_). RESULT-INFORMED: "
+        "all of these are computed from games already played, so they are not "
+        "pre-game features. They are NOT season-end finals either -- "
+        "cr_through_week says how far into the season a row reflects, and the "
+        "current season's rows move on every refresh. Built on a union spine, not "
+        "off one source: GraphQL `ratings` is widest (1890+) but stops at 2025, "
+        "while sp/fpi/core_ratings carry 2026. stg.sp's 'nationalAverages' "
+        "sentinel row is not a team and is excluded; read it from stg.sp."
+    ),
+    ("core", "fact_team_season_record_postgame"): (
+        "One row per season x team: W/L/T split by home, away, neutral, "
+        "conference, regular season and postseason. RESULT-INFORMED, and the "
+        "current season's rows are partial."
+    ),
+    ("core", "fact_team_ats_postgame"): (
+        "One row per season x team: against-the-spread record and average cover "
+        "margin. Starts 2019. RESULT-INFORMED, and the current season is partial."
+    ),
+    ("core", "fact_team_recruiting"): (
+        "One row per season x team: recruiting class points and national rank. "
+        "Settled before the season starts, so safe as a pre-game feature. 23 rows "
+        "across 7 non-FBS schools (Grand Valley State, Savannah St, ...) are "
+        "excluded because they are outside dim_team and so have no team_id."
+    ),
+    ("core", "fact_team_returning_production"): (
+        "One row per season x team: returning usage and PPA share. Computed from "
+        "the prior season's roster before this one starts, so safe as a pre-game "
+        "feature."
+    ),
     # -- core facts -----------------------------------------------------------
     ("core", "fact_game"): (
         "One row per game, 2012+, REST-sourced. The grain every other fact hangs "
@@ -247,6 +301,23 @@ _EDGES: tuple[tuple[str, str, str, str, str], ...] = (
     ("fact_game_odds", "game_id", "fact_game", "game_id", ""),
     ("fact_coach_season", "coach_id", "dim_coach", "coach_id", ""),
     ("fact_team_talent", "team_id", "dim_team", "team_id", ""),
+    # Edges the lookup dims finally make reachable. The two draft ones were
+    # dangling key columns on dim_draft_pick until 2026-09-18.
+    ("dim_draft_pick", "position_id", "dim_draft_position", "draft_position_id", ""),
+    ("dim_draft_pick", "nfl_team_id", "dim_draft_team", "draft_team_id", ""),
+    ("dim_athlete", "position_id", "dim_position", "position_id", ""),
+    (
+        "dim_athlete",
+        "team_id",
+        "dim_team",
+        "team_id",
+        "Athletes on teams outside CFBD's team table.",
+    ),
+    ("fact_team_season_rating_postgame", "team_id", "dim_team", "team_id", ""),
+    ("fact_team_season_record_postgame", "team_id", "dim_team", "team_id", ""),
+    ("fact_team_ats_postgame", "team_id", "dim_team", "team_id", ""),
+    ("fact_team_recruiting", "team_id", "dim_team", "team_id", ""),
+    ("fact_team_returning_production", "team_id", "dim_team", "team_id", ""),
 )
 
 

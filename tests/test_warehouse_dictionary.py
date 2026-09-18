@@ -78,6 +78,37 @@ def test_notes_are_written_for_both_halves_of_every_collider_pair():
         assert ("stg", b) in TABLE_NOTES, b
 
 
+def test_postgame_suffix_is_reserved_for_wholly_result_informed_tables():
+    """`fact_game` is mixed -- schedule and teams are pre-game, points are not --
+    and correctly has no suffix. The suffix has to mean something narrower than
+    "contains a result", or it stops carrying information."""
+    suffixed = {n for (s, n) in TABLE_NOTES if s == "core" and n.endswith("_postgame")}
+    assert suffixed == {
+        "fact_team_season_rating_postgame",
+        "fact_team_season_record_postgame",
+        "fact_team_ats_postgame",
+    }
+    for name in suffixed:
+        note = TABLE_NOTES[("core", name)]
+        assert "RESULT-INFORMED" in note, name
+    # The pre-game twins must say so, or the distinction lives only in the suffix.
+    for name in ("fact_team_recruiting", "fact_team_returning_production"):
+        assert "pre-game feature" in TABLE_NOTES[("core", name)], name
+
+
+def test_the_rating_merge_does_not_anchor_on_one_source():
+    """GraphQL `ratings` is the widest source but stops at 2025, so building off it
+    would drop the season currently being bet. The spine is a union for that
+    reason; a refactor back to a single anchor is the regression to catch."""
+    from cfb_system_maker.duckdb_core import _RATING_SOURCES
+
+    tables = {t for _, t, _, _, _ in _RATING_SOURCES}
+    assert {"sp", "fpi", "core_ratings"} <= tables, "the 2026-carrying sources"
+    assert "ratings" in tables, "the wide GraphQL source"
+    prefixes = [p for p, _, _, _, _ in _RATING_SOURCES]
+    assert len(prefixes) == len(set(prefixes)), "prefixes must keep sources apart"
+
+
 def test_every_edge_names_a_core_table_that_has_a_note():
     """An edge pointing at an undocumented table sends the reader nowhere."""
     for child, _, parent, _, _ in _EDGES:

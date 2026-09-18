@@ -67,6 +67,26 @@ CORE_NOTES = {
     "fact_game_team": "Entering-game running W% / ATS / streaks",
     "fact_coach_season": "Coach × team × season record, SP+/SRS, ranks",
     "fact_team_talent": "247 composite team talent by season",
+    "dim_athlete": "Athlete identity: team, position, jersey, height / weight",
+    "dim_position": "Player position code and display name",
+    "dim_recruit_position": "Recruit position code and its position group",
+    "dim_draft_position": "NFL draft position code",
+    "dim_draft_team": "NFL franchise (not a CFB team)",
+    "dim_play_type": "Play type code and text",
+    "dim_play_stat_type": "Play-stat type code",
+    "dim_poll_type": "Poll code (AP, Coaches, CFP, …)",
+    "dim_weather_condition": "Weather condition code and description",
+    "dim_stat_category": "Box-score stat category vocabulary",
+    "fact_team_season_rating_postgame": (
+        "Season × team: SP+, SRS, Elo, FPI, GraphQL ratings and core_ratings, "
+        "prefixed by source"
+    ),
+    "fact_team_season_record_postgame": (
+        "Season × team: W/L/T by home, away, neutral, conference, postseason"
+    ),
+    "fact_team_ats_postgame": "Season × team: ATS record and average cover margin",
+    "fact_team_recruiting": "Season × team: recruiting class points and rank",
+    "fact_team_returning_production": "Season × team: returning usage and PPA share",
     "coach_name_conflicts": "Audit: one name, several coach ids",
     "coach_season_unmatched": "Audit: coach seasons that would not join",
     "fact_game_line_conflicts": "Audit: REST and GraphQL disagree on a line",

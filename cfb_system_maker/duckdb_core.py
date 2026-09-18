@@ -78,6 +78,15 @@ def build_core(
             built += ["fact_coach_season", "coach_season_unmatched"]
         if _build_fact_game_historical(con):
             built.append("fact_game_historical")
+        # Lookup dims first: the team-season facts resolve names through dim_team,
+        # which is already built, but the lookups are what make dim_draft_pick and
+        # dim_athlete's key columns reachable.
+        built += _build_lookup_dims(con)
+        if _build_dim_athlete(con):
+            built.append("dim_athlete")
+        if _build_fact_team_season_rating(con):
+            built.append("fact_team_season_rating_postgame")
+        built += _build_team_season_facts(con)
         _add_phase_1_indexes(con)
         _build_core_views(con)
         built.append("v_game")
@@ -1167,6 +1176,362 @@ def _build_fact_game_historical(con: duckdb.DuckDBPyConnection) -> bool:
     )
     con.execute("ALTER TABLE core.fact_game_historical ADD PRIMARY KEY (game_id)")
     return True
+
+
+# Vendor lookup tables promoted verbatim: a key, a label or two, nothing derived.
+# `(core name, stg table, [(stg column, core column)], primary key)`. Each key was
+# checked unique and non-NULL on 2026-09-18; a drift makes the PK fail loudly rather
+# than letting a duplicate code through.
+_LOOKUP_DIMS: tuple[tuple[str, str, tuple[tuple[str, str], ...], str], ...] = (
+    ("dim_position", "position", (
+        ("positionId", "position_id"), ("name", "name"),
+        ("abbreviation", "abbreviation"), ("displayName", "display_name"),
+    ), "position_id"),
+    ("dim_recruit_position", "recruit_position", (
+        ("recruitPositionId", "recruit_position_id"), ("position", "position"),
+        ("positionGroup", "position_group"),
+    ), "recruit_position_id"),
+    ("dim_draft_position", "draft_position", (
+        ("draftPositionId", "draft_position_id"), ("name", "name"),
+        ("abbreviation", "abbreviation"),
+    ), "draft_position_id"),
+    ("dim_draft_team", "draft_team", (
+        ("draftTeamId", "draft_team_id"), ("displayName", "display_name"),
+        ("location", "location"), ("mascot", "mascot"), ("nickname", "nickname"),
+        ("shortDisplayName", "short_display_name"), ("logo", "logo"),
+    ), "draft_team_id"),
+    ("dim_play_type", "play_types", (
+        ("playTypeId", "play_type_id"), ("text", "text"),
+        ("abbreviation", "abbreviation"),
+    ), "play_type_id"),
+    ("dim_play_stat_type", "play_stat_types", (
+        ("playStatTypeId", "play_stat_type_id"), ("name", "name"),
+    ), "play_stat_type_id"),
+    ("dim_poll_type", "poll_type", (
+        ("pollTypeId", "poll_type_id"), ("name", "name"), ("shortName", "short_name"),
+    ), "poll_type_id"),
+    ("dim_weather_condition", "weather_condition", (
+        ("weatherConditionId", "weather_condition_id"), ("description", "description"),
+    ), "weather_condition_id"),
+    ("dim_stat_category", "stat_categories", (
+        ("value", "stat_category"),
+    ), "stat_category"),
+)
+
+
+def _build_lookup_dims(con: duckdb.DuckDBPyConnection) -> list[str]:
+    """Promote the small vendor code tables so `core` can be read without `stg`.
+
+    These are the join targets `core` already referenced and could not reach:
+    ``dim_draft_pick.position_id`` and ``.nfl_team_id`` pointed at nothing until
+    ``dim_draft_position`` and ``dim_draft_team`` existed (both 0 orphans).
+
+    Each is skipped, not failed, when its `stg` source is absent -- same contract
+    as every other merge here.
+    """
+    built: list[str] = []
+    for name, source, columns, pk in _LOOKUP_DIMS:
+        if not _has(con, "stg", source):
+            warnings.warn(f"stg.{source} absent: core.{name} not built", RuntimeWarning)
+            continue
+        if not _has_columns(con, "stg", source, *(src for src, _ in columns)):
+            warnings.warn(
+                f"stg.{source} is missing a mapped column: core.{name} not built",
+                RuntimeWarning,
+            )
+            continue
+        select = ", ".join(f'"{src}" AS {dst}' for src, dst in columns)
+        con.execute(f"DROP TABLE IF EXISTS core.{name}")
+        con.execute(
+            f'CREATE TABLE core.{name} AS SELECT {select} FROM stg."{source}"'
+            f' WHERE "{columns[0][0]}" IS NOT NULL'
+        )
+        con.execute(f"ALTER TABLE core.{name} ADD PRIMARY KEY ({pk})")
+        built.append(name)
+    return built
+
+
+def _build_dim_athlete(con: duckdb.DuckDBPyConnection) -> bool:
+    """One row per athlete, from GraphQL `stg.athlete`.
+
+    ``hometown_id`` is carried but **dangles**: the GraphQL `hometown` dump has no
+    id field at all -- verified against `raw.gql_hometown`'s payload structure, not
+    just the exploded table -- so there is nothing to join it to and no
+    ``dim_hometown`` is built. The column is kept because 138,150 athletes have one
+    and it becomes useful the moment the vendor ships the key.
+
+    ``team_id`` is the athlete's *current* team, and 685 of them sit outside
+    ``dim_team``; LEFT JOIN.
+    """
+    if not _has(con, "stg", "athlete"):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.dim_athlete")
+    con.execute(
+        """
+        CREATE TABLE core.dim_athlete AS
+        SELECT
+          "athleteId" AS athlete_id, "teamId" AS team_id,
+          "positionId" AS position_id, "hometownId" AS hometown_id,
+          name, "firstName" AS first_name, "lastName" AS last_name,
+          jersey, height, weight
+        FROM stg.athlete
+        WHERE "athleteId" IS NOT NULL
+        """
+    )
+    con.execute("ALTER TABLE core.dim_athlete ADD PRIMARY KEY (athlete_id)")
+    return True
+
+
+# The six rating systems the warehouse carries, each in its own `stg` table with its
+# own team key and its own column names. `prefix` keeps them apart once merged --
+# `elo` exists in both the REST dump and the GraphQL one, and `sp`/`fpi` appear as
+# both a rating and a set of component efficiencies.
+_RATING_SOURCES: tuple[tuple[str, str, str, str, str], ...] = (
+    # prefix, stg table, season column, team key column, key kind
+    ("sp", "sp", "season", "team", "name"),
+    ("srs", "srs", "season", "team", "name"),
+    ("elo", "elo", "season", "team", "name"),
+    ("fpi", "fpi", "season", "team", "name"),
+    ("cr", "core_ratings", "season", "team", "name"),
+    ("gql", "ratings", "year", "teamId", "id"),
+)
+
+# Carried on the spine or redundant with it, so never prefixed onto a source's columns.
+_RATING_DROP = frozenset({
+    "season", "year", "team", "conference", "division", "classification",
+    "teamId", "conferenceId", "_source_file",
+})
+
+
+def _snake(name: str) -> str:
+    """`spOverall` -> `sp_overall`, `offense_havoc_db` -> `offense_havoc_db`."""
+    out: list[str] = []
+    for i, ch in enumerate(name):
+        if ch.isupper() and i and (name[i - 1].islower() or name[i - 1].isdigit()):
+            out.append("_")
+        out.append(ch.lower())
+    return "".join(out)
+
+
+def _rating_source_cte(
+    con: duckdb.DuckDBPyConnection,
+    prefix: str,
+    table: str,
+    season_col: str,
+    key_col: str,
+    kind: str,
+) -> tuple[str, list[str]] | None:
+    """One deduplicated `(season, team_id, <prefix>_*)` CTE, or None if unusable.
+
+    Columns are read from the catalog rather than spelled out, so a vendor adding a
+    field lands in `core` on the next rebuild instead of being silently dropped.
+    Name-keyed sources join `dim_team.school`, which is safe only because no school
+    name maps to two team_ids (checked 2026-09-18); the join therefore resolves a
+    2012 row on the team's *current* name, per the Type-1 rule in duckdb-core-ddl.md.
+    """
+    if not _has(con, "stg", table) or not _has_columns(con, "stg", table, season_col, key_col):
+        return None
+    cols = [
+        r[0]
+        for r in con.execute(
+            "SELECT column_name FROM duckdb_columns()"
+            " WHERE schema_name = 'stg' AND table_name = ? ORDER BY column_index",
+            [table],
+        ).fetchall()
+        if r[0] not in _RATING_DROP
+    ]
+    if not cols:
+        return None
+    aliases = [f"{prefix}_{_snake(c)}" for c in cols]
+    payload = ", ".join(f's."{c}" AS {a}' for c, a in zip(cols, aliases))
+    if kind == "name":
+        src = (
+            f'FROM stg."{table}" s'
+            f" JOIN core.dim_team d ON d.school = s.\"{key_col}\""
+            f' WHERE s."{season_col}" IS NOT NULL'
+        )
+        team = "d.team_id"
+    else:
+        src = f'FROM stg."{table}" s WHERE s."{season_col}" IS NOT NULL AND s."{key_col}" IS NOT NULL'
+        team = f's."{key_col}"'
+    # `stg.srs` carries a couple of duplicate (season, team) rows; take one
+    # deterministically rather than letting the merge fan out and break the PK.
+    cte = (
+        f"{prefix}_src AS (SELECT * FROM ("
+        f'SELECT CAST(s."{season_col}" AS INTEGER) AS season, {team} AS team_id, {payload},'
+        f' ROW_NUMBER() OVER (PARTITION BY CAST(s."{season_col}" AS INTEGER), {team}'
+        f' ORDER BY {team}) AS _rn '
+        f"{src}) WHERE _rn = 1)"
+    )
+    return cte, aliases
+
+
+def _build_fact_team_season_rating(con: duckdb.DuckDBPyConnection) -> bool:
+    """One row per team-season, with every rating system side by side.
+
+    Result-informed, hence the ``_postgame`` suffix: SP+, SRS, Elo and FPI are all
+    computed from games already played. They are **not** end-of-season finals --
+    ``cr_through_week`` records how far into the season the row reflects, and the
+    current season's rows move every refresh.
+
+    Built on a FULL-OUTER spine rather than off one source, because coverage
+    differs: the GraphQL `ratings` table is the widest (1890 onward) but stops at
+    2025, while `sp`, `fpi` and `core_ratings` carry 2026. Anchoring on `ratings`
+    would drop the season currently being bet.
+    """
+    parts: list[tuple[str, list[str]]] = []
+    for prefix, table, season_col, key_col, kind in _RATING_SOURCES:
+        made = _rating_source_cte(con, prefix, table, season_col, key_col, kind)
+        if made is None:
+            warnings.warn(
+                f"stg.{table} unusable: core.fact_team_season_rating_postgame"
+                " will not carry it",
+                RuntimeWarning,
+            )
+            continue
+        parts.append((made[0], made[1]))
+    if not parts:
+        return False
+    names = [p[0].split("_src AS", 1)[0] for p in parts]
+    ctes = ", ".join(p[0] for p in parts)
+    spine = " UNION ".join(f"SELECT season, team_id FROM {n}_src" for n in names)
+    payload = ", ".join(
+        ", ".join(f"{n}.{a}" for a in aliases)
+        for (n, (_, aliases)) in zip(names, parts)
+    )
+    joins = " ".join(
+        f"LEFT JOIN {n}_src {n} ON {n}.season = k.season AND {n}.team_id = k.team_id"
+        for n in names
+    )
+    con.execute("DROP TABLE IF EXISTS core.fact_team_season_rating_postgame")
+    con.execute(
+        f"""
+        CREATE TABLE core.fact_team_season_rating_postgame AS
+        WITH {ctes}, spine AS ({spine})
+        SELECT k.season, k.team_id, {payload}
+        FROM spine k {joins}
+        """
+    )
+    con.execute(
+        "ALTER TABLE core.fact_team_season_rating_postgame"
+        " ADD PRIMARY KEY (season, team_id)"
+    )
+    return True
+
+
+def _build_team_season_facts(con: duckdb.DuckDBPyConnection) -> list[str]:
+    """Four single-source team-season facts, keyed to ``dim_team``.
+
+    Split by whether they are knowable before kickoff. ``records`` and ``teams_ats``
+    are counts of games already played, so they carry ``_postgame``; recruiting
+    class and returning production are settled before the season starts and do not.
+    """
+    built: list[str] = []
+
+    if _has(con, "stg", "records"):
+        con.execute("DROP TABLE IF EXISTS core.fact_team_season_record_postgame")
+        con.execute(
+            """
+            CREATE TABLE core.fact_team_season_record_postgame AS
+            SELECT
+              CAST(season AS INTEGER) AS season, "teamId" AS team_id,
+              total_games, total_wins, total_losses, total_ties,
+              "regularSeason_games" AS regular_season_games,
+              "regularSeason_wins" AS regular_season_wins,
+              "regularSeason_losses" AS regular_season_losses,
+              "regularSeason_ties" AS regular_season_ties,
+              "conferenceGames_games" AS conference_games,
+              "conferenceGames_wins" AS conference_wins,
+              "conferenceGames_losses" AS conference_losses,
+              "conferenceGames_ties" AS conference_ties,
+              "homeGames_games" AS home_games, "homeGames_wins" AS home_wins,
+              "homeGames_losses" AS home_losses, "homeGames_ties" AS home_ties,
+              "awayGames_games" AS away_games, "awayGames_wins" AS away_wins,
+              "awayGames_losses" AS away_losses, "awayGames_ties" AS away_ties,
+              "neutralSiteGames_games" AS neutral_games,
+              "neutralSiteGames_wins" AS neutral_wins,
+              "neutralSiteGames_losses" AS neutral_losses,
+              "neutralSiteGames_ties" AS neutral_ties,
+              "postseason_games" AS postseason_games,
+              "postseason_wins" AS postseason_wins,
+              "postseason_losses" AS postseason_losses,
+              "postseason_ties" AS postseason_ties,
+              "expectedWins" AS expected_wins
+            FROM stg.records
+            WHERE season IS NOT NULL AND "teamId" IS NOT NULL
+            """
+        )
+        con.execute(
+            "ALTER TABLE core.fact_team_season_record_postgame"
+            " ADD PRIMARY KEY (season, team_id)"
+        )
+        built.append("fact_team_season_record_postgame")
+
+    if _has(con, "stg", "teams_ats"):
+        con.execute("DROP TABLE IF EXISTS core.fact_team_ats_postgame")
+        con.execute(
+            """
+            CREATE TABLE core.fact_team_ats_postgame AS
+            SELECT
+              CAST(season AS INTEGER) AS season, "teamId" AS team_id,
+              games, "atsWins" AS ats_wins, "atsLosses" AS ats_losses,
+              "atsPushes" AS ats_pushes, "avgCoverMargin" AS avg_cover_margin
+            FROM stg.teams_ats
+            WHERE season IS NOT NULL AND "teamId" IS NOT NULL
+            """
+        )
+        con.execute(
+            "ALTER TABLE core.fact_team_ats_postgame ADD PRIMARY KEY (season, team_id)"
+        )
+        built.append("fact_team_ats_postgame")
+
+    if _has(con, "stg", "recruiting_teams"):
+        con.execute("DROP TABLE IF EXISTS core.fact_team_recruiting")
+        con.execute(
+            """
+            CREATE TABLE core.fact_team_recruiting AS
+            SELECT CAST(r.season AS INTEGER) AS season, d.team_id,
+                   r.points, r.rank
+            FROM stg.recruiting_teams r
+            JOIN core.dim_team d ON d.school = r.team
+            WHERE r.season IS NOT NULL
+            """
+        )
+        con.execute(
+            "ALTER TABLE core.fact_team_recruiting ADD PRIMARY KEY (season, team_id)"
+        )
+        built.append("fact_team_recruiting")
+
+    if _has(con, "stg", "returning_production"):
+        con.execute("DROP TABLE IF EXISTS core.fact_team_returning_production")
+        con.execute(
+            """
+            CREATE TABLE core.fact_team_returning_production AS
+            SELECT
+              CAST(r.season AS INTEGER) AS season, d.team_id,
+              r.usage, r."passingUsage" AS passing_usage,
+              r."receivingUsage" AS receiving_usage,
+              r."rushingUsage" AS rushing_usage,
+              r."totalPPA" AS total_ppa,
+              r."totalPassingPPA" AS total_passing_ppa,
+              r."totalReceivingPPA" AS total_receiving_ppa,
+              r."totalRushingPPA" AS total_rushing_ppa,
+              r."percentPPA" AS percent_ppa,
+              r."percentPassingPPA" AS percent_passing_ppa,
+              r."percentReceivingPPA" AS percent_receiving_ppa,
+              r."percentRushingPPA" AS percent_rushing_ppa
+            FROM stg.returning_production r
+            JOIN core.dim_team d ON d.school = r.team
+            WHERE r.season IS NOT NULL
+            """
+        )
+        con.execute(
+            "ALTER TABLE core.fact_team_returning_production"
+            " ADD PRIMARY KEY (season, team_id)"
+        )
+        built.append("fact_team_returning_production")
+
+    return built
 
 
 def _add_phase_1_indexes(con: duckdb.DuckDBPyConnection) -> None:
