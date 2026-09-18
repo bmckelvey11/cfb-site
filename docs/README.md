@@ -132,6 +132,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [models-organization-2026-09-16.md](models-organization-2026-09-16.md) | Plan for organizing `models/` and `research/`, and the safe sequence |
 | [fetch-venv-2026-09-17.md](fetch-venv-2026-09-17.md) | Why CFBD fetches need `.venv-cfbd` (pydantic 2 breaks the vendored client) |
 | [cfbdepth-scrape-2026-09-16.md](cfbdepth-scrape-2026-09-16.md) | What cfbdepth.com exposes and whether to scrape it (scope open) |
+| [tv-grid-2026-09-17.md](tv-grid-2026-09-17.md) | Weekly TV grid (`scripts/tv_grid.py`): network rows × kickoff columns with median line, AP+Massey rank, forecast weather |
 | [sql-course-perplexity-prompt-2026-09-16.md](sql-course-perplexity-prompt-2026-09-16.md) | The prompt that generated the SQL course on the warehouse |
 | [sql-course-program-plan-2026-09-16.md](sql-course-program-plan-2026-09-16.md) | Plan to turn the SQL course into slides, a grading CLI, and progress tracking |
 | [img/](img/) | Figures for the README and coach-playstyle doc |

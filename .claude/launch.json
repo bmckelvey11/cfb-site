@@ -47,6 +47,18 @@
       ],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "Exports (static)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8778",
+        "--directory",
+        "data/exports"
+      ],
+      "port": 8778
     }
   ]
 }
