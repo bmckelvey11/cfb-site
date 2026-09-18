@@ -31,6 +31,7 @@ than any one unit.
 | [duckdb-warehouse-plan.md](duckdb-warehouse-plan.md) | The warehouse plan of record |
 | [duckdb-rebuild-spec.md](duckdb-rebuild-spec.md) | Rebuild design spec |
 | [duckdb-core-ddl.md](duckdb-core-ddl.md) | `core` DDL contract (Phase 1) |
+| [warehouse-discovery-layer-2026-09-18.md](warehouse-discovery-layer-2026-09-18.md) | What makes 324 flat tables hard to navigate, and what `meta.table_dictionary` / `meta.relationship` / `core.v_game` do about it |
 | [data-coverage.md](data-coverage.md) | CFBD data coverage — what we have and don't |
 | [raw-stg-classification.md](raw-stg-classification.md) | raw ↔ stg classification |
 | [schema-audit.md](schema-audit.md) | REST ↔ GraphQL join map |

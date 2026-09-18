@@ -178,9 +178,35 @@ CREATE INDEX idx_fact_game_team_team_id ON core.fact_game_team (team_id);
 Do **not** add indexes that duplicate primary keys (`game_id`,
 `(game_id, provider_key)`, `(game_id, team_id)`).
 
+## Views
+
+```sql
+CREATE OR REPLACE VIEW core.v_game AS ...  -- see duckdb_core._build_core_views
+```
+
+`fact_game` with `dim_venue`, `dim_week` and the selected lines already joined. It joins
+`fact_game_line` **twice**, on `selected_spread_provider_key` and
+`selected_total_provider_key` separately: those differ on 2,943 games, so a single join
+returns one market from the wrong book. It carries no derived result column
+(`home_margin`, `total_points`) on purpose — see the no-lookahead rule.
+
+## Referential integrity: `meta.relationship`, not `FOREIGN KEY`
+
+DuckDB has no `ALTER TABLE ... ADD FOREIGN KEY`, and this DDL creates every table with
+`CREATE TABLE AS`, so a declared FK would mean rewriting each table with an explicit column
+list. It would also be *wrong*: `fact_game.home_team_id` has 91 orphans and
+`away_team_id` 401, because `dim_team` deliberately omits opponents outside CFBD's team
+table, and 154 postseason games do not join `dim_week`. A constraint that fails the 05:00
+rebuild is worse than no constraint.
+
+Instead `meta.relationship` records each known edge with its orphan and NULL-key counts
+**measured on every build**, so `is_lossy` cannot go stale. Add an edge by appending to
+`_EDGES` in `cfb_system_maker/warehouse_dictionary.py`; the counts take care of themselves.
+Rationale and the full measurement:
+[warehouse-discovery-layer-2026-09-18.md](warehouse-discovery-layer-2026-09-18.md).
+
 ## Out of scope here
 
-- Soft `FOREIGN KEY` clauses (optional later; not integrity)
 - `ref` name-alias table
 - ActionNetwork timestamped history fact
 - `fact_team_week` / mart feature tables

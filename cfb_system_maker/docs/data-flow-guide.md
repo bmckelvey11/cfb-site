@@ -1,6 +1,6 @@
 # Data flow guide — sources, warehouse, consumers
 
-Living reference. Last verified 2026-09-16 against the code and the
+Living reference. Last verified 2026-09-18 against the code and the
 [data audit](data-audit-2026-09-11.md). When a step here stops matching the code, fix
 the code or this page in the same commit.
 
@@ -131,8 +131,29 @@ Four schemas:
 |---|---|---|
 | `raw` | One table per dump, one row per source file, payload as JSON. REST under the endpoint name, GraphQL as `gql_<table>` | Never read for analysis; it is the replay log |
 | `stg` | Typed, exploded tables. REST keeps endpoint names; GraphQL lands under its bare snake_case name, `_gql` suffix only on the three colliders (`calendar_gql`, `draft_picks_gql`, `predicted_points_gql`) | The default place to query. One collapsed schema since ADR-0003; there is no `stg_gql` |
-| `core` | Kimball dims and facts | What models should join to |
-| `meta` | `load_report` (schema, name, files, rows, error, loaded_at) | Where a rebuild says what it did |
+| `core` | Kimball dims and facts, plus the `v_game` view | What models should join to |
+| `meta` | `load_report` (what the rebuild did), `table_dictionary` and `relationship` (what everything *is*) | Where the warehouse describes itself |
+
+**Start in `meta` when you do not know which table you want.** The dictionary and the
+relationship map are rebuilt with `core`, so they describe the warehouse you are holding:
+
+```sql
+-- which `game` did I mean? (and every other collider)
+SELECT schema_name, table_name, source_system, note FROM meta.table_dictionary
+WHERE table_name LIKE 'game%';
+
+-- everything from one upstream system
+SELECT * FROM meta.table_dictionary WHERE source_system = 'pff';
+
+-- which joins silently drop rows, and how many
+SELECT * FROM meta.relationship WHERE is_lossy;
+```
+
+The same notes are attached to the objects themselves with `COMMENT ON`, so
+`duckdb_tables().comment` / `duckdb_views().comment` and any SQL client's object browser
+show them too. The dictionary lists views as well as tables — the HTML catalog reads
+`duckdb_tables()` only, so `core.v_game` does not appear there. Design and
+measurements: [warehouse-discovery-layer-2026-09-18.md](../../docs/warehouse-discovery-layer-2026-09-18.md).
 
 **Load** (`build_duckdb`). Takes the exclusive lock, stages at `cfb.duckdb.building`, sets
 `threads = 1`, `preserve_insertion_order = false`, `memory_limit` (default 4 GB, override
@@ -172,6 +193,8 @@ absent:
 | `fact_game_odds` | `stg.oa_odds_tick` | 2026-09-09 onward only |
 | `dim_coach`, `fact_coach_season`, `dim_draft_pick`, `dim_recruit`, `fact_team_talent` | GraphQL `stg` tables | unmatched coaches land in `coach_season_unmatched` |
 | `fact_game_historical` | GraphQL `stg.game` pre-2012 | |
+| `v_game` (view) | `fact_game` + `dim_venue` + `dim_week` + `fact_game_line` | the selected spread and total are joined **separately**: their provider keys differ on 2,943 games, so one join gets one market wrong |
+| `meta.table_dictionary`, `meta.relationship` | every table in the file; orphan counts measured at build | written last, so they describe what the build actually left behind |
 
 Conventions that bite: `stg.games` is REST and regular season; `stg.game` is GraphQL with
 postseason, and is the source of record for season-type completeness. Betting lines floor at
@@ -210,6 +233,7 @@ reasoning is in [app-vs-warehouse-read-path-2026-09-16.md](app-vs-warehouse-read
 
 | Question | Run |
 |---|---|
+| Which table do I want, and is my join lossy? | `SELECT * FROM meta.table_dictionary`, `SELECT * FROM meta.relationship WHERE is_lossy` — in SQL, no file to open |
 | What tables and columns exist, and what does the data look like? | Open [cfb-warehouse-catalog.html](../../docs/cfb-warehouse-catalog.html). Every table with its columns, types and first 3 rows — click a row to expand. Regenerate with `python scripts/build_warehouse_catalog.py` (`--check` tests for staleness without writing; ~18s either way) |
 | Is the folder and warehouse clean? | `python scripts/audit_data_hygiene.py` (read-only; `--checks folder` skips the warehouse) |
 | What did the last rebuild load, and what failed? | `SELECT * FROM meta.load_report WHERE error IS NOT NULL`; `data/logs/cfbd_refresh.log` |

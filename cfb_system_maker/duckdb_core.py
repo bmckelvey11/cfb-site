@@ -24,6 +24,7 @@ from cfb_system_maker.normalize import (
     _select_total,
 )
 from cfb_system_maker.running_stats import compute_running_stats
+from cfb_system_maker.warehouse_dictionary import build_dictionary
 
 # CFBD seasonType values seen on disk (stg.games), including spring slate.
 _SEASON_TYPES = ("regular", "postseason", "spring_regular", "spring_postseason")
@@ -78,6 +79,12 @@ def build_core(
         if _build_fact_game_historical(con):
             built.append("fact_game_historical")
         _add_phase_1_indexes(con)
+        _build_core_views(con)
+        built.append("v_game")
+        # Last: the dictionary classifies whatever tables the build actually left
+        # behind, and the relationship edges are measured against them.
+        build_dictionary(con)
+        built += ["table_dictionary", "relationship"]
         con.execute("CHECKPOINT")
         return built
     finally:
@@ -968,6 +975,7 @@ def _build_dim_draft_pick(con: duckdb.DuckDBPyConnection) -> bool:
         FULL OUTER JOIN stg.draft_picks r
           ON g.year = r.year AND g.round = r.round AND g.pick = r.pick
     """)
+    con.execute("ALTER TABLE core.dim_draft_pick ADD PRIMARY KEY (year, round, pick)")
     return True
 
 
@@ -1181,5 +1189,51 @@ def _add_phase_1_indexes(con: duckdb.DuckDBPyConnection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_fact_game_team_team_id
         ON core.fact_game_team (team_id)
+        """
+    )
+
+
+def _build_core_views(con: duckdb.DuckDBPyConnection) -> None:
+    """``core.v_game`` -- ``fact_game`` with the joins everyone writes already made.
+
+    Two joins to ``fact_game_line``, not one: ``selected_spread_provider_key`` and
+    ``selected_total_provider_key`` differ on 2,943 games (measured 2026-09-18), so
+    a single join on either key attaches the other market's number from the wrong
+    book. That is the trap this view exists to absorb.
+
+    Deliberately no ``home_margin`` / ``total_points``. ``home_points`` and
+    ``away_points`` are already on the row, so nothing is hidden; naming the
+    derived result columns here is how a result-informed value gets swept into a
+    pre-game feature set untagged (see the no-lookahead rule in CLAUDE.md).
+    """
+    con.execute(
+        """
+        CREATE OR REPLACE VIEW core.v_game AS
+        SELECT
+          g.*,
+          v.name       AS venue_name,
+          v.city       AS venue_city,
+          v.state      AS venue_state,
+          v.dome       AS venue_dome,
+          v.grass      AS venue_grass,
+          v.capacity   AS venue_capacity,
+          v.elevation  AS venue_elevation,
+          w.start_date AS week_start_date,
+          w.end_date   AS week_end_date,
+          s.spread_open  AS selected_spread_open,
+          s.spread_close AS selected_spread_close,
+          t.total_open   AS selected_total_open,
+          t.total_close  AS selected_total_close
+        FROM core.fact_game g
+        LEFT JOIN core.dim_venue v ON v.venue_id = g.venue_id
+        LEFT JOIN core.dim_week w
+          ON w.season = g.season AND w.week = g.week
+         AND w.season_type = g.season_type
+        LEFT JOIN core.fact_game_line s
+          ON s.game_id = g.game_id
+         AND s.provider_key = g.selected_spread_provider_key
+        LEFT JOIN core.fact_game_line t
+          ON t.game_id = g.game_id
+         AND t.provider_key = g.selected_total_provider_key
         """
     )
