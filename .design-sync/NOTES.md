@@ -50,3 +50,29 @@
 - **If components ever ship** (a JS build, a React port), delete the tokens-only
   scaffold and re-run detection — `cfg.shape` is pinned to `package` and the synthetic
   entry would mask real exports.
+
+## Sync history
+
+- **2026-09-18** — first sync. Project `CFB System Builder`
+  (`9a1f4da1-37d7-499a-ab29-3c8bfa1aad23`), created empty, 11 files uploaded,
+  `package-validate.mjs` exit 0.
+
+- **Saturday Signal is a separate, richer project** (`ddf9b44f-3d88-4b48-b3da-c9edcb3b5f7c`).
+  It already holds a `design_handoff_cfb_system_maker/` slice (styles.css + tokens +
+  6 screens), `ui_kits/cfb/`, `templates/cfb-system-maker/`, five React components
+  (Avatar, Badge, Button, Card, Input) and eleven `guidelines/*.card.html`.
+  **Do not sync this repo into it.** A design-sync upload carries delete globs over
+  `components/`, `guidelines/`, `tokens/` and `_vendor/`, and the reconciliation pass
+  would remove everything this repo's tokens-only build does not produce.
+
+- `cfb_system_maker/static/tokens/*.css` are byte-identical to Saturday Signal's
+  (down to its `@kind other` annotations), so the repo is a downstream consumer of
+  that project, not the source. Token edits belong upstream in Saturday Signal; only
+  `styles.css` (the 166-class app layer) originates here.
+
+- Saturday Signal's root `styles.css` imports only the three token files, so designs
+  built from it receive tokens but **not** the app's class vocabulary. That gap is why
+  this repo syncs as its own project: the class layer reaches designs through this
+  project's import closure without pushing app chrome classes
+  (`.filter-modal__*`, `.grade-7`) into the house brand system. Revisit only if the
+  user asks for the two to merge.
