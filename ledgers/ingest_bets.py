@@ -41,11 +41,20 @@ Usage:
     python ledgers/ingest_bets.py --init     # create the sheet from the template
     python ledgers/ingest_bets.py --dry-run  # match only, write nothing
     python ledgers/ingest_bets.py
+
+`--add` appends one bet instead of hand-editing the CSV, which is where a transposed
+line or a column-shifted row comes from. It validates the row, refuses to write one
+that could never grade, and then says whether the warehouse can find the game:
+
+    python ledgers/ingest_bets.py --add \\
+        --away Miami --home "Wake Forest" --market total --side UNDER \\
+        --line 55.5 --odds -112 --stake 1.1 --book DraftKings --source totals
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import shutil
 import sys
 from pathlib import Path
@@ -240,6 +249,114 @@ def compute_clv(market: str, side_role: str, line: float | None,
     return round(implied_prob(float(close)) - implied_prob(float(odds)), 4), "probability"
 
 
+# --------------------------------------------------------------------------- appending
+
+SHEET_COLS = ["placed_at", "away", "home", "market", "side", "line", "odds", "stake",
+              "book", "source", "notes"]
+
+
+def validate_add(row: dict) -> str:
+    """Reject a row that could never grade correctly. Returns '' when the row is fine."""
+    market = row["market"]
+    if market not in MARKETS:
+        return f"market must be one of {sorted(MARKETS)}, got {market!r}"
+
+    try:
+        pd.Timestamp(row["placed_at"])
+    except (ValueError, TypeError):
+        return f"unparseable placed_at {row['placed_at']!r}"
+
+    if market == "total" and row["side"].strip().upper() not in OVER_UNDER:
+        return f"a total needs side OVER or UNDER, got {row['side']!r}"
+    if market != "total" and not row["side"].strip():
+        return f"a {market} needs a side naming a team"
+
+    for field in ("line", "odds", "stake"):
+        try:
+            _num(row[field])
+        except ValueError:
+            return f"{field} must be a number, got {row[field]!r}"
+
+    if market == "moneyline":
+        if _num(row["line"]) is not None:
+            return "a moneyline has no line; leave it blank"
+    elif _num(row["line"]) is None:
+        return f"a {market} needs a line"
+
+    if _num(row["odds"]) is None:
+        return "odds are required"
+    if (stake := _num(row["stake"])) is None or stake <= 0:
+        return f"stake must be a positive number, got {row['stake']!r}"
+    return ""
+
+
+def check_match(row: dict) -> str:
+    """Say whether the warehouse can find this game, so a typo surfaces now.
+
+    Advisory only -- the bet is appended either way, matching the rule that unmatched
+    rows are reported rather than dropped.
+    """
+    try:
+        con = duckdb.connect(str(DB_PATH), read_only=True)
+    except (duckdb.Error, OSError) as exc:
+        return f"could not open the warehouse to check the match: {exc}"
+    try:
+        games = load_games(con)
+    finally:
+        con.close()
+
+    placed = pd.Timestamp(row["placed_at"])
+    placed = placed.tz_localize("UTC") if placed.tz is None else placed.tz_convert("UTC")
+    game, status, note = find_game(row["away"], row["home"], placed, games)
+    if game is None:
+        return f"{status}: {note}" if note else status
+
+    side_role, side_note = resolve_side(row["market"], row["side"], game)
+    if not side_role:
+        return side_note
+    return ""
+
+
+def append_row(sheet: Path, row: dict) -> None:
+    """Append one bet, creating the sheet with a header when it does not exist yet."""
+    sheet.parent.mkdir(parents=True, exist_ok=True)
+    new = not sheet.exists()
+    with sheet.open("a", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=SHEET_COLS)
+        if new:
+            writer.writeheader()
+        writer.writerow(row)
+
+
+def add(sheet: Path, args: argparse.Namespace) -> None:
+    row = {
+        "placed_at": args.placed_at or pd.Timestamp.now("UTC").strftime("%Y-%m-%d %H:%M"),
+        "away": str(args.away).strip(),
+        "home": str(args.home).strip(),
+        "market": str(args.market).strip().lower(),
+        "side": str(args.side).strip(),
+        "line": "" if args.line is None else str(args.line).strip(),
+        "odds": str(args.odds).strip(),
+        "stake": str(args.stake).strip(),
+        "book": str(args.book).strip(),
+        "source": str(args.source).strip(),
+        "notes": str(args.notes).strip(),
+    }
+
+    problem = validate_add(row)
+    if problem:
+        raise SystemExit(f"not appended -- {problem}")
+
+    append_row(sheet, row)
+    line = "" if row["market"] == "moneyline" else f" {row['line']}"
+    print(f"appended to {sheet}\n"
+          f"  {row['away']} @ {row['home']}  {row['market']} {row['side']}{line} "
+          f"{row['odds']}  stake {row['stake']}  ({row['book'] or 'no book'})")
+
+    warning = check_match(row)
+    print(f"  WARNING: {warning}" if warning else "  matched a warehouse game")
+
+
 # ------------------------------------------------------------------------------ driver
 
 def load_games(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
@@ -407,10 +524,32 @@ def main() -> None:
                     help="copy the template to the sheet path if it does not exist")
     ap.add_argument("--dry-run", action="store_true", help="match only, write nothing")
     ap.add_argument("--self-check", action="store_true")
+    ap.add_argument("--add", action="store_true",
+                    help="append one bet to the sheet and exit")
+    g = ap.add_argument_group("--add fields")
+    g.add_argument("--away")
+    g.add_argument("--home")
+    g.add_argument("--market", choices=sorted(MARKETS))
+    g.add_argument("--side", help="OVER/UNDER for a total, else the team you took")
+    g.add_argument("--line", help="the number as you took it; blank for a moneyline")
+    g.add_argument("--odds")
+    g.add_argument("--stake")
+    g.add_argument("--book", default="")
+    g.add_argument("--source", default="")
+    g.add_argument("--notes", default="")
+    g.add_argument("--placed-at", dest="placed_at", help="default: now, UTC")
     args = ap.parse_args()
 
     if args.self_check:
         self_check()
+        return
+
+    if args.add:
+        missing = [f"--{f}" for f in ("away", "home", "market", "side", "odds", "stake")
+                   if not getattr(args, f)]
+        if missing:
+            raise SystemExit(f"--add needs {', '.join(missing)}")
+        add(args.sheet, args)
         return
 
     if args.init:

@@ -12,13 +12,16 @@ import pytest
 
 from ledgers.ingest_bets import (
     REQUIRED_COLS,
+    SHEET_COLS,
     american_payout,
+    append_row,
     compute_clv,
     implied_prob,
     pick_close,
     settle,
     spread_result,
     total_result,
+    validate_add,
 )
 
 
@@ -203,3 +206,64 @@ def test_missing_game_reports_no_line_data(lines):
 def test_empty_line_table_is_not_an_error():
     assert pick_close(pd.DataFrame(), 1, "spread", "home", "DraftKings") \
         == (None, None, "no line data")
+
+
+# ------------------------------------------------------------------- appending a bet
+
+def good_row(**over):
+    row = {"placed_at": "2026-09-18 12:00", "away": "Miami", "home": "Wake Forest",
+           "market": "total", "side": "UNDER", "line": "55.5", "odds": "-112",
+           "stake": "1.1", "book": "DraftKings", "source": "totals", "notes": ""}
+    row.update(over)
+    return row
+
+
+def test_a_well_formed_total_validates():
+    assert validate_add(good_row()) == ""
+
+
+def test_a_moneyline_validates_without_a_line():
+    assert validate_add(good_row(market="moneyline", side="Miami", line="")) == ""
+
+
+@pytest.mark.parametrize("over,fragment", [
+    ({"market": "totals"}, "market must be one of"),
+    ({"placed_at": "not-a-date"}, "unparseable placed_at"),
+    ({"side": "HOME"}, "OVER or UNDER"),
+    ({"market": "spread", "side": ""}, "needs a side"),
+    ({"line": "fifty"}, "line must be a number"),
+    ({"line": ""}, "needs a line"),
+    ({"market": "moneyline", "side": "Miami", "line": "3"}, "no line"),
+    ({"odds": ""}, "odds are required"),
+    ({"stake": "0"}, "positive number"),
+    ({"stake": "-1"}, "positive number"),
+])
+def test_rows_that_could_never_grade_are_rejected(over, fragment):
+    assert fragment in validate_add(good_row(**over))
+
+
+def test_append_writes_a_header_once_and_then_only_rows(tmp_path):
+    sheet = tmp_path / "bets" / "manual_bets.csv"
+    append_row(sheet, good_row())
+    append_row(sheet, good_row(away="Houston", home="Texas Tech"))
+    lines = sheet.read_text().strip().splitlines()
+    assert lines[0] == ",".join(SHEET_COLS)
+    assert len(lines) == 3
+
+
+def test_appended_columns_line_up_with_what_the_reader_requires(tmp_path):
+    # A column-shifted row is the failure --add exists to prevent, so pin the order.
+    sheet = tmp_path / "manual_bets.csv"
+    append_row(sheet, good_row())
+    frame = pd.read_csv(sheet, dtype=str, keep_default_na=False)
+    assert list(frame.columns) == SHEET_COLS
+    assert not set(REQUIRED_COLS) - set(frame.columns)
+    assert frame.iloc[0]["line"] == "55.5" and frame.iloc[0]["odds"] == "-112"
+
+
+def test_a_note_containing_a_comma_survives_the_round_trip(tmp_path):
+    sheet = tmp_path / "manual_bets.csv"
+    append_row(sheet, good_row(notes="CONFIRM LINE, slip read 52.2"))
+    frame = pd.read_csv(sheet, dtype=str, keep_default_na=False)
+    assert frame.iloc[0]["notes"] == "CONFIRM LINE, slip read 52.2"
+    assert frame.iloc[0]["source"] == "totals"
