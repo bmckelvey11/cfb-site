@@ -114,6 +114,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [totals-model.md](totals-model.md), [totals-early-weeks.md](totals-early-weeks.md) | Totals model and early-season behaviour |
 | [wind-orientation-totals.md](wind-orientation-totals.md) | Crosswind vs head/tail wind and scoring |
 | [ppa-opponent-adjusted-ratings-2026-09-16.md](ppa-opponent-adjusted-ratings-2026-09-16.md) | Opponent-adjusted team PPA ratings early in the season (mixed-effects, v1.0) |
+| [epa-metric-constructions-2026-09-18.md](epa-metric-constructions-2026-09-18.md) | How to build the better-constructed version of five EPA-family metrics from `stg.plays`; four are buildable on one shared pipeline, dropback scramble/pressure splits are not |
 | [total-points-distribution-2026-09-17.md](total-points-distribution-2026-09-17.md) | How combined game totals are distributed and which exact totals spike (55, 41, 44); scoring is down ~5.7 pts since 2016 |
 | [scoring-margin-distribution-2026-09-18.md](scoring-margin-distribution-2026-09-18.md) | How scoring margins are distributed; 3 and 7 take 18.5% of games between them; home-field advantage is flat at +4, not trending |
 | [scoring-by-minute-2026-09-18.md](scoring-by-minute-2026-09-18.md) | When points land inside a quarter, split by game state and spread; Q4 min 15 ranges 0.37 (leading) to 3.00 (trailing), and the spread effect flips sign between Q1-Q3 and Q4 |
