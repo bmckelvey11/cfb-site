@@ -26,12 +26,12 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Team involvement** — any core bet placed on a game that team played in, including totals. Measures where betting attention goes, not who was backed.
 - **Core bet** — NCAAF full-game straight bet (spread, total, or moneyline). Excludes first-half/second-half/live/team-total bets, parlays, and teasers.
 - **Break-even rate** — the win rate at which a flat bet nets zero at its price: 52.38% at −110, 54.55% at −120. Edge is win rate minus this at the price taken, never at −110 by default. (method: `docs/methods.md`)
-- **CLV (closing line value)** — the difference between the number taken and the consensus closing number, signed so positive = better than close.
+- **CLV (closing line value)** — the difference between the number taken and a **predeclared** closing reference (named book or consensus, fixed cutoff, stated de-vig), signed so positive = better than close. A leading indicator of price acquisition, not a score: positive CLV does not establish that the probabilities are calibrated or that the bet had edge. (method: `docs/methods.md`)
 - **Model consensus** — screened, equal-weighted average of Prediction Tracker model spreads (E4 input). Not "composite".
 - **Book fair** — median closing spread across real sportsbooks (Action Network ids 49 Caesars, 68 DraftKings, 69 FanDuel, 71 BetRivers, 75 BetMGM; names per AN's own book list, corrected 2026-09-08). Not "composite".
 - **Cover margin** — bet team's score plus the line taken, minus the opponent's score. Positive = covered by that much; negative = missed by that much. Defined for spread bets only.
 - **Hook loss** — a spread bet with cover margin of exactly −0.5: lost by the half point.
-- **Key number** — a spread line on or adjacent to 3 or 7 (2.5–3.5, 6.5–7.5), where NFL/CFB final-margin mass concentrates and books shade hardest.
+- **Key number** — a spread line on or adjacent to 3 or 7 (2.5–3.5, 6.5–7.5), where CFB final-margin mass concentrates and books shade hardest. In the scoring-distribution work the same phrase is used for a *frequent outcome* rather than a pivotal line — a combined total (55, 41, 44) or an exact margin (3, 7) that stands above its neighbours. Say which sense is meant when both are in play.
 - **Betting day** — the ET calendar date of kickoff (a 1am UTC kickoff belongs to the previous ET evening).
 
 ## Greenline evaluation
@@ -79,6 +79,34 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Exposure** — total stake on one weekend as a share of the bankroll. Twelve unders and four overs at 1% is 16%; the over-zero guide's own caution is 8–10% a slate. The projection assumes the higher figure.
 - **Bet to** — over-zero's walk-away number: the highest total at which an OVER still qualifies. A line above it is a pass; `betTo` in the board JSON. (`models/over_zero/docs/bet-to-2026-09-11.md`)
 - **Price rule** — the projection prices Greenline at −110 and over-zero at −120; a bet at a worse price than its leg's assumption is a pass, and the week's list shops the best book first. (`research/bankroll/docs/seed-bankroll-proposal-2026-09-17.md`)
+
+## Scoring distribution
+
+Where points land inside a game, and which games and teams put them there. Descriptive of realised scores; nothing in this section is joined to a price.
+
+- **Minute of quarter** — 1 through 15, where minute 1 is 15:00–14:01 on the game clock. Scoring-by-minute tables are indexed this way, not by game minute 1–60.
+- **Game-minute cell** — the exposure unit for a conditional scoring rate: one (game, quarter, minute). Every game contributes all 60 of its regulation minutes, including the roughly a third that contain no snap, and each cell carries one bucket label read at its first play. Points per game-minute cell is comparable across buckets and against the unconditional 0.942. (method: `docs/methods.md`)
+  _Avoid_: exposure (that word means weekend stake)
+- **Share of own points** — a bucket's points in a quarter or half over all its own points, pooled across the bucket rather than averaged game by game. Separates *where* a team scores from *how much*. (method: `docs/methods.md`)
+- **Front-loaded / back-loaded** — a team type whose first-half share sits above / below the 52.06% all-team figure. Shape only: a back-loaded weak offence still scores fewer fourth-quarter points than a front-loaded strong one, because the share is of a smaller pile.
+- **Exceedance** — the share of games finishing above a line; a distribution read from the tail instead of the peak. Realised scores only, never an over/under hit rate against a market.
+- **Neighbour lift** — how far an exact total or margin stands above the same-parity values around it. The test that separates a real spike from a bin that is merely near the middle of the bell. (method: `docs/methods.md`)
+- **Prior-season bucket** — a team-type label (tempo, SP+ offence quartile) read from season − 1, so the label is never built from the games being measured, with quartile cuts recomputed each season. Stale by construction — a team that changed coordinator carries last year's label — which biases every effect toward zero. (method: `docs/methods.md`)
+
+## Model and system evaluation
+
+Governed by [`docs/model-evaluation-standard.md`](docs/model-evaluation-standard.md).
+
+- **Model** vs **system** — a model outputs probabilities, spreads, totals or prices. A system adds the bet-selection rule, timing, book availability, staking and execution. The distinction decides what a result is evidence *about*: a model can forecast well and lose money, and a profitable backtest can come from staking, unavailable prices or search, with the model contributing nothing.
+- **Proper scoring rule** — a forecast score whose expected value is best when you report your true probability, so it cannot be gamed by shading. Brier and log loss are the binary pair used here, RPS for three-way outcomes, CRPS for a full predictive distribution. (method: `docs/methods.md`)
+- **Calibration** — whether a stated probability matches the observed frequency. Distinct from **resolution**, the ability to separate games into genuinely different risk groups. A forecast can be perfectly calibrated and carry no information; both are reported, never one as a proxy for the other. (method: `docs/methods.md`)
+- **Market-relative skill** — a proper score measured against the de-vigged market price **at the same timestamp**, not against a base rate and not against a later close. The bar that matters: beating a coin flip is not an achievement, and beating a price that knew more than you did is not a measurement. (method: `docs/methods.md`)
+- **Incremental information** — whether a model contributes anything the market price does not already carry, tested by conditioning on the market rather than by CLV. The claim CLV is routinely mistaken for. (method: `docs/methods.md`)
+- **Turnover ROI** — net profit over total staked, net of every cost that scales with betting. Not bankroll return and not log growth; the three answer different questions and are never reported under one label. (method: `docs/methods.md`)
+- **Hard gate** — a defect that makes a result **invalid** rather than merely weaker, whatever the ROI: lookahead or leakage, prices that cannot be reconstructed at decision time, incomplete bet or trial logging, a threshold chosen on the test set, materially misstated costs, or no chronological out-of-sample evaluation. Gates are checked before the score is read, not weighed against it.
+- **Trial ledger** — the append-only record of every materially distinct rule, feature set, threshold, model and staking variant tested. Without the count, the winner's p-value, ROI and Sharpe are all optimistic by an unknown amount, and DSR/PBO cannot be computed at all. Recording obligation, not paperwork. (method: `docs/methods.md`)
+- **Research-only** — a system that passes the gates but is not deployable: negative market-relative skill, an ROI interval too wide to act on, profit carried by a handful of outcomes, or performance that collapses under nearby parameters or modest slippage. A status, not a failure — distinct from **invalid**, which is what a hard gate produces.
+- **Execution** — whether the quoted price was actually available, at the needed stake, when the decision fired: fill rate, slippage, quote age, limits, book concentration. Scored as its own pillar, because a backtest that assumes the shown price is a backtest of a market that did not exist.
 
 ## Warehouse layers
 
