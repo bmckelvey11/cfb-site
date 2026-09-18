@@ -255,20 +255,35 @@
       .filter(Boolean);
   }
 
-  function committedFeature(key) {
+  // A team-scoped categorical renders one row per side, so reads and writes have to
+  // name the side they mean. Without this every launcher chip hit the first row, and
+  // Bet-side and Opponent shared one filter.
+  function featureRowScope(fallback, wantPerspective) {
+    if (!wantPerspective || wantPerspective === "single") {
+      return fallback;
+    }
+    const row = fallback.querySelector(
+      '[data-row-perspective="' + wantPerspective + '"]',
+    );
+    return row || fallback;
+  }
+
+  function committedFeature(key, wantPerspective) {
     const fallback = document.querySelector(
       '[data-fallback-for="feature:' + key + '"]',
     );
     if (!fallback) {
       return null;
     }
+    // ff_enable lives on the container and governs every row of the feature.
     const enable = fallback.querySelector('input[name="ff_enable"]');
     if (!enable || !enable.checked) {
       return null;
     }
-    const opEl = fallback.querySelector('[name="ff_op"]');
-    const valueEl = fallback.querySelector('[name="ff_value"]');
-    const perspectiveEl = fallback.querySelector('[name="ff_perspective"]');
+    const scope = featureRowScope(fallback, wantPerspective);
+    const opEl = scope.querySelector('[name="ff_op"]');
+    const valueEl = scope.querySelector('[name="ff_value"]');
+    const perspectiveEl = scope.querySelector('[name="ff_perspective"]');
     const raw = valueEl ? String(valueEl.value || "") : "";
     let values;
     if (opEl && opEl.value === "in") {
@@ -1806,9 +1821,10 @@
       return;
     }
     const enable = fallback.querySelector('input[name="ff_enable"]');
-    const opEl = fallback.querySelector('[name="ff_op"]');
-    const valueEl = fallback.querySelector('[name="ff_value"]');
-    const perspectiveEl = fallback.querySelector('[name="ff_perspective"]');
+    const scope = featureRowScope(fallback, state.perspective);
+    const opEl = scope.querySelector('[name="ff_op"]');
+    const valueEl = scope.querySelector('[name="ff_value"]');
+    const perspectiveEl = scope.querySelector('[name="ff_perspective"]');
     if (state.control === "bool") {
       if (state.selected.length !== 1) {
         return;
@@ -1827,11 +1843,16 @@
       }
     } else if (state.control === "categorical") {
       if (!state.selected.length) {
-        if (enable) {
-          enable.checked = false;
-        }
         if (valueEl) {
           valueEl.value = "";
+        }
+        // Clearing one side must not switch the whole feature off while the other
+        // side still constrains something.
+        const othersSet = Array.from(
+          fallback.querySelectorAll('[name="ff_value"]'),
+        ).some((el) => el !== valueEl && String(el.value || "").trim() !== "");
+        if (enable && !othersSet) {
+          enable.checked = false;
         }
         return;
       }
@@ -2192,7 +2213,12 @@
       };
     } else {
       const featureKey = candidateId.split(":").slice(1).join(":");
-      const committed = committedFeature(featureKey);
+      // Same idiom openNumericCandidate uses: the chip's own side decides which
+      // committed row is being edited.
+      const committed = committedFeature(
+        featureKey,
+        button ? button.getAttribute("data-perspective") : null,
+      );
       let selected = [];
       if (control === "bool") {
         if (committed && committed.values.length === 1) {

@@ -188,6 +188,53 @@ def test_index_has_season_dialog_launcher_markup(tmp_path):
     assert "filter_modal.js" in html
 
 
+def _editor_html_with_both_perspectives(tmp_path):
+    """Render the editor for a system constraining bet-side AND opponent on one
+    categorical stat. The backend already supports it; the form has to survive it."""
+    games = [_game(1, season=2023, week=1), _game(2, season=2023, week=2)]
+    save_processed_games(tmp_path, games)
+    save_features(
+        tmp_path,
+        {
+            "1": {"home_team_state": "TX", "away_team_state": "FL"},
+            "2": {"home_team_state": "FL", "away_team_state": "TX"},
+        },
+    )
+    app = create_app(data_dir=tmp_path)
+    query = (
+        "/system?side=home"
+        "&ff_enable=team_state"
+        "&ff_key=team_state&ff_op=eq&ff_value=TX&ff_perspective=bet_side"
+        "&ff_key=team_state&ff_op=eq&ff_value=FL&ff_perspective=opponent"
+    )
+    return app.test_client().get(query).get_data(as_text=True)
+
+
+def test_categorical_keeps_bet_side_and_opponent_as_separate_rows(tmp_path):
+    html = _editor_html_with_both_perspectives(tmp_path)
+    # Both perspectives must round-trip into the form. A single shared slot drops one.
+    assert 'value="TX"' in html
+    assert 'value="FL"' in html
+    assert 'data-row-perspective="bet_side"' in html
+    assert 'data-row-perspective="opponent"' in html
+
+
+def test_categorical_rows_post_back_as_two_filters(tmp_path):
+    games = [_game(1, season=2023, week=1)]
+    save_processed_games(tmp_path, games)
+    save_features(tmp_path, {"1": {"home_team_state": "TX", "away_team_state": "FL"}})
+    app = create_app(data_dir=tmp_path)
+    response = app.test_client().get(
+        "/api/backtest?side=home"
+        "&ff_enable=team_state"
+        "&ff_key=team_state&ff_op=eq&ff_value=TX&ff_perspective=bet_side"
+        "&ff_key=team_state&ff_op=eq&ff_value=FL&ff_perspective=opponent"
+    )
+    # Both constraints apply to the same game, so the one game matches.
+    assert response.status_code == 200
+    assert response.get_json()["wins"] == 1
+
+
 def test_api_backtest_neutral_no_match_is_200_zeros(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)

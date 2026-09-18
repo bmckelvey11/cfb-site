@@ -182,7 +182,7 @@
                   {% set active = namespace(filt=none, gte=none, lte=none) %}
                   {# Team-scoped numerics carry one gte/lte pair PER perspective, so a
                      system can constrain the bet-side team and its opponent at once. #}
-                  {% set dual = namespace(primary_gte=none, primary_lte=none, secondary_gte=none, secondary_lte=none) %}
+                  {% set dual = namespace(primary_gte=none, primary_lte=none, secondary_gte=none, secondary_lte=none, primary_cat=none, secondary_cat=none, other_cat=none) %}
                   {% set primary_p = 'bet_side' if form.bet_type == 'spread' else 'either' %}
                   {% set secondary_p = 'opponent' %}
                   {% for filt in form.feature_filters %}
@@ -193,9 +193,17 @@
                       {% if filt.perspective == secondary_p %}
                         {% if filt.op == 'gte' %}{% set dual.secondary_gte = filt %}{% endif %}
                         {% if filt.op == 'lte' %}{% set dual.secondary_lte = filt %}{% endif %}
+                        {% if filt.op not in ('gte', 'lte') %}{% set dual.secondary_cat = filt %}{% endif %}
                       {% else %}
                         {% if filt.op == 'gte' %}{% set dual.primary_gte = filt %}{% endif %}
                         {% if filt.op == 'lte' %}{% set dual.primary_lte = filt %}{% endif %}
+                        {# Home/Away are still reachable through the fallback select, so a
+                           categorical filter on one of them keeps its own row rather than
+                           being coerced into the Bet-side slot on the next save. #}
+                        {% if filt.op not in ('gte', 'lte') %}
+                          {% if filt.perspective == primary_p %}{% set dual.primary_cat = filt %}
+                          {% else %}{% set dual.other_cat = filt %}{% endif %}
+                        {% endif %}
                       {% endif %}
                     {% endif %}
                   {% endfor %}
@@ -217,7 +225,7 @@
                             data-team-scoped="1"
                             data-perspective="{{ primary_p }}"
                             data-label="{{ feature.label }} — {{ 'Either' if form.bet_type != 'spread' else 'Bet-side' }}"
-                            {% if dual.primary_gte or dual.primary_lte %}data-has-filter="1"{% endif %}
+                            {% if dual.primary_gte or dual.primary_lte or dual.primary_cat %}data-has-filter="1"{% endif %}
                             aria-haspopup="dialog"
                           >Bet-side</button>
                           <button
@@ -230,7 +238,7 @@
                             data-team-scoped="1"
                             data-perspective="{{ secondary_p }}"
                             data-label="{{ feature.label }} — Opponent"
-                            {% if dual.secondary_gte or dual.secondary_lte %}data-has-filter="1"{% endif %}
+                            {% if dual.secondary_gte or dual.secondary_lte or dual.secondary_cat %}data-has-filter="1"{% endif %}
                             aria-haspopup="dialog"
                           >Opponent</button>
                         </span>
@@ -317,6 +325,51 @@
                             <label>Max <input name="ff_value" type="number" step="any" data-bound="max"
                               value="{% if active.lte %}{{ active.lte.value }}{% endif %}"
                               placeholder="{% if feature.max_value is not none %}{{ feature.max_value }}{% endif %}"></label>
+                          </div>
+                          {% endif %}
+                        {% elif feature.team_scoped and form.bet_type == "spread" %}
+                          {# Two independent rows, one per side, each with a FIXED hidden
+                             perspective -- the same shape the numeric branch above uses.
+                             One shared row made the Bet-side and Opponent launcher buttons
+                             write to the same filter, so picking one replaced the other. #}
+                          {% for row_p, row_label, row_cat in [
+                               (primary_p, 'Bet-side', dual.primary_cat),
+                               (secondary_p, 'Opponent', dual.secondary_cat)] %}
+                          <div class="feature-row" data-row-perspective="{{ row_p }}">
+                            <input type="hidden" name="ff_perspective" value="{{ row_p }}">
+                            <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                            <span>{{ row_label }}</span>
+                            <select name="ff_op">
+                              {% if feature.control == "bool" %}
+                                <option value="eq" {% if row_cat and row_cat.op == 'eq' %}selected{% endif %}>is</option>
+                              {% else %}
+                                <option value="eq" {% if row_cat and row_cat.op == 'eq' %}selected{% endif %}>equals</option>
+                                <option value="in" {% if row_cat and row_cat.op == 'in' %}selected{% endif %}>in list</option>
+                              {% endif %}
+                            </select>
+                            {% if feature.control == "bool" %}
+                              <select name="ff_value">
+                                <option value="" {% if not row_cat %}selected{% endif %}>&mdash;</option>
+                                <option value="true" {% if row_cat and row_cat.value == true %}selected{% endif %}>Yes</option>
+                                <option value="false" {% if row_cat and row_cat.value == false %}selected{% endif %}>No</option>
+                              </select>
+                            {% else %}
+                              <input name="ff_value" placeholder="value or comma list"
+                                value="{% if row_cat %}{{ row_cat.value if row_cat.value is string else row_cat.value|join(',') }}{% endif %}">
+                            {% endif %}
+                          </div>
+                          {% endfor %}
+                          {% if dual.other_cat %}
+                          <div class="feature-row" data-row-perspective="{{ dual.other_cat.perspective }}">
+                            <input type="hidden" name="ff_perspective" value="{{ dual.other_cat.perspective }}">
+                            <input type="hidden" name="ff_key" value="{{ feature.key }}">
+                            <span>{{ dual.other_cat.perspective|capitalize }}</span>
+                            <select name="ff_op">
+                              <option value="eq" {% if dual.other_cat.op == 'eq' %}selected{% endif %}>equals</option>
+                              <option value="in" {% if dual.other_cat.op == 'in' %}selected{% endif %}>in list</option>
+                            </select>
+                            <input name="ff_value" placeholder="value or comma list"
+                              value="{{ dual.other_cat.value if dual.other_cat.value is string else dual.other_cat.value|join(',') }}">
                           </div>
                           {% endif %}
                         {% else %}
