@@ -40,10 +40,68 @@ cell stores `n`, the mean of `rem`, and the integer histogram of `rem`.
 
 At run time the calculator computes expected remaining as `live_total − current_score`
 — the market's own estimate — picks the matching cell, and shifts that cell's
-histogram so its mean sits on the user's number. The shift is split between the two
-neighbouring integers so recentring introduces no rounding bias. The result is a
-distribution over integer final totals, which is folded into the five branches of a
-totals middle and priced.
+histogram so its mean sits on the user's number. The result is a distribution over
+integer final totals, which is folded into the five branches of a totals middle and
+priced.
+
+### Recentring
+
+The cell mean is fractional and the user's expected remaining is fractional, but the
+histogram is over integers. Rounding the shift to the nearest integer would bias the
+whole distribution by up to half a point, which matters because a half point is
+exactly the difference between a push and a win. So the shift is split across the two
+neighbouring integers:
+
+    shift = expRem − cell.mean
+    k     = floor(shift)
+    w     = shift − k
+
+    P(rem = lo + i + k)     += cell.p[i] × (1 − w)
+    P(rem = lo + i + k + 1) += cell.p[i] × w
+
+`final_total = current_score + rem` is then an integer, so `final == X` is a real
+comparison rather than a floating-point near-miss, and the push branches carry their
+true mass.
+
+### Pricing the five branches
+
+With `lo = min(X, Y)` and `hi = max(X, Y)` over the two numbers, a totals middle has
+five branches, and within each one both legs' outcomes are fixed, so the net is a
+constant:
+
+| Final total | Pregame Over X | Live Under Y | Net |
+| --- | --- | --- | --- |
+| `< lo` | loss | win | one leg's profit − other's stake |
+| `= lo` | **push** | win | **one leg's profit** (stake refunded) |
+| `lo < t < hi` | win | win | both legs' profit |
+| `= hi` | win | **push** | **one leg's profit** |
+| `> hi` | win | loss | one leg's profit − other's stake |
+
+The pregame-Under case is the same table with the leg roles swapped. The push rows
+are **winners net of a refunded leg, not half-losses** — a distinction that is easy
+to get wrong and not negligible: on integer totals the two push branches carried 2.5%
+of the mass in a representative late-game state (Over 52 / Under 56, 38 points scored,
+6:00 left).
+
+A leg's contribution is `stake × decimalProfit(price)` on a win, `0` on a push, and
+`−stake` on a loss, where `decimalProfit` converts American odds. Stakes are
+independent per leg, so unequal sizing works without special-casing. EV is
+`Σ(branch probability × branch net)`.
+
+### Validation
+
+- **Cell histograms integrate to 1.** Worst cell mass error 1.9 × 10⁻⁴, from rounding
+  stored probabilities to five decimals across ~100-bin histograms. Immaterial at the
+  one-decimal-place the page displays.
+- **Recentring conserves mass and hits its target.** For the default state (live total
+  58.5, 31 points scored, 18:00 left) the recentred distribution sums to 1.00004 and
+  has mean 58.503 — i.e. it lands on the live total, which is what "the market's
+  estimate is unbiased" is supposed to mean.
+- **EV math is tested against the shipped code.** `tests/test_middle_ev.py` extracts
+  the JS from the page and runs it under node rather than testing a Python port that
+  could drift. Eight cases: each of the five branches in both directions, half-point
+  numbers carrying no push mass, branch probabilities partitioning the distribution,
+  unequal stakes, plus-money payouts, and a wrong-way line move.
 
 ### Filters applied
 
@@ -74,6 +132,49 @@ sets the floor; `stg.drives` itself starts in 2012). Cells below n = 100 are dro
 σ scales as √t as it should: 15.4 at kickoff, 10.9 at the half (√(27/60) × 15.4 =
 10.3 predicted). The 0–2:30 cell breaks the pattern upward because overtime lives
 there.
+
+## Alternatives tested and rejected
+
+### A pace-blended expected-remaining proxy
+
+The historical key `pregame_total × min_rem / 60` is a flat linear decay that ignores
+how the game has actually gone. The obvious upgrade blends observed pace into it:
+
+    elapsed_frac = (60 − min_rem) / 60
+    rate         = elapsed_frac × (pts_so_far / elapsed_min)
+                 + (1 − elapsed_frac) × (pregame_total / 60)
+    proxy        = rate × min_rem
+
+Measured against the 322,746-row sample:
+
+| Proxy | corr with actual remaining | σ(actual − proxy) | Range | Populated 5-pt bins |
+| --- | --- | --- | --- | --- |
+| Linear decay | **0.806** | **12.17** | 0–90 | 19 |
+| Pace-blended | 0.774 | 13.11 | 0–111 | 23 |
+
+**Rejected.** The blend spans a wider range, which was the motivation, but it predicts
+strictly worse — early-game scoring is noisy and reading pace off two possessions adds
+more variance than it removes. Kept the linear decay.
+
+### Five-point expected-remaining bins
+
+The first build used 5-point bins, producing 58 cells. The default game state landed
+in an empty one and the fallback warning fired on ordinary inputs, which trains a user
+to ignore warnings. Checking how much σ actually varies along that axis inside a time
+bucket settled it — at 30–37.5 minutes remaining, σ runs 12.12 / 13.00 / 14.60 across
+the 20 / 30 / 40 expected-remaining bins, about 10% per bin.
+
+**Widened to 10-point bins**: 34 cells, median n = 10,142, smallest n = 151, covering
+322,576 of 322,746 observations (99.95%). σ stratification is weak enough that the
+wider bins cost almost nothing and the lookup stops falling off the edge.
+
+### A parametric fallback off the closing total
+
+The original plan, had drive data not been usable, was σ of `final − closing total`
+bucketed by closing total. **Rejected on inspection**: that is a pregame quantity of
+≈15 points against ≈6 at 5:00 remaining. It would have been wrong by a factor of 2.5
+in precisely the game state the tool exists for. Recorded here because it is the
+tempting shortcut.
 
 ## What this does not support
 

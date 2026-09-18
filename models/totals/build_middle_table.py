@@ -19,6 +19,12 @@ Output is written straight into `middle_calculator.html` as a JS object literal
 between the MIDDLE_TABLE markers -- the page makes no network requests.
 
 Run:  python -m models.totals.build_middle_table
+
+The page is also published as an artifact at
+https://claude.ai/artifact/4Y1CxComNST9GpPz7g3nXK — that copy is a snapshot, not a
+live view of this file. Rebuilding the table here does NOT update it, and the stale
+copy looks current because its provenance footer keeps reporting the same sample.
+Republish to that URL after any rebuild you want people to see.
 """
 
 from __future__ import annotations
