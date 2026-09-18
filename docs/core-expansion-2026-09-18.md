@@ -1,10 +1,11 @@
-# Expanding `core`: lookup dims and team-season facts — 2026-09-18
+# Expanding `core`: lookup dims, team-season and game-grain facts — 2026-09-18
 
 **Question.** `core` held 18 objects: a game grain, a game-line grain, and six dims. Two of
 its own columns — `dim_draft_pick.position_id` and `.nfl_team_id` — pointed at nothing.
-Team-season information that a betting model wants (SP+, SRS, Elo, FPI, records, recruiting,
-returning production, ATS) sat in `stg` across a dozen tables with three different team keys.
-Which of those can be promoted into `core` with a real key, and what does that cost?
+Information a betting model wants — SP+, SRS, Elo, FPI, records, recruiting, returning
+production, ATS, plus weather, polls and drives — sat in `stg` across a dozen tables with
+three different team keys. Which of those can be promoted into `core` with a real key, and
+what does that cost?
 
 **Method.** Read-only probe of every candidate for grain, season coverage, key uniqueness and
 orphans against `core.dim_team`, on `data/cfb.duckdb` (built 2026-09-18). Built against a
@@ -15,7 +16,7 @@ in [`warehouse_dictionary.py`](../cfb_system_maker/warehouse_dictionary.py).
 Supersedes nothing. Builds on
 [warehouse-discovery-layer-2026-09-18.md](warehouse-discovery-layer-2026-09-18.md).
 
-## What was added — 15 objects, `core` 18 → 33
+## What was added — 18 objects, `core` 18 → 36
 
 **Nine lookup dims**, promoted verbatim from vendor code tables, each with a verified PK:
 `dim_position` (28), `dim_recruit_position` (28), `dim_draft_position` (31), `dim_draft_team`
@@ -33,6 +34,54 @@ Supersedes nothing. Builds on
 | `fact_team_ats_postgame` | 1,750 | 2019–2026 | no |
 | `fact_team_recruiting` | 3,160 | 2012–2026 | yes |
 | `fact_team_returning_production` | 1,691 | 2014–2026 | yes |
+
+## Game-grain facts
+
+| Table | Rows | Span | Grain |
+|---|---:|---|---|
+| `fact_game_weather` | 28,402 | 2001–2026 | one row per game |
+| `fact_poll_rank` | 49,507 | 1936–2026 | season × week × season_type × poll × team |
+| `fact_drive_postgame` | 371,564 | 2012–2026 | one row per drive |
+
+**`fact_game_weather` merges two feeds, because neither is a superset.** GraphQL
+`game_weather` covers 6,413 games REST lacks; REST `weather` covers 545 GraphQL lacks;
+21,444 overlap. Same shape as `_merge_game_lines`: FULL OUTER on the game id, REST wins a
+conflict, `_source` marks `gql` / `rest` / `both`. `game_indoors` and `weather_condition`
+are REST-only and are NULL on the 6,413 GraphQL-only rows.
+
+It is **not** suffixed `_postgame` — weather is a condition, not an outcome. Two edges from
+it are lossy, both for stated reasons rather than defects:
+
+- 6,413 rows have no `fact_game` parent. They are **2001–2011** games, below `core`'s 2012
+  floor; their parent is `fact_game_historical`.
+- 7,347 rows carry `weather_condition_code = 0`, which has **no row** in the vendor's
+  condition table (`dim_weather_condition` starts at 1 and runs to 27). The obvious guess is
+  an off-by-one, and it is left unmapped rather than guessed at.
+
+**`fact_poll_rank` uses `SELECT DISTINCT`, not a ROW_NUMBER pick.** The 150 duplicate keys
+are all 2022, weeks 6 and 8, in the D2/D3/FCS polls — and the duplicate rows are
+byte-identical (same rank, points, first-place votes, conference) from the same dump file.
+The vendor emitted each record twice. There is nothing to choose between, so collapsing them
+loses no information; a ROW_NUMBER would have implied there was a choice. 283 ballots with no
+team name (all 1943–44 AP, wartime) and 291 whose school is outside `dim_team` cannot be
+keyed and are excluded.
+
+It is **not** suffixed: a week's poll is published before that week's games. But the vendor's
+`week`-label convention is *not* verified here — confirm it before using a poll as a pre-game
+feature.
+
+**It is also stale, and that is not a defect of this change.** `stg.poll_rank` comes from the
+hand-pulled GraphQL `pollRank` dump, which is not on the daily refresh path. As of 2026-09-18
+it carries only **2026 week 1** (75 ballots), so the current season is effectively empty —
+a query for a recent AP top 25 returns nothing. Re-pull the dump before using this in-season;
+`scripts/audit_graphql_dump_age.py` measures which dumps have aged.
+
+**`fact_drive_postgame`** is result-informed throughout (drive result, yards, plays, scores),
+so it takes the suffix. `offense_team_id` / `defense_team_id` are LEFT JOINed from school
+names, leaving 727 drives with a NULL id rather than dropping them; the names are kept
+alongside. Indexed on `game_id`, as `fact_poll_rank` is on `(team_id, season)` — these are
+the only `core` tables large enough for a scan to be felt.
+
 
 ## The ratings merge
 
@@ -103,9 +152,10 @@ rule in [duckdb-core-ddl.md](duckdb-core-ddl.md).
   team-season rating sources (PPA splits; EPA and rushing line-yards) and were left out to
   keep this change to the six systems scoped. Adding them is a mechanical extension of
   `_RATING_SOURCES`.
-- **No game-grain facts.** `fact_game_weather` (27,857), `fact_poll_rank` (49,948) and
-  `fact_drive` (371,564) were scoped out of this pass, as was `advanced_game_stats` (63
-  columns of postgame team box score).
+- **No box-score facts.** `advanced_game_stats` (63 columns of postgame team box score),
+  `player_season_stats` (1.4M) and `plays` (2.7M) remain in `stg` only.
+- **`fact_poll_rank`'s week convention is unverified.** See above; it is the one claim in
+  this change that rests on how the vendor labels a week rather than on a measurement.
 - **`fact_team_season_rating_postgame` is not a pre-game feature source.** Every column in it
   is computed from games already played. Using a season's rating to predict that season's
   games is leakage. The pre-game-safe team-season tables are `fact_team_recruiting` and

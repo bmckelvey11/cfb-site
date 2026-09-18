@@ -87,6 +87,7 @@ def test_postgame_suffix_is_reserved_for_wholly_result_informed_tables():
         "fact_team_season_rating_postgame",
         "fact_team_season_record_postgame",
         "fact_team_ats_postgame",
+        "fact_drive_postgame",
     }
     for name in suffixed:
         note = TABLE_NOTES[("core", name)]
@@ -94,6 +95,11 @@ def test_postgame_suffix_is_reserved_for_wholly_result_informed_tables():
     # The pre-game twins must say so, or the distinction lives only in the suffix.
     for name in ("fact_team_recruiting", "fact_team_returning_production"):
         assert "pre-game feature" in TABLE_NOTES[("core", name)], name
+    # And the converse: an unsuffixed fact must not quietly claim to be wholly
+    # result-informed. `fact_game_weather` is the case that tempts it.
+    for (schema, name), note in TABLE_NOTES.items():
+        if schema == "core" and name.startswith("fact_") and name not in suffixed:
+            assert "RESULT-INFORMED throughout" not in note, name
 
 
 def test_the_rating_merge_does_not_anchor_on_one_source():

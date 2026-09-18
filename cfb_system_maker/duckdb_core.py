@@ -87,6 +87,14 @@ def build_core(
         if _build_fact_team_season_rating(con):
             built.append("fact_team_season_rating_postgame")
         built += _build_team_season_facts(con)
+        # Game-grain facts last: fact_poll_rank needs dim_poll_type, and
+        # fact_drive_postgame resolves school names through dim_team.
+        if _build_fact_game_weather(con):
+            built.append("fact_game_weather")
+        if _build_fact_poll_rank(con):
+            built.append("fact_poll_rank")
+        if _build_fact_drive_postgame(con):
+            built.append("fact_drive_postgame")
         _add_phase_1_indexes(con)
         _build_core_views(con)
         built.append("v_game")
@@ -1534,6 +1542,169 @@ def _build_team_season_facts(con: duckdb.DuckDBPyConnection) -> list[str]:
     return built
 
 
+def _build_fact_game_weather(con: duckdb.DuckDBPyConnection) -> bool:
+    """One row per game's weather, merging the GraphQL and REST feeds.
+
+    Same shape as ``_merge_game_lines``: FULL OUTER on the game id, REST wins a
+    conflict, ``_source`` marks which feeds carried the row. Neither side is a
+    superset -- GraphQL has 6,413 games REST lacks, REST has 545 GraphQL lacks --
+    so taking either alone loses real rows.
+
+    Not suffixed ``_postgame``: weather is a condition, not an outcome. But 6,412
+    of these games are 2001-2011 and sit in ``fact_game_historical`` rather than
+    ``fact_game``, which is why the edge to ``fact_game`` is lossy.
+    """
+    gql, rest = _has(con, "stg", "game_weather"), _has(con, "stg", "weather")
+    if not (gql or rest):
+        return False
+    if not gql or not rest:
+        warnings.warn(
+            "only one weather feed present: core.fact_game_weather is single-source",
+            RuntimeWarning,
+        )
+    g = (
+        'SELECT "gameId" AS game_id, temperature, dewpoint, humidity, precipitation,'
+        ' pressure, snowfall, "windSpeed" AS wind_speed,'
+        ' "windDirection" AS wind_direction,'
+        ' "weatherConditionCode" AS weather_condition_code'
+        ' FROM stg.game_weather WHERE "gameId" IS NOT NULL'
+        if gql
+        else "SELECT NULL::BIGINT AS game_id, NULL::DOUBLE AS temperature,"
+        " NULL::DOUBLE AS dewpoint, NULL::DOUBLE AS humidity,"
+        " NULL::DOUBLE AS precipitation, NULL::DOUBLE AS pressure,"
+        " NULL::DOUBLE AS snowfall, NULL::DOUBLE AS wind_speed,"
+        " NULL::DOUBLE AS wind_direction, NULL::BIGINT AS weather_condition_code"
+        " WHERE false"
+    )
+    r = (
+        'SELECT "gameId" AS game_id, temperature, "dewPoint" AS dewpoint, humidity,'
+        ' precipitation, pressure, snowfall, "windSpeed" AS wind_speed,'
+        ' "windDirection" AS wind_direction,'
+        ' "weatherConditionCode" AS weather_condition_code,'
+        ' "gameIndoors" AS game_indoors, "weatherCondition" AS weather_condition'
+        ' FROM stg.weather WHERE "gameId" IS NOT NULL'
+        if rest
+        else "SELECT NULL::BIGINT AS game_id, NULL::DOUBLE AS temperature,"
+        " NULL::DOUBLE AS dewpoint, NULL::DOUBLE AS humidity,"
+        " NULL::DOUBLE AS precipitation, NULL::DOUBLE AS pressure,"
+        " NULL::DOUBLE AS snowfall, NULL::DOUBLE AS wind_speed,"
+        " NULL::DOUBLE AS wind_direction, NULL::BIGINT AS weather_condition_code,"
+        " NULL::BOOLEAN AS game_indoors, NULL::VARCHAR AS weather_condition"
+        " WHERE false"
+    )
+    con.execute("DROP TABLE IF EXISTS core.fact_game_weather")
+    con.execute(
+        f"""
+        CREATE TABLE core.fact_game_weather AS
+        WITH g AS ({g}), r AS ({r})
+        SELECT
+          coalesce(r.game_id, g.game_id) AS game_id,
+          coalesce(r.temperature, g.temperature) AS temperature,
+          coalesce(r.dewpoint, g.dewpoint) AS dewpoint,
+          coalesce(r.humidity, g.humidity) AS humidity,
+          coalesce(r.precipitation, g.precipitation) AS precipitation,
+          coalesce(r.pressure, g.pressure) AS pressure,
+          coalesce(r.snowfall, g.snowfall) AS snowfall,
+          coalesce(r.wind_speed, g.wind_speed) AS wind_speed,
+          coalesce(r.wind_direction, g.wind_direction) AS wind_direction,
+          coalesce(r.weather_condition_code, g.weather_condition_code)
+            AS weather_condition_code,
+          r.weather_condition, r.game_indoors,
+          CASE WHEN r.game_id IS NOT NULL AND g.game_id IS NOT NULL THEN 'both'
+               WHEN r.game_id IS NOT NULL THEN 'rest' ELSE 'gql' END AS _source
+        FROM r FULL OUTER JOIN g ON g.game_id = r.game_id
+        """
+    )
+    con.execute("ALTER TABLE core.fact_game_weather ADD PRIMARY KEY (game_id)")
+    return True
+
+
+def _build_fact_poll_rank(con: duckdb.DuckDBPyConnection) -> bool:
+    """One row per poll ballot: season x week x season_type x poll x team.
+
+    ``SELECT DISTINCT`` rather than a ROW_NUMBER pick, because the 150 duplicate
+    keys (2022 weeks 6 and 8, D2/D3/FCS polls) are byte-identical records from the
+    same dump -- the vendor emitted each twice. There is no information to choose
+    between, so collapsing them loses nothing; a ROW_NUMBER would imply otherwise.
+
+    Rows with no team name (283, all 1943-44 AP ballots) and teams outside
+    ``dim_team`` (291, mostly small-college poll entries) cannot be keyed and are
+    excluded.
+
+    Not suffixed ``_postgame``: a week's poll is published before that week's games.
+    The exact convention of the ``week`` label is the vendor's and is **not**
+    verified here -- confirm it before using a poll as a pre-game feature.
+    """
+    if not (_has(con, "stg", "poll_rank") and _has(con, "core", "dim_poll_type")):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.fact_poll_rank")
+    con.execute(
+        """
+        CREATE TABLE core.fact_poll_rank AS
+        SELECT DISTINCT
+          CAST(p.poll_season AS INTEGER) AS season,
+          CAST(p.poll_week AS INTEGER) AS week,
+          p."poll_seasonType" AS season_type,
+          t.poll_type_id,
+          d.team_id,
+          p.rank,
+          p.points,
+          p."firstPlaceVotes" AS first_place_votes
+        FROM stg.poll_rank p
+        JOIN core.dim_poll_type t ON t.name = p."poll_pollType_name"
+        JOIN core.dim_team d ON d.school = p."team_school"
+        WHERE p.poll_season IS NOT NULL AND p.poll_week IS NOT NULL
+        """
+    )
+    con.execute(
+        "ALTER TABLE core.fact_poll_rank"
+        " ADD PRIMARY KEY (season, week, season_type, poll_type_id, team_id)"
+    )
+    return True
+
+
+def _build_fact_drive_postgame(con: duckdb.DuckDBPyConnection) -> bool:
+    """One row per drive. Result-informed throughout, hence the suffix.
+
+    ``offense_team_id`` / ``defense_team_id`` are resolved from the school names the
+    feed carries and are LEFT JOINed: 21 names sit outside ``dim_team``, so a strict
+    join would drop their drives. The names are kept alongside the ids.
+    """
+    if not _has(con, "stg", "drives"):
+        return False
+    con.execute("DROP TABLE IF EXISTS core.fact_drive_postgame")
+    con.execute(
+        """
+        CREATE TABLE core.fact_drive_postgame AS
+        SELECT
+          s."driveId" AS drive_id, s."gameId" AS game_id,
+          CAST(s.season AS INTEGER) AS season,
+          s."driveNumber" AS drive_number,
+          o.team_id AS offense_team_id, d.team_id AS defense_team_id,
+          s.offense, s.defense,
+          s."isHomeOffense" AS is_home_offense,
+          s."driveResult" AS drive_result, s.scoring, s.plays, s.yards,
+          s."startPeriod" AS start_period, s."endPeriod" AS end_period,
+          s."startYardline" AS start_yardline,
+          s."startYardsToGoal" AS start_yards_to_goal,
+          s."endYardline" AS end_yardline,
+          s."endYardsToGoal" AS end_yards_to_goal,
+          s."startOffenseScore" AS start_offense_score,
+          s."startDefenseScore" AS start_defense_score,
+          s."endOffenseScore" AS end_offense_score,
+          s."endDefenseScore" AS end_defense_score,
+          s."elapsed_minutes" AS elapsed_minutes,
+          s."elapsed_seconds" AS elapsed_seconds
+        FROM stg.drives s
+        LEFT JOIN core.dim_team o ON o.school = s.offense
+        LEFT JOIN core.dim_team d ON d.school = s.defense
+        WHERE s."driveId" IS NOT NULL
+        """
+    )
+    con.execute("ALTER TABLE core.fact_drive_postgame ADD PRIMARY KEY (drive_id)")
+    return True
+
+
 def _add_phase_1_indexes(con: duckdb.DuckDBPyConnection) -> None:
     con.execute(
         """
@@ -1556,6 +1727,18 @@ def _add_phase_1_indexes(con: duckdb.DuckDBPyConnection) -> None:
         ON core.fact_game_team (team_id)
         """
     )
+    # The game-grain facts are the only core tables large enough that a scan to
+    # find one game's rows is felt: 371k drives, 49k poll ballots.
+    if _has(con, "core", "fact_drive_postgame"):
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_fact_drive_game_id"
+            " ON core.fact_drive_postgame (game_id)"
+        )
+    if _has(con, "core", "fact_poll_rank"):
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_fact_poll_rank_team"
+            " ON core.fact_poll_rank (team_id, season)"
+        )
 
 
 def _build_core_views(con: duckdb.DuckDBPyConnection) -> None:

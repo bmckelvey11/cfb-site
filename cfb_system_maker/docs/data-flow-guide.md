@@ -198,6 +198,9 @@ absent:
 | `fact_team_season_rating_postgame` | `stg.sp`, `srs`, `elo`, `fpi`, `ratings`, `core_ratings` | one row per season × team, six systems side by side with `sp_`/`srs_`/`elo_`/`fpi_`/`cr_`/`gql_` prefixes. Union spine, not anchored on `ratings`: that one stops at 2025 and would drop 2026 |
 | `fact_team_season_record_postgame`, `fact_team_ats_postgame` | `stg.records`, `teams_ats` | result-informed; the current season is partial |
 | `fact_team_recruiting`, `fact_team_returning_production` | `stg.recruiting_teams`, `returning_production` | settled before kickoff, so pre-game safe |
+| `fact_game_weather` | `stg.game_weather` + `stg.weather` | FULL OUTER on game id, REST wins; neither feed is a superset. 6,413 rows are 2001-2011 games whose parent is `fact_game_historical`, not `fact_game` |
+| `fact_poll_rank` | `stg.poll_rank` + `dim_poll_type` | `SELECT DISTINCT` -- the 2022 dump emits 150 byte-identical duplicate ballots |
+| `fact_drive_postgame` | `stg.drives` | result-informed; offense/defense ids LEFT JOINed from school names |
 | `v_game` (view) | `fact_game` + `dim_venue` + `dim_week` + `fact_game_line` | the selected spread and total are joined **separately**: their provider keys differ on 2,943 games, so one join gets one market wrong |
 | `meta.table_dictionary`, `meta.relationship` | every table in the file; orphan counts measured at build | written last, so they describe what the build actually left behind |
 

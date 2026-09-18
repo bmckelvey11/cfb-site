@@ -180,6 +180,36 @@ TABLE_NOTES: dict[tuple[str, str], str] = {
         "One row per season x school. team_id is NULL for schools outside "
         "dim_team, so season x team_id is NOT unique."
     ),
+    # -- game-grain facts -----------------------------------------------------
+    ("core", "fact_game_weather"): (
+        "One row per game's weather, merging the GraphQL and REST feeds; _source "
+        "marks gql / rest / both and REST wins a conflict. Neither feed is a "
+        "superset. NOT result-informed -- weather is a condition, not an outcome. "
+        "6,413 of these games are 2001-2011 and live in fact_game_historical, not "
+        "fact_game, which is why that edge is lossy. weather_condition_code 0 "
+        "(7,347 rows) has no row in dim_weather_condition; it is left unmapped "
+        "rather than guessed at."
+    ),
+    ("core", "fact_poll_rank"): (
+        "One row per poll ballot: season x week x season_type x poll_type x team. "
+        "Exact duplicate records in the 2022 dump are collapsed with DISTINCT. "
+        "Ballots with no team name (283, all 1943-44) and teams outside dim_team "
+        "(291, small-college polls) are excluded because they cannot be keyed. "
+        "A week's poll is published before that week's games, but the vendor's "
+        "week-label convention is NOT verified here -- confirm it before using a "
+        "poll as a pre-game feature. STALENESS: this is only as fresh as the "
+        "hand-pulled GraphQL pollRank dump, which is not on the daily refresh "
+        "path. As of 2026-09-18 it stops at 2026 week 1, so the current season is "
+        "nearly empty. Re-pull before using it in-season; see "
+        "scripts/audit_graphql_dump_age.py."
+    ),
+    ("core", "fact_drive_postgame"): (
+        "One row per drive, 2012+. RESULT-INFORMED throughout: drive result, "
+        "yards, plays and scores are all outcomes. offense_team_id and "
+        "defense_team_id are resolved from school names and LEFT JOINed, so 21 "
+        "names outside dim_team leave a NULL id rather than dropping the drive; "
+        "the names are kept alongside."
+    ),
     ("core", "coach_name_conflicts"): "Coaches whose name resolved to more than one id.",
     ("core", "coach_season_unmatched"): (
         "Coach seasons whose school did not resolve to a team."
@@ -318,6 +348,31 @@ _EDGES: tuple[tuple[str, str, str, str, str], ...] = (
     ("fact_team_ats_postgame", "team_id", "dim_team", "team_id", ""),
     ("fact_team_recruiting", "team_id", "dim_team", "team_id", ""),
     ("fact_team_returning_production", "team_id", "dim_team", "team_id", ""),
+    # Game-grain facts.
+    (
+        "fact_game_weather",
+        "game_id",
+        "fact_game",
+        "game_id",
+        "The non-matching games are 2001-2011 and live in fact_game_historical.",
+    ),
+    (
+        "fact_game_weather",
+        "weather_condition_code",
+        "dim_weather_condition",
+        "weather_condition_id",
+        "Code 0 has no row in the vendor's condition table; left unmapped.",
+    ),
+    ("fact_poll_rank", "team_id", "dim_team", "team_id", ""),
+    ("fact_poll_rank", "poll_type_id", "dim_poll_type", "poll_type_id", ""),
+    ("fact_drive_postgame", "game_id", "fact_game", "game_id", ""),
+    (
+        "fact_drive_postgame",
+        "offense_team_id",
+        "dim_team",
+        "team_id",
+        "Schools outside CFBD's team table leave a NULL id, not a dropped drive.",
+    ),
 )
 
 
