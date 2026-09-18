@@ -14,6 +14,7 @@ from ledgers.ingest_bets import (
     REQUIRED_COLS,
     american_payout,
     compute_clv,
+    filter_bet_column,
     implied_prob,
     pick_close,
     settle,
@@ -142,6 +143,17 @@ def test_the_two_teams_are_separate_required_columns():
     """They are read straight from the sheet, so neither may be folded into the other."""
     assert "away" in REQUIRED_COLS and "home" in REQUIRED_COLS
     assert "game" not in REQUIRED_COLS
+
+
+def test_bet_column_keeps_only_yes_rows():
+    df = pd.DataFrame({"bet": ["Y", "n", "yes", "", "1", "no", "TRUE", "true"]})
+    assert filter_bet_column(df).index.tolist() == [0, 2, 4, 6, 7]
+
+
+def test_no_bet_column_means_every_row_counts():
+    """A hand-typed sheet has no `bet` column; presence on the sheet is the bet."""
+    df = pd.DataFrame({"away": ["Alabama", "Georgia"], "home": ["Auburn", "Florida"]})
+    assert len(filter_bet_column(df)) == 2
 
 
 def test_template_header_matches_the_required_columns():

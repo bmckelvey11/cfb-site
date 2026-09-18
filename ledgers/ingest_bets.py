@@ -37,10 +37,15 @@ no line history and therefore no CLV.
 Never writes to your input file. Unmatched rows are reported and carried into the output
 with `match_status`, never dropped.
 
+A sheet may carry an extra `bet` column (Y/N per row) -- `build_slate_sheet.py` writes one
+from the pred-tracker-model's weekly slate. When present, only rows marked y/yes/1/true are
+graded; a hand-typed sheet has no such column, so every row counts, same as always.
+
 Usage:
     python ledgers/ingest_bets.py --init     # create the sheet from the template
     python ledgers/ingest_bets.py --dry-run  # match only, write nothing
     python ledgers/ingest_bets.py
+    python ledgers/build_slate_sheet.py      # generate a fillable sheet from this week's slate
 """
 
 from __future__ import annotations
@@ -70,6 +75,7 @@ MARKETS = {"spread", "total", "moneyline"}
 OVER_UNDER = {"OVER": "over", "UNDER": "under", "O": "over", "U": "under"}
 
 REQUIRED_COLS = ["placed_at", "away", "home", "market", "side", "line", "odds", "stake"]
+BET_YES = {"y", "yes", "1", "true"}
 
 OUT_COLS = [
     "placed_at", "away", "home", "market", "side", "side_role", "line", "odds", "stake",
@@ -252,6 +258,15 @@ def load_games(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     return g
 
 
+def filter_bet_column(bets: pd.DataFrame) -> pd.DataFrame:
+    """A slate sheet's `bet` column keeps only the rows marked y/yes/1/true. A hand-typed
+    sheet has no such column -- every row is a bet by virtue of being on the sheet at all,
+    exactly as before this existed."""
+    if "bet" not in bets.columns:
+        return bets
+    return bets[bets["bet"].astype(str).str.strip().str.lower().isin(BET_YES)]
+
+
 def _num(value) -> float | None:
     if value is None:
         return None
@@ -269,8 +284,11 @@ def build(sheet: Path) -> pd.DataFrame:
             if "game" in bets.columns else ""
         raise SystemExit(f"{sheet} is missing columns: {missing}{extra}")
     bets = bets[(bets["away"].str.strip() != "") & (bets["home"].str.strip() != "")]
+    has_bet_col = "bet" in bets.columns
+    bets = filter_bet_column(bets)
     if bets.empty:
-        raise SystemExit(f"{sheet} has no rows with both teams filled in")
+        reason = "no rows marked `bet`" if has_bet_col else "no rows with both teams filled in"
+        raise SystemExit(f"{sheet} has {reason}")
 
     con = duckdb.connect(str(DB_PATH), read_only=True)
     try:
@@ -486,6 +504,13 @@ def self_check() -> None:
     opener, close, src = pick_close(lines, 1, "total", "over", "SomeLocalBook")
     assert (opener, close) == (54.0, 55.0) and src.startswith("median"), src
     assert pick_close(lines, 2, "spread", "home", "DraftKings") == (None, None, "no line data")
+
+    # A slate sheet's `bet` column filters to yes rows; a hand-typed sheet has none and
+    # every row counts, same as before this feature existed.
+    marked = pd.DataFrame({"bet": ["Y", "n", "yes", "", "1", "no", "TRUE"]})
+    assert filter_bet_column(marked).index.tolist() == [0, 2, 4, 6]
+    untyped = pd.DataFrame({"away": ["Alabama"], "home": ["Auburn"]})
+    assert len(filter_bet_column(untyped)) == 1
 
     print("self-check ok")
 
