@@ -78,8 +78,8 @@ CORE_NOTES = {
     "dim_weather_condition": "Weather condition code and description",
     "dim_stat_category": "Box-score stat category vocabulary",
     "fact_team_season_rating_postgame": (
-        "Season × team: SP+, SRS, Elo, FPI, GraphQL ratings and core_ratings, "
-        "prefixed by source"
+        "Season × team: SP+, SRS, Elo, FPI, GraphQL ratings, core_ratings, PPA "
+        "and adjusted EPA, prefixed by source"
     ),
     "fact_team_season_record_postgame": (
         "Season × team: W/L/T by home, away, neutral, conference, postseason"

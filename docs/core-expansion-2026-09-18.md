@@ -29,7 +29,7 @@ Supersedes nothing. Builds on
 
 | Table | Rows | Span | Pre-game safe? |
 |---|---:|---|---|
-| `fact_team_season_rating_postgame` | 15,383 | 1890–2026 | no |
+| `fact_team_season_rating_postgame` | 15,399 | 1890–2026 | no |
 | `fact_team_season_record_postgame` | 6,454 | 2012–2026 | no |
 | `fact_team_ats_postgame` | 1,750 | 2019–2026 | no |
 | `fact_team_recruiting` | 3,160 | 2012–2026 | yes |
@@ -85,11 +85,18 @@ the only `core` tables large enough for a scan to be felt.
 
 ## The ratings merge
 
-Six rating systems — SP+, SRS, Elo, FPI, the GraphQL `ratings` table, and CFBD's own
-`core_ratings` — collapse into one 67-column row per team-season, each source's columns
-prefixed (`sp_`, `srs_`, `elo_`, `fpi_`, `cr_`, `gql_`). The prefixes are load-bearing: `elo`
-exists in both the REST dump and the GraphQL one, and they are not the same number
-(`elo_elo` vs `gql_elo`).
+Eight rating systems — SP+, SRS, Elo, FPI, the GraphQL `ratings` table, CFBD's own
+`core_ratings`, team PPA (`ppa_teams`) and opponent-adjusted EPA
+(`adjusted_team_season`) — collapse into one 107-column row per team-season, each source's
+columns prefixed (`sp_`, `srs_`, `elo_`, `fpi_`, `cr_`, `gql_`, `ppa_`, `adj_`). The prefixes
+are load-bearing: `elo` exists in both the REST dump and the GraphQL one, and they are not
+the same number (`elo_elo` vs `gql_elo`).
+
+`ppa_teams` and `adjusted_team_season` were added on 2026-09-18 after the first six, by
+appending two rows to `_RATING_SOURCES`; nothing else changed. Both landed without loss
+(1,953/1,953 and 1,848/1,848 joinable rows), and the spine grew by 16 team-seasons that none
+of the original six carried — the union design paying off a second time. `adjusted_team_season`
+stops at 2025, so its columns are NULL for 2026.
 
 **It is built on a union spine, not off a single anchor.** The GraphQL `ratings` table is the
 widest source by far (1890 onward, 14,730 rows) and is the obvious thing to anchor on — but
@@ -101,6 +108,10 @@ would have silently dropped the season currently being bet. Coverage by season:
 | 2024 | 262 | 134 | 134 | 134 | 134 | 262 | 134 |
 | 2025 | 264 | 136 | 136 | 136 | 136 | 264 | 136 |
 | 2026 | 138 | 138 | 138 | 138 | **0** | **0** | **0** |
+
+With all eight sources the table is 15,399 rows. Coverage of the two added systems: `ppa_`
+tracks `sp_` exactly (133/134/136/138 for 2023–26); `adj_` matches through 2025 and is empty
+for 2026.
 
 Columns are read from the catalog at build time rather than spelled out, so a vendor adding a
 field lands in `core` on the next rebuild instead of being dropped without notice.
@@ -148,10 +159,6 @@ rule in [duckdb-core-ddl.md](duckdb-core-ddl.md).
   `hometown` dump ships **no id field at all** — confirmed against `raw.gql_hometown`'s payload
   structure, not just the exploded table. The key is carried on `dim_athlete` and dangles.
   It becomes joinable the moment the vendor ships an id; nothing here works around it.
-- **`ppa_teams` and `adjusted_team_season` are not in the merge.** They are two more
-  team-season rating sources (PPA splits; EPA and rushing line-yards) and were left out to
-  keep this change to the six systems scoped. Adding them is a mechanical extension of
-  `_RATING_SOURCES`.
 - **No box-score facts.** `advanced_game_stats` (63 columns of postgame team box score),
   `player_season_stats` (1.4M) and `plays` (2.7M) remain in `stg` only.
 - **`fact_poll_rank`'s week convention is unverified.** See above; it is the one claim in

@@ -1290,10 +1290,10 @@ def _build_dim_athlete(con: duckdb.DuckDBPyConnection) -> bool:
     return True
 
 
-# The six rating systems the warehouse carries, each in its own `stg` table with its
-# own team key and its own column names. `prefix` keeps them apart once merged --
-# `elo` exists in both the REST dump and the GraphQL one, and `sp`/`fpi` appear as
-# both a rating and a set of component efficiencies.
+# The eight rating systems the warehouse carries, each in its own `stg` table with
+# its own team key and its own column names. `prefix` keeps them apart once merged
+# -- `elo` exists in both the REST dump and the GraphQL one, and `sp`/`fpi` appear
+# as both a rating and a set of component efficiencies.
 _RATING_SOURCES: tuple[tuple[str, str, str, str, str], ...] = (
     # prefix, stg table, season column, team key column, key kind
     ("sp", "sp", "season", "team", "name"),
@@ -1302,6 +1302,8 @@ _RATING_SOURCES: tuple[tuple[str, str, str, str, str], ...] = (
     ("fpi", "fpi", "season", "team", "name"),
     ("cr", "core_ratings", "season", "team", "name"),
     ("gql", "ratings", "year", "teamId", "id"),
+    ("ppa", "ppa_teams", "season", "team", "name"),
+    ("adj", "adjusted_team_season", "season", "teamId", "id"),
 )
 
 # Carried on the spine or redundant with it, so never prefixed onto a source's columns.

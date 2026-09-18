@@ -183,8 +183,11 @@ Do **not** add indexes that duplicate primary keys (`game_id`,
 Suffix a `core` table `_postgame` when **every** column in it is result-informed. A mixed
 table does not get the suffix: `fact_game` carries schedule, venue and teams (pre-game)
 alongside points (not), and correctly has no suffix. Today the suffix is on
-`fact_team_season_rating_postgame`, `fact_team_season_record_postgame` and
-`fact_team_ats_postgame`.
+`fact_team_season_rating_postgame`, `fact_team_season_record_postgame`,
+`fact_team_ats_postgame` and `fact_drive_postgame`.
+
+`fact_game_weather` is the case that tempts the suffix and does not take it: weather is a
+condition, not an outcome.
 
 `_final` is deliberately **not** used. `core_ratings` carries `throughWeek` because it is an
 as-of snapshot; the current season's rows are partial and move on every refresh. Carry the
@@ -198,9 +201,9 @@ Pinned by `tests/test_warehouse_dictionary.py`.
 `fact_team_season_record_postgame`, `fact_team_ats_postgame`, `fact_team_recruiting`,
 `fact_team_returning_production`.
 
-`fact_team_season_rating_postgame` merges six rating systems side by side with per-source
-prefixes (`sp_`, `srs_`, `elo_`, `fpi_`, `cr_`, `gql_`) — `elo` exists in both the REST and
-GraphQL sources and they are different numbers. Built on a **union spine**, not anchored on
+`fact_team_season_rating_postgame` merges eight rating systems side by side with per-source
+prefixes (`sp_`, `srs_`, `elo_`, `fpi_`, `cr_`, `gql_`, `ppa_`, `adj_`) — `elo` exists in both
+the REST and GraphQL sources and they are different numbers. Built on a **union spine**, not anchored on
 one source: GraphQL `ratings` is the widest (1890+) but stops at 2025, while `sp`, `fpi` and
 `core_ratings` carry 2026. Extend it by appending to `_RATING_SOURCES`.
 

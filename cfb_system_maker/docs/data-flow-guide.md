@@ -195,7 +195,7 @@ absent:
 | `fact_game_historical` | GraphQL `stg.game` pre-2012 | |
 | 9 lookup dims (`dim_position`, `dim_play_type`, `dim_draft_position`, `dim_draft_team`, …) | vendor code tables in `stg` | promoted verbatim with a PK; the two draft ones are what `dim_draft_pick.position_id` / `.nfl_team_id` finally join to |
 | `dim_athlete` | `stg.athlete` | `hometown_id` dangles — the GraphQL `hometown` dump ships no id, so there is no `dim_hometown` |
-| `fact_team_season_rating_postgame` | `stg.sp`, `srs`, `elo`, `fpi`, `ratings`, `core_ratings` | one row per season × team, six systems side by side with `sp_`/`srs_`/`elo_`/`fpi_`/`cr_`/`gql_` prefixes. Union spine, not anchored on `ratings`: that one stops at 2025 and would drop 2026 |
+| `fact_team_season_rating_postgame` | `stg.sp`, `srs`, `elo`, `fpi`, `ratings`, `core_ratings`, `ppa_teams`, `adjusted_team_season` | one row per season × team, eight systems side by side with `sp_`/`srs_`/`elo_`/`fpi_`/`cr_`/`gql_`/`ppa_`/`adj_` prefixes. Union spine, not anchored on `ratings`: that one stops at 2025 and would drop 2026 |
 | `fact_team_season_record_postgame`, `fact_team_ats_postgame` | `stg.records`, `teams_ats` | result-informed; the current season is partial |
 | `fact_team_recruiting`, `fact_team_returning_production` | `stg.recruiting_teams`, `returning_production` | settled before kickoff, so pre-game safe |
 | `fact_game_weather` | `stg.game_weather` + `stg.weather` | FULL OUTER on game id, REST wins; neither feed is a superset. 6,413 rows are 2001-2011 games whose parent is `fact_game_historical`, not `fact_game` |

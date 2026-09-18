@@ -114,8 +114,8 @@ TABLE_NOTES: dict[tuple[str, str], str] = {
     # -- team-season facts ----------------------------------------------------
     ("core", "fact_team_season_rating_postgame"): (
         "One row per season x team with every rating system side by side, "
-        "prefixed by source (sp_, srs_, elo_, fpi_, cr_, gql_). RESULT-INFORMED: "
-        "all of these are computed from games already played, so they are not "
+        "prefixed by source (sp_, srs_, elo_, fpi_, cr_, gql_, ppa_, adj_). "
+        "RESULT-INFORMED: all are computed from games already played, so they are not "
         "pre-game features. They are NOT season-end finals either -- "
         "cr_through_week says how far into the season a row reflects, and the "
         "current season's rows move on every refresh. Built on a union spine, not "
