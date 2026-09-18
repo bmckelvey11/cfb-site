@@ -11,6 +11,8 @@ human-facing product intent. None should duplicate another file's rules.
 
 - Any modelling, backtesting, or analysis that might be reproduced gets a reusable script, not a one-off. Write the script as part of the task.
 
+- Scoring models and systems is governed by [`docs/model-evaluation-standard.md`](docs/model-evaluation-standard.md). It binds any new work that reports ROI, CLV, a hit rate, or forecast skill — the totals harness, over-zero, spread research, vendor-pick grading, saved system-maker filters. Report the Tier 1 metrics it names (interval, not just a point estimate; proper score against the same-time de-vigged market; trial count; walk-forward folds), and treat its hard gates as invalidating: leakage, prices not reconstructible at decision time, or a threshold chosen on the test set means the result does not count, however good the ROI. Existing dated docs are records and are not re-scored.
+
 - Every analysis gets written up in a markdown file — not just chat. Lands in the owning unit's `docs/` (`research/spread/docs/`, `models/totals/docs/`, ...), else root `docs/`; name it `<topic>-<YYYY-MM-DD>.md` unless it updates an existing doc. Minimum: the question, the method, the data and date range used, the numbers, and what the result does *not* support. Point at the script that reproduces it. Applies to ad-hoc digging too — if it took real work to find out, the finding is written down.
 
 - Docs lifecycle (`tests/test_docs_index.py` enforces the first point):

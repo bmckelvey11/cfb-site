@@ -1,6 +1,6 @@
 # Methods
 
-How the repo's numbers are computed: the formula, the values plugged in, the assumption each rests on, and the alternative that was rejected. Vocabulary stays in [`CONTEXT.md`](../CONTEXT.md); this file is where a term's `method:` pointer lands. Each entry names the script that implements it. Same rule as the glossary: edit an entry in place rather than adding a second one.
+How the repo's numbers are computed: the formula, the values plugged in, the assumption each rests on, and the alternative that was rejected. Vocabulary stays in [`CONTEXT.md`](../CONTEXT.md); this file is where a term's `method:` pointer lands. Which of these numbers a result is *required* to report, and what invalidates it, is [`model-evaluation-standard.md`](model-evaluation-standard.md). Each entry names the script that implements it. Same rule as the glossary: edit an entry in place rather than adding a second one.
 
 ## Prices and edge
 

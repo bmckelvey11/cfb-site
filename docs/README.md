@@ -15,6 +15,8 @@ Unit-specific docs live in that unit's `docs/`:
 
 Cross-unit reference: [`methods.md`](methods.md) holds the formulas and assumptions behind every record and projection; [`../CONTEXT.md`](../CONTEXT.md) holds the vocabulary and points here.
 
+Governing standard: [`model-evaluation-standard.md`](model-evaluation-standard.md) sets how any model, system, or filter is scored — which metrics are mandatory, and what invalidates a result regardless of ROI.
+
 The warehouse/ingest cluster below is **correctly** at root: 33 files under `scripts/`,
 `cfb_system_maker/`, and `tests/` cite a doc that lives here, 16 of them the warehouse
 cluster specifically, and these docs describe the shared `cfb.duckdb` warehouse rather
@@ -100,6 +102,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | Doc | What it answers |
 | --- | --- |
 | [bet-history-analysis-2023-2025.md](bet-history-analysis-2023-2025.md) | The 2023–2025 personal bet history |
+| [model-evaluation-standard.md](model-evaluation-standard.md) | How is a model, system, or filter scored, and what invalidates the result? |
 | [clv-analysis.md](clv-analysis.md) | Do you beat the closing line? |
 | [value-sources-beyond-the-close.md](value-sources-beyond-the-close.md) | Value other than beating the close |
 | [under-bets-analysis.md](under-bets-analysis.md) | NCAAF unders — full analysis |
