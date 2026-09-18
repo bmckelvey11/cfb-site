@@ -112,6 +112,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [wind-orientation-totals.md](wind-orientation-totals.md) | Crosswind vs head/tail wind and scoring |
 | [ppa-opponent-adjusted-ratings-2026-09-16.md](ppa-opponent-adjusted-ratings-2026-09-16.md) | Opponent-adjusted team PPA ratings early in the season (mixed-effects, v1.0) |
 | [total-points-distribution-2026-09-17.md](total-points-distribution-2026-09-17.md) | How combined game totals are distributed and which exact totals spike (55, 41, 44); scoring is down ~5.7 pts since 2016 |
+| [scoring-margin-distribution-2026-09-18.md](scoring-margin-distribution-2026-09-18.md) | How scoring margins are distributed; 3 and 7 take 18.5% of games between them; home-field advantage is flat at +4, not trending |
 | [scoring-by-minute-2026-09-18.md](scoring-by-minute-2026-09-18.md) | When points land inside a quarter, unconditional and split by game state and spread; Q2 min 15 is 3.17 pts/game-minute and Q4 min 15 ranges 0.37 (leading) to 3.00 (trailing) |
 
 > **Caution on the unders docs:** per project memory, the 2023-25 `history.csv` unders are
