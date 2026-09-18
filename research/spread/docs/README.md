@@ -62,6 +62,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `phwin-moneyline-2026-09-17.md` | review | EXPLORATORY: phwin priced against real moneylines, 2021-25. Loses; the spread control arm is unresolved, not an edge. |
 | `panel-vs-line-2026-09-17.md` | review | EXPLORATORY: what the ~140 `line*` columns are. None of 141 beats the closing line, and deviation from it correlates +0.97 with error. |
 | `panel-ats-2026-09-17.md` | review | EXPLORATORY: the bettability test the RMSE study could not do. 2 of 330 testable cells clear break-even; `linecrunch` clears it while losing on RMSE. |
+| `line-movement-distribution-2026-09-18.md` | results | DESCRIPTIVE: how far the spread actually travels open→close (Bovada, 2021-25, n=3,932). 14.24% never move; the market moves onto 3 and 7 (+1.22 pp each) but only 7 is sticky; no stable drift. Forecasts nothing — that is `line-movement-results.md`. |
 | `review-2026-09-02-composite-spread.md` | dated record | The pivot from margin to movement; §5–6 set the direction. Cites archived files. |
 | `session-guide-2026-09-02.md` | dated record | Narrative of the 2026-09-02 session. Paths and numbers are as of that day; see its banner. |
 
@@ -87,6 +88,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_model_columns_ats.py` | `model-columns-ats-2026-09-17.md` | `processed/model_columns_ats.json` |
 | `edge_vs_market_move.py` | `actionable-picks-2026-09-17.md` § 0: regresses the served `edge` on the move since the opener | stdout |
 | `version_b_ceiling.py` | `line-movement-results.md` § version B read of 2026-09-17: E\|close − anchor\| (the CLV ceiling) and each week's anchor ET weekday | stdout |
+| `analyze_line_movement_distribution.py` [`--start`] [`--end`] [`--book`] | `line-movement-distribution-2026-09-18.md` | `research/spread/docs/img/line-movement-distribution.png`, `research/spread/docs/data/line-movement-frequency.csv` |
 
 Estimator core, imported by all of the above and not run on its own for live work:
 `eval_prediction_tracker_models.py` (loader, `MARKET_LINES`, prior skill, wild cluster
