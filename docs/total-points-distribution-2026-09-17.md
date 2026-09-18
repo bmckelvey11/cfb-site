@@ -68,16 +68,16 @@ establish.
 
 Exceedance, for sizing a line:
 
-| Line | P(total > line) | P(total ≤ line) |
-| --- | --- | --- |
-| 40 | 79.79% | 20.21% |
-| 45 | 68.89% | 31.11% |
-| 50 | 59.33% | 40.67% |
-| 55 | 46.86% | 53.14% |
-| 60 | 37.00% | 63.01% |
+| Line | P(total > line) |
+| --- | --- |
+| 40 | 79.79% |
+| 45 | 68.89% |
+| 50 | 59.33% |
+| 55 | 46.86% |
+| 60 | 37.00% |
 
-The chart's lower panel plots the cumulative curve, `P(total ≤ x)`, with these five lines marked
-— so a value read off the chart is the complement of the exceedance column, not the same number.
+The chart's lower panel is this table plotted: the curve is `P(total > x)` with these five lines
+marked, so a value read off the chart is the same number the table gives.
 
 ## Scoring is drifting down
 

@@ -192,16 +192,18 @@ ax.set_title(
 ax.grid(axis="y", alpha=0.25, lw=0.6)
 ax.set_axisbelow(True)
 
-# Cumulative panel. Reported as P(total <= x); the exceedance figures printed
-# above are the complement, so 55 reads 53.1% here and 46.9% there.
-ax2.step(values, cum, where="mid", color="#1f3a5f", lw=1.8)
+# Cumulative panel, drawn from the tail as P(total > x) so it is the exceedance
+# table plotted rather than its complement -- a reader moving between the two
+# should not have to subtract from 100.
+surv = 100.0 - cum
+ax2.step(values, surv, where="mid", color="#1f3a5f", lw=1.8)
 for k in (40, 45, 50, 55, 60):
     # `values` starts at `lo`, not 0 -- index by offset, not by the total itself.
     j = k - lo
-    ax2.plot([k], [cum[j]], "o", color=HILITE, ms=5, zorder=4)
+    ax2.plot([k], [surv[j]], "o", color=HILITE, ms=5, zorder=4)
     ax2.annotate(
-        f"{cum[j]:.1f}%",
-        xy=(k, cum[j]),
+        f"{surv[j]:.1f}%",
+        xy=(k, surv[j]),
         xytext=(4, -11),
         textcoords="offset points",
         fontsize=8.5,
@@ -210,7 +212,7 @@ for k in (40, 45, 50, 55, 60):
     )
 ax2.set_ylim(0, 100)
 ax2.set_yticks([0, 25, 50, 75, 100])
-ax2.set_ylabel("P(total ≤ x)")
+ax2.set_ylabel("P(total > x)")
 ax2.set_xlabel("Combined points scored (1-point bins)")
 ax2.set_xlim(lo - 1, args.xmax)
 ax2.set_xticks(np.arange(0, args.xmax + 1, 5))
