@@ -129,15 +129,18 @@ for s in sorted(df["season"].unique()):
 
 csv_path = OUT.parent / "data" / "total-points-frequency.csv"
 csv_path.parent.mkdir(parents=True, exist_ok=True)
+cum = np.cumsum(counts) / n * 100.0
 with csv_path.open("w", encoding="utf-8") as fh:
-    fh.write("total_points,games,pct\n")
-    for v, c, p in zip(values, counts, pct):
-        fh.write(f"{v},{c},{p:.4f}\n")
+    fh.write("total_points,games,pct,cumulative_pct\n")
+    for v, c, p, cu in zip(values, counts, pct, cum):
+        fh.write(f"{v},{c},{p:.4f},{cu:.4f}\n")
 print(f"\nwrote {csv_path.relative_to(REPO)}")
 
 # ---- chart -----------------------------------------------------------------
 BASE, HILITE = "#9fb3c8", "#c0392b"
-fig, ax = plt.subplots(figsize=(13, 6.5), dpi=140)
+fig, (ax, ax2) = plt.subplots(
+    2, 1, figsize=(13, 8), dpi=140, sharex=True, gridspec_kw={"height_ratios": [2.4, 1]}
+)
 
 colors = [HILITE if v in top_values else BASE for v in values]
 ax.bar(values, counts, width=1.0, color=colors, edgecolor="white", linewidth=0.25)
@@ -179,10 +182,7 @@ ax.text(
     bbox=dict(boxstyle="round,pad=0.5", fc="#f4f7fa", ec="#cbd6e2", lw=0.8),
 )
 
-ax.set_xlim(lo - 1, args.xmax)
 ax.set_ylim(0, ymax * 1.22)
-ax.set_xticks(np.arange(0, args.xmax + 1, 5))
-ax.set_xlabel("Combined points scored (1-point bins)")
 ax.set_ylabel("Games")
 ax.set_title(
     f"FBS combined game totals, {args.start}-{args.end}  (n={n:,})\n"
@@ -191,8 +191,35 @@ ax.set_title(
 )
 ax.grid(axis="y", alpha=0.25, lw=0.6)
 ax.set_axisbelow(True)
-for side in ("top", "right"):
-    ax.spines[side].set_visible(False)
+
+# Cumulative panel. Reported as P(total <= x); the exceedance figures printed
+# above are the complement, so 55 reads 53.1% here and 46.9% there.
+ax2.step(values, cum, where="mid", color="#1f3a5f", lw=1.8)
+for k in (40, 45, 50, 55, 60):
+    # `values` starts at `lo`, not 0 -- index by offset, not by the total itself.
+    j = k - lo
+    ax2.plot([k], [cum[j]], "o", color=HILITE, ms=5, zorder=4)
+    ax2.annotate(
+        f"{cum[j]:.1f}%",
+        xy=(k, cum[j]),
+        xytext=(4, -11),
+        textcoords="offset points",
+        fontsize=8.5,
+        color=HILITE,
+        fontweight="bold",
+    )
+ax2.set_ylim(0, 100)
+ax2.set_yticks([0, 25, 50, 75, 100])
+ax2.set_ylabel("P(total ≤ x)")
+ax2.set_xlabel("Combined points scored (1-point bins)")
+ax2.set_xlim(lo - 1, args.xmax)
+ax2.set_xticks(np.arange(0, args.xmax + 1, 5))
+ax2.grid(axis="y", alpha=0.25, lw=0.6)
+ax2.set_axisbelow(True)
+
+for a in (ax, ax2):
+    for side in ("top", "right"):
+        a.spines[side].set_visible(False)
 
 fig.tight_layout()
 png = OUT / "total-points-distribution.png"

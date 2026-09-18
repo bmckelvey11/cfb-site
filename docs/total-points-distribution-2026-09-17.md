@@ -68,13 +68,16 @@ establish.
 
 Exceedance, for sizing a line:
 
-| Line | P(total > line) |
-| --- | --- |
-| 40 | 79.79% |
-| 45 | 68.89% |
-| 50 | 59.33% |
-| 55 | 46.86% |
-| 60 | 37.00% |
+| Line | P(total > line) | P(total ≤ line) |
+| --- | --- | --- |
+| 40 | 79.79% | 20.21% |
+| 45 | 68.89% | 31.11% |
+| 50 | 59.33% | 40.67% |
+| 55 | 46.86% | 53.14% |
+| 60 | 37.00% | 63.01% |
+
+The chart's lower panel plots the cumulative curve, `P(total ≤ x)`, with these five lines marked
+— so a value read off the chart is the complement of the exceedance column, not the same number.
 
 ## Scoring is drifting down
 
@@ -126,6 +129,6 @@ python scripts/analyze_total_points_distribution.py --start 2014 --end 2025
 ```
 
 Writes `docs/img/total-points-distribution.png` (committed) and the full per-integer
-frequency table to `docs/data/total-points-frequency.csv` (generated on each run, not
+frequency and cumulative table to `docs/data/total-points-frequency.csv` (generated on each run, not
 committed — `docs/data/` is covered by the repo's `data/` ignore rule). Prints every number
 quoted above.
