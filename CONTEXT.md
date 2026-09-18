@@ -31,7 +31,7 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Book fair** — median closing spread across real sportsbooks (Action Network ids 49 Caesars, 68 DraftKings, 69 FanDuel, 71 BetRivers, 75 BetMGM; names per AN's own book list, corrected 2026-09-08). Not "composite".
 - **Cover margin** — bet team's score plus the line taken, minus the opponent's score. Positive = covered by that much; negative = missed by that much. Defined for spread bets only.
 - **Hook loss** — a spread bet with cover margin of exactly −0.5: lost by the half point.
-- **Key number** — a spread line on or adjacent to 3 or 7 (2.5–3.5, 6.5–7.5), where CFB final-margin mass concentrates and books shade hardest. In the scoring-distribution work the same phrase is used for a *frequent outcome* rather than a pivotal line — a combined total (55, 41, 44) or an exact margin (3, 7) that stands above its neighbours. Say which sense is meant when both are in play.
+- **Key number** — a spread line on or adjacent to 3 or 7 (2.5–3.5, 6.5–7.5), where NFL/CFB final-margin mass concentrates and books shade hardest. In the scoring-distribution work the same phrase is used for a *frequent outcome* rather than a pivotal line — a combined total (55, 41, 44) or an exact margin (3, 7) that stands above its neighbors. Say which sense is meant when both are in play.
 - **Betting day** — the ET calendar date of kickoff (a 1am UTC kickoff belongs to the previous ET evening).
 
 ## Greenline evaluation
@@ -82,16 +82,14 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 
 ## Scoring distribution
 
-Where points land inside a game, and which games and teams put them there. Descriptive of realised scores; nothing in this section is joined to a price.
-
 - **Minute of quarter** — 1 through 15, where minute 1 is 15:00–14:01 on the game clock. Scoring-by-minute tables are indexed this way, not by game minute 1–60.
-- **Game-minute cell** — the exposure unit for a conditional scoring rate: one (game, quarter, minute). Every game contributes all 60 of its regulation minutes, including the roughly a third that contain no snap, and each cell carries one bucket label read at its first play. Points per game-minute cell is comparable across buckets and against the unconditional 0.942. (method: `docs/methods.md`)
+- **Game-minute cell** — the unit a conditional scoring rate is measured per: one (game, quarter, minute). Every game contributes all 60 of its regulation minutes, including the roughly one third that contain no snap, and each cell carries one bucket label read at its first play. Points per game-minute cell is comparable across buckets and against the unconditional 0.942. (method: `docs/methods.md`)
   _Avoid_: exposure (that word means weekend stake)
-- **Share of own points** — a bucket's points in a quarter or half over all its own points, pooled across the bucket rather than averaged game by game. Separates *where* a team scores from *how much*. (method: `docs/methods.md`)
-- **Front-loaded / back-loaded** — a team type whose first-half share sits above / below the 52.06% all-team figure. Shape only: a back-loaded weak offence still scores fewer fourth-quarter points than a front-loaded strong one, because the share is of a smaller pile.
-- **Exceedance** — the share of games finishing above a line; a distribution read from the tail instead of the peak. Realised scores only, never an over/under hit rate against a market.
-- **Neighbour lift** — how far an exact total or margin stands above the same-parity values around it. The test that separates a real spike from a bin that is merely near the middle of the bell. (method: `docs/methods.md`)
-- **Prior-season bucket** — a team-type label (tempo, SP+ offence quartile) read from season − 1, so the label is never built from the games being measured, with quartile cuts recomputed each season. Stale by construction — a team that changed coordinator carries last year's label — which biases every effect toward zero. (method: `docs/methods.md`)
+- **Share of own points** — a bucket's points in a quarter or half over all its own points, pooled across the bucket rather than averaged game by game. Separates _where_ a team scores from _how much_. (method: `docs/methods.md`)
+- **Front-loaded / back-loaded** — a team type whose first-half share sits above / below the 52.06% all-team figure. Shape only: a back-loaded weak offense still scores fewer fourth-quarter points than a front-loaded strong one, because the share is of a smaller pile.
+- **Exceedance** — the share of games finishing above a line; a scoring distribution read from the tail instead of the peak. Realized scores only, never an over/under hit rate against a market.
+- **Neighbor lift** — how far an exact total or margin stands above the same-parity values around it. Separates a real spike from a bin that is merely near the middle of the bell. (method: `docs/methods.md`)
+- **Prior-season bucket** — a team-type label (tempo, SP+ offense quartile) read from season − 1, so the label is never built from the games being measured, with quartile cuts recomputed each season. Stale by construction — a team that changed coordinator carries last year's label — which biases every effect toward zero. (method: `docs/methods.md`)
 
 ## Model and system evaluation
 
