@@ -311,6 +311,8 @@ function render() {
 
   if (!MIDDLE_TABLE) return fail('Probability table not built. Run <code>python -m models.totals.build_middle_table</code>.');
   if (expRem < 0) return fail('The live total is below the points already scored. Check the inputs.');
+  // `min`/`max` on a number input only bind the spinner, so a typed value still needs checking.
+  if (!(minRem >= 0 && minRem <= 60)) return fail('Minutes remaining must be between 0 and 60. Overtime counts as 0.');
 
   const windowOpen = (bet.preSide === 'over' && bet.liveNum > bet.preNum)
                   || (bet.preSide === 'under' && bet.liveNum < bet.preNum);
