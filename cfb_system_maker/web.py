@@ -23,7 +23,7 @@ from cfb_system_maker.backtest import (
     sign_consistency,
     split_holdout,
 )
-from cfb_system_maker.describe import describe, group_is_renderable
+from cfb_system_maker.describe import PERSPECTIVE_PREFIX, describe, group_is_renderable
 from cfb_system_maker.enrich import (
     load_features,
     load_features_from,
@@ -48,6 +48,7 @@ from cfb_system_maker.storage import (
     EXAMPLES_DIR,
     list_examples,
     list_systems,
+    list_versions,
     load_example_system,
     load_processed_games,
     load_saved_system,
@@ -55,7 +56,9 @@ from cfb_system_maker.storage import (
     load_system,
     load_upcoming_games,
     load_upcoming_meta,
+    next_version_name,
     save_system,
+    version_family,
 )
 
 _REMOVE_PARAM_MAP: dict[str, tuple[str, ...]] = {
@@ -567,6 +570,7 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
                 feature_options=[],
                 features_enabled=False,
                 saved_systems=[],
+                version_names=[],
                 load_error=None,
                 parse_warning=False,
                 loaded_system="",
@@ -615,6 +619,7 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
             features_enabled=feature_map is not None,
             stale_registry=stale_registry,
             saved_systems=list_systems(app.config["DATA_DIR"]),
+            version_names=list_versions(str(form.get("save_name", "")), app.config["DATA_DIR"]),
             result=result,
             bets=result.bet_details[:250],
             chart=_range_chart(result),
@@ -643,6 +648,33 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
             args.setlist("save_error", ["invalid_name"])
             return redirect("/system?" + urlencode(list(args.items(multi=True))))
         return redirect(url_for("index", **{"load_system": name}))
+
+    @app.post("/save-version")
+    def save_version():
+        """Save the editor's current filters as the next version of a family.
+
+        Versions are the same saved systems under a ``-vN`` name, so nothing
+        downstream (load, compare, dashboard, delete) needs to know about them.
+        """
+        form = _form_values_from_post()
+        name = str(form.get("save_name", "")).strip()
+        args = _query_args_from_form(form)
+        if not name:
+            args.setlist("save_error", ["missing_name"])
+            return redirect("/system?" + urlencode(list(args.items(multi=True))))
+        try:
+            base, _ = version_family(slugify_system_name(name))
+            version_name = next_version_name(base, list_systems(app.config["DATA_DIR"]))
+            save_system(
+                version_name,
+                _system_from_form(form),
+                app.config["DATA_DIR"],
+                theory=form.get("theory", ""),
+            )
+        except ValueError:
+            args.setlist("save_error", ["invalid_name"])
+            return redirect("/system?" + urlencode(list(args.items(multi=True))))
+        return redirect(url_for("index", **{"load_system": version_name}))
 
     @app.post("/systems/<name>/delete")
     def delete_saved_system(name: str):
@@ -676,6 +708,7 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
                 "compare.html",
                 error="missing_data",
                 rows=[],
+                differences={"differing": [], "shared": []},
                 selected=[],
                 saved_systems=[],
                 saved_system_meta={},
@@ -684,6 +717,9 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
             )
 
         selected = request.args.getlist("system")
+        family = request.args.get("family", "")
+        if not selected and family:
+            selected = list_versions(family, app.config["DATA_DIR"])
         holdout_seasons = _int_set(",".join(request.args.getlist("holdout_season")))
         available_seasons = {game.season for game in games}
         rows = []
@@ -731,6 +767,7 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
             "compare.html",
             error=None,
             rows=rows,
+            differences=_compare_differences(rows),
             selected=selected,
             saved_systems=system_names,
             saved_system_meta=saved_system_meta,
@@ -1741,6 +1778,54 @@ def _normalize_timeframe(raw: str, seasons: list[int]) -> str:
         if candidate in seasons:
             return str(candidate)
     return "all"
+
+
+def _humanize_sentence_key(key: str) -> str:
+    """Row label for the compare diff -- the sentence itself carries the detail.
+
+    Feature keys resolve through the registry so the column reads "Conference
+    Game" rather than the raw vendor spelling ``conferenceGame``.
+    """
+    if not key.startswith("ff:"):
+        # Sentence case, so core filters sit beside registry labels without
+        # reading as a different column.
+        spaced = key.replace("_", " ")
+        return spaced[:1].upper() + spaced[1:]
+    feature_key, _, perspective = key.removeprefix("ff:").partition("@")
+    feature = FEATURE_BY_KEY.get(feature_key)
+    label = feature.label if feature else feature_key
+    if not perspective:
+        return label
+    # Same wording and separator the stat-row launcher buttons use, and labels
+    # already ending in "(pregame)" must not pick up a second parenthetical.
+    side = PERSPECTIVE_PREFIX.get(perspective, perspective.replace("_", " "))
+    return f"{label} \u2014 {side}"
+
+
+def _compare_differences(rows: list[dict[str, object]]) -> dict[str, list[object]]:
+    """Split the compared systems' filters into what differs and what is shared.
+
+    Comparing versions of one system is "what did I change, and did it help?" --
+    the metrics table answers the second half only. Keyed on ``describe``'s
+    sentence keys, which are already unique per system.
+    """
+    per_row = []
+    for row in rows:
+        sentences = describe(row["system"])
+        per_row.append({str(s["key"]): str(s["text"]) for s in sentences})
+    keys = list(dict.fromkeys(key for texts in per_row for key in texts))
+    differing = []
+    shared = []
+    for key in keys:
+        values = [texts.get(key, "") for texts in per_row]
+        if len(set(values)) == 1:
+            shared.append(values[0])
+        else:
+            differing.append({
+                "label": _humanize_sentence_key(key),
+                "cells": [value or "\u2014" for value in values],
+            })
+    return {"differing": differing, "shared": shared}
 
 
 def _saved_systems_newest_first(data_dir: Path) -> list[SavedSystem]:

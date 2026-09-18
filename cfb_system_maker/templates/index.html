@@ -380,6 +380,7 @@
               <input name="save_name" value="{{ form.save_name }}" placeholder="my-system">
             </label>
             <button type="submit" formaction="{{ url_for('save') }}" formmethod="post">Save system</button>
+            <button type="submit" formaction="{{ url_for('save_version') }}" formmethod="post">Save as new version</button>
           </div>
         </form>
 
@@ -398,6 +399,9 @@
           <p class="no-saved-systems">No saved systems yet. Configure filters and click Save system.</p>
           {% endif %}
           <p class="compare-link"><a href="{{ url_for('compare') }}">Compare saved systems &rarr;</a></p>
+          {% if version_names|length > 1 %}
+          <p class="compare-link"><a href="{{ url_for('compare', family=version_names[0]) }}">Compare {{ version_names|length }} versions &rarr;</a></p>
+          {% endif %}
         </section>
       </aside>
 

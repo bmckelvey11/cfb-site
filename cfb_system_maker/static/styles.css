@@ -152,6 +152,10 @@ tbody tr:hover{background:var(--ink-50)}
 .compare-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-2);align-items:end;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4)}
 .compare-picker .check{margin-top:0}
 .compare-picker>label{display:grid;gap:5px}
+.compare-subhead{margin:0 0 var(--space-2);font-family:var(--font-body);font-size:var(--text-sm);font-weight:var(--weight-semibold)}
+.compare-shared,.compare-warning{color:var(--muted);font-size:var(--text-xs);line-height:var(--leading-normal)}
+.compare-shared ul{margin:var(--space-1) 0 0;padding-left:var(--space-4)}
+.compare-warning{color:var(--color-warning)}
 
 /* ── Charts ─────────────────────────────────────────── */
 .chart-card{display:grid;gap:var(--space-2)}

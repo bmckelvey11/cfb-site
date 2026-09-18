@@ -44,6 +44,52 @@ def slugify_system_name(name: str) -> str:
     return _safe_system_name(slug)
 
 
+_VERSION_RE = re.compile(r"^(?P<base>.+?)-v(?P<n>\d+)$")
+
+
+def version_family(name: str) -> tuple[str, int]:
+    """Split a system name into its family base and version number.
+
+    Versions are a naming convention, not a new file format: ``x`` is v1 of
+    family ``x`` and ``x-v2`` is its second version. A bare name with digits in
+    it (``week-3-unders``) is its own family.
+    """
+    match = _VERSION_RE.match(name)
+    if not match:
+        return name, 1
+    return match.group("base"), int(match.group("n"))
+
+
+def next_version_name(base: str, existing_names: list[str]) -> str:
+    """Name for the next version of ``base``, given the names already saved.
+
+    Takes the name list rather than a data dir so it stays testable, and counts
+    from the highest version present so a deleted middle version is not reused.
+    """
+    base, _ = version_family(base)
+    highest = max(
+        (version for family, version in map(version_family, existing_names) if family == base),
+        default=0,
+    )
+    return f"{base}-v{highest + 1}"
+
+
+def list_versions(base: str, data_dir: str | Path) -> list[str]:
+    """Every saved version of one family, oldest first.
+
+    Sorted on the parsed version number -- ``list_systems`` sorts lexically,
+    which would put ``-v10`` before ``-v2``.
+    """
+    base, _ = version_family(base)
+    members = [
+        (version, name)
+        for name in list_systems(data_dir)
+        for family, version in [version_family(name)]
+        if family == base
+    ]
+    return [name for _, name in sorted(members)]
+
+
 def delete_system(name: str, data_dir: str | Path) -> bool:
     """Remove a saved system. Returns False when it was already gone."""
     path = Path(data_dir) / "systems" / f"{_safe_system_name(name)}.json"

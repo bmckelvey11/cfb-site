@@ -5,7 +5,7 @@ from collections import OrderedDict
 from cfb_system_maker.features import FEATURE_BY_KEY, format_kickoff_hour
 from cfb_system_maker.models import FeatureFilter, SystemFilter
 
-_PERSPECTIVE_PREFIX: dict[str, str] = {
+PERSPECTIVE_PREFIX: dict[str, str] = {
     "home": "Home",
     "away": "Away",
     "bet_side": "Bet-side",
@@ -89,8 +89,8 @@ def _feature_group_sentence(filts: list[FeatureFilter]) -> dict[str, object] | N
     if feature.team_scoped and perspective != "single":
         sentence_key = f"ff:{key}@{perspective}"
 
-    if feature.team_scoped and perspective in _PERSPECTIVE_PREFIX:
-        label = f"{_PERSPECTIVE_PREFIX[perspective]} {feature.label}"
+    if feature.team_scoped and perspective in PERSPECTIVE_PREFIX:
+        label = f"{PERSPECTIVE_PREFIX[perspective]} {feature.label}"
     else:
         label = feature.label
 

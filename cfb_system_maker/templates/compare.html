@@ -49,6 +49,38 @@
             {% endif %}
           </form>
 
+          {% if rows|length > 1 and differences.differing and not holdout_seasons %}
+            <p class="compare-warning">In-sample only. Pick a holdout season before ranking versions on ROI.</p>
+          {% endif %}
+
+          {% if rows|length > 1 %}
+          <section class="table-wrap">
+            <h2 class="compare-subhead">What differs</h2>
+            <table class="compare-table">
+              <thead>
+                <tr><th>Filter</th>{% for row in rows %}<th>{{ row.name }}</th>{% endfor %}</tr>
+              </thead>
+              <tbody>
+                {% for diff in differences.differing %}
+                  <tr><td>{{ diff.label }}</td>{% for value in diff.cells %}<td>{{ value }}</td>{% endfor %}</tr>
+                {% else %}
+                  <tr><td colspan="{{ rows|length + 1 }}">Identical filters.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% if differences.shared %}
+              {# <details> keeps the shared filters out of the way while staying
+                 find-in-page searchable -- a JS toggle would hide them from Ctrl+F. #}
+              <details class="compare-shared">
+                <summary>Same in all ({{ differences.shared|length }})</summary>
+                <ul>
+                  {% for text in differences.shared %}<li>{{ text }}</li>{% endfor %}
+                </ul>
+              </details>
+            {% endif %}
+          </section>
+          {% endif %}
+
           {% if rows %}
           <section class="table-wrap">
             <table class="compare-table">
