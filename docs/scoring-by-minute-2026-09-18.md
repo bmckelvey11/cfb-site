@@ -117,34 +117,59 @@ as the Q2 two-minute drill — while a leading offense is at 0.37 to 0.51.
 Every state spikes. Nobody kneels out the first half, so the two-minute drill is
 close to state-independent — a 2.60-3.70 band against a 0.37-3.00 band in Q4.
 
-## Pooled pts / game-minute, by state and quarter
+## Pts / game-minute, by state and quarter
 
 | state | Q1 | Q2 | Q3 | Q4 |
 | --- | --- | --- | --- | --- |
-| offense up 15+ | 1.38 | 1.65 | 1.07 | 0.87 |
-| offense up 4-14 | 1.07 | 1.23 | 0.90 | 0.90 |
-| within 3 | 0.99 | 1.09 | 0.82 | 0.96 |
-| offense down 4-14 | 0.86 | 1.05 | 0.80 | 1.18 |
-| offense down 15+ | 0.71 | 1.01 | 0.78 | 0.90 |
+| offense up 15+ | 1.379 | 1.645 | 1.071 | 0.866 |
+| offense up 4-14 | 1.071 | 1.229 | 0.898 | 0.895 |
+| within 3 | 0.985 | 1.089 | 0.818 | 0.958 |
+| offense down 4-14 | 0.858 | 1.045 | 0.795 | 1.180 |
+| offense down 15+ | 0.714 | 1.013 | 0.776 | 0.901 |
 
-The ordering inverts across the game. Early, the offense that is already ahead
-scores fastest (1.38 in Q1 vs 0.71 for a team down 15+). By Q4 it reverses:
-trailing by 4-14 is the top bucket (1.18) and leading buckets fall to ~0.87-0.90.
+Exposure cells behind each figure:
 
-## Spread does much less work
-
-| bucket | pooled | Q4 min 8-12 | Q4 min 15 | cells |
+| state | Q1 | Q2 | Q3 | Q4 |
 | --- | --- | --- | --- | --- |
-| spread 0-3 | 0.925 | 0.92 | 1.50 | 115,620 |
-| spread 3.5-7 | 0.913 | 0.87 | 1.34 | 157,620 |
-| spread 7.5-14 | 0.935 | 0.88 | 1.28 | 175,800 |
-| spread 14.5+ | 0.972 | 0.83 | 1.00 | 241,560 |
+| offense up 15+ | 917 | 14,112 | 32,310 | 44,253 |
+| offense up 4-14 | 26,084 | 49,020 | 40,984 | 35,070 |
+| within 3 | 80,644 | 47,959 | 32,193 | 27,232 |
+| offense down 4-14 | 35,665 | 52,554 | 41,015 | 32,931 |
+| offense down 15+ | 1,680 | 16,397 | 33,573 | 40,589 |
+
+The ordering inverts across the game. Early, the offense already ahead scores
+fastest (1.379 in Q1 vs 0.714 for a team down 15+). By Q4 it reverses: trailing
+by 4-14 is the top bucket (1.180) and every leading bucket falls to 0.866-0.895.
+
+Read the Q1 row for the extreme buckets with care: only 917 cells are "offense
+up 15+" in Q1 and 1,680 are "down 15+", because it takes most of a quarter to
+build a three-score lead. The Q1 spread of 1.379 vs 0.714 rests on those thin
+cells and is largely a game-total confound, not an effect of leading.
+
+## Spread by quarter: the effect flips sign
+
+| bucket | pooled | Q1 | Q2 | Q3 | Q4 | cells/quarter |
+| --- | --- | --- | --- | --- | --- | --- |
+| spread 0-3 | 0.925 | 0.751 | 1.110 | 0.832 | **1.008** | 28,905 |
+| spread 3.5-7 | 0.913 | 0.744 | 1.108 | 0.831 | 0.971 | 39,405 |
+| spread 7.5-14 | 0.935 | 0.771 | 1.140 | 0.859 | 0.969 | 43,950 |
+| spread 14.5+ | 0.972 | **0.867** | **1.203** | **0.916** | 0.902 | 60,390 |
 
 Pooled, the four spread buckets span 0.913-0.972 — a 6% range, against a 22%
-range across state buckets (0.872-1.064) and an 8x range in the Q4 final minute.
-Big favourites score slightly faster overall and noticeably slower late, which is
-the same clock-killing effect showing up weakly through a pre-game proxy. **The
-live margin, not the closing spread, is what carries the signal.**
+range across state buckets and an 8x range in the Q4 final minute. But pooling
+hides a sign flip: **big favourites are the top bucket in Q1, Q2 and Q3 and the
+bottom bucket in Q4**, while pick'em games are the bottom bucket in Q1-Q3 and the
+top bucket in Q4. Blowout-favourite games score faster for three quarters and
+then shut down; close games keep scoring to the end.
+
+Cells are balanced by construction — every game contributes 15 cells per quarter
+— so the quarter comparison within a bucket is not a sample-composition artifact.
+
+Across the four quarters the largest bucket gap is Q4 (1.008 vs 0.902, 12%) and
+Q1 (0.867 vs 0.744, 17%). Even at its widest the spread split moves less than the
+state split does, and **the live margin, not the closing spread, is what carries
+the signal** — the spread effect is mostly clock-killing leaking through a
+pre-game proxy for who ends up ahead.
 
 ## What the splits do not support
 
@@ -159,3 +184,5 @@ live margin, not the closing spread, is what carries the signal.**
   live total or a live spread is mispriced at any of these moments — only that
   the realised scoring rate varies a lot by state.
 - **Spread coverage is 93% of games**, and `selected_spread` mixes providers.
+- **Q1 state buckets for three-score leads are thin** (917 and 1,680 cells),
+  so the Q1 row of the state-by-quarter table is the least reliable line in it.

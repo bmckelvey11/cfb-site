@@ -163,6 +163,15 @@ def main() -> None:
         print(tot.reindex(order).round(3).to_string())
         print(df.groupby("bucket").cells.sum().reindex(order).to_string())
 
+        byq = df.groupby(["bucket", "period"]).apply(
+            lambda s: (s.pts_per_cell * s.cells).sum() / s.cells.sum(),
+            include_groups=False).unstack().reindex(order)
+        cells_q = df.groupby(["bucket", "period"]).cells.sum().unstack().reindex(order)
+        byq.round(4).to_csv(out / f"scoring-by-minute-{slug}-by-quarter-{tag}.csv")
+        print(f"\n[{slug}] pts per cell, by quarter:")
+        print(byq.round(3).to_string())
+        print(cells_q.to_string())
+
 
 if __name__ == "__main__":
     main()
