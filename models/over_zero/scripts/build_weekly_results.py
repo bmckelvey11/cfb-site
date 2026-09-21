@@ -25,7 +25,7 @@ from predict_week import _cfbd_token
 
 # These source revisions contain the exact published boards, not every raw signal.
 # (week, site revision) in publication order; a game keeps its first published line.
-PUBLICATIONS = [(1, '0802db9'), (2, 'a0e0b4e'), (2, '34a34df')]
+PUBLICATIONS = [(1, '0802db9'), (2, 'a0e0b4e'), (2, '34a34df'), (3, '4f65acb'), (3, '9838f6a')]
 
 
 def show(revision, path):

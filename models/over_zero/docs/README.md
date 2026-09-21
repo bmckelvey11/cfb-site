@@ -25,6 +25,7 @@ Documentation for the Floor Bias / over-zero model. Unit rules live in
 | --- | --- |
 | [site-refresh-cap50-2026-09-16.md](site-refresh-cap50-2026-09-16.md) | Rerun with an absolute 50-point spread cap and publish. Carries its own reproduction command. |
 | [site-refresh-2026-09-14.md](site-refresh-2026-09-14.md) | Refresh the board for the Sep 17–19 slate; settle the Week 2 picks. |
+| [week3-grade-2026-09-21.md](week3-grade-2026-09-21.md) | The 2026-09-19 board graded at each pick's first published total: 4-1 on the week, 21-9 on the season, and why neither number is model performance. |
 | [pick-history-2026-09-12.md](pick-history-2026-09-12.md) | The running qualified-pick history — purpose and location. **Classification uncertain:** it reads as an ongoing artifact rather than a closed study, so it may belong with the live unit. Step 2 decides. |
 | [bet-to-2026-09-11.md](bet-to-2026-09-11.md) | Which total is the limit for an OVER signal staying above 1.75 bias? Implemented `bet_to_total` in `../scripts/best_line_slate.py`. |
 | [site-refresh-2026-09-11.md](site-refresh-2026-09-11.md) | Refresh current prices; drop settled games from the open board. |
