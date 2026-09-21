@@ -136,6 +136,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [betting-system-builder-implementation-plan.md](betting-system-builder-implementation-plan.md) | System builder implementation plan |
 | [sports-insights-systems-combined-guide.md](sports-insights-systems-combined-guide.md) | Source material for the above two |
 | [autostart-audit-2026-09-15.md](autostart-audit-2026-09-15.md) | Autostart / scheduled-task audit |
+| [rclone-credential-exposure-2026-09-21.md](rclone-credential-exposure-2026-09-21.md) | Is `rclone.conf` exposing cloud credentials, and does it need encrypting? (rotate first) |
 | [repo-restructure-plan.md](repo-restructure-plan.md) | The 2026-08-31 restructure (executed; sets this file's scope rule) |
 | [data-location-2026-09-21.md](data-location-2026-09-21.md) | Should `data/` live inside the repo? (recommends moving to `~\data\cfb`) |
 | [methodology/todo-system.md](methodology/todo-system.md) | How `TODO.md` works |
