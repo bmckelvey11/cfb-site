@@ -6,19 +6,27 @@ which file, and what the numbers in those files mean.
 Living doc — it describes current code, so it is fixed or archived when the code changes
 (root `CLAUDE.md`, docs lifecycle). Verified against the tree on 2026-09-21 at `0800020`.
 
-There is no single ledger. There are five, split by what they record:
+There is no single ledger. There are six things this repo calls one, split by what they record
+— five betting, one operational:
 
 | | What a row is | Code | File on disk | Live? |
 | --- | --- | --- | --- | --- |
 | **Manual bet ledger** | a bet you placed | [`ledgers/ingest_bets.py`](../ledgers/ingest_bets.py) | `$CFB_DATA_ROOT/processed/bet_history_graded.csv` | built, never run for real |
-| **Action Network betlog** | a bet from a book export | [`cfb_system_maker/betlog.py`](../cfb_system_maker/betlog.py) | `<data-dir>/betlog/bets.csv` | dormant |
+| **Action Network betlog** | a bet from a book export | [`cfb_system_maker/betlog.py`](../cfb_system_maker/betlog.py) | `$CFB_DATA_ROOT/betlog/bets.csv` | dormant |
 | **Greenline bet log** | a PFF totals flag, and whether it got bet | [`research/bankroll/scripts/greenline_bet_log.py`](../research/bankroll/scripts/greenline_bet_log.py) | `$CFB_DATA_ROOT/ingest/pff_scoreboard/greenline_bet_log.csv` | live |
 | **Over-zero pick history** | a pick the model qualified | [`models/over_zero/scripts/pick_history.py`](../models/over_zero/scripts/pick_history.py) | `$CFB_DATA_ROOT/processed/over_zero/qualified_picks_history.csv` | live |
 | **Totals forward CLV ledger** | a total the model liked at bet-time | [`models/totals/clv.py`](../models/totals/clv.py) | `models/ledgers/totals_clv_ledger.jsonl` | **broken path — see below** |
+| **Scheduled-task run ledger** *(not betting)* | one scheduled-task run | [`scripts/task_ledger.cmd`](../scripts/task_ledger.cmd) | `$CFB_DATA_ROOT/logs/task_runs.csv` | live |
 
-The organizing distinction: the first two are **bet ledgers** (what you actually wagered),
-the last two are **pick ledgers** (what a model said, graded against the close whether or
-not money moved). `greenline_bet_log.py` straddles them on purpose — it exists to measure
+The last one is an operational record, listed only so a reader grepping `ledger` knows what
+it is: every scheduled-task wrapper appends `task,started,finished,exit_code` to it at the
+end of a run, which is how "did everything fire last night?" gets answered across tasks.
+Nothing below concerns it.
+
+The organizing distinction among the five betting ledgers: the manual ledger and the
+betlog are **bet ledgers** (what you actually wagered); the over-zero pick history and the
+totals CLV ledger are **pick ledgers** (what a model said, graded against the close whether
+or not money moved). The Greenline bet log straddles them on purpose — it exists to measure
 the gap between flags produced and flags bet.
 
 ---
@@ -84,9 +92,10 @@ back.
   and P&L, they just carry a null `clv`.
 - **Openers are thin.** Only bovada, espn bet and draftkings carry `spread_open`/`total_open`,
   so `open_line` is often null even on a matched recent game.
-- **Spread only, from the slate sheet.** `weekly_slate.py`'s live book feed requests
-  `markets=spreads` from the-odds-api, so a generated sheet has no total or moneyline number
-  to carry. Totals and moneylines have to be hand-typed.
+- **Spread only, from the slate sheet.** `build_slate_sheet.py` hardcodes `market` to
+  `"spread"`, because `weekly_slate.py` produces a spread pick per game and nothing else —
+  not because the odds pull is limited (`cfb_system_maker/oddsapi_client.py` defaults to
+  `h2h, spreads, totals`). Totals and moneylines have to be hand-typed.
 
 ### Safety properties worth knowing
 
