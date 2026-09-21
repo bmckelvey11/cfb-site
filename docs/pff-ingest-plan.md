@@ -27,7 +27,7 @@ wins on what is finished.
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
 | S5 | loader entries → `stg` | S6 | **done** | 2026-09-09 |
-| S6 | Backfill 2014–2024, finish 2026 | — | **ready** — all gates met, awaiting key rotation + go | 2026-09-10 |
+| S6 | Backfill 2014–2024, finish 2026 | — | **part 1 done** — 2024 + 2026 clean; 2014–2023 open | 2026-09-21 |
 | S7 | Trim the pull plan using 2025 as the reference season | S6 | **done** | 2026-09-10 |
 | S8 | Decide the player tier: finish it or delete the smoke test | — | **done** — deleted | 2026-09-10 |
 
@@ -183,7 +183,13 @@ against the live warehouse).
 **Done when:** a rebuild lands the PFF tables, `scripts/check_an_tick_pin.py`'s sibling
 check passes for PFF, and row counts match the processed CSVs.
 
-## S6 — Backfill and 2026 ▶ gates met 2026-09-10 — awaiting key rotation + go
+## S6 — Backfill and 2026 ▶ part 1 done 2026-09-21 — 2024 + 2026 clean, 2014–2023 open
+
+> **2026-09-21.** Both blockers below are cleared — `PFF_API` was rotated and the go was
+> given, scoped to two seasons. **2024 and 2026 are pulled and audit clean**; 2014–2023
+> are still open at ~1,800 reads + 6,090 exports. See the worklog entry of that date for
+> the numbers, the season-level-leaderboard gap in the puller, and
+> `#pff-export-skip-ignores-size`. The original text follows as the record of the hold.
 
 **Held deliberately. Nothing is pulled for 2014–2024 until the process is proven on 2025.**
 Every unfixed inefficiency or schema mistake is paid eleven times over, so 2025 — complete
@@ -589,3 +595,88 @@ directional pass-rush splits — the one block with no substitute anywhere — r
 `pass-rush` costs one line and 136 reads a season.
 
 That closes S6's last gate. It now waits only on the secrets rotation and a go.
+
+### 2026-09-21 — S6 part 1: 2024 and 2026 pulled, `PFF_API` rotated
+
+**Both gates cleared.** The user rotated `PFF_API` at the provider and pasted the new key
+into `env.env` directly — it never passed through a chat transcript, which is the whole
+point given the key it replaced was the one assumed disclosed on 2026-09-09. Verified by
+fingerprint rather than by reading it: `sha256[:12]` moved `fd12be007189` → `c71ccd25d534`,
+same 35-byte length. Then the explicit go, scoped to **two seasons, not eleven** — 2024 and
+2026.
+
+**The run.** `python scripts/pull_pff_modeling.py --seasons 2024,2026 --player-facets`:
+369 reads, 1,131 exports, **0 failed, 89.8 min**. The planner predicted ~70 min; the 28%
+overrun is the export tier drifting from the 3.5 s pacing constant to ~4.0 s/export under
+a sustained run, so `EXPORT_PACING_SECONDS` is optimistic at length. Worth knowing before
+pricing the remaining nine seasons off the planner's estimate.
+
+A 99-read probe ran first, against 2014–2024 week 0, for two reasons: `--dry-run` refuses
+without a `team_directory_<season>.json` on disk, and a live read is the only proof the new
+key authenticates. It left ~90 stray week-0 rows for 2016–2023 in `team_game.csv`
+(4 in 2016, 10 in 2017, … 20 in 2023) — real data, harmless, and they disappear into the
+full seasons whenever 2014–2023 is pulled.
+
+**2024 needed a second pull the planner does not cover.** The first audit came back with
+**25 missing cells, every one a season-level leaderboard** — `--player-facets` plans weekly
+exports only, and the 23 season-level (no-`--week`) CSVs 2025 carries have no equivalent in
+`pull_pff_modeling.py`'s plan at all. Closed with
+`python scripts/pull_pff_facet.py all --league ncaa --season 2024 --division fbs`: 26 of 28
+exported in ~2 min. **This is a gap in the puller, not in the pull** — any future season
+backfilled through `pull_pff_modeling.py` alone will land 25 cells short the same way.
+
+**Audit verdicts.**
+
+| | 2024 | 2026 |
+|---|---|---|
+| Files (usable) | 825 (825) | 471 (346) |
+| Defects | **0** | 125 |
+| Duplicate bodies | 0 | 1 op |
+| Declared-type drift | 0 | 0 |
+| Missing cells | **0** | 493 |
+| Column drift | 3 ops | 3 ops |
+
+**2024 is clean** and matches 2025's shape: the 3 column-drift ops
+(`facet-passing-concept`, `facet-passing-pressure`, `signature-passing-time-in-pocket`) and
+the 3 json-only leaderboards (`facet-offense-summary`, `facet-passing-detail`,
+`facet-rushing-direction`) are the same families 2025 shows, and the 134 franchises with
+"team coverage" gaps are the per-team report tier S7 dropped on purpose. The audit counts
+that tier in its census whether or not `TEAM_REPORTS` is populated, so **134 gaps is the
+expected reading for a trimmed season, not a defect** — 2025 reads differently only because
+it was pulled before the trim, with 3,998 team files to 2024's 190.
+
+**2026's 125 defects are all "no rows", and all in wk4–wk20** — 7 or 8 files a week across
+seventeen unplayed weeks. The season is complete through wk3 (games: wk0 77, wk1 132,
+wk2 131, wk3 128), which is correct for 2026-09-21. The single duplicate-body op is
+`team_overview` returning identical bytes for wk4 through wk20, which is the same fact seen
+from the other side: PFF answers a future week with the current standing. **None of this is
+sticky** — `wanted()` short-circuits on `season == live`, so every current-season file is
+re-pulled on every run and fills in as weeks are played.
+
+**One real defect found and fixed, and it exposes a bug.**
+`facet_defense_coverage_ncaa_2026_fbs_wk1.csv` was **zero bytes, dated 2026-09-08** — a
+played week sitting empty since the original 2026 pull. The 89.8-minute run did not repair
+it. Cause: the export planner's skip test is existence-only —
+
+```python
+if args.force or not any((args.out_dir / f"{stem}{ext}").exists() for ext in (".csv", ".json")):
+```
+
+— while the read path's `wanted()` checks size too (`not dest.stat().st_size`). So a
+zero-byte export is treated as done. An explicit re-pull recovered **2,578 rows × 40 cols**.
+Outside the live season a file like this is skipped *forever*; `find data/raw/pff -name
+'*.csv' -size 0` now returns nothing, so 2024–2026 are clear, but the defect is latent for
+every season 2014–2023 will pull. Tracked as `#pff-export-skip-ignores-size`.
+
+The two `FAIL` lines in the wk1 re-pull (`facet-defense-coverage-matchup`,
+`facet-receiving-coverage`, both `upstream 500`) are expected: they are two of the three
+ids in `SKIP_FACETS`, pinned out because PFF 500s on them.
+
+**State after this run.** `data/processed/pff/team_game.csv` is 10,064 rows × 39 cols —
+2024 3,340, 2025 3,406, 2026 3,228, plus the ~90 probe rows. `data/raw/pff` grew 323 MB →
+~490 MB.
+
+**S6 is not done.** 2014–2023 remain: **1,800 reads + 6,090 exports, ~375 min planned**,
+which the pacing drift above puts nearer 8 hours in practice, plus ~2 min a season of
+season-level leaderboards the planner omits. Fixing `#pff-export-skip-ignores-size` before
+that run is cheap insurance — otherwise every zero-byte export it produces is permanent.
