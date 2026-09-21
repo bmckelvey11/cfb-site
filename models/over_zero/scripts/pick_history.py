@@ -87,12 +87,12 @@ def append_history(rows, path=None):
     return added, len(keyed)
 
 
-def slate_rows(records, view, source, threshold=None, as_of=None):
+def slate_rows(records, view, source, threshold=None, as_of=None, model='slate'):
     for r in records:
         if r.get('pick') != 'OVER':
             continue
         kick = datetime.fromisoformat(str(r['kick']).replace('Z', '+00:00')).astimezone(timezone.utc)
-        yield dict(model='slate', run_at=r['run_at'], lines_as_of=as_of, view=view,
+        yield dict(model=model, run_at=r['run_at'], lines_as_of=as_of, view=view,
                    game_date=kick.astimezone(ZoneInfo('America/New_York')).date(),
                    kickoff_utc=kick.isoformat(), home=r['home'], away=r['away'],
                    spread=r['spread_fair'], total=r['total_fair'], bias=r['bias_fair'],
@@ -102,9 +102,10 @@ def slate_rows(records, view, source, threshold=None, as_of=None):
                    bet_to=r.get('bet_to'), source=source)
 
 
-def record_views(views, run_at, threshold, as_of):
+def record_views(views, run_at, threshold, as_of, model='slate'):
     rows = [r for view, frame in views.items()
-            for r in slate_rows(frame.to_dict('records'), view, f'live:{run_at}', threshold, as_of)]
+            for r in slate_rows(frame.to_dict('records'), view, f'live:{run_at}', threshold,
+                                as_of, model)]
     added, total = append_history(rows)
     print(f'Pick history: added {added}; {total} qualified observations -> {default_path()}')
 
