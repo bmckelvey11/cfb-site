@@ -233,7 +233,7 @@ def simulate(cfg: Config) -> dict:
     # pooling a week-27 stake with a week-4 one would make "a week" look bigger than
     # any week of the season being funded. The percent series is scale-free and does
     # pool across every week.
-    week_pnl_s0, week_ret = [], []
+    week_pnl_s0, week_ret, week_pnl_fan = [], [], []
     weeks_up = np.zeros(n)     # weeks that ended in profit, per path
     season_end = []            # bankroll at the end of each modelled season
     oz_remaining = oz_by_season[0].copy()
@@ -289,6 +289,7 @@ def simulate(cfg: Config) -> dict:
         weeks_up += week_pnl > 0
         if s_ix == 0:
             week_pnl_s0.append(week_pnl.copy())
+            week_pnl_fan.append(np.percentile(week_pnl, PCTS))
         week_ret.append(np.where(week_start > 0, week_pnl / np.maximum(week_start, 1e-9), 0.0))
         if w + 1 == n_weeks or schedule[w + 1][2] != s_ix:
             season_end.append(cfg.bankroll + pnl.copy())
@@ -305,7 +306,10 @@ def simulate(cfg: Config) -> dict:
     # is 12 of 15 weeks, so it is not comparable and is excluded.
     full_season_growth = (season_end[1] / np.maximum(season_end[0], 1e-9) - 1.0
                           if len(season_end) > 1 else None)
-    wk_pnl = np.concatenate(week_pnl_s0)
+    # (weeks, paths) for season 0: the percentiles, the pooled sample and the
+    # single representative season in the chart all come off this one matrix.
+    wk_mat = np.stack(week_pnl_s0)
+    wk_pnl = wk_mat.ravel()
     wk_ret = np.concatenate(week_ret)
 
     return {
@@ -325,6 +329,12 @@ def simulate(cfg: Config) -> dict:
         "full_season_growth": full_season_growth,  # per path, or None for 1 season
         # percentiles of a single week's profit, season 0 only, in dollars
         "week_pnl_q": np.percentile(wk_pnl, PCTS),
+        # a subsample of the raw season-0 weekly profits, for the histogram panel
+        "week_pnl_sample": (wk_pnl if wk_pnl.size <= 400_000
+                            else rng.choice(wk_pnl, 400_000, replace=False)),
+        # per-week percentiles of that week's profit, season 0, for the chart
+        "week_pnl_fan": np.array(week_pnl_fan),   # (WEEKS_REMAINING, len(PCTS))
+        "week_pnl_matrix": wk_mat,                # (WEEKS_REMAINING, paths)
         "week_pnl_mean": float(wk_pnl.mean()),
         # the same thing scale-free, pooled over every modelled week
         "week_ret_q": np.percentile(wk_ret, PCTS),
@@ -393,6 +403,96 @@ def _fan(ax, res, label, b0):
     ax.set_ylabel("bankroll ($)")
     ax.yaxis.set_major_formatter(lambda v, _: f"${v / 1000:.0f}k")
     _style(ax)
+
+
+def weekly_pnl_figure(path: Path, bankroll: float, paths: int, seed: int,
+                      units: tuple[float, float] = (0.01, 0.005), **kw) -> None:
+    """Two panels on the week, not the season: profit by week, and one week's spread.
+
+    The fan chart plots the bankroll, which only ever drifts. This plots the thing
+    that is actually experienced -- what a Saturday adds or subtracts -- because a
+    season median of +8% and a median week of +$125 against a worst week of
+    -$1,055 are the same projection described at two very different scales.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    runs = [(u, simulate(Config(bankroll=bankroll, paths=paths, seed=seed,
+                                gl_unit=u, oz_unit=0.01, seasons=1, **kw)))
+            for u in units]
+    plt.rcParams.update({"font.family": "DejaVu Sans", "axes.titlesize": 10.5,
+                         "axes.titleweight": "bold", "figure.facecolor": "white"})
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.6, 4.6))
+    fig.subplots_adjust(left=0.075, right=0.98, top=0.82, bottom=0.13, wspace=0.22)
+
+    # left: one season, week by week. Every week has the same distribution, so a
+    # band chart of the 12 would be twelve copies of the right-hand panel. What is
+    # worth showing instead is the sequence -- picked by a rule, not by eye: the
+    # path whose ending bankroll is closest to the median of all of them.
+    unit, res = runs[0]
+    mat = res["week_pnl_matrix"]
+    pick = int(np.argmin(np.abs(res["final"] - np.median(res["final"]))))
+    bars = mat[:, pick]
+    weeks = np.arange(WEEKS_REMAINING) + 4
+    ax1.bar(weeks, bars, color=[GREEN if v >= 0 else RED for v in bars],
+            alpha=0.85, width=0.68, zorder=3)
+    ax1.axhline(0, color=INK, lw=1.0, zorder=4)
+    ax1b = ax1.twinx()
+    # anchor the line at the starting bankroll, one notch left of week 4
+    ax1b.plot(np.concatenate([[weeks[0] - 1], weeks]),
+              np.concatenate([[bankroll], bankroll + np.cumsum(bars)]),
+              color=BLUE, lw=2, marker="o", ms=3.5, zorder=5, label="bankroll")
+    ax1b.axhline(bankroll, color=MUTED, lw=1.0, ls="--", zorder=4)
+    ax1b.set_ylabel("bankroll ($)", color=BLUE)
+    ax1b.tick_params(colors=BLUE, labelsize=8.5, length=3)
+    ax1b.yaxis.set_major_formatter(lambda v, _: f"${v / 1000:.1f}k")
+    for sp in ("top", "left"):
+        ax1b.spines[sp].set_visible(False)
+    ax1b.spines["right"].set_color(GRID)
+    ax1.set_title(f"One season week by week — the median outcome at {unit:.1%}: "
+                  f"{int((bars >= 0).sum())} green, {int((bars < 0).sum())} red, "
+                  f"ends ${bankroll + bars.sum():,.0f}", fontsize=9.5)
+    ax1.set_xlabel("week of the 2026 season")
+    ax1.set_ylabel("that week's profit ($)")
+    ax1.set_xticks(weeks)
+    ax1.set_xlim(weeks[0] - 1.4, weeks[-1] + 0.6)
+
+    # right: the spread of a single week, both units on one axis
+    lim = max(abs(runs[0][1]["week_pnl_q"][0]), runs[0][1]["week_pnl_q"][4]) * 1.6
+    # weekly P/L sits on a shifting lattice (an integer number of wins out of 6-12
+    # bets), so a fine binning renders as a comb. ~50 bins covers several lattice
+    # points each and shows the shape instead of the aliasing.
+    bins = np.linspace(-lim, lim, 51)
+    for (u, r), col in zip(runs, (BLUE, GOLD)):
+        q = r["week_pnl_q"]
+        ax2.hist(r["week_pnl_sample"], bins=bins, histtype="step", lw=1.8, color=col,
+                 density=True,
+                 label=f"{u:.1%} unit  ({r['frac_weeks_up']:.0%} of weeks profitable, "
+                       f"median +${q[2]:,.0f})")
+    ax2.axvline(0, color=RED, lw=1.1, ls="--", zorder=2)
+    ax2.set_title("One week, over every modelled week of the season")
+    ax2.set_xlabel("that week's profit ($)")
+    ax2.set_ylabel("share of weeks")
+    ax2.set_yticks([])
+    ax2.legend(fontsize=8.5, frameon=False, loc="upper left")
+    for ax in (ax1, ax2):
+        _style(ax)
+    money_axis = lambda v, _: (f"−${abs(v):,.0f}" if v < 0 else f"${v:,.0f}")
+    ax1.yaxis.set_major_formatter(money_axis)
+    ax2.xaxis.set_major_formatter(money_axis)
+
+    fig.suptitle("What a week does to the bankroll, rest of the 2026 season",
+                 fontsize=13, fontweight="bold", color=INK)
+    fig.text(0.5, 0.885,
+             "Weeks 4-15, 6-12 Greenline unders plus the odd over-zero over, units "
+             "re-sized off the bankroll each Monday. Season 0 only: a 2027 week is "
+             "staked off a different bankroll.",
+             fontsize=9, color=MUTED, ha="center")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=170, facecolor="white")
+    plt.close(fig)
+    print(f"wrote {path}")
 
 
 def make_figures(base: Config, scenarios: list[tuple[str, Config]], path: Path) -> None:
@@ -670,6 +770,12 @@ def self_check() -> None:
     # time, clearly more than a third, and the median week is small either way
     assert 0.35 < base["frac_weeks_up"] < 0.65, base["frac_weeks_up"]
     assert (np.diff(base["week_pnl_q"]) >= 0).all() and (np.diff(base["week_ret_q"]) >= 0).all()
+    # the chart reads the weekly matrix; it must be season 0 shaped and must sum
+    # per path to that path's season-0 profit, or the bars and the line disagree
+    m = base["week_pnl_matrix"]
+    assert m.shape == (WEEKS_REMAINING, 5_000), m.shape
+    assert np.allclose(m.sum(axis=0), base["final"] - Config().bankroll)
+    assert np.allclose(base["week_pnl_fan"][:, 2], np.median(m, axis=1))
     # A path's worst week out of 12 lands near the low tail of the pooled week
     # distribution, so the median of it must sit between the 5th and 25th pooled
     # percentiles. Outside that bracket the two weekly numbers in the writeup are
@@ -705,6 +811,7 @@ def main() -> None:
     ap.add_argument("--gl-coverage", type=float, default=1.0,
                     help="fraction of the weekly Greenline flags actually bet")
     ap.add_argument("--seed", type=int, default=20260921)
+    ap.add_argument("--weekly-fig", help="write the week-level figure here (.png) and stop")
     ap.add_argument("--growth", action="store_true",
                     help="print the growth-rate and week-level tables and stop")
     ap.add_argument("--json", help="write the scenario table here")
@@ -714,6 +821,10 @@ def main() -> None:
 
     if args.self_check:
         self_check()
+        return
+
+    if args.weekly_fig:
+        weekly_pnl_figure(Path(args.weekly_fig), args.bankroll, args.paths, args.seed)
         return
 
     if args.growth:

@@ -18,6 +18,7 @@ python research/bankroll/scripts/bankroll_config_sweep.py --paths 50000 --season
 python research/bankroll/scripts/pooled_growth_chart.py --paths 100000 --seasons 2 --flat-stakes --out research/bankroll/docs
 python research/bankroll/scripts/bankroll_stress.py --paths 50000 --out research/bankroll/docs
 python research/bankroll/scripts/mc_combined_totals.py --growth --paths 50000 --gl-unit 0.01
+python research/bankroll/scripts/mc_combined_totals.py --weekly-fig research/bankroll/docs/figs/weekly-pnl-2026-09-21.png --paths 50000
 ```
 
 ---
@@ -284,7 +285,15 @@ moves once a week.
 | median week, as a % of that week's bankroll | +0.56% | +0.32% |
 | 5th to 95th percentile week, same basis | −5.27% to +6.27% | −2.68% to +3.44% |
 
-Three things worth saying plainly about that table.
+![What a week does to the bankroll](figs/weekly-pnl-2026-09-21.png)
+
+On the left, one season week by week: the simulated path whose ending bankroll
+lands closest to the median of all 50,000, picked by that rule rather than by
+eye. Green bars are winning Saturdays, red are losing ones, and the blue line is
+the bankroll they add up to. On the right, the spread of a single week at both
+units, pooled over every modelled week of the season.
+
+Three things worth saying plainly about that table and that picture.
 
 1. **A typical week is small and a bad week is not.** The median week makes $125
    and the worst week of a typical season loses $1,055 — eight times the median

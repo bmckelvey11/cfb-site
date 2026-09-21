@@ -1,4 +1,4 @@
-"""Render the seed-bankroll proposal to PDF and a 10-slide deck.
+"""Render the seed-bankroll proposal to PDF, an editable .docx and an 11-slide deck.
 
     python research/bankroll/scripts/build_proposal_deliverables.py
     python research/bankroll/scripts/build_proposal_deliverables.py --self-check
@@ -6,6 +6,7 @@
 Inputs: docs/seed-bankroll-proposal-2026-09-21.md, the two figures in docs/figs/,
 and the sweep CSV. Outputs, next to the markdown:
     seed-bankroll-proposal-2026-09-21.pdf     markdown -> HTML -> Chrome headless print
+    seed-bankroll-proposal-2026-09-21.docx    md_to_docx.py -> officecli (editable in Word)
     seed-bankroll-proposal-2026-09-21.pptx    python-pptx, terminal numbers from the
                                               sweep CSV, rate and week-level ones
                                               re-simulated at the same seed
@@ -38,6 +39,7 @@ STEM = "seed-bankroll-proposal-2026-09-21"
 SWEEP = DOCS / "bankroll-config-sweep-2026-09-21.csv"
 FIG_GROWTH = DOCS / "figs" / "pooled-bankroll-growth-2026-09-21.png"
 FIG_SWEEP = DOCS / "figs" / "bankroll-config-sweep-2026-09-21.png"
+FIG_WEEKLY = DOCS / "figs" / "weekly-pnl-2026-09-21.png"
 # Chrome first: Edge headless on this machine intermittently prints a 1-page stray
 # render instead of the URL, even with an isolated profile. Chrome has not.
 BROWSERS = (Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
@@ -310,6 +312,12 @@ def build_pptx() -> Path:
         "Dollar rows are the 2026 leg only; stakes re-size weekly, so a 2027 week is not the same week.",
     ], 14, color=MUTED)
 
+    # 6c the weekly picture on its own, at full width
+    s = slide("A week, drawn",
+              "Left: the simulated season whose ending bankroll is closest to the median of all 50,000. "
+              "Right: the spread of a single week at both units.")
+    s.shapes.add_picture(str(FIG_WEEKLY), Inches(0.45), Inches(2.0), width=Inches(12.45))
+
     # 7 does not support
     s = slide("What the numbers do not support")
     text(s, 0.6, 1.5, 12, 5.5, [
@@ -344,9 +352,16 @@ def self_check() -> None:
     rec = rows[("pooled", 0.005)], rows[("n58", 0.005)]
     assert all(r["p_m25"] <= 0.01 and r["p_bust"] == 0 for r in rec), rec
     assert all(r["median"] > 20_000 for r in rec)
-    assert FIG_GROWTH.exists() and FIG_SWEEP.exists()
+    assert FIG_GROWTH.exists() and FIG_SWEEP.exists() and FIG_WEEKLY.exists()
     assert "gift" in (DOCS / f"{STEM}.md").read_text(encoding="utf-8").lower()
     print("self-check OK")
+
+
+def build_docx() -> Path:
+    """The editable copy. Slowest of the three (one officecli call per block), so
+    it sits behind --no-docx when only the PDF or the deck is being iterated on."""
+    from md_to_docx import convert
+    return convert(DOCS / f"{STEM}.md", DOCS / f"{STEM}.docx")
 
 
 def main() -> None:
@@ -354,6 +369,7 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--self-check", action="store_true")
     ap.add_argument("--no-pdf", action="store_true")
+    ap.add_argument("--no-docx", action="store_true")
     args = ap.parse_args()
     if args.self_check:
         self_check()
@@ -361,6 +377,8 @@ def main() -> None:
     print("wrote", build_pptx())
     if not args.no_pdf:
         print("wrote", build_pdf())
+    if not args.no_docx:
+        print("wrote", build_docx())
 
 
 if __name__ == "__main__":
