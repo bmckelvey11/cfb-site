@@ -22,23 +22,23 @@ python -m pytest tests/test_backtest.py::test_name  # single test
 python -m pytest -m slow                            # browser smoke + search benchmark
 
 # CLI (also runnable as `python -m cfb_system_maker <command>`)
-python -m cfb_system_maker sample --data-dir data        # write+backtest bundled sample data, no network
-python -m cfb_system_maker fetch --season 2023 --provider consensus --data-dir data
-python -m cfb_system_maker scrape --season 2023 2024 --data-dir data   # pull ALL CFBD REST endpoints to data/raw/
+python -m cfb_system_maker sample        # write+backtest bundled sample data, no network
+python -m cfb_system_maker fetch --season 2023 --provider consensus
+python -m cfb_system_maker scrape --season 2023 2024   # pull ALL CFBD REST endpoints to data/raw/
 python -m cfb_system_maker scrape --season 2023 --only games lines sp   # subset by endpoint name
 python -m cfb_system_maker scrape --season 2023 --include-per-game --fbs-only   # per-game endpoints, FBS only
-python -m cfb_system_maker graphql --season 2023 --data-dir data   # bulk-pull GraphQL tables to data/graphql/ (Tier 3)
-python -m cfb_system_maker actionnetwork --season 2023 --data-dir data   # period odds CFBD lacks → data/raw/actionnetwork/
-python -m cfb_system_maker build --season 2023 --provider consensus --data-dir data
-python -m cfb_system_maker enrich --data-dir data   # join registry features -> data/processed/features.json (run after build)
-python -m cfb_system_maker upcoming --data-dir data   # unplayed week → processed/upcoming.csv; never writes games.csv
-python -m cfb_system_maker duckdb --data-dir data --explode --flatten-nested   # data/cfb.duckdb; serving still csv+features
-python -m cfb_system_maker search --data-dir data --holdout-season 2024
-python -m cfb_system_maker betlog import --csv path.csv --data-dir data
-python -m cfb_system_maker refit-v1 --data-dir data   # Arscott tobit cache → processed/v1_fit.json
-python -m cfb_system_maker backtest --data-dir data --side home --favorite --min-spread -14
-python -m cfb_system_maker backtest --data-dir data --bet-type total --total-side over
-python -m cfb_system_maker web --data-dir data --port 5000   # Flask UI at 127.0.0.1:5000 (waitress; --debug for reloader)
+python -m cfb_system_maker graphql --season 2023   # bulk-pull GraphQL tables to data/graphql/ (Tier 3)
+python -m cfb_system_maker actionnetwork --season 2023   # period odds CFBD lacks → data/raw/actionnetwork/
+python -m cfb_system_maker build --season 2023 --provider consensus
+python -m cfb_system_maker enrich   # join registry features -> data/processed/features.json (run after build)
+python -m cfb_system_maker upcoming   # unplayed week → processed/upcoming.csv; never writes games.csv
+python -m cfb_system_maker duckdb --explode --flatten-nested   # data/cfb.duckdb; serving still csv+features
+python -m cfb_system_maker search --holdout-season 2024
+python -m cfb_system_maker betlog import --csv path.csv
+python -m cfb_system_maker refit-v1   # Arscott tobit cache → processed/v1_fit.json
+python -m cfb_system_maker backtest --side home --favorite --min-spread -14
+python -m cfb_system_maker backtest --bet-type total --total-side over
+python -m cfb_system_maker web --port 5000   # Flask UI at 127.0.0.1:5000 (waitress; --debug for reloader)
 ```
 
 There is no compile step and no linter configured for our code. `requirements.lock` is the reproducible install; `requirements.txt` is the loose pins (Flask, waitress, duckdb, sklearn, pytest, plus `cfbd-python/requirements.txt`).

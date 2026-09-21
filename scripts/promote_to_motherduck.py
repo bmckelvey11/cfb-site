@@ -12,6 +12,7 @@ Requires `motherduck_token` (or `MOTHERDUCK_TOKEN`) env var, or a prior
 `duckdb -c "ATTACH 'md:'"` interactive login on this machine.
 """
 
+from pathlib import Path
 import argparse
 import os
 import subprocess
@@ -20,6 +21,10 @@ import time
 from datetime import datetime, timezone
 
 import duckdb
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DATA_ROOT  # noqa: E402
 
 DEFAULT_SCHEMAS = ["raw", "stg", "core", "meta"]
 
@@ -36,7 +41,7 @@ def git_sha() -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", default=os.environ.get("CFB_DATA_ROOT", "data"))
+    parser.add_argument("--data-dir", default=DATA_ROOT)
     parser.add_argument("--schemas", nargs="+", default=DEFAULT_SCHEMAS)
     parser.add_argument(
         "--dry-run", action="store_true", help="list tables, push nothing"

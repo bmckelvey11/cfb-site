@@ -5,6 +5,7 @@ Run:  python v1/predict_week.py --fit-seasons 2015 2016 ... 2025 \
           --raw data/raw/lines_2026_week1.json --book DraftKings
 """
 
+import sys
 import argparse
 import csv
 import json
@@ -18,8 +19,18 @@ import numpy as np
 from censoring_bias import censoring_bias, fit_pipeline, implied_team_points
 from run_on_project_data import DEFAULT_CSV, load
 
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
-DATA_ROOT = Path(os.environ["CFB_DATA_ROOT"])
 DEFAULT_OUT_CSV = DATA_ROOT / "processed" / "over_zero" / "predictions.csv"
 DEFAULT_SNAPSHOT_DIR = DATA_ROOT / "processed" / "over_zero" / "predictions"
 CFBD_LINES_URL = "https://api.collegefootballdata.com/lines"

@@ -21,7 +21,19 @@ if "%PYTHON%"=="" (
     set "PYTHON=%REPO%\.venv\Scripts\python.exe"
   )
 )
-if "%CFB_DATA_ROOT%"=="" set "CFB_DATA_ROOT=%REPO%\data"
+if "%CFB_DATA_ROOT%"=="" (
+  echo CFB_DATA_ROOT is not set; refusing to guess a data root. 1>&2
+  exit /b 3
+)
+if not exist "%CFB_DATA_ROOT%\.cfb-data-root" (
+  echo CFB_DATA_ROOT="%CFB_DATA_ROOT%" is not an initialized CFB data root. 1>&2
+  exit /b 3
+)
+REM `if exist` matches directories too, so reject a marker that is one.
+if exist "%CFB_DATA_ROOT%\.cfb-data-root\" (
+  echo CFB_DATA_ROOT="%CFB_DATA_ROOT%" marker is a directory, not a file. 1>&2
+  exit /b 3
+)
 set "LOGDIR=%CFB_DATA_ROOT%\logs"
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
 set "LOG=%LOGDIR%\cfbd_refresh.log"

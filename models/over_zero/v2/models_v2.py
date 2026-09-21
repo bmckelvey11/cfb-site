@@ -22,17 +22,27 @@ v2 tightens two caveats flagged in v1:
 Shared, unchanged-from-v1 pieces (implied points, OLS test, censoring bias,
 LL-ratio, Kelly) are reproduced here so v2 is self-contained and v1 stays frozen.
 """
-
 from __future__ import annotations
 
 import json
-import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import statsmodels.api as sm
 from scipy import optimize, stats
+
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
 
 NORM = stats.norm
 
@@ -41,7 +51,7 @@ NORM = stats.norm
 # Shared CFBD raw-lines loader (v2/v3/saturation/monitor drivers; v1 keeps
 # its own frozen copy)
 # ===========================================================================
-_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
+_HUB_DATA = DATA_ROOT
 RAW_DIR = _HUB_DATA / "raw"
 
 

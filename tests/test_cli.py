@@ -2,6 +2,8 @@ import random
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+import pytest
+
 from cfb_system_maker.cli import main
 from cfb_system_maker.models import GameRecord
 from cfb_system_maker.storage import save_processed_games
@@ -447,6 +449,9 @@ def test_web_command_reads_env_defaults(monkeypatch, tmp_path):
 
     monkeypatch.setattr("cfb_system_maker.web.create_app", fake_create_app)
     monkeypatch.setattr("waitress.serve", fake_serve)
+    # CFB_DATA_DIR is marker-checked like CFB_DATA_ROOT, so the override target has
+    # to be an initialized root -- see test_web_command_rejects_unmarked_data_dir.
+    (tmp_path / ".cfb-data-root").touch()
     monkeypatch.setenv("CFB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("CFB_WEB_HOST", "0.0.0.0")
     monkeypatch.setenv("CFB_WEB_PORT", "8123")
@@ -467,6 +472,19 @@ def test_web_command_reads_env_defaults(monkeypatch, tmp_path):
     assert exit_code == 0
     assert created["data_dir"] == "cli-dir"
     assert served == {"host": "1.2.3.4", "port": 6001, "threads": 8}
+
+
+def test_web_command_rejects_unmarked_data_dir(monkeypatch, tmp_path):
+    """An unmarked CFB_DATA_DIR must fail loudly, not serve an empty warehouse.
+
+    This is the override's half of the marker contract: a directory that merely
+    exists is not a data root, and the web app silently reading one would show an
+    empty board rather than saying anything was wrong.
+    """
+    monkeypatch.setenv("CFB_DATA_DIR", str(tmp_path))  # exists, but no marker
+
+    with pytest.raises(SystemExit, match="not an initialized CFB data root"):
+        main(["web"])
 
 
 def test_betlog_import_command_reports_summary(tmp_path, monkeypatch, capsys):

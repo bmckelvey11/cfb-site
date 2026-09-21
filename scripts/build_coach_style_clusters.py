@@ -21,11 +21,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DATA_ROOT  # noqa: E402
 
 SEASONS = range(2016, 2025)
 FEATS = [
@@ -125,7 +129,9 @@ def name_clusters(profiles: pd.DataFrame) -> dict[int, str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data-dir", default=os.environ.get("CFB_DATA_ROOT", "data"))
+    parser.add_argument("--data-dir", default=DATA_ROOT)
+    parser.add_argument("--pregame", action="store_true", help="Write per-season models trained only on earlier seasons; never overwrite the legacy module")
+    parser.add_argument("--target-seasons", nargs="+", type=int)
     args = parser.parse_args()
     raw = Path(args.data_dir) / "raw"
 

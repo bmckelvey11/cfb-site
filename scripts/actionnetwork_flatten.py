@@ -36,12 +36,14 @@ import argparse
 import csv
 import glob
 import json
-import os
 import re
 import sys
 from pathlib import Path
 
-DATA_ROOT = Path(os.environ.get("CFB_DATA_ROOT", Path(__file__).resolve().parent.parent / "data"))
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
 IN_DIR = DATA_ROOT / "raw" / "actionnetwork"
 OUT_DIR = DATA_ROOT / "processed" / "actionnetwork"
 OUT_NAME = "an_history_tick.csv"

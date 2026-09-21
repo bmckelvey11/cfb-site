@@ -17,8 +17,8 @@ Season block-bootstrap for CIs (games within a season are not independent).
 Run:  python research/b6_high_total_under/test_high_total_under.py
 """
 
+import sys
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -31,7 +31,18 @@ sys.path.insert(0, str(REPO / "v1"))
 
 from censoring_bias import censoring_bias, fit_pipeline, implied_team_points  # noqa: E402
 
-_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
+_HUB_DATA = DATA_ROOT
 RAW_DIR = _HUB_DATA / "raw"
 SEASONS = list(range(2013, 2026))
 RNG = np.random.default_rng(20260811)

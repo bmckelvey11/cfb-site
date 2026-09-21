@@ -14,13 +14,14 @@ docstrings are prose, and attribute access like ``meta.get(...)`` is not a table
 from __future__ import annotations
 
 import ast
-import os
 import re
 from collections import defaultdict
 from pathlib import Path
 
 import duckdb
 import pytest
+
+from cfb_paths import DB_PATH  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 ROOTS = ("cfb_system_maker", "models", "research", "scripts")
@@ -74,7 +75,7 @@ def collect_references() -> dict[tuple[str, str], list[str]]:
 
 
 def test_every_schema_table_literal_resolves():
-    db = Path(os.environ.get("CFB_DATA_ROOT", "")) / "cfb.duckdb"
+    db = DB_PATH
     if not db.exists():
         pytest.skip("no live CFB_DATA_ROOT warehouse")
     con = duckdb.connect(str(db), read_only=True)

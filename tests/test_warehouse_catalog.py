@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import sys
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+
+from cfb_paths import DB_PATH  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
@@ -268,7 +269,7 @@ def test_sampling_is_deterministic():
     Without a total order the sample drifts between runs, which makes `--check`
     cry wolf after a reload that changed nothing.
     """
-    db = Path(os.environ.get("CFB_DATA_ROOT", "")) / "cfb.duckdb"
+    db = DB_PATH
     if not db.exists():
         pytest.skip("no live CFB_DATA_ROOT warehouse")
     import duckdb
@@ -289,7 +290,7 @@ def test_sampling_is_deterministic():
 
 
 def test_committed_catalog_matches_the_live_warehouse():
-    db = Path(os.environ.get("CFB_DATA_ROOT", "")) / "cfb.duckdb"
+    db = DB_PATH
     if not db.exists():
         pytest.skip("no live CFB_DATA_ROOT warehouse")
     html = bwc.CATALOG.read_text(encoding="utf-8")

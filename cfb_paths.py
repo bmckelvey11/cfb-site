@@ -9,6 +9,20 @@ if not _configured_root:
     )
 
 DATA_ROOT = Path(_configured_root).expanduser().resolve()
+
+# The marker, not mere existence. An empty directory that exists because something
+# recreated `<repo>/data` would pass an `is_dir()` check and read as a valid-but-empty
+# warehouse -- which is how `prune_motherduck_orphans` comes to believe every remote
+# table is an orphan. `is_file()` because a *directory* named `.cfb-data-root` satisfies
+# `exists()`.
+MARKER = DATA_ROOT / ".cfb-data-root"
+if not MARKER.is_file():
+    raise RuntimeError(
+        f"CFB_DATA_ROOT={DATA_ROOT} is not an initialized CFB data root: no "
+        f"{MARKER.name} marker. Create the directory and touch the marker to "
+        f"initialize it."
+    )
+
 DB_PATH = DATA_ROOT / "cfb.duckdb"
 
 # Warehouse inputs. `build_duckdb` globs RAW/*.json, so everything landing here

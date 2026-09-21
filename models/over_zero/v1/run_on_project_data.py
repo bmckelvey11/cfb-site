@@ -8,9 +8,9 @@ the favorite is whichever team has the negative spread; spreadEst = |spread|
 Run:  python v1/run_on_project_data.py [--csv path/to/games.csv]
 """
 
+import sys
 import csv
 import json
-import os
 from pathlib import Path
 
 import numpy as np
@@ -24,8 +24,19 @@ from censoring_bias import (
     strategy_returns,
 )
 
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]  # over-zero/
-_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
+_HUB_DATA = DATA_ROOT
 DEFAULT_CSV = _HUB_DATA / "processed" / "games.csv"
 RAW_DIR = _HUB_DATA / "raw"
 

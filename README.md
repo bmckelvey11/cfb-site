@@ -17,8 +17,8 @@ cd cfb
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.lock
-python -m cfb_system_maker sample --data-dir data
-python -m cfb_system_maker web --data-dir data
+python -m cfb_system_maker sample
+python -m cfb_system_maker web
 ```
 
 Open `http://127.0.0.1:5000`.
@@ -35,9 +35,9 @@ Build the full historical dataset (2013 is the earliest season CFBD has betting
 lines for):
 
 ```powershell
-python -m cfb_system_maker fetch --season (2013..2025) --provider consensus --data-dir data
-python -m cfb_system_maker build --season (2013..2025) --provider consensus --data-dir data
-python -m cfb_system_maker enrich --data-dir data
+python -m cfb_system_maker fetch --season (2013..2025) --provider consensus
+python -m cfb_system_maker build --season (2013..2025) --provider consensus
+python -m cfb_system_maker enrich
 ```
 
 - `fetch` pulls games + betting lines per season from CFBD and writes raw JSON to `data/raw/`.
@@ -52,16 +52,16 @@ directly (only `fetch`'s `games`/`lines` files do), but `enrich` picks up what t
 
 ```powershell
 # Every CFBD REST endpoint the vendored client exposes, written to data/raw/
-python -m cfb_system_maker scrape --season 2023 2024 --data-dir data
+python -m cfb_system_maker scrape --season 2023 2024
 python -m cfb_system_maker scrape --season 2023 --only games lines sp
 python -m cfb_system_maker scrape --season 2023 --include-per-game --fbs-only
 
 # Bulk GraphQL pull (Patreon Tier 3 CFBD accounts only), written to data/graphql/
-python -m cfb_system_maker graphql --season 2023 --data-dir data
+python -m cfb_system_maker graphql --season 2023
 python -m cfb_system_maker graphql --season 2023 --game-player-stats
 
 # Action Network odds scrape, written to data/raw/actionnetwork/
-python -m cfb_system_maker actionnetwork --season 2023 --data-dir data
+python -m cfb_system_maker actionnetwork --season 2023
 ```
 
 ## Weekly in-season refresh
@@ -69,9 +69,9 @@ python -m cfb_system_maker actionnetwork --season 2023 --data-dir data
 Bring the dataset current during the season:
 
 ```powershell
-python -m cfb_system_maker fetch --season 2026 --provider consensus --data-dir data
-python -m cfb_system_maker build --season 2026 --provider consensus --data-dir data
-python -m cfb_system_maker enrich --data-dir data
+python -m cfb_system_maker fetch --season 2026 --provider consensus
+python -m cfb_system_maker build --season 2026 --provider consensus
+python -m cfb_system_maker enrich
 ```
 
 This re-pulls the current season's completed games/lines and refreshes
@@ -79,7 +79,7 @@ This re-pulls the current season's completed games/lines and refreshes
 posted lines on the dashboard's "Current Matches" panel, run:
 
 ```powershell
-python -m cfb_system_maker upcoming --data-dir data
+python -m cfb_system_maker upcoming
 ```
 
 `upcoming` writes `data/processed/upcoming.csv` separately — it never touches
@@ -88,9 +88,9 @@ python -m cfb_system_maker upcoming --data-dir data
 ## Backtest filters (CLI reference)
 
 ```powershell
-python -m cfb_system_maker backtest --data-dir data --side home --favorite --min-spread -14 --max-spread -3.5
-python -m cfb_system_maker backtest --data-dir data --side away --underdog --conference SEC
-python -m cfb_system_maker backtest --data-dir data --bet-type total --total-side over
+python -m cfb_system_maker backtest --side home --favorite --min-spread -14 --max-spread -3.5
+python -m cfb_system_maker backtest --side away --underdog --conference SEC
+python -m cfb_system_maker backtest --bet-type total --total-side over
 ```
 
 Available filters: `--bet-type`, `--side`, `--total-side`, `--season`, `--week`, `--team`,
@@ -104,12 +104,30 @@ Available filters: `--bet-type`, `--side`, `--total-side`, `--season`, `--week`,
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `CFB_DATA_ROOT` | Canonical data folder (`raw/`, `processed/`, `cfb.duckdb`) | `<repo>/data` |
-| `CFB_DATA_DIR` | Default `--data-dir` for `web` (legacy; `CFB_DATA_ROOT` wins via `cfb_paths`) | `data` |
+| `CFB_DATA_ROOT` | Canonical data folder (`raw/`, `processed/`, `cfb.duckdb`) | **required — no default** |
+| `CFB_DATA_DIR` | Override `--data-dir` for `web` (legacy; marker-checked like `CFB_DATA_ROOT`) | unset → `CFB_DATA_ROOT` |
 | `CFB_WEB_HOST` | Default `--host` for `web` | `127.0.0.1` |
 | `CFB_WEB_PORT` | Default `--port` for `web` | `5000` |
 
 Explicit CLI flags (`--data-dir`, `--host`, `--port`) always win over these env vars.
+
+### Initializing a data root
+
+`CFB_DATA_ROOT` is required and must point at a directory containing a
+`.cfb-data-root` marker file. Without the marker every entry point refuses to run,
+rather than silently creating a fresh empty root and writing there — which is how a
+warehouse ends up somewhere nobody looks, and how `prune_motherduck_orphans.py` comes
+to believe every remote table is an orphan.
+
+To initialize one:
+
+```powershell
+New-Item -ItemType Directory -Force <path>
+New-Item -ItemType File <path>\.cfb-data-root
+[Environment]::SetEnvironmentVariable('CFB_DATA_ROOT', '<path>', 'User')
+```
+
+Open a new shell afterwards — an existing one keeps the old value.
 
 `python -m cfb_system_maker web` serves via `waitress` (production-style) by default;
 pass `--debug` to switch to the Flask dev server with the auto-reloader.

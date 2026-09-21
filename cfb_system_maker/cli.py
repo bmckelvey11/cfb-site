@@ -44,6 +44,25 @@ from cfb_system_maker.v1_model import fit_v1, save_v1_fit
 DATA_DIR_DEFAULT = str(DATA_ROOT)
 
 
+def _web_data_dir_default() -> str:
+    """`CFB_DATA_DIR` is a legacy override for `web`; make it obey the same marker.
+
+    Left as an override rather than removed, but routed through the marker check so it
+    cannot become the one resolver that skips it -- an unmarked root reached this way
+    would put the app on an empty warehouse without saying so.
+    """
+    override = os.environ.get("CFB_DATA_DIR")
+    if not override:
+        return DATA_DIR_DEFAULT
+    root = Path(override).expanduser().resolve()
+    if not (root / ".cfb-data-root").is_file():
+        raise SystemExit(
+            f"CFB_DATA_DIR={root} is not an initialized CFB data root: no "
+            f".cfb-data-root marker."
+        )
+    return str(root)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -926,7 +945,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     web = subparsers.add_parser("web")
     web.add_argument(
-        "--data-dir", default=os.environ.get("CFB_DATA_DIR", DATA_DIR_DEFAULT)
+        "--data-dir", default=_web_data_dir_default()
     )
     web.add_argument(
         "--host",

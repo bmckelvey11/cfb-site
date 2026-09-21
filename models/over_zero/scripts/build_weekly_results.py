@@ -8,9 +8,10 @@ Run from repository root with CFB_DATA_ROOT set.
 """
 from __future__ import annotations
 
+import sys
+
 import ast
 import json
-import os
 import re
 import subprocess
 import sys
@@ -22,6 +23,17 @@ ROOT = Path(__file__).resolve().parents[3]
 SITE = ROOT / 'models/over_zero/site'
 sys.path.insert(0, str(ROOT / 'models/over_zero/v1'))
 from predict_week import _cfbd_token
+
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
 
 # These source revisions contain the exact published boards, not every raw signal.
 # (week, site revision) in publication order; a game keeps its first published line.
@@ -52,7 +64,7 @@ def main():
                                  headers={'Authorization': f'Bearer {_cfbd_token()}'})
     with urllib.request.urlopen(req, timeout=60) as response:
         games = json.load(response)
-    raw = Path(os.environ['CFB_DATA_ROOT']) / 'processed/over_zero/results'
+    raw = DATA_ROOT / 'processed/over_zero/results'
     raw.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     (raw / f'cfbd_games_{stamp}.json').write_text(json.dumps(games), encoding='utf-8')

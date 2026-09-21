@@ -68,10 +68,11 @@ landed later the same day:
 ```bash
 python - <<'PY'
 import glob
-print('_post_wk files:', len(glob.glob('data/raw/*_post_wk*.json')))
-print('_ngt files:', len(glob.glob('data/raw/*_ngt*.json')))
-print('raw json total:', len(glob.glob('data/raw/*.json')))
-print('graphql json total:', len(glob.glob('data/graphql/*.json')))
+from cfb_paths import DATA_ROOT
+print('_post_wk files:', len(glob.glob(f'{DATA_ROOT}/raw/*_post_wk*.json')))
+print('_ngt files:', len(glob.glob(f'{DATA_ROOT}/raw/*_ngt*.json')))
+print('raw json total:', len(glob.glob(f'{DATA_ROOT}/raw/*.json')))
+print('graphql json total:', len(glob.glob(f'{DATA_ROOT}/graphql/*.json')))
 PY
 ```
 
@@ -254,7 +255,8 @@ and a populated `week` column:
 ```bash
 python -c "
 import glob
-print(len(glob.glob('data/raw/*_post_wk*.json')))
+from cfb_paths import DATA_ROOT
+print(len(glob.glob(f'{DATA_ROOT}/raw/*_post_wk*.json')))
 "
 ```
 

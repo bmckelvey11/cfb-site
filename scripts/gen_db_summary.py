@@ -5,7 +5,11 @@ from pathlib import Path
 
 import duckdb
 
-DB = Path(__file__).resolve().parents[1] / "data" / "cfb.duckdb"
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DB_PATH  # noqa: E402
+
+DB = DB_PATH
 OUT = Path(__file__).resolve().parents[1] / "docs" / "db-summary.html"
 CELL = 160  # ponytail: hard truncate; raw.payload holds whole JSON API responses
 

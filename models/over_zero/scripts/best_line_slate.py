@@ -30,12 +30,12 @@ Caveat: shopping was never backtested for this model. The 64.5% headline is a
 single-line-source number; taking a better total can only help at an unchanged
 signal, but it is an execution improvement, not a re-validated edge.
 """
-
 from __future__ import annotations
+
+import sys
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -55,13 +55,24 @@ from censoring_bias import censoring_bias, fit_pipeline, implied_team_points  # 
 from run_on_project_data import DEFAULT_CSV, load  # noqa: E402
 from pick_history import record_views  # noqa: E402
 
-OUT_DIR = Path(os.environ["CFB_DATA_ROOT"]) / "processed" / "over_zero"
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
+OUT_DIR = DATA_ROOT / "processed" / "over_zero"
 # the-odds-api book keys -> display names. Since 2026-09-11 this snapshot is the only feed:
 # the Action Network scoreboard is no longer read (docs/odds-sources-an-vs-apis-2026-09-11.md).
 OA_BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betrivers": "BetRivers",
             "betmgm": "BetMGM", "betonlineag": "BetOnline.ag", "bovada": "Bovada",
             "lowvig": "LowVig.ag", "betus": "BetUS", "mybookieag": "MyBookie.ag"}
-OA_SNAP_DIR = Path(os.environ["CFB_DATA_ROOT"]) / "ingest" / "oddsapi"
+OA_SNAP_DIR = DATA_ROOT / "ingest" / "oddsapi"
 # Only the regulated books vote in the fair spread and fair total. The 1.75 gate was
 # calibrated on games.csv -- one CFBD line per game -- and the regulated median is the closest
 # live stand-in for that number; until 2026-09-11 it was these four plus Caesars, read live

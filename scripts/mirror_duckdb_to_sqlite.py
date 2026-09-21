@@ -3,13 +3,17 @@
 Nested types (STRUCT/LIST/MAP) have no sqlite equivalent, so those columns are
 serialized with to_json() on the way out.
 """
-import os
+from pathlib import Path
 import sys
 import time
 
 import duckdb
 
-_ROOT = os.environ.get("CFB_DATA_ROOT", "data")
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
+_ROOT = str(DATA_ROOT)
 SRC = f"{_ROOT}/cfb.duckdb"
 DST = f"{_ROOT}/cfb_mirror.sqlite"
 

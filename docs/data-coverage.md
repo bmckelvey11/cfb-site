@@ -4,7 +4,7 @@ Audited 2026-08-26. Two re-runnable scripts answer the two different questions:
 
 ```bash
 python scripts/audit_endpoints.py                      # spec vs code: is every CFBD endpoint covered?
-python scripts/audit_coverage.py --data-dir data       # registry vs disk: is every expected file scraped?
+python scripts/audit_coverage.py       # registry vs disk: is every expected file scraped?
 ```
 
 `audit_endpoints.py` reads the live REST spec (`/api-docs.json`) and partitions all
@@ -21,7 +21,7 @@ Audited 2026-08-28. Every `scrape` and `fetch` run to date used the default
 absent from `data/raw/`** for seasons 1992-2024. Count it from disk:
 
 ```bash
-python -c "import json,collections; [print(y, collections.Counter(x.get('seasonType') for x in json.load(open(f'data/raw/games_{y}.json',encoding='utf-8')))) for y in (2003,2019,2024,2025)]"
+python -c "import json,collections; from cfb_paths import RAW; [print(y, collections.Counter(x.get('seasonType') for x in json.load(open(RAW/f'games_{y}.json',encoding='utf-8')))) for y in (2003,2019,2024,2025)]"
 ```
 
 | File family | `regular` | `postseason` |
@@ -638,7 +638,7 @@ documented exits non-zero.
 Reach a non-default table with:
 
 ```bash
-python -m cfb_system_maker graphql --data-dir data --tables hometown recruitSchool
+python -m cfb_system_maker graphql --tables hometown recruitSchool
 ```
 
 ## 2026 season

@@ -21,12 +21,14 @@ import argparse
 import csv
 import glob
 import json
-import os
 import re
 import sys
 from pathlib import Path
 
-DATA_ROOT = Path(os.environ.get("CFB_DATA_ROOT", Path(__file__).resolve().parent.parent / "data"))
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
 RAW_DIR = DATA_ROOT / "raw"
 INGEST_DIR = DATA_ROOT / "ingest"
 IN_DIR = INGEST_DIR / "massey"

@@ -512,7 +512,7 @@ def main() -> None:
                     help=f"directory holding the archives (default: {DEFAULT_SRC})")
     ap.add_argument("--out", type=Path, default=None,
                     help="output CSV (default: "
-                         "data/ingest/pff_scoreboard/greenline_history_archive.csv)")
+                         "$CFB_DATA_ROOT/ingest/pff_scoreboard/greenline_history_archive.csv)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
 

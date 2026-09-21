@@ -4,8 +4,8 @@ Probit: over ~ z(biasTotals) + z(features), pooled, season-clustered SEs.
 Feature list fixed by research/b4_features/INVENTORY.md -- edit FEATURES
 to the <=4 names chosen there, then never again.
 """
+import sys
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -17,7 +17,18 @@ sys.path.insert(0, str(REPO / "v2"))
 from models_v2 import (censoring_bias, implied_team_points, pick_line,
                        tobit_left_censored_v2)
 
-_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
+_HUB_DATA = DATA_ROOT
 RAW = _HUB_DATA / "raw"
 FEATURES = ["week", "neutralSite", "conferenceGame", "home_dog"]  # fcs_dog → home_dog per BLOCKERS.md 11b2500
 BONFERRONI_P = 0.05 / 4

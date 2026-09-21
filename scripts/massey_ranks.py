@@ -17,7 +17,6 @@ import argparse
 import base64
 import datetime as dt
 import json
-import os
 import re
 import sys
 import time
@@ -25,12 +24,15 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
 BASE = "https://masseyratings.com"
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 )
-DATA_ROOT = Path(os.environ.get("CFB_DATA_ROOT", Path(__file__).resolve().parent.parent / "data"))
 OUT_DIR = DATA_ROOT / "ingest" / "massey"
 
 _TOKEN_RE = re.compile(r'stamp\.jsonURL = "([^"]*)"')

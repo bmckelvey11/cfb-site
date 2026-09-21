@@ -13,10 +13,12 @@ def test_editor_modal_golden_path():
 
     from cfb_system_maker.web import create_app
 
-    if not os.path.exists("data/processed/games.csv"):
-        pytest.skip("requires a built data/ directory (run `sample` or the fetch/build pipeline first)")
+    from cfb_paths import DATA_ROOT
 
-    app = create_app("data")
+    if not (DATA_ROOT / "processed" / "games.csv").exists():
+        pytest.skip("requires a built data root (run `sample` or the fetch/build pipeline first)")
+
+    app = create_app(DATA_ROOT)
     server = make_server("127.0.0.1", 5599, app)
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()

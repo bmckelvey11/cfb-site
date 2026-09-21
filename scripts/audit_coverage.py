@@ -3,7 +3,7 @@
 Re-runnable. Reports per endpoint: expected filenames (from ENDPOINTS + mode)
 vs what's on disk, plus which existing files are empty `[]`.
 
-    python scripts/audit_coverage.py --data-dir data --seasons 2012-2025
+    python scripts/audit_coverage.py --seasons 2012-2025
 """
 from __future__ import annotations
 

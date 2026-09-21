@@ -15,8 +15,8 @@ present:
 
 drift = overUnder - overUnderOpen (positive = total rose toward close).
 """
+import sys
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -26,7 +26,18 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "v2"))
 from models_v2 import _team_censor_bias, implied_team_points, pick_line
 
-_HUB_DATA = Path(os.environ["CFB_DATA_ROOT"])
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
+
+_HUB_DATA = DATA_ROOT
 RAW = _HUB_DATA / "raw"
 SEASONS = range(2013, 2026)
 SIGMA_DOG, SIGMA_FAV = 11.03, 11.78

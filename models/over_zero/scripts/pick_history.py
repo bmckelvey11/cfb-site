@@ -6,12 +6,24 @@ import json
 import math
 import os
 import subprocess
+import sys
 import tempfile
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "cfb_paths.py").is_file():
+            return parent
+    raise RuntimeError("Cannot locate repository root containing cfb_paths.py")
+
+
+sys.path.insert(0, str(_repo_root()))
+from cfb_paths import DATA_ROOT  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 FIELDS = ['model', 'run_at', 'lines_as_of', 'view', 'game_id', 'game_date',
@@ -22,7 +34,7 @@ KEY = ['model', 'run_at', 'view', 'away', 'home']
 
 
 def default_path():
-    return Path(os.environ['CFB_DATA_ROOT']) / 'processed/over_zero/qualified_picks_history.csv'
+    return DATA_ROOT / 'processed/over_zero/qualified_picks_history.csv'
 
 
 def clean(value):

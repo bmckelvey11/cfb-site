@@ -6,16 +6,20 @@ controls, the clusters and the speed buckets are all fixed in the plan.
 
     python scripts/analyze_wind_totals.py [--data-dir data]
 """
-
 from __future__ import annotations
 
 import argparse
 import csv
 import glob
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DATA_ROOT  # noqa: E402
 
 # Pre-registered wind-speed buckets (mph), plan section 2.
 BUCKETS = ((0.0, 7.0), (7.0, 12.0), (12.0, 18.0), (18.0, 1e9))
@@ -195,7 +199,7 @@ def holm(pairs: dict[str, tuple[float, float]]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--data-dir", default="data", type=Path)
+    ap.add_argument("--data-dir", default=DATA_ROOT, type=Path)
     ap.add_argument(
         "--books-only",
         action="store_true",

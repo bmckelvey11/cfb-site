@@ -36,7 +36,9 @@ from cfb_system_maker.enrich import load_features
 from cfb_system_maker.search import beam_search, grade_finalists
 from cfb_system_maker.storage import load_processed_games
 
-DATA_DIR = Path("data")
+from cfb_paths import DATA_ROOT  # noqa: E402
+
+DATA_DIR = DATA_ROOT
 # See module docstring's FINDING -- measured full-scale beam_search alone was
 # 1548.6s; this ceiling adds headroom for grade_finalists' holdout run_backtest
 # calls (each with a 1000-iteration permutation test) on top. Not "minutes not
