@@ -26,7 +26,7 @@
       {% if error == "missing_data" %}
         <div class="empty-state">
           <h2>No processed data found</h2>
-          <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025 --data-dir data</code>, then refresh.</p>
+          <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025</code>, then refresh.</p>
         </div>
       {% else %}
       <div class="dash-columns">
@@ -124,7 +124,7 @@
           {% if panel.state == 'missing' %}
             <div class="empty-state cm-empty">
               <h3>No upcoming games data</h3>
-              <p>Run <code>python -m cfb_system_maker upcoming --data-dir data</code> to fetch this week's games and lines.</p>
+              <p>Run <code>python -m cfb_system_maker upcoming</code> to fetch this week's games and lines.</p>
             </div>
           {% elif panel.state == 'no_systems' %}
             <div class="empty-state cm-empty">

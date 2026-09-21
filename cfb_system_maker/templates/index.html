@@ -162,7 +162,7 @@
           <section class="feature-filters">
             <h3>Feature Filters</h3>
             {% if stale_registry %}
-            <p class="stale-warning">features.json was built with an older field registry — run <code>python -m cfb_system_maker enrich --data-dir data</code> to refresh.</p>
+            <p class="stale-warning">features.json was built with an older field registry — run <code>python -m cfb_system_maker enrich</code> to refresh.</p>
             {% endif %}
             <p class="feature-hint filter-fallback">Check a filter to enable it. Un-checked filters are ignored.</p>
             {# Deliberately has NO name attribute: this input sits inside
@@ -416,7 +416,7 @@
             {% endfor %}
           </section>
           {% else %}
-          <p class="feature-disabled">Run <code>python -m cfb_system_maker enrich --data-dir data</code> to enable feature filters.</p>
+          <p class="feature-disabled">Run <code>python -m cfb_system_maker enrich</code> to enable feature filters.</p>
           {% endif %}
 
           <label class="theory-field full-width">Theory<textarea name="theory" placeholder="Add the theory behind your system.">{{ form.theory }}</textarea></label>
@@ -462,7 +462,7 @@
         {% if error == "missing_data" %}
           <div class="empty-state">
             <h2>No processed data found</h2>
-            <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025 --data-dir data</code>, then refresh.</p>
+            <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025</code>, then refresh.</p>
           </div>
         {% else %}
           <header class="workspace-header">

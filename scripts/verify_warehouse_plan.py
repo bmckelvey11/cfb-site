@@ -29,6 +29,11 @@ from cfb_system_maker.graphql_client import (  # noqa: E402
     GQL_ENTITY_TO_STG,
 )
 
+import sys
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DB_PATH  # noqa: E402
+
 # Section 1's table counts are state, not invariants -- `stg` grows with every new source
 # (PFF's S5 adds ~19 `stg.pff_*` tables, and pff-ingest-plan.md owns that work). Pinning
 # them here would fail step 0 for a non-problem. So the counts are printed, and what gets
@@ -429,7 +434,7 @@ def _selftest_structure() -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--db", default="data/cfb.duckdb")
+    ap.add_argument("--db", default=str(DB_PATH))
     ap.add_argument("--coverage", action="store_true", help="year span per pair, then exit")
     ap.add_argument("--camel", action="store_true", help="list camelCase table names, then exit")
     ap.add_argument("--selftest", action="store_true")

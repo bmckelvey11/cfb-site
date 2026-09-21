@@ -12,7 +12,7 @@ from cfb_system_maker.cli import main
 from cfb_system_maker.duckdb_core import _provider_key, build_core
 from cfb_system_maker.enrich import _build_line_move_index
 from cfb_system_maker.models import GameRecord
-from cfb_system_maker.normalize import MEDIAN_PROVIDER, _select_line, _select_total, normalize_games
+from cfb_system_maker.normalize import _select_line, _select_total, normalize_games
 from cfb_system_maker.running_stats import compute_running_stats
 from cfb_system_maker.storage import load_processed_games, save_processed_games
 
@@ -339,14 +339,9 @@ def test_agreement_2_identity_columns(phase_1a_env):
         assert away_team == g.away_team
         assert home_points == g.home_points
         assert away_points == g.away_points
-        # Line columns deliberately DIVERGE since the builder moved to the median line:
-        # games.csv grades against median-across-books, while core.fact_game keeps the
-        # per-book row (CLV and anything book-specific needs a real book, not a synthetic
-        # one). Assert that divergence positively rather than dropping the guard.
-        assert g.provider == MEDIAN_PROVIDER
-        assert provider_key != MEDIAN_PROVIDER, "warehouse must still name a real book"
-        assert spread is None or isinstance(spread, float)
-        assert total is None or isinstance(total, float)
+        assert provider_key == _provider_key(g.provider)
+        assert spread == g.spread
+        assert total == g.total
 
 
 def test_agreement_3_provider_clone_split_book_total():
@@ -377,15 +372,10 @@ def test_agreement_4_line_move_matches_enrich_index(phase_1a_env):
     data_dir, db, records = phase_1a_env
     index = _build_line_move_index(data_dir, [2023], records)
     assert 1 in index
-    # Game 1 books: teamrankings (spread -3.0), consensus (-7.0, open -6.5, OU 55.5,
-    # OU open 54.0), bovada (OU 54.0). Median close spread = -5.0; median total =
-    # median(55.5, 54.0) = 54.75, snapped away from zero = 55.0. Only consensus posted
-    # opens, so the opens are its numbers -- the move therefore spans different book
-    # sets on each end, which is the documented trade-off in _build_line_move_index.
     assert index[1]["spread_open"] == -6.5
     assert index[1]["total_open"] == 54.0
-    assert index[1]["spread_move"] == pytest.approx(1.5)
-    assert index[1]["total_move"] == pytest.approx(1.0)
+    assert index[1]["spread_move"] == pytest.approx(-0.5)
+    assert index[1]["total_move"] == pytest.approx(1.5)
     # Null open on game 3 → enrich still indexes the game with null opens
     assert 3 in index
     assert index[3]["spread_open"] is None
@@ -400,30 +390,48 @@ def test_agreement_4_line_move_matches_enrich_index(phase_1a_env):
         # game whose selected book CFBD spelled `Draft Kings` resolves to the
         # `draftkings` row the merge keeps. Reimplementing the rule is how the two
         # would drift apart.
-        # games.csv no longer names a book, so there is no single fact_game_line row to
-        # match. What must still hold is that the median the builder graded against sits
-        # inside the range of what the books actually posted -- a median outside its own
-        # inputs means the collapse-by-book step or the snap is wrong.
-        book_spreads = [
-            r[0]
-            for r in con.execute(
-                "SELECT spread_close FROM core.fact_game_line WHERE game_id = ? AND spread_close IS NOT NULL",
-                [game_id],
-            ).fetchall()
-        ]
-        if book_spreads and game.spread is not None:
-            # Half-point snapping can push the median one half step outside a tight range.
-            assert min(book_spreads) - 0.5 <= game.spread <= max(book_spreads) + 0.5
+        provider_key = _provider_key(game.provider)
+        row = con.execute(
+            """
+            SELECT spread_close, spread_open
+            FROM core.fact_game_line
+            WHERE game_id = ? AND provider_key = ?
+            """,
+            [game_id, provider_key],
+        ).fetchone()
+        assert row is not None, f"missing fact_game_line for {game_id}/{provider_key}"
+        spread_close, spread_open = row
+        assert spread_close == game.spread
+        assert spread_open == moves["spread_open"]
+        if spread_open is None:
+            assert moves["spread_move"] is None
+        else:
+            assert moves["spread_move"] == pytest.approx(game.spread - spread_open)
 
-        book_totals = [
-            r[0]
-            for r in con.execute(
-                "SELECT total_close FROM core.fact_game_line WHERE game_id = ? AND total_close IS NOT NULL",
-                [game_id],
-            ).fetchall()
-        ]
-        if book_totals and game.total is not None:
-            assert min(book_totals) - 0.5 <= game.total <= max(book_totals) + 0.5
+        # Totals may be split-book — match selected_total_provider_key row
+        total_provider = con.execute(
+            """
+            SELECT selected_total_provider_key FROM core.fact_game WHERE game_id = ?
+            """,
+            [game_id],
+        ).fetchone()[0]
+        assert total_provider is not None
+        total_row = con.execute(
+            """
+            SELECT total_close, total_open
+            FROM core.fact_game_line
+            WHERE game_id = ? AND provider_key = ?
+            """,
+            [game_id, total_provider],
+        ).fetchone()
+        assert total_row is not None
+        total_close, total_open = total_row
+        assert total_close == game.total
+        assert total_open == moves["total_open"]
+        if total_open is None:
+            assert moves["total_move"] is None
+        else:
+            assert moves["total_move"] == pytest.approx(game.total - total_open)
 
     # Full tape includes non-selected books; opens stay null (fail-closed)
     providers = {

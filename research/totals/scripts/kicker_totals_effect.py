@@ -45,6 +45,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+import sys
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DB_PATH  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
@@ -52,7 +57,7 @@ SKILL = Path.home() / ".claude" / "skills" / "econometrics"
 if SKILL.exists():
     sys.path.insert(0, str(SKILL))
 
-DB = ROOT / "data" / "cfb.duckdb"
+DB = DB_PATH
 
 # Real sportsbooks in core.dim_lines_provider. teamrankings and numberfire are
 # projection sites and are deliberately excluded. `consensus` is an aggregate whose

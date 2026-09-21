@@ -45,12 +45,6 @@ from models_v2 import (  # noqa: E402
     tobit_left_censored_v2,
 )
 
-RAW_DIR = DATA_ROOT / "raw"
-
-
-# ---------------------------------------------------------------------------
-
-
 def _repo_root() -> Path:
     for parent in Path(__file__).resolve().parents:
         if (parent / "cfb_paths.py").is_file():
@@ -60,6 +54,11 @@ def _repo_root() -> Path:
 
 sys.path.insert(0, str(_repo_root()))
 from cfb_paths import DATA_ROOT  # noqa: E402
+
+RAW_DIR = DATA_ROOT / "raw"
+
+
+# ---------------------------------------------------------------------------
 # Data loading: join 1H scores (games) with a 1H line (real CSV or approx)
 # ---------------------------------------------------------------------------
 @dataclass

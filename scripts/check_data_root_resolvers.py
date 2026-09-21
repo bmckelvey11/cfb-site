@@ -39,9 +39,15 @@ SKIP_PARTS = (".claude/worktrees",)
 # history; a command in a living guide is something someone will paste tomorrow.
 RECORD_DIRS = ("docs/superpowers/plans/", "docs/superpowers/specs/", ".solopreneur/")
 DATED_DOC = re.compile(r"-\d{4}-\d{2}-\d{2}\.md$")
-RECORD_FILES = ("floor_bias_1h_chat_history.md",)
+RECORD_FILES = ("floor_bias_1h_chat_history.md", "REVIEW.md", "UI-REVIEW-2026-09-11.md")
 
-SCAN_SUFFIXES = {".py", ".cmd", ".bat", ".ps1", ".json", ".md", ".toml", ".ini", ".cfg"}
+# .html and .ipynb earn their place: the web templates tell operators what to run, and
+# a notebook that opens a relative path reads the empty stray DB at the repo root. The
+# first draft of this scan omitted both and missed 8 live sites because of it.
+SCAN_SUFFIXES = {
+    ".py", ".cmd", ".bat", ".ps1", ".json", ".md", ".toml", ".ini", ".cfg",
+    ".html", ".ipynb",
+}
 
 PHASE_1 = [
     (re.compile(r'set "CFB_DATA_ROOT=%'), "batch fallback to a repo-relative data root"),
@@ -53,6 +59,14 @@ PHASE_1 = [
     # `data` as a Path, it embeds the whole relative path in a string literal.
     (re.compile(r'["\']data/(processed|raw|exports|logs|ingest|graphql)/'), "cwd-relative data path literal"),
     (re.compile(r'create_app\(\s*["\']data["\']\s*\)'), "app pointed at a cwd-relative data dir"),
+    # Two shapes the first draft could not express, each a live default in the tree:
+    # `ROOT / "data" / "cfb.duckdb"` and `default="data/cfb.duckdb"`.
+    # Anchored to a repo-root variable. A bare `/ "data" /` also matches docs asset
+    # directories (`docs/img/../data/`, `research/spread/docs/data/`), which are not
+    # the warehouse and must not be rewritten.
+    (re.compile(r'(REPO|ROOT|parents\[\d\])\s*/\s*["\']data["\']'), 'warehouse path built from a literal "data"'),
+    (re.compile(r'["\']data/[a-z_]+\.(duckdb|csv|json|parquet|sqlite)["\']'), "cwd-relative data file literal"),
+    (re.compile(r"connect\(\s*['\"]cfb\.duckdb['\"]"), "opens the stray repo-root cfb.duckdb"),
 ]
 
 PHASE_2 = PHASE_1 + [
@@ -69,8 +83,12 @@ ALLOW = {
     ("docs/superpowers/plans/2026-09-21-data-root-move.md", None),
     ("docs/superpowers/plans/2026-09-21-data-root-move-review-log.md", None),
     ("docs/data-location-2026-09-21.md", None),
+    # A markdown cell explaining why a relative connect() silently creates an empty
+    # file. It documents the defect rather than committing it, and it is correct.
+    ("basic-betting.py", 'duckdb.connect("cfb.duckdb")'),
 }
 ALLOWED_FILES = {f for f, line in ALLOW if line is None}
+ALLOWED_LINES = {(f, line) for f, line in ALLOW if line is not None}
 
 
 def iter_files():
@@ -102,6 +120,8 @@ def main() -> int:
         except (UnicodeDecodeError, OSError):
             continue
         for lineno, line in enumerate(text.splitlines(), 1):
+            if any(rel == f and frag in line for f, frag in ALLOWED_LINES):
+                continue
             for pat, why in patterns:
                 if pat.search(line):
                     hits.append((rel, lineno, why, line.strip()[:110]))

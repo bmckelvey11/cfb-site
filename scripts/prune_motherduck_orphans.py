@@ -89,6 +89,7 @@ def _assert_local_is_the_promoted_warehouse(con) -> None:
 
 
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", default=DATA_ROOT)
@@ -111,6 +112,8 @@ def main() -> int:
     con.execute(f"ATTACH '{src_path}' AS src (READ_ONLY)")
     con.execute("ATTACH 'md:cfb' AS md")
 
+    _assert_local_is_the_promoted_warehouse(con)
+
     local = {
         (schema, table)
         for schema, table in con.execute(
@@ -126,8 +129,6 @@ def main() -> int:
         SELECT schema_name, table_name, estimated_size FROM duckdb_tables()
         WHERE database_name = 'md' AND schema_name = ANY(?)
         ORDER BY estimated_size DESC
-    _assert_local_is_the_promoted_warehouse(con)
-
         """,
         [args.schemas],
     ).fetchall()

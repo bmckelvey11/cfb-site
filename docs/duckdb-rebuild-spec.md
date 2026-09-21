@@ -21,7 +21,8 @@ Two independent problems, verified against the live file (not estimated):
 ```bash
 python - <<'PY'
 import duckdb
-con = duckdb.connect('data/cfb.duckdb', read_only=True)
+from cfb_paths import DB_PATH
+con = duckdb.connect(str(DB_PATH), read_only=True)
 print(con.execute("SELECT table_schema, COUNT(*) FROM information_schema.tables GROUP BY 1 ORDER BY 1").fetchall())
 print(con.execute("SELECT MAX(loaded_at), COUNT(*) FROM meta.load_report").fetchone())
 print(con.execute("SELECT schema, COUNT(*) FROM meta.load_report GROUP BY 1").fetchall())
@@ -43,7 +44,8 @@ instead in the report's `graphql` rows. One of them is `calendar_gql` — the cl
 ```bash
 python - <<'PY'
 import duckdb
-con = duckdb.connect('data/cfb.duckdb', read_only=True)
+from cfb_paths import DB_PATH
+con = duckdb.connect(str(DB_PATH), read_only=True)
 raw_tables = {r[0] for r in con.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='raw'").fetchall()}
 report_raw = {r[0] for r in con.execute("SELECT name FROM meta.load_report WHERE schema='raw'").fetchall()}
 report_gql = {r[0] for r in con.execute("SELECT name FROM meta.load_report WHERE schema='graphql'").fetchall()}

@@ -13,6 +13,11 @@ from pathlib import Path
 
 import duckdb
 
+import sys
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from cfb_paths import DB_PATH  # noqa: E402
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # (concept, gql_table, rest_table) — both live in `stg` since the collapse (ADR-0003);
@@ -88,7 +93,7 @@ def concept_metrics(
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--db", default="data/cfb.duckdb")
+    ap.add_argument("--db", default=str(DB_PATH))
     args = ap.parse_args()
     con = duckdb.connect(args.db, read_only=True)
     gql_present = {

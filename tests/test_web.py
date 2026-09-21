@@ -1961,7 +1961,7 @@ def test_current_matches_missing_upcoming_file_names_the_cli_command(tmp_path):
 
     assert response.status_code == 200
     panel = _panel(response.get_data(as_text=True))
-    assert "python -m cfb_system_maker upcoming --data-dir data" in panel
+    assert "python -m cfb_system_maker upcoming" in panel
 
 
 def test_current_matches_no_saved_systems_points_at_examples(tmp_path):
