@@ -38,7 +38,13 @@ from cfb_system_maker.graphql_client import (  # noqa: E402
 SPEC_URL = "https://api.collegefootballdata.com/api-docs.json"
 CLIENT_API_DIR = Path(__file__).resolve().parent.parent / "cfbd-python" / "cfbd" / "api"
 # Endpoints CFBD publishes that we deliberately do not register; see docs/data-coverage.md.
-DELIBERATE = {"/info/usage": "account metering, not football data"}
+DELIBERATE = {
+    "/info/usage": "account metering, not football data",
+    # Dropped 2026-09-10, not pending: GraphQL supersedes both under R6 and the REST
+    # pulls were duplicates (docs/warehouse-drop-superseded-2026-09-10.md).
+    "/draft/positions": "superseded by GraphQL draftPosition",
+    "/draft/teams": "superseded by GraphQL draftTeam",
+}
 
 
 def load_spec(src: str) -> dict:

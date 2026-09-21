@@ -285,28 +285,6 @@ _Points Above Average Replacement for kickers on field goals._
 | `preDraftGrade` | int | Pre draft grade. |
 | `hometownInfo` | DraftPickHometownInfo | Recruit's hometown details. — see [DraftPickHometownInfo](#draftpickhometowninfo) |
 
-### `draft_positions`
-
-- **CFBD method:** `DraftApi.get_draft_positions`
-- **Scrape mode:** once (no params)
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | str | Name. |
-| `abbreviation` | str | Short abbreviation. |
-
-### `draft_teams`
-
-- **CFBD method:** `DraftApi.get_draft_teams`
-- **Scrape mode:** once (no params)
-
-| Field | Type | Description |
-|---|---|---|
-| `location` | str | Location details (city/state/lat/lon). |
-| `nickname` | str | Nickname. |
-| `displayName` | str | Full display name. |
-| `logo` | str | Logo. |
-
 ## Drives
 
 ### `drives`
@@ -763,6 +741,9 @@ Same schema as its base endpoint above. `excludeGarbageTime=true` — drops garb
 | `isThrowaway` | bool | Is throwaway. |
 | `isIntentionalGrounding` | bool | Is intentional grounding. |
 | `parseStatus` | PassParseStatus | Parse status. (`complete`, `partial`, `invalid`) |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `success` | bool | Success rate — share of plays gaining enough yardage to be an on-schedule down (per Football Outsiders rules). |
+| `locationAnalysisEligible` | bool | Location analysis eligible. |
 
 ### `passing_players_games`
 
@@ -785,6 +766,17 @@ Same schema as its base endpoint above. `excludeGarbageTime=true` — drops garb
 | `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
 | `totalYardsAfterCatch` | int | Total yards after catch. |
 | `averageYardsAfterCatch` | float | Average yards after catch. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `ppaAttemptsAvailable` | int | PPA attempts available. |
+| `successAttemptsAvailable` | int | Success attempts available. |
+| `successfulAttempts` | int | Successful attempts. |
+| `successfulPpaAttemptsAvailable` | int | Successful PPA attempts available. |
+| `locationEligibleAttempts` | int | Location eligible attempts. |
+| `locationAvailableAttempts` | int | Location available attempts. |
+| `locations` | PassingLocations | Locations. — see [PassingLocations](#passinglocations) |
 | `gameId` | int | Game identifier, joins to the games endpoint. |
 | `season` | int | Season year. |
 | `week` | int | Week number within the season. |
@@ -816,6 +808,17 @@ Same schema as its base endpoint above. `excludeGarbageTime=true` — drops garb
 | `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
 | `totalYardsAfterCatch` | int | Total yards after catch. |
 | `averageYardsAfterCatch` | float | Average yards after catch. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `ppaAttemptsAvailable` | int | PPA attempts available. |
+| `successAttemptsAvailable` | int | Success attempts available. |
+| `successfulAttempts` | int | Successful attempts. |
+| `successfulPpaAttemptsAvailable` | int | Successful PPA attempts available. |
+| `locationEligibleAttempts` | int | Location eligible attempts. |
+| `locationAvailableAttempts` | int | Location available attempts. |
+| `locations` | PassingLocations | Locations. — see [PassingLocations](#passinglocations) |
 | `season` | int | Season year. |
 | `playerId` | str | Player ID. |
 | `player` | str | Player. |
@@ -1310,6 +1313,164 @@ _SRS including FCS opponents, with additional sub-components._
 | `rank` | int | Rank (1 = best) within the given scope. |
 | `team` | str | Team name. |
 | `points` | float | Points value for this rating component. |
+
+## Rushing charting (rush direction, attribution, clock)
+
+### `rushing_plays`
+
+- **CFBD method:** `RushingApi.get_rushing_plays`
+- **Scrape mode:** per season x week
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `playId` | str | Play ID. |
+| `driveId` | str | Drive ID. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `offenseId` | int | Offense ID. |
+| `offense` | str | Offensive-side breakdown. |
+| `offenseConference` | str | Offense team's conference. |
+| `defenseId` | int | Defense ID. |
+| `defense` | str | Defensive-side breakdown. |
+| `defenseConference` | str | Defense team's conference. |
+| `period` | int | Quarter/period number. |
+| `clock` | RushingPlayClock | Game clock at the time of the play/event. — see [RushingPlayClock](#rushingplayclock) |
+| `down` | int | Down number (1-4). |
+| `distance` | int | Yards to go for a first down. |
+| `playText` | str | Human-readable play description. |
+| `startYardline` | int | Start yardline. |
+| `startYardsToGoal` | int | Start yards to goal. |
+| `rusherId` | str | Rusher ID. |
+| `rusher` | str | Rusher. |
+| `rushDirection` | RushDirection | Rush direction. (`left`, `middle`, `right`) |
+| `rushingYards` | int | Rushing yards. |
+| `rusherYards` | int | Rusher yards. |
+| `isRushingTouchdown` | bool | Is rushing touchdown. |
+| `isSack` | bool | Is sack. |
+| `isKneel` | bool | Is kneel. |
+| `isTeamRush` | bool | Is team rush. |
+| `attributionStatus` | RushAttributionStatus | Attribution status. (`individual`, `team`, `multi_carrier`, `unmatched`, `ambiguous`, `conflict`, `unlinked`) |
+| `directionAnalysisEligible` | bool | Direction analysis eligible. |
+| `parseStatus` | RushParseStatus | Parse status. (`complete`, `partial`, `invalid`) |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `success` | bool | Success rate — share of plays gaining enough yardage to be an on-schedule down (per Football Outsiders rules). |
+
+### `rushing_players_games`
+
+- **CFBD method:** `RushingApi.get_player_rushing_by_game`
+- **Scrape mode:** per season x week
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `rushingYardsAvailable` | int | Rushing yards available. |
+| `totalRushingYards` | int | Total rushing yards. |
+| `yardsPerCarry` | float | Yards per carry. |
+| `individualAttempts` | int | Individual attempts. |
+| `unattributedAttempts` | int | Unattributed attempts. |
+| `sacks` | int | Sacks. |
+| `kneels` | int | Kneels. |
+| `teamRushes` | int | Team rushes. |
+| `multiCarrierAttempts` | int | Multi carrier attempts. |
+| `directionEligibleAttempts` | int | Direction eligible attempts. |
+| `directionAvailableAttempts` | int | Direction available attempts. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `lineYards` | float | Yards attributable to the offensive line on run plays (Football Outsiders-style stat). |
+| `lineYardsTotal` | float | Line yards total. |
+| `secondLevelYards` | float | Run yards gained 5-10 yards past the line of scrimmage. |
+| `secondLevelYardsTotal` | float | Second level yards total. |
+| `openFieldYards` | float | Run yards gained 10+ yards past the line of scrimmage. |
+| `openFieldYardsTotal` | float | Open field yards total. |
+| `stuffRate` | float | Share of opponent run plays stopped at or behind the line of scrimmage. |
+| `powerSuccess` | float | Power success. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `directions` | PlayerRushingSeasonDirections | Directions. — see [PlayerRushingSeasonDirections](#playerrushingseasondirections) |
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `playerId` | str | Player ID. |
+| `player` | str | Player. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `opponent` | str | Opponent team name. |
+
+### `rushing_players_season`
+
+- **CFBD method:** `RushingApi.get_player_rushing_by_season`
+- **Scrape mode:** per season
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `rushingYardsAvailable` | int | Rushing yards available. |
+| `totalRushingYards` | int | Total rushing yards. |
+| `yardsPerCarry` | float | Yards per carry. |
+| `individualAttempts` | int | Individual attempts. |
+| `unattributedAttempts` | int | Unattributed attempts. |
+| `sacks` | int | Sacks. |
+| `kneels` | int | Kneels. |
+| `teamRushes` | int | Team rushes. |
+| `multiCarrierAttempts` | int | Multi carrier attempts. |
+| `directionEligibleAttempts` | int | Direction eligible attempts. |
+| `directionAvailableAttempts` | int | Direction available attempts. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `lineYards` | float | Yards attributable to the offensive line on run plays (Football Outsiders-style stat). |
+| `lineYardsTotal` | float | Line yards total. |
+| `secondLevelYards` | float | Run yards gained 5-10 yards past the line of scrimmage. |
+| `secondLevelYardsTotal` | float | Second level yards total. |
+| `openFieldYards` | float | Run yards gained 10+ yards past the line of scrimmage. |
+| `openFieldYardsTotal` | float | Open field yards total. |
+| `stuffRate` | float | Share of opponent run plays stopped at or behind the line of scrimmage. |
+| `powerSuccess` | float | Power success. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `directions` | PlayerRushingSeasonDirections | Directions. — see [PlayerRushingSeasonDirections](#playerrushingseasondirections) |
+| `season` | int | Season year. |
+| `playerId` | str | Player ID. |
+| `player` | str | Player. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+
+### `rushing_teams_games`
+
+- **CFBD method:** `RushingApi.get_team_rushing_by_game`
+- **Scrape mode:** per season x week
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `opponent` | str | Opponent team name. |
+| `offense` | TeamRushingProduction | Offensive-side breakdown. — see [TeamRushingProduction](#teamrushingproduction) |
+| `defense` | TeamRushingProduction | Defensive-side breakdown. — see [TeamRushingProduction](#teamrushingproduction) |
+
+### `rushing_teams_season`
+
+- **CFBD method:** `RushingApi.get_team_rushing_by_season`
+- **Scrape mode:** per season
+- **Data floor:** no data before 2025
+
+| Field | Type | Description |
+|---|---|---|
+| `season` | int | Season year. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `offense` | TeamRushingProduction | Offensive-side breakdown. — see [TeamRushingProduction](#teamrushingproduction) |
+| `defense` | TeamRushingProduction | Defensive-side breakdown. — see [TeamRushingProduction](#teamrushingproduction) |
 
 ## Stats
 
@@ -2221,22 +2382,6 @@ Enum values: `fbs`, `fcs`, `ii`, `ii/iii`, `iii`
 | `state` | str | State/province abbreviation. |
 | `city` | str | City name. |
 
-### DraftPosition
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | str | Name. |
-| `abbreviation` | str | Short abbreviation. |
-
-### DraftTeam
-
-| Field | Type | Description |
-|---|---|---|
-| `location` | str | Location details (city/state/lat/lon). |
-| `nickname` | str | Nickname. |
-| `displayName` | str | Full display name. |
-| `logo` | str | Logo. |
-
 ### Drive
 
 | Field | Type | Description |
@@ -2492,6 +2637,46 @@ Enum values: `completion`, `incompletion`, `interception`
 
 Enum values: `complete`, `partial`, `invalid`
 
+### PassingLocationProduction
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `completions` | int | Completions. |
+| `incompletions` | int | Incompletions. |
+| `interceptions` | int | Interceptions. |
+| `completionRate` | float | Completion rate. |
+| `airYardsAttemptsAvailable` | int | Air yards attempts available. |
+| `totalAirYards` | int | Total air yards. |
+| `averageDepthOfTarget` | float | Average depth of target. |
+| `totalYardsAttemptsAvailable` | int | Total yards attempts available. |
+| `totalYards` | int | Total yards. |
+| `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
+| `totalYardsAfterCatch` | int | Total yards after catch. |
+| `averageYardsAfterCatch` | float | Average yards after catch. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `ppaAttemptsAvailable` | int | PPA attempts available. |
+| `successAttemptsAvailable` | int | Success attempts available. |
+| `successfulAttempts` | int | Successful attempts. |
+| `successfulPpaAttemptsAvailable` | int | Successful PPA attempts available. |
+| `yardsPerAttempt` | float | Yards per attempt. |
+| `airYardsPerAttempt` | float | Air yards per attempt. |
+
+### PassingLocations
+
+| Field | Type | Description |
+|---|---|---|
+| `short left` | PassingLocationProduction | Short left. — see [PassingLocationProduction](#passinglocationproduction) |
+| `short middle` | PassingLocationProduction | Short middle. — see [PassingLocationProduction](#passinglocationproduction) |
+| `short right` | PassingLocationProduction | Short right. — see [PassingLocationProduction](#passinglocationproduction) |
+| `deep left` | PassingLocationProduction | Deep left. — see [PassingLocationProduction](#passinglocationproduction) |
+| `deep middle` | PassingLocationProduction | Deep middle. — see [PassingLocationProduction](#passinglocationproduction) |
+| `deep right` | PassingLocationProduction | Deep right. — see [PassingLocationProduction](#passinglocationproduction) |
+| `unknown` | PassingLocationProduction | Unknown. — see [PassingLocationProduction](#passinglocationproduction) |
+
 ### PassingPlay
 
 | Field | Type | Description |
@@ -2531,6 +2716,9 @@ Enum values: `complete`, `partial`, `invalid`
 | `isThrowaway` | bool | Is throwaway. |
 | `isIntentionalGrounding` | bool | Is intentional grounding. |
 | `parseStatus` | PassParseStatus | Parse status. (`complete`, `partial`, `invalid`) |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `success` | bool | Success rate — share of plays gaining enough yardage to be an on-schedule down (per Football Outsiders rules). |
+| `locationAnalysisEligible` | bool | Location analysis eligible. |
 
 ### PassingPlayClock
 
@@ -2556,6 +2744,17 @@ Enum values: `complete`, `partial`, `invalid`
 | `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
 | `totalYardsAfterCatch` | int | Total yards after catch. |
 | `averageYardsAfterCatch` | float | Average yards after catch. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `ppaAttemptsAvailable` | int | PPA attempts available. |
+| `successAttemptsAvailable` | int | Success attempts available. |
+| `successfulAttempts` | int | Successful attempts. |
+| `successfulPpaAttemptsAvailable` | int | Successful PPA attempts available. |
+| `locationEligibleAttempts` | int | Location eligible attempts. |
+| `locationAvailableAttempts` | int | Location available attempts. |
+| `locations` | PassingLocations | Locations. — see [PassingLocations](#passinglocations) |
 
 ### Play
 
@@ -2718,6 +2917,17 @@ Enum values: `complete`, `partial`, `invalid`
 | `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
 | `totalYardsAfterCatch` | int | Total yards after catch. |
 | `averageYardsAfterCatch` | float | Average yards after catch. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `ppaAttemptsAvailable` | int | PPA attempts available. |
+| `successAttemptsAvailable` | int | Success attempts available. |
+| `successfulAttempts` | int | Successful attempts. |
+| `successfulPpaAttemptsAvailable` | int | Successful PPA attempts available. |
+| `locationEligibleAttempts` | int | Location eligible attempts. |
+| `locationAvailableAttempts` | int | Location available attempts. |
+| `locations` | PassingLocations | Locations. — see [PassingLocations](#passinglocations) |
 | `gameId` | int | Game identifier, joins to the games endpoint. |
 | `season` | int | Season year. |
 | `week` | int | Week number within the season. |
@@ -2745,11 +2955,105 @@ Enum values: `complete`, `partial`, `invalid`
 | `yardsAfterCatchAttemptsAvailable` | int | Yards after catch attempts available. |
 | `totalYardsAfterCatch` | int | Total yards after catch. |
 | `averageYardsAfterCatch` | float | Average yards after catch. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `ppaAttemptsAvailable` | int | PPA attempts available. |
+| `successAttemptsAvailable` | int | Success attempts available. |
+| `successfulAttempts` | int | Successful attempts. |
+| `successfulPpaAttemptsAvailable` | int | Successful PPA attempts available. |
+| `locationEligibleAttempts` | int | Location eligible attempts. |
+| `locationAvailableAttempts` | int | Location available attempts. |
+| `locations` | PassingLocations | Locations. — see [PassingLocations](#passinglocations) |
 | `season` | int | Season year. |
 | `playerId` | str | Player ID. |
 | `player` | str | Player. |
 | `team` | str | Team name. |
 | `conference` | str | Conference name. |
+
+### PlayerRushingGame
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `rushingYardsAvailable` | int | Rushing yards available. |
+| `totalRushingYards` | int | Total rushing yards. |
+| `yardsPerCarry` | float | Yards per carry. |
+| `individualAttempts` | int | Individual attempts. |
+| `unattributedAttempts` | int | Unattributed attempts. |
+| `sacks` | int | Sacks. |
+| `kneels` | int | Kneels. |
+| `teamRushes` | int | Team rushes. |
+| `multiCarrierAttempts` | int | Multi carrier attempts. |
+| `directionEligibleAttempts` | int | Direction eligible attempts. |
+| `directionAvailableAttempts` | int | Direction available attempts. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `lineYards` | float | Yards attributable to the offensive line on run plays (Football Outsiders-style stat). |
+| `lineYardsTotal` | float | Line yards total. |
+| `secondLevelYards` | float | Run yards gained 5-10 yards past the line of scrimmage. |
+| `secondLevelYardsTotal` | float | Second level yards total. |
+| `openFieldYards` | float | Run yards gained 10+ yards past the line of scrimmage. |
+| `openFieldYardsTotal` | float | Open field yards total. |
+| `stuffRate` | float | Share of opponent run plays stopped at or behind the line of scrimmage. |
+| `powerSuccess` | float | Power success. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `directions` | PlayerRushingSeasonDirections | Directions. — see [PlayerRushingSeasonDirections](#playerrushingseasondirections) |
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `playerId` | str | Player ID. |
+| `player` | str | Player. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `opponent` | str | Opponent team name. |
+
+### PlayerRushingSeason
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `rushingYardsAvailable` | int | Rushing yards available. |
+| `totalRushingYards` | int | Total rushing yards. |
+| `yardsPerCarry` | float | Yards per carry. |
+| `individualAttempts` | int | Individual attempts. |
+| `unattributedAttempts` | int | Unattributed attempts. |
+| `sacks` | int | Sacks. |
+| `kneels` | int | Kneels. |
+| `teamRushes` | int | Team rushes. |
+| `multiCarrierAttempts` | int | Multi carrier attempts. |
+| `directionEligibleAttempts` | int | Direction eligible attempts. |
+| `directionAvailableAttempts` | int | Direction available attempts. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `lineYards` | float | Yards attributable to the offensive line on run plays (Football Outsiders-style stat). |
+| `lineYardsTotal` | float | Line yards total. |
+| `secondLevelYards` | float | Run yards gained 5-10 yards past the line of scrimmage. |
+| `secondLevelYardsTotal` | float | Second level yards total. |
+| `openFieldYards` | float | Run yards gained 10+ yards past the line of scrimmage. |
+| `openFieldYardsTotal` | float | Open field yards total. |
+| `stuffRate` | float | Share of opponent run plays stopped at or behind the line of scrimmage. |
+| `powerSuccess` | float | Power success. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `directions` | PlayerRushingSeasonDirections | Directions. — see [PlayerRushingSeasonDirections](#playerrushingseasondirections) |
+| `season` | int | Season year. |
+| `playerId` | str | Player ID. |
+| `player` | str | Player. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+
+### PlayerRushingSeasonDirections
+
+| Field | Type | Description |
+|---|---|---|
+| `unknown` | RushingDirectionProduction | Unknown. — see [RushingDirectionProduction](#rushingdirectionproduction) |
+| `right` | RushingDirectionProduction | Right. — see [RushingDirectionProduction](#rushingdirectionproduction) |
+| `middle` | RushingDirectionProduction | Middle. — see [RushingDirectionProduction](#rushingdirectionproduction) |
+| `left` | RushingDirectionProduction | Left. — see [RushingDirectionProduction](#rushingdirectionproduction) |
 
 ### PlayerSearchResult
 
@@ -3092,6 +3396,83 @@ Enum values: `JUCO`, `PrepSchool`, `HighSchool`
 | `homeCountyFIPS` | str | Home county f i p s. |
 | `recruitIds` | List[str] | Recruit IDs. |
 
+### RushAttributionStatus
+
+Enum values: `individual`, `team`, `multi_carrier`, `unmatched`, `ambiguous`, `conflict`, `unlinked`
+
+### RushDirection
+
+Enum values: `left`, `middle`, `right`
+
+### RushParseStatus
+
+Enum values: `complete`, `partial`, `invalid`
+
+### RushingDirectionProduction
+
+| Field | Type | Description |
+|---|---|---|
+| `carries` | int | Carries. |
+| `yards` | int | Yards. |
+| `yardsPerCarry` | float | Yards per carry. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `lineYards` | float | Yards attributable to the offensive line on run plays (Football Outsiders-style stat). |
+| `lineYardsTotal` | float | Line yards total. |
+| `secondLevelYards` | float | Run yards gained 5-10 yards past the line of scrimmage. |
+| `secondLevelYardsTotal` | float | Second level yards total. |
+| `openFieldYards` | float | Run yards gained 10+ yards past the line of scrimmage. |
+| `openFieldYardsTotal` | float | Open field yards total. |
+| `stuffRate` | float | Share of opponent run plays stopped at or behind the line of scrimmage. |
+| `powerSuccess` | float | Power success. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+
+### RushingPlay
+
+| Field | Type | Description |
+|---|---|---|
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `playId` | str | Play ID. |
+| `driveId` | str | Drive ID. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `offenseId` | int | Offense ID. |
+| `offense` | str | Offensive-side breakdown. |
+| `offenseConference` | str | Offense team's conference. |
+| `defenseId` | int | Defense ID. |
+| `defense` | str | Defensive-side breakdown. |
+| `defenseConference` | str | Defense team's conference. |
+| `period` | int | Quarter/period number. |
+| `clock` | RushingPlayClock | Game clock at the time of the play/event. — see [RushingPlayClock](#rushingplayclock) |
+| `down` | int | Down number (1-4). |
+| `distance` | int | Yards to go for a first down. |
+| `playText` | str | Human-readable play description. |
+| `startYardline` | int | Start yardline. |
+| `startYardsToGoal` | int | Start yards to goal. |
+| `rusherId` | str | Rusher ID. |
+| `rusher` | str | Rusher. |
+| `rushDirection` | RushDirection | Rush direction. (`left`, `middle`, `right`) |
+| `rushingYards` | int | Rushing yards. |
+| `rusherYards` | int | Rusher yards. |
+| `isRushingTouchdown` | bool | Is rushing touchdown. |
+| `isSack` | bool | Is sack. |
+| `isKneel` | bool | Is kneel. |
+| `isTeamRush` | bool | Is team rush. |
+| `attributionStatus` | RushAttributionStatus | Attribution status. (`individual`, `team`, `multi_carrier`, `unmatched`, `ambiguous`, `conflict`, `unlinked`) |
+| `directionAnalysisEligible` | bool | Direction analysis eligible. |
+| `parseStatus` | RushParseStatus | Parse status. (`complete`, `partial`, `invalid`) |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `success` | bool | Success rate — share of plays gaining enough yardage to be an on-schedule down (per Football Outsiders rules). |
+
+### RushingPlayClock
+
+| Field | Type | Description |
+|---|---|---|
+| `minutes` | int | Minutes. |
+| `seconds` | int | Seconds. |
+
 ### ScoreboardGame
 
 | Field | Type | Description |
@@ -3363,6 +3744,62 @@ Enum values: `allstar`, `postseason`, `preseason`, `regular`, `spring_postseason
 | `rank` | int | Rank (1 = best) within the given scope. |
 | `team` | str | Team name. |
 | `points` | float | Points value for this rating component. |
+
+### TeamRushingGame
+
+| Field | Type | Description |
+|---|---|---|
+| `gameId` | int | Game identifier, joins to the games endpoint. |
+| `season` | int | Season year. |
+| `week` | int | Week number within the season. |
+| `seasonType` | SeasonType | `regular` or `postseason`. (`regular`, `postseason`, `both`, `allstar`, `spring_regular`, `spring_postseason`) |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `opponent` | str | Opponent team name. |
+| `offense` | TeamRushingProduction | Offensive-side breakdown. — see [TeamRushingProduction](#teamrushingproduction) |
+| `defense` | TeamRushingProduction | Defensive-side breakdown. — see [TeamRushingProduction](#teamrushingproduction) |
+
+### TeamRushingProduction
+
+| Field | Type | Description |
+|---|---|---|
+| `attempts` | int | Attempts. |
+| `rushingYardsAvailable` | int | Rushing yards available. |
+| `totalRushingYards` | int | Total rushing yards. |
+| `yardsPerCarry` | float | Yards per carry. |
+| `individualAttempts` | int | Individual attempts. |
+| `unattributedAttempts` | int | Unattributed attempts. |
+| `sacks` | int | Sacks. |
+| `kneels` | int | Kneels. |
+| `teamRushes` | int | Team rushes. |
+| `multiCarrierAttempts` | int | Multi carrier attempts. |
+| `directionEligibleAttempts` | int | Direction eligible attempts. |
+| `directionAvailableAttempts` | int | Direction available attempts. |
+| `successRate` | float | Success rate. |
+| `ppa` | float | Predicted Points Added — CFBD's play-value metric, similar to EPA. |
+| `totalPpa` | float | Total PPA. |
+| `lineYards` | float | Yards attributable to the offensive line on run plays (Football Outsiders-style stat). |
+| `lineYardsTotal` | float | Line yards total. |
+| `secondLevelYards` | float | Run yards gained 5-10 yards past the line of scrimmage. |
+| `secondLevelYardsTotal` | float | Second level yards total. |
+| `openFieldYards` | float | Run yards gained 10+ yards past the line of scrimmage. |
+| `openFieldYardsTotal` | float | Open field yards total. |
+| `stuffRate` | float | Share of opponent run plays stopped at or behind the line of scrimmage. |
+| `powerSuccess` | float | Power success. |
+| `explosiveness` | float | Average PPA on successful plays — a measure of big-play ability. |
+| `directions` | PlayerRushingSeasonDirections | Directions. — see [PlayerRushingSeasonDirections](#playerrushingseasondirections) |
+| `touchdownStatusAvailable` | int | Touchdown status available. |
+| `rushingTouchdowns` | int | Rushing touchdowns. |
+
+### TeamRushingSeason
+
+| Field | Type | Description |
+|---|---|---|
+| `season` | int | Season year. |
+| `team` | str | Team name. |
+| `conference` | str | Conference name. |
+| `offense` | TeamRushingProduction | Offensive-side breakdown. — see [TeamRushingProduction](#teamrushingproduction) |
+| `defense` | TeamRushingProduction | Defensive-side breakdown. — see [TeamRushingProduction](#teamrushingproduction) |
 
 ### TeamSP
 

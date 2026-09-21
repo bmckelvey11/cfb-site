@@ -126,6 +126,13 @@ ENDPOINTS: list[Endpoint] = [
     Endpoint("recruiting_groups", "RecruitingApi", "get_aggregated_team_recruiting_ratings", ONCE),
     Endpoint("recruits", "RecruitingApi", "get_recruits", SEASON),
     Endpoint("recruiting_teams", "RecruitingApi", "get_team_recruiting_rankings", SEASON),
+    # Rushing (charting: rush direction, attribution, clock. Same 2025 floor as Passing -
+    # /rushing/players/season returns 0 rows for 2022-2024 and 1,622 for 2025.)
+    Endpoint("rushing_plays", "RushingApi", "get_rushing_plays", SEASON_WEEK, min_season=2025),
+    Endpoint("rushing_players_games", "RushingApi", "get_player_rushing_by_game", SEASON_WEEK, min_season=2025),
+    Endpoint("rushing_players_season", "RushingApi", "get_player_rushing_by_season", SEASON, min_season=2025),
+    Endpoint("rushing_teams_games", "RushingApi", "get_team_rushing_by_game", SEASON_WEEK, min_season=2025),
+    Endpoint("rushing_teams_season", "RushingApi", "get_team_rushing_by_season", SEASON, min_season=2025),
     # Stats
     Endpoint("advanced_game_stats", "StatsApi", "get_advanced_game_stats", SEASON),
     Endpoint("advanced_season_stats", "StatsApi", "get_advanced_season_stats", SEASON),

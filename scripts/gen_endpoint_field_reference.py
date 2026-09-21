@@ -37,7 +37,8 @@ API_FILE_MAP = {
     "InfoApi": "info_api.py", "MetricsApi": "metrics_api.py", "PassingApi": "passing_api.py",
     "PlayersApi": "players_api.py",
     "PlaysApi": "plays_api.py", "PlayoffsApi": "playoffs_api.py", "RankingsApi": "rankings_api.py",
-    "RatingsApi": "ratings_api.py", "RecruitingApi": "recruiting_api.py", "StatsApi": "stats_api.py",
+    "RatingsApi": "ratings_api.py", "RecruitingApi": "recruiting_api.py",
+    "RushingApi": "rushing_api.py", "StatsApi": "stats_api.py",
     "TeamsApi": "teams_api.py", "VenuesApi": "venues_api.py",
 }
 
@@ -64,6 +65,7 @@ CATEGORY_FOR_API = {
     "RankingsApi": "Rankings / polls",
     "RatingsApi": "Ratings (SP+, FPI, Elo, SRS)",
     "RecruitingApi": "Recruiting",
+    "RushingApi": "Rushing charting (rush direction, attribution, clock)",
     "StatsApi": "Stats",
     "TeamsApi": "Teams",
     "VenuesApi": "Venues",

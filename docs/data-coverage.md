@@ -131,53 +131,59 @@ Other analyses that silently inherit the gap:
 | `scripts/analyze_coach_styles.py:231` | style clusters fit on regular-season games only |
 | `scrapers.py:441` per-game seed | per-game stats for bowls never requested |
 
-## Every CFBD spec path is registered but eight
+## Every CFBD spec path is registered but three, all deliberate
 
 Re-audited **2026-09-21** against live spec **5.27.1** (`python scripts/audit_endpoints.py`).
-The spec has grown 74 → **84 paths**: **76 registered**, **3 in the client but
-unregistered**, **5 with no client method**. The ceiling is the vendored client again.
-The eight unregistered paths split three ways — 5 bump-blocked (`/rushing/*`),
-2 registerable today (`/draft/positions`, `/draft/teams`), 1 deliberate (`/info/usage`).
+The spec has grown 74 → **84 paths**. The audit found 76 registered, 5 with no client
+method, and 3 in the client but unregistered; the vendored client was bumped the same
+day and the five are now registered, leaving **81 registered + 3 deliberate = 84 of 84**.
+Nothing is blocked on the client.
 
 CFBD's API server is now open source — [`CFBD/cfb-api-v2`](https://github.com/CFBD/cfb-api-v2),
 TypeScript/TSOA, one `src/app/<domain>/controller.ts` per route family, and a
 `CHANGELOG.md` that is the release log. That is the place to read what is coming; the
 deployed `/api-docs.json` is what we can actually call today, and the two differ.
 
-### Blocked on a `cfbd-python` bump — the `/rushing/*` family (5 paths)
+### The `/rushing/*` family — the gap the bump closed (5 paths)
 
 Shipped server-side 2026-09-03 (`5.26.0`, "enhanced rushing api"): `/rushing/plays`,
 `/rushing/players/season`, `/rushing/players/games`, `/rushing/teams/season`,
-`/rushing/teams/games`. The vendored client has no `RushingApi`, so `scrape` cannot
-reach them at all — `_call_raw` resolves the method by name off a `cfbd` API class, so a
+`/rushing/teams/games`. Client 5.25.0 had no `RushingApi`, so `scrape` could not reach
+them at all — `_call_raw` resolves the method by name off a `cfbd` API class, so a
 missing *route* is a hard block (a missing *response field* is not; see below).
 
 This is not the same thing as the existing `adjusted_player_rushing` row, which is
 `/wepa/players/rushing` — opponent-adjusted season aggregates, not the new play-level
 rushing family with `rushDirection` / `attributionStatus` / `isTeamRush` filters.
 
-`cfbd-python/` is pinned at OpenAPI **5.25.0**; PyPI `cfbd` is at **5.27.1**, which is
-exactly the deployed spec. Upstream `main` carries `cfbd/api/rushing_api.py` with the
-five methods a registry row would resolve (`get_rushing_plays`,
-`get_player_rushing_by_season|_by_game`, `get_team_rushing_by_season|_by_game`), so one
-bump closes all five — verified against the upstream repo, not the installed wheel.
-Unknown going in: whether 5.27.1 still needs `.venv-cfbd`
+Vendored `cfbd-python/` went **5.25.0 → 5.27.1** (the published wheel, `cfbd/` package
+only), which is exactly the deployed spec. The swap was additive: 15 new files
+(`rushing_api.py` plus the rushing and pass-location models), no method on any existing
+API renamed or removed, and `requirements.txt` untouched — upstream still pins
+`pydantic < 2`, so CFBD fetches still need `.venv-cfbd`
 (see [fetch-venv-2026-09-17.md](fetch-venv-2026-09-17.md)).
 
-### Registerable now, no bump needed (2 paths)
+All five are registered with **`min_season=2025`**, the same charting floor as Passing:
+`/rushing/players/season` returns 0 rows for 2022-2024 and 1,622 for 2025. `plays`,
+`players/games` and `teams/games` are `SEASON_WEEK` — all three 400 with
+`team or week is required` when given `year` alone. Tables are not created yet; this is
+registration only.
 
-`/draft/positions` and `/draft/teams` — `DraftApi.get_draft_positions` /
-`get_draft_teams` exist in the vendored client and are unregistered. Both are static
-dimension tables, `ONCE` mode.
+### Not scraped — superseded by GraphQL (2 paths)
+
+`/draft/positions` and `/draft/teams` exist in the client and are **deliberately**
+unregistered: GraphQL `draftPosition` / `draftTeam` supersede them under R6 and the REST
+pulls were duplicates (`docs/warehouse-drop-superseded-2026-09-10.md`). Pinned by
+`tests/test_scrapers.py`, which asserts neither name is in the registry.
 
 ### New response fields arrive without a bump; new *parameters* do not
 
 `5.27.0` (2026-09-07) added pass-location breakdowns to the passing endpoints. The
 deployed `/passing/plays` parameter list is unchanged from what the 5.25.0 client
-sends, so this is a response-shape change only — and `_call_raw` bypasses pydantic and
+sent, so this is a response-shape change only — and `_call_raw` bypasses pydantic and
 saves raw JSON, so the new fields land in `data/raw/` on the next scrape with no code
-change. What *is* stale: [cfbd-endpoint-field-reference.md](cfbd-endpoint-field-reference.md),
-generated off the client's models, won't show them until the bump.
+change. [cfbd-endpoint-field-reference.md](cfbd-endpoint-field-reference.md) is
+generated off the client's models, so it only picked them up at the bump.
 
 A new query *parameter* is the opposite case — the generated method signature is
 load-bearing, so it needs the bump.
