@@ -137,11 +137,14 @@ probably overstates and ignoring them throws away 201 bets. **The planning prior
 counts them at half weight** (κ = 0.5). Every recommendation in this document is
 made on it.
 
-| prior | record | mean | P(true rate below break-even) | median at 1%, rest of 2026 | P(−25%) at 1% |
+| prior | record | posterior mean | P(true rate below break-even) | median at 1%, rest of 2026 | P(−25%) at 1% |
 |---|---|---:|---:|---:|---:|
 | `n58`, published under list only | 32–26 | 55.1% | 34% | $21,174 (+5.9%) | 2.9% |
 | **planning**, κ = 0.5 | **89–69.5** | **56.1%** | **17%** | **$21,633 (+8.2%)** | **0.7%** |
 | `pooled`, κ = 1 | 146–113 | 56.4% | 10% | $21,725 (+8.6%) | 0.4% |
+
+The mean column is the Jeffreys posterior mean the simulator draws from, which is why
+the under list reads 55.1% here and 55.2% as a raw record in §3.
 
 Two flag-level sensitivities, not used for any recommendation: all 106 totals
 flags (58–48) put the κ = 0.5 mean at 55.7%, and under flags only (46–42) put it
@@ -245,12 +248,14 @@ third of seasons. That is the price of the growth frame; 0.5% halves both.
 **The recommendation was stress-tested.** An outside review asked whether the unit
 holds when the over-zero haircut is uncertain, the Greenline prior is weaker, bets 7–12
 each week are worse, and same-slate correlation is up to five times the assumed value.
-Under the 3% cap: 0.5% passes all 25 scenarios; **1% passes 17 of 25** (15 a week ago),
-failing when the prior is the under list alone combined with another insult, or ρ ≥ 0.2
-on that prior; 1.2% passes 13. 1% passes the combined skeptical case built on the
-planning prior (P(−25%) 1.7%). Details in
-[`bankroll-stress-2026-09-17.md`](bankroll-stress-2026-09-17.md); the regenerated grid
-is [`bankroll-stress-table-2026-09-21.md`](bankroll-stress-table-2026-09-21.md).
+Under the 3% cap: 0.5% passes all 25 scenarios; **1% passes 17 of 25**, failing at
+ρ ≥ 0.2 on the under-list prior, at ρ = 0.5 on any prior, on the under-list prior
+combined with a weaker over-zero or a marginal-bet penalty, and on the two harsher
+combined cases; 1.2% passes 13. 1% passes the combined skeptical case built on the
+planning prior (P(−25%) 1.7%). The full regenerated grid is
+[`bankroll-stress-table-2026-09-21.md`](bankroll-stress-table-2026-09-21.md); the
+reasoning behind the scenarios is [`bankroll-stress-2026-09-17.md`](bankroll-stress-2026-09-17.md),
+written when 1% passed 15 of 25 on the thinner week-2 prior.
 
 ## 8. What this does not support
 

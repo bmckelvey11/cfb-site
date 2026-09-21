@@ -65,8 +65,8 @@ OZ_SELECTION_HAIRCUT = (OZ_WINS / (OZ_WINS + OZ_LOSSES)) - 0.582  # ~0.063
 
 # Volume, weeks 4-15. over-zero week-4+ counts by season: 2021..2025 = 8,11,9,11,14.
 OZ_WEEK4PLUS_HISTORY = (8, 11, 9, 11, 14)
-# Greenline: 49 gradeable totals flags in week 2, 57 flagged in week 3. 49 is the
-# graded count and the conservative floor of the two; it is the `constant` volume.
+# Greenline: 49 totals flags in week 2, 57 in week 3, all now graded. 49 is the
+# conservative floor of the two; it is the `constant` volume, unused here.
 GL_FLAGS_PER_WEEK = 49.0
 # But Greenline flags EVERY FBS-vs-FBS game: week 2 had 49 such games and 49 flags,
 # week 3 had 57 and 57. So the weekly count is the slate, and the slate is known.
