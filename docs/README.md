@@ -137,6 +137,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [sports-insights-systems-combined-guide.md](sports-insights-systems-combined-guide.md) | Source material for the above two |
 | [autostart-audit-2026-09-15.md](autostart-audit-2026-09-15.md) | Autostart / scheduled-task audit |
 | [repo-restructure-plan.md](repo-restructure-plan.md) | The 2026-08-31 restructure (executed; sets this file's scope rule) |
+| [data-location-2026-09-21.md](data-location-2026-09-21.md) | Should `data/` live inside the repo? (recommends moving to `~\data\cfb`) |
 | [methodology/todo-system.md](methodology/todo-system.md) | How `TODO.md` works |
 | [intent/new-system-type-catalog.md](intent/new-system-type-catalog.md) | Intent: New System type catalog |
 | [reminders.md](reminders.md) | Loose reminders (scratch-adjacent) |
