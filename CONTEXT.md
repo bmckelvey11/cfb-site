@@ -78,7 +78,7 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Stress scenario** — a projection run with one or more skeptical knobs on (over-zero centre and spread, κ, marginal-bet penalty, ρ). The decision is the unit that passes the cap across all of them, not any one scenario as the true model. (method: `docs/methods.md`)
 - **Exposure** — total stake on one weekend as a share of the bankroll. Twelve unders and four overs at 1% is 16%; the over-zero guide's own caution is 8–10% a slate. The projection assumes the higher figure.
 - **Bet to** — over-zero's walk-away number: the highest total at which an OVER still qualifies. A line above it is a pass; `betTo` in the board JSON. (`models/over_zero/docs/bet-to-2026-09-11.md`)
-- **Price rule** — the projection prices Greenline at −110 and over-zero at −120; a bet at a worse price than its leg's assumption is a pass, and the week's list shops the best book first. (`research/bankroll/docs/seed-bankroll-proposal-2026-09-17.md`)
+- **Price rule** — the projection prices Greenline at −110 and over-zero at −120; a bet at a worse price than its leg's assumption is a pass, and the week's list shops the best book first. (`research/bankroll/docs/seed-bankroll-proposal-2026-09-21.md`)
 
 ## Scoring distribution
 

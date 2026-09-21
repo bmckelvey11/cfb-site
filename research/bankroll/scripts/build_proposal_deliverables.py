@@ -3,10 +3,10 @@
     python research/bankroll/scripts/build_proposal_deliverables.py
     python research/bankroll/scripts/build_proposal_deliverables.py --self-check
 
-Inputs: docs/seed-bankroll-proposal-2026-09-17.md, the two figures in docs/figs/,
+Inputs: docs/seed-bankroll-proposal-2026-09-21.md, the two figures in docs/figs/,
 and the sweep CSV. Outputs, next to the markdown:
-    seed-bankroll-proposal-2026-09-17.pdf     markdown -> HTML -> Chrome headless print
-    seed-bankroll-proposal-2026-09-17.pptx    python-pptx, numbers read from the CSV
+    seed-bankroll-proposal-2026-09-21.pdf     markdown -> HTML -> Chrome headless print
+    seed-bankroll-proposal-2026-09-21.pptx    python-pptx, numbers read from the CSV
 
 Needs `markdown` and `python-pptx` (system Python has both; the repo .venv does not)
 and Chrome (or Edge) for the PDF step.
@@ -30,10 +30,10 @@ GL_UNIT_TODAY = 0.01   # the rule's answer today: min(quarter Kelly 1.31%, 3% ca
 
 OZ_TOTAL = sum(OZ_WEEK4PLUS_HISTORY) / len(OZ_WEEK4PLUS_HISTORY)  # ~10.6 bets, weeks 4-15
 DOCS = Path(__file__).resolve().parents[1] / "docs"
-STEM = "seed-bankroll-proposal-2026-09-17"
-SWEEP = DOCS / "bankroll-config-sweep-2026-09-17.csv"
-FIG_GROWTH = DOCS / "figs" / "pooled-bankroll-growth-2026-09-17.png"
-FIG_SWEEP = DOCS / "figs" / "bankroll-config-sweep-2026-09-17.png"
+STEM = "seed-bankroll-proposal-2026-09-21"
+SWEEP = DOCS / "bankroll-config-sweep-2026-09-21.csv"
+FIG_GROWTH = DOCS / "figs" / "pooled-bankroll-growth-2026-09-21.png"
+FIG_SWEEP = DOCS / "figs" / "bankroll-config-sweep-2026-09-21.png"
 # Chrome first: Edge headless on this machine intermittently prints a 1-page stray
 # render instead of the URL, even with an isolated profile. Chrome has not.
 BROWSERS = (Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
@@ -92,7 +92,7 @@ def build_pptx() -> Path:
 
     rows = sweep_rows()
     plan10, plan05 = rows[("k0.5", 0.01)], rows[("k0.5", 0.005)]
-    n49_10, pooled10 = rows[("n49", 0.01)], rows[("pooled", 0.01)]
+    n49_10, pooled10 = rows[("n58", 0.01)], rows[("pooled", 0.01)]
     p_plan = planning_p_gl(0.5)
     qk = kelly_unit(p_plan, -110)
 
@@ -152,7 +152,7 @@ def build_pptx() -> Path:
         "Not an investment, not a loan, not a security.",
         "Every number here comes from a script in the repository and carries its uncertainty.",
     ], 18, color=MUTED)
-    text(s, 0.8, 6.4, 11.5, 0.5, "Prepared September 17, 2026", 12, color=MUTED)
+    text(s, 0.8, 6.4, 11.5, 0.5, "Prepared September 21, 2026", 12, color=MUTED)
 
     # 2 the ask
     s = slide("The ask")
@@ -172,8 +172,8 @@ def build_pptx() -> Path:
     table(s, 0.6, 1.7, 12.1, [
         ["", "Over-zero (floor-bias OVERs)", "Greenline totals (PFF flags, ~85% unders)"],
         ["what it is", "in-house model: totals pinned too low against heavy favorites", "vendor projection disagreeing with the market"],
-        ["record", "151–83, 64.5% (58.2–70.4%), walk-forward 2016–25", "27–22, 55.1% (41–68%), 2026 wk 2; + 114–87 personal unders 2023–25"],
-        ["planning win rate", "58.2%, the interval's lower endpoint", f"{p_plan:.1%}: 2026 flags + 2023–25 unders at half weight. Bracket 55.0% to 56.4%"],
+        ["record", "151–83, 64.5% (58.2–70.4%), walk-forward 2016–25; 21–9 on the 2026 board", "32–26, 55.2% (42.5–67.3%), published 2026 under list wks 2–3; + 114–87 personal unders 2023–25"],
+        ["planning win rate", "58.2%, the interval's lower endpoint", f"{p_plan:.1%}: published under list + 2023–25 unders at half weight. Bracket 55.1% to 56.4%"],
         ["price", "−120 or better", "−110"],
         ["bets left in 2026", "~11, median +$133; 30–51 in a full season", "6–12 a week by plan, ~107 in 2026, ~134 in 2027"],
         ["role", "better evidence, nearly spent for 2026; ~a third of 2027's profit", "carries the 2026 projection"],
@@ -224,7 +224,7 @@ def build_pptx() -> Path:
         f"Quarter Kelly off the planning prior ({p_plan:.1%}), shrunk for 9 simultaneous bets: {qk:.2%}.",
         f"The 3% cap binds first: 1% has P(−25%) {plan10['p_m25']:.1%}; 1.5% fails at 3.8%. Unit today: 1%.",
         "",
-        f"At 1%: median {money(plan10['median'])} planning / {money(n49_10['median'])} n49 / {money(pooled10['median'])} pooled. "
+        f"At 1%: median {money(plan10['median'])} planning / {money(n49_10['median'])} n58 / {money(pooled10['median'])} pooled. "
         f"5th pct {money(plan10['p5'])}. P(−25%) {plan10['p_m25']:.1%} / {n49_10['p_m25']:.1%} / {pooled10['p_m25']:.1%}.",
         "",
         f"0.5% is the all-weather fallback: median {money(plan05['median'])}, P(−25%) {plan05['p_m25']:.2%}.",
@@ -235,7 +235,7 @@ def build_pptx() -> Path:
     # 6 risk
     s = slide("Risk, stated plainly", "At 1% / 1% units, re-sized weekly, rest of 2026. No stop-loss.")
     table(s, 0.6, 1.7, 8.4, [
-        ["measure", "planning prior", "n49 bracket", "pooled bracket"],
+        ["measure", "planning prior", "n58 bracket", "pooled bracket"],
         ["P(season ends below $20,000)", f"{plan10['p_down']:.1%}", f"{n49_10['p_down']:.1%}", f"{pooled10['p_down']:.1%}"],
         ["P(ends below $15,000)", f"{plan10['p_m25']:.1%}", f"{n49_10['p_m25']:.1%}", f"{pooled10['p_m25']:.1%}"],
         ["P(passes through $0)", "0 of 50,000", "0 of 50,000", "0 of 50,000"],
@@ -258,7 +258,7 @@ def build_pptx() -> Path:
     # 7 does not support
     s = slide("What the numbers do not support")
     text(s, 0.6, 1.5, 12, 5.5, [
-        "• Greenline as independently validated. n=49 in 2026, interval 41–68%. The planning prior is half personal history of the same signal.",
+        "• Greenline as independently validated. n=58 in 2026, interval 42.5–67.3%. The planning prior is half personal history of the same signal.",
         "• The 2027 numbers as a forecast. They assume the edge persists unchanged on 2025's schedule.",
         "• Golf. No record, no price, no volume. A placeholder leg until graded.",
         "• A reproducible selection rule. 'Bet 6–12 of the week's flags' is a volume plan; no script picks which ones.",
@@ -286,7 +286,7 @@ def build_pptx() -> Path:
 
 def self_check() -> None:
     rows = sweep_rows()
-    rec = rows[("pooled", 0.005)], rows[("n49", 0.005)]
+    rec = rows[("pooled", 0.005)], rows[("n58", 0.005)]
     assert all(r["p_m25"] <= 0.01 and r["p_bust"] == 0 for r in rec), rec
     assert all(r["median"] > 20_000 for r in rec)
     assert FIG_GROWTH.exists() and FIG_SWEEP.exists()

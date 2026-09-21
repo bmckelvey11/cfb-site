@@ -1,3 +1,5 @@
+**Superseded by** [bankroll-config-sweep-2026-09-21.md](../../research/bankroll/docs/bankroll-config-sweep-2026-09-21.md)
+
 ### `k0.5` prior
 
 | GL unit | coverage | GL bets | staked | median | 5th | 95th | P(down) | P(-25%) | busts | ratio | passes (a) |

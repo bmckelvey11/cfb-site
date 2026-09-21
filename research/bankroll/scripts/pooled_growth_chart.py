@@ -5,9 +5,9 @@
     python research/bankroll/scripts/pooled_growth_chart.py --self-check
 
 The unit rule is to bracket both priors. This chart deliberately does not: it was
-asked for as "the pooled edge, charted", so it conditions on the 141-109 record
-(posterior mean 56.4%) and shows three configs side by side. The n49 reading is
-in mc-combined-totals-2026-09-17.md and bankroll-config-sweep-2026-09-17.md.
+asked for as "the pooled edge, charted", so it conditions on the 146-113 record
+(posterior mean 56.4%) and shows three configs side by side. The n58 reading is
+in mc-combined-totals-2026-09-17.md and bankroll-config-sweep-2026-09-21.md.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ CONFIGS = (
     ("1.0% unit, 6-12 unders/wk", 0.01, GREEN),
     ("1.2% unit (quarter Kelly), 6-12 unders/wk", 0.012, GOLD),
 )
-STEM = "pooled-bankroll-growth-2026-09-17"
+STEM = "pooled-bankroll-growth-2026-09-21"
 
 
 def run(paths: int, seed: int, bankroll: float, resize: bool = True, seasons: int = 1) -> list[dict]:
@@ -62,9 +62,9 @@ def figure(runs: list[dict], bankroll: float, path: Path, resized: list[dict] | 
             ax.set_title(r["label"] + ("\nunits re-sized weekly" if r["resize"]
                                        else "\nflat units off the start"), fontsize=10.5)
     axes[0, 0].legend(fontsize=8, frameon=False, loc="upper left")
-    fig.suptitle(f"Bankroll by week, planning prior (kappa 0.5: 84.5–65.5, mean 56.1%), "
+    fig.suptitle(f"Bankroll by week, planning prior (kappa 0.5: 89.5–70.0, mean 56.1%), "
                  f"${bankroll:,.0f} start", fontsize=13, fontweight="bold", color=INK)
-    sub = "Win rate drawn per path from the half-pooled posterior. n49 and pooled readings are in the sweep."
+    sub = "Win rate drawn per path from the half-pooled posterior. n58 and pooled readings are in the sweep."
     if resized:
         sub += " Top row: units re-sized off the bankroll each week. Bottom row: flat stakes off the starting bankroll."
     fig.text(0.5, 0.905 if not resized else 0.95, sub, fontsize=9, color=MUTED, ha="center")
@@ -124,7 +124,7 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bankroll", type=float, default=20_000.0)
     ap.add_argument("--paths", type=int, default=50_000)
-    ap.add_argument("--seed", type=int, default=20260917)
+    ap.add_argument("--seed", type=int, default=20260921)
     ap.add_argument("--out", help="docs directory; writes figs/<stem>.png")
     ap.add_argument("--flat-stakes", action="store_true",
                     help="add a second row with flat units off the starting bankroll")

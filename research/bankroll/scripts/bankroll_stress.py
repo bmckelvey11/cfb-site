@@ -34,22 +34,22 @@ MAX_P_M25, MAX_BUST = 0.03, 0   # growth frame: 3% per horizon, no busts
 SCENARIOS = [
     ("base", "planning prior kappa 0.5", dict(gl_kappa=0.5)),
     ("base", "pooled prior", dict(gl_kappa=None, gl_prior="pooled")),
-    ("base", "n49 prior", dict(gl_kappa=None, gl_prior="n49")),
+    ("base", "n58 prior", dict(gl_kappa=None, gl_prior="n58")),
     ("over-zero", "center 56.5%, pooled", dict(gl_kappa=None, gl_prior="pooled", oz_center=0.565)),
     ("over-zero", "haircut sd +3pt, pooled", dict(gl_kappa=None, gl_prior="pooled", oz_extra_sd=0.03)),
-    ("over-zero", "center 56.5% + sd 4pt, n49", dict(gl_kappa=None, gl_prior="n49", oz_center=0.565, oz_extra_sd=0.04)),
+    ("over-zero", "center 56.5% + sd 4pt, n58", dict(gl_kappa=None, gl_prior="n58", oz_center=0.565, oz_extra_sd=0.04)),
 ] + [
     ("kappa", f"kappa {k:.2f}", dict(gl_kappa=k)) for k in (0.0, 0.25, 0.75, 1.0)
 ] + [
     ("marginal", f"bets 7-12 at p-{d}pt, pooled", dict(gl_kappa=None, gl_prior="pooled", gl_marginal_penalty=d / 100))
     for d in (1, 2, 3)
 ] + [
-    ("marginal", f"bets 7-12 at p-{d}pt, n49", dict(gl_kappa=None, gl_prior="n49", gl_marginal_penalty=d / 100))
+    ("marginal", f"bets 7-12 at p-{d}pt, n58", dict(gl_kappa=None, gl_prior="n58", gl_marginal_penalty=d / 100))
     for d in (2,)
 ] + [
     ("rho", f"rho {r:.2f}, pooled", dict(gl_kappa=None, gl_prior="pooled", rho=r)) for r in (0.0, 0.05, 0.2, 0.35, 0.5)
 ] + [
-    ("rho", f"rho {r:.2f}, n49", dict(gl_kappa=None, gl_prior="n49", rho=r)) for r in (0.2, 0.35, 0.5)
+    ("rho", f"rho {r:.2f}, n58", dict(gl_kappa=None, gl_prior="n58", rho=r)) for r in (0.2, 0.35, 0.5)
 ] + [
     ("combined", "kappa 0.5, p-2pt, oz 56.5%+sd3, rho 0.2",
      dict(gl_kappa=0.5, gl_marginal_penalty=0.02, oz_center=0.565, oz_extra_sd=0.03, rho=0.2)),
@@ -117,11 +117,11 @@ def self_check() -> None:
     assert len(rows) == len(SCENARIOS) * len(UNITS)
     by = {(r["label"], r["unit"]): r for r in rows}
     # kappa endpoints reproduce the named priors' means
-    assert abs(by[("kappa 0.00", 0.005)]["p_gl"] - by[("n49 prior", 0.005)]["p_gl"]) < 0.01
+    assert abs(by[("kappa 0.00", 0.005)]["p_gl"] - by[("n58 prior", 0.005)]["p_gl"]) < 0.01
     assert abs(by[("kappa 1.00", 0.005)]["p_gl"] - by[("pooled prior", 0.005)]["p_gl"]) < 0.01
     assert abs(by[("planning prior kappa 0.5", 0.005)]["p_gl"] - 0.561) < 0.01
-    # the worst combined case must be worse than base n49 at the same unit
-    assert by[("kappa 0, p-3pt, oz 56.5%+sd4, rho 0.5  (worst)", 0.01)]["median"] < by[("n49 prior", 0.01)]["median"]
+    # the worst combined case must be worse than base n58 at the same unit
+    assert by[("kappa 0, p-3pt, oz 56.5%+sd4, rho 0.5  (worst)", 0.01)]["median"] < by[("n58 prior", 0.01)]["median"]
     assert all(r["es5"] <= r["p5"] for r in rows)
     print("self-check OK")
 
@@ -130,8 +130,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bankroll", type=float, default=20_000.0)
     ap.add_argument("--paths", type=int, default=20_000)
-    ap.add_argument("--seed", type=int, default=20260917)
-    ap.add_argument("--out", help="docs directory; writes bankroll-stress-2026-09-17.md table")
+    ap.add_argument("--seed", type=int, default=20260921)
+    ap.add_argument("--out", help="docs directory; writes bankroll-stress-2026-09-21.md table")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
@@ -143,7 +143,7 @@ def main() -> None:
     print()
     print(verdict(rows))
     if args.out:
-        out = Path(args.out) / "bankroll-stress-table-2026-09-17.md"
+        out = Path(args.out) / "bankroll-stress-table-2026-09-21.md"
         out.write_text(md + "\n\n" + verdict(rows) + "\n", encoding="utf-8")
         print(f"wrote {out}")
 

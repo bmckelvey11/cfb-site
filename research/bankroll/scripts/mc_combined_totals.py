@@ -6,23 +6,25 @@
 
 Two legs, very different shapes. Over-zero (floor bias, bias > 1.75) fires ~11
 times across weeks 4-15 -- its volume is front-loaded into the FCS-cupcake weeks
-that have already played. Greenline totals fires ~49 times a week, ~590 bets over
-the same span, and is ~85% unders. So Greenline's assumed win rate IS the answer;
-over-zero barely moves the terminal bankroll either way.
+that have already played. Greenline totals flags every FBS-vs-FBS game, ~49-57 a
+week, and is ~85% unders; the plan bets 6-12 of those unders. So Greenline's
+assumed win rate IS the answer; over-zero barely moves the terminal bankroll
+either way.
 
 Which is why neither win rate is a point estimate here. Both are drawn per path
 from the Beta posterior of their own graded record, so the output is a mixture
 over parameter uncertainty, not a curve conditioned on a number the source data
-does not establish. research/totals/docs/greenline-season-review-2026-09-16.md
-says so explicitly: n=49, CI 41-68%, break-even 52.38% sits inside it.
+does not establish. The Greenline record is the published under list graded by
+research/totals/scripts/grade_unders_list.py: n=58, CI 42.5-67.3%, break-even
+52.38% sits inside it.
 
 Bets inside a week are correlated through one shared scoring environment: a high-
 scoring Saturday helps every OVER and hurts every UNDER. Because over-zero is all
 overs and Greenline is mostly unders, that shared factor correlates the two legs
 NEGATIVELY. Modelled with a Gaussian copula on a per-week shock.
 
-Pushes are not modelled: all 234 graded over-zero bets and all 49 graded Greenline
-totals sat on half-point lines, so the realised push rate is 0.
+Pushes are not modelled: all 234 graded over-zero bets and all 58 graded Greenline
+under picks sat on half-point lines, so the realised push rate is 0.
 """
 
 from __future__ import annotations
@@ -39,8 +41,14 @@ from scipy.special import erfinv, ndtr
 # over-zero: 151-83 walk-forward, 2016-2025 (models/over_zero/docs/ROI_HITRATE.md)
 OZ_WINS, OZ_LOSSES = 151, 83
 # Greenline totals. Three defensible priors, selected with --gl-prior.
-#  n49         27-22, 2026 week 2 graded flags only
-#              (research/totals/docs/greenline-season-review-2026-09-16.md)
+#  n58         32-26, the published 2026 under list, weeks 2-3 (36 + 22 picks),
+#              graded at PFF's number and at DraftKings' -- identical both ways
+#              (research/totals/docs/greenline-w3-grade-2026-09-21.md;
+#              research/totals/scripts/grade_unders_list.py --week 2 --week 3).
+#              This is the bet population: the plan bets unders off that list,
+#              never the over flags. The all-flags reading is 58-48 and the
+#              unders-only-flags reading is 46-42; both are in the bracket table
+#              of the proposal, neither is what gets staked.
 #  pooled      + the 201 full-game unders in the personal book export, 2023-08
 #              to 2025-12, 114-87 at a mean price of -110.1
 #              (docs/bet-history-analysis-2023-2025.md,
@@ -49,7 +57,7 @@ OZ_WINS, OZ_LOSSES = 151, 83
 #              same signal in earlier seasons, never independent confirmation.
 #  pff-window  the same pooling restricted to 2024-25 (72-50), the slice most
 #              strongly identified as PFF-driven. Sensitivity only.
-GL_PRIORS = {"n49": (27, 22), "pooled": (141, 109), "pff-window": (99, 72)}
+GL_PRIORS = {"n58": (32, 26), "pooled": (146, 113), "pff-window": (104, 76)}
 
 # MODEL_GUIDE.md: the 1.75 threshold was chosen on this data, so the 64.5% point
 # estimate is selection-inflated. The guide says plan on the 58.2% lower bound.
@@ -112,8 +120,8 @@ def kelly_unit(p: float, american: int, fraction: float = 0.25, n_simul: float =
 
 def planning_p_gl(kappa: float = 0.5) -> float:
     """Posterior mean of the planning prior."""
-    w = GL_PRIORS["n49"][0] + kappa * 114 + 0.5
-    l = GL_PRIORS["n49"][1] + kappa * 87 + 0.5
+    w = GL_PRIORS["n58"][0] + kappa * 114 + 0.5
+    l = GL_PRIORS["n58"][1] + kappa * 87 + 0.5
     return w / (w + l)
 
 
@@ -130,7 +138,7 @@ class Config:
     gl_volume: str = "range"    # "range": GL_BETS_RANGE unders/wk; "slate": coverage x schedule; "constant": coverage x 49
     gl_range: tuple = GL_BETS_RANGE
     resize_weekly: bool = True  # units off the bankroll at the start of each week
-    seed: int = 20260917
+    seed: int = 20260921
     # --- stress knobs (bankroll_stress.py); defaults reproduce the base model ---
     oz_center: float | None = None   # override the post-haircut over-zero mean (e.g. 0.565)
     oz_extra_sd: float = 0.0         # add N(0, sd) to each path's over-zero haircut
@@ -171,9 +179,9 @@ def simulate(cfg: Config) -> dict:
         p_gl = rng.beta(gl_w + 0.5, gl_l + 0.5, n)
     else:
         # Partial pooling: the 201 personal unders (114-87) count kappa-fold.
-        # kappa=0 is n49, kappa=1 is pooled.
-        gl_w = GL_PRIORS["n49"][0] + cfg.gl_kappa * 114
-        gl_l = GL_PRIORS["n49"][1] + cfg.gl_kappa * 87
+        # kappa=0 is n58, kappa=1 is pooled.
+        gl_w = GL_PRIORS["n58"][0] + cfg.gl_kappa * 114
+        gl_l = GL_PRIORS["n58"][1] + cfg.gl_kappa * 87
         p_gl = rng.beta(gl_w + 0.5, gl_l + 0.5, n)
     p_gl_marg = np.clip(p_gl - cfg.gl_marginal_penalty, 0.01, 0.99)
 
@@ -305,8 +313,8 @@ def _style(ax):
 def _short(label: str) -> str:
     """Scenario labels are written for the table; the dot plot needs them narrow."""
     lab = label.split(" -- ")[0]
-    for a, b in (("Pooled prior", "pooled"), ("n=49 prior (week 2 only)", "n=49"),
-                 ("n=49 prior", "n=49"), ("2024-25 window prior (72-50)", "2024-25 window"),
+    for a, b in (("Pooled prior", "pooled"), ("n=58 prior (published under list)", "n=58"),
+                 ("n=58 prior", "n=58"), ("2024-25 window prior (72-50)", "2024-25 window"),
                  (", bet at the historical rate (~6/wk),", ", ~6/wk,"),
                  (", historical rate,", ", ~6/wk,"), (", historical rate", ", ~6/wk"),
                  (", bet EVERY flag (~49/wk),", ", all 49/wk,"),
@@ -348,7 +356,7 @@ def make_figures(base: Config, scenarios: list[tuple[str, Config]], path: Path) 
 
     cov = GL_COVERAGE_HISTORICAL
     pooled = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="pooled", gl_kappa=None))
-    thin = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="n49", gl_kappa=None))
+    thin = simulate(variant(gl_coverage=cov, gl_unit=0.01, gl_prior="n58", gl_kappa=None))
     b0 = base.bankroll
 
     fig = plt.figure(figsize=(15.5, 10.2))
@@ -357,8 +365,8 @@ def make_figures(base: Config, scenarios: list[tuple[str, Config]], path: Path) 
 
     # 1-2. the bracket, as two fan charts on a shared scale
     ax1, ax2 = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1])
-    _fan(ax1, pooled, "Pooled prior (141-109)", b0)
-    _fan(ax2, thin, "Graded flags only (27-22)", b0)
+    _fan(ax1, pooled, "Pooled prior (146-113)", b0)
+    _fan(ax2, thin, "Published under list only (32-26)", b0)
     lo = min(pooled["fan"][:, 0].min(), thin["fan"][:, 0].min())
     hi = max(pooled["fan"][:, 4].max(), thin["fan"][:, 4].max())
     for ax in (ax1, ax2):
@@ -474,9 +482,9 @@ def self_check() -> None:
                       np.sqrt(0.3), np.sqrt(0.7), upper=False)
     assert np.corrcoef(up, dn)[0, 1] < -0.3, np.corrcoef(up, dn)[0, 1]
 
-    # the n=49 posterior must keep real mass below break-even, or the sim has
-    # smuggled in an edge that one graded week does not establish
-    thin = simulate(Config(paths=5_000, seed=2, gl_prior="n49", gl_kappa=None))
+    # the n=58 posterior must keep real mass below break-even, or the sim has
+    # smuggled in an edge that two graded weeks do not establish
+    thin = simulate(Config(paths=5_000, seed=2, gl_prior="n58", gl_kappa=None))
     assert 0.25 < thin["p_gl_below_breakeven"] < 0.50, thin["p_gl_below_breakeven"]
 
     # pooling the 201 personal unders must actually tighten it, not just relabel
@@ -546,7 +554,7 @@ def main() -> None:
     ap.add_argument("--no-haircut", action="store_true",
                     help="skip the MODEL_GUIDE selection haircut on over-zero p")
     ap.add_argument("--gl-kappa", type=float, default=0.5,
-                    help="planning prior weight on the 2023-25 unders (0=n49, 1=pooled); default 0.5")
+                    help="planning prior weight on the 2023-25 unders (0=n58, 1=pooled); default 0.5")
     ap.add_argument("--seasons", type=int, default=1,
                     help="1 = rest of 2026; 2 adds a full 2027-style season, and so on")
     ap.add_argument("--gl-prior", choices=sorted(GL_PRIORS), default=None,
@@ -560,7 +568,7 @@ def main() -> None:
                     help="flat units off the starting bankroll instead of weekly re-sizing")
     ap.add_argument("--gl-coverage", type=float, default=1.0,
                     help="fraction of the weekly Greenline flags actually bet")
-    ap.add_argument("--seed", type=int, default=20260917)
+    ap.add_argument("--seed", type=int, default=20260921)
     ap.add_argument("--json", help="write the scenario table here")
     ap.add_argument("--figs", help="write the four-panel figure here (.png)")
     ap.add_argument("--self-check", action="store_true")
@@ -591,10 +599,10 @@ def main() -> None:
          variant(gl_coverage=1.0, gl_unit=0.0025)),
         ("Pooled prior, bet EVERY flag, 1% units",
          variant(gl_coverage=1.0, gl_unit=0.01)),
-        ("n=49 prior (week 2 only), every flag at 0.25% -- the previous headline",
-         variant(gl_prior="n49", gl_coverage=1.0, gl_unit=0.0025)),
-        ("n=49 prior, historical rate at 1%",
-         variant(gl_prior="n49", gl_coverage=cov, gl_unit=0.01)),
+        ("n=58 prior (published under list), every flag at 0.25% -- the previous headline",
+         variant(gl_prior="n58", gl_coverage=1.0, gl_unit=0.0025)),
+        ("n=58 prior, historical rate at 1%",
+         variant(gl_prior="n58", gl_coverage=cov, gl_unit=0.01)),
         ("2024-25 window prior (72-50), historical rate at 1% -- sensitivity",
          variant(gl_prior="pff-window", gl_coverage=cov, gl_unit=0.01)),
         ("Over-zero only (Greenline stood down)", variant(gl_unit=0.0)),

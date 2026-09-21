@@ -42,9 +42,9 @@ from mc_combined_totals import (  # noqa: E402
 GL_UNITS = (0.0025, 0.005, 0.01, 0.015, 0.02)
 COVERAGES = (GL_COVERAGE_HISTORICAL, 0.25, 0.50, 1.0)
 RANGE_KEY = -1.0  # the coverage column's value for a range-volume row
-# planning prior first; n49 and pooled are the bracket, reported but not decisive
-PRIORS = ("k0.5", "n49", "pooled")
-PRIOR_KW = {"k0.5": dict(gl_kappa=0.5), "n49": dict(gl_kappa=None, gl_prior="n49"),
+# planning prior first; n58 and pooled are the bracket, reported but not decisive
+PRIORS = ("k0.5", "n58", "pooled")
+PRIOR_KW = {"k0.5": dict(gl_kappa=0.5), "n58": dict(gl_kappa=None, gl_prior="n58"),
             "pooled": dict(gl_kappa=None, gl_prior="pooled")}
 PLANNING = "k0.5"
 
@@ -101,7 +101,7 @@ def recommend(rows: list[dict]) -> tuple[dict | None, dict | None]:
     """(recommended, best_conditional).
 
     recommended: supported coverage only, constraint (a) under the PLANNING prior,
-    ranked by the planning prior's median. n49 and pooled rows ride along as the
+    ranked by the planning prior's median. n58 and pooled rows ride along as the
     bracket.
     best_conditional: same rule without the coverage restriction -- what the
     grid would pick if the coverage transfer held. Reported, never recommended.
@@ -226,7 +226,7 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bankroll", type=float, default=20_000.0)
     ap.add_argument("--paths", type=int, default=20_000)
-    ap.add_argument("--seed", type=int, default=20260917)
+    ap.add_argument("--seed", type=int, default=20260921)
     ap.add_argument("--out", help="directory: writes sweep .csv, .md and figs/ .png")
     ap.add_argument("--gl-volume", choices=("range", "slate"), default="range",
                     help="range: 6-12 unders a week (default); slate: the coverage grid")
@@ -272,7 +272,7 @@ def main() -> None:
     if args.out:
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
-        stem = "bankroll-config-sweep-2026-09-17"
+        stem = "bankroll-config-sweep-2026-09-21"
         with open(out / f"{stem}.csv", "w", newline="") as fh:
             keys = [k for k in rows[0] if not k.endswith("_by_prior")]
             w = csv.DictWriter(fh, fieldnames=keys)

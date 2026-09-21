@@ -1,3 +1,5 @@
+**Superseded by** [seed-bankroll-proposal-2026-09-21.md](../../research/bankroll/docs/seed-bankroll-proposal-2026-09-21.md)
+
 # Seed bankroll proposal: $20,000 to grow across seasons
 
 Prepared September 17, 2026, revised the same day after outside review and a change of
