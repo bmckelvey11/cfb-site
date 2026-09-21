@@ -93,13 +93,22 @@ CREATE TABLE stg.pff_passing (
 
 -- `team-rushing-direction` is pulled twice per team for one distinct body -- but the body
 -- already holds *both* views: `rows` is player-grain and `teamTotals` is franchise-grain,
--- same 19-value direction vocabulary. Nothing is lost by dropping the second call, and the
+-- same 21-value direction vocabulary. Nothing is lost by dropping the second call, and the
 -- two payloads become two tables from one file (ingest plan S7).
 --
--- The direction vocabulary is 19 values, not the 8 gaps §3 lists: the gaps (LE..RE, ML,
+-- The direction vocabulary is 21 values, not the 8 gaps §3 lists: the gaps (LE..RE, ML,
 -- MR), plus end-around and jet-sweep by side (EA-L/R, JS-L/R), scrambles and designed QB
--- runs (QBK, QBSc, QBSn, QBT, QBF), and R-L/R-R. Enumerated rather than free text so a new
--- value fails loudly instead of silently widening the split.
+-- runs (QBK, QBSc, QBSn, QBT, QBF), R-L/R-R, and NV/LP-R. Enumerated rather than free text
+-- so a new value fails loudly instead of silently widening the split.
+--
+-- NV and LP-R were added 2026-09-21, and the CHECK is why they were found: 2024 landed and
+-- the validate load failed on them. Both are genuine PFF vocabulary that the 2025-only pull
+-- never emitted — across every raw file on disk, NV appears 39 times and LP-R once, against
+-- ~12.9k for RE. LP-R belongs to the EA/JS/R family of charted concepts by side; NV is
+-- PFF's uncharted catch-all, and its rows carry ordinary attempts and yards, so it is a
+-- real bucket rather than a null marker and must not be dropped. Counts this thin are the
+-- argument for keeping the enumeration: 2014–2023 will likely surface more, and each one
+-- should stop the load the same way.
 CREATE TABLE stg.pff_rushing_direction (
     season       INTEGER NOT NULL,
     week         INTEGER NOT NULL,
@@ -107,8 +116,8 @@ CREATE TABLE stg.pff_rushing_direction (
     franchise_id INTEGER NOT NULL,
     direction    VARCHAR NOT NULL CHECK (direction IN (
                      'LE', 'LT', 'LG', 'ML', 'MR', 'RG', 'RT', 'RE',
-                     'EA-L', 'EA-R', 'JS-L', 'JS-R', 'R-L', 'R-R',
-                     'QBK', 'QBSc', 'QBSn', 'QBT', 'QBF')),
+                     'EA-L', 'EA-R', 'JS-L', 'JS-R', 'R-L', 'R-R', 'LP-R',
+                     'QBK', 'QBSc', 'QBSn', 'QBT', 'QBF', 'NV')),
     attempts INTEGER, yards INTEGER, touchdowns INTEGER, first_downs INTEGER,
     explosive INTEGER, avoided_tackles INTEGER, fumbles INTEGER, longest INTEGER,
     yards_after_contact INTEGER,
