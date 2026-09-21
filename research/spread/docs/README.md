@@ -48,6 +48,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `combining-predictions.md` | review | How E4 and the book fair combine into one fair spread and one bet decision. |
 | `prediction-tracker.md` | dataset | Column dictionary for the joined panel. |
 | `review-2026-09-08-tree-audit.md` | review | Full-tree audit; each finding carries its resolution date. |
+| `methods-review-2026-09-21.md` | review | Audit of the live serving and version B grading paths on 147 graded games. Leakage and selection clean; the graded "Monday line" is a Tuesday line for 62% of games, B4's regressor spends 71% of its variance on the revert-to-opener component, and `beat_close` counts a line that never moved as a loss. No verdict. |
 | **`plan-2026-09-08-master.md`** | **plan of record** | **Start here for the plan.** What is true, what is decided, what must change, and the execution waves. Absorbs the hardened plan, the review log and the audit's open items. |
 | `plan-2026-09-08-hardened.md` | absorbed | Contract the master absorbed; audit history of the claudex-loop. |
 | `plan-review-log-2026-09-08.md` | absorbed | The three-round adversarial argument (claudex-loop) that produced the hardened plan. |
@@ -76,6 +77,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_line_movement.py` [`--amend`] [`--decontaminate`] [`--decontaminate-wf`] [`--fine-ridge`] | `prereg-line-movement.md` A / A2 / A3 / A6 / A4 | `processed/pt_movement_preds{,_a2}{,_decon,_decon_wf}.csv`, `pt_movement{…}.json`, `pt_movement_decon_wf_a4.json` |
 | `eval_version_b.py` | `prereg-line-movement.md` B4–B5, amendments B1, B2, B3 | `processed/version_b.json` |
 | `version_b_by_week.py` | The version B read cut by season-week cluster (same joins as `eval_version_b.py`; per-week SEs are HC1, informational only) | stdout |
+| `audit_version_b_methods.py` | `methods-review-2026-09-21.md` — anchor realization, regressor composition, tie handling, selection, B2 coverage, archive leakage, and the exploratory R/C decomposition. Grades nothing | stdout |
 | `eval_line_shopping.py` | `prereg-line-shopping.md` | `processed/line_shopping_sides.csv`, `line_shopping.json` |
 | `check_pt_line_is_close.py` | `line-movement-results.md` § target, amendment A5 | `processed/pt_line_vs_an_close.json` |
 | `model_publish_times.py` | `line-movement-results.md` § when the constituents publish | `processed/model_publish_times.csv` |
