@@ -219,6 +219,26 @@ def cluster_mean(v, cl):
             "hi": float(v.mean() + crit * se), "n": int(len(v)), "clusters": int(len(codes))}
 
 
+def close_outcomes(side, y) -> dict:
+    """B5's three-way split of a bet's fate against the close, plus the moved-only rate.
+
+    `beat_close` keeps its registered definition -- mean(side * y > 0) -- so the key means the
+    same thing it always did. What it does NOT mean is a win rate against 50%: a line that
+    never moves (y == 0) lands in the complement, and in 2026 through week 3 that was 35% of
+    graded games, which made the printed figure read as an anti-signal it is not. `tied_close`
+    and `lost_to_close` name the rest of the mass; `beat_close_moved` is the rate among lines
+    that actually moved, which is the one comparable to a coin flip. CLV is unaffected either
+    way -- a tie contributes exactly 0 to the mean. See docs/methods-review-2026-09-21.md F3.
+    """
+    side, y = np.asarray(side, float), np.asarray(y, float)
+    moved = y != 0
+    return {"beat_close": float((side * y > 0).mean()),
+            "tied_close": float((y == 0).mean()),
+            "lost_to_close": float((side * y < 0).mean()),
+            "n_moved": int(moved.sum()),
+            "beat_close_moved": float((side * y > 0)[moved].mean()) if moved.any() else None}
+
+
 def main() -> int:
     log = pd.read_csv(LOG)
     g = monday_anchor(log)
@@ -291,15 +311,18 @@ def main() -> int:
             continue
         side = np.sign(x4[m])
         clv = cluster_mean(side * y[m], cl[m])
-        row = {"thr": thr, "bets": int(m.sum()), "clv": clv, "beat_close": float((side * y[m] > 0).mean())}
+        row = {"thr": thr, "bets": int(m.sum()), "clv": clv, **close_outcomes(side, y[m])}
         res = side * (graded.margin.to_numpy(float)[m] - graded.line_pt.to_numpy(float)[m])
         keep = np.isfinite(res) & (res != 0)
         if keep.sum() >= 10:
             row["ats"] = cluster_mean((res[keep] > 0).astype(float), cl[m][keep])
         out["bets"].append(row)
         ats = row.get("ats")
+        moved = (f"{row['beat_close_moved']:.1%} (n {row['n_moved']})"
+                 if row["beat_close_moved"] is not None else "n/a")
         print(f"  |x| >= {thr:.0f}: {row['bets']} bets  CLV {clv['mean']:+.2f} [{clv['lo']:+.2f}, {clv['hi']:+.2f}]  "
-              f"beat close {row['beat_close']:.1%}"
+              f"vs close beat/tie/lost {row['beat_close']:.1%}/{row['tied_close']:.1%}/{row['lost_to_close']:.1%}  "
+              f"beat among moved {moved}"
               + (f"  ATS {ats['mean']:.3f} [{ats['lo']:.3f}, {ats['hi']:.3f}] vs {BREAKEVEN}" if ats else "  ATS: no scores yet"))
 
     print("\nB2  slope by capture offset (fixed game set; season-week clusters)")
@@ -353,6 +376,13 @@ def _check() -> None:
     x = rng.normal(0, 0.5, 400); yv = 0.3 * x + rng.normal(0, 1, 400)
     r = cluster_ols(yv, x, np.repeat(np.arange(10), 40))
     assert abs(r["slope"] - 0.3) < 0.3 and r["lo"] < 0.3 < r["hi"], r
+    # close_outcomes: the three shares partition the sample, and ties are excluded from the
+    # moved-only rate rather than counted as losses (the bug docs/methods-review-2026-09-21.md
+    # F3 found). 2 beats, 1 loss, 2 ties -> 40% / 40% / 20%, and 2 of 3 among the moved.
+    o = close_outcomes([1, 1, 1, -1, -1], [2.0, 1.0, 0.0, 0.0, 1.0])
+    assert (o["beat_close"], o["tied_close"], o["lost_to_close"]) == (0.4, 0.4, 0.2), o
+    assert abs(o["beat_close"] + o["tied_close"] + o["lost_to_close"] - 1.0) < 1e-12, o
+    assert o["n_moved"] == 3 and abs(o["beat_close_moved"] - 2 / 3) < 1e-12, o
     print("checks pass\n")
 
 

@@ -107,27 +107,29 @@ this decomposition, and the amendment ledger's own rule bars a data-driven amend
 carrying the confirmatory claim. B4 stands as registered; the decomposition is reported beside
 it as a diagnostic, the same way A5 was.
 
-## F3 — [CAVEAT] `beat_close` counts a line that never moved as a loss
+## F3 — [CAVEAT → fixed 2026-09-21] `beat_close` counts a line that never moved as a loss
+
+> **Resolution.** `eval_version_b.py` now prints the three-way split and the moved-only rate
+> via `close_outcomes()`, with a unit test pinning the partition and the tie exclusion. The
+> registered `beat_close` key keeps its definition — `mean(side * y > 0)` — so nothing graded
+> changes; `tied_close`, `lost_to_close`, `n_moved` and `beat_close_moved` are added beside it
+> in `version_b.json`.
 
 **What.** B5 computes `beat_close = mean(side * y > 0)`. **52 of 147 graded games (35.4%)** have
 `close == line_anchor` exactly — the line never moved. Those fall into the `> 0` complement:
 
-| statistic | value |
-|---|---|
-| beat close, as coded | 33.3% |
-| lost to the close (`side*y < 0`) | 29.3% |
-| tied (`y == 0`) | 35.4% |
-| beat close **among games that moved** | 51.6% (n = 95) |
+| sample | beat | tied | lost | beat among moved |
+|---|---|---|---|---|
+| all 147 graded | 33.3% | 35.4% | 29.3% | 51.6% (n = 95) |
+| B5 bet set, \|x\| ≥ 1 (n = 67) | 34.3% | 32.8% | 32.8% | 51.1% (n = 45) |
+| B5 bet set, \|x\| ≥ 2 (n = 26) | 23.1% | 42.3% | 34.6% | 40.0% (n = 15) |
 
-**Why it bites here.** The printed 33.3% / 23.1% figures read as a catastrophic win rate against
+**Why it bites here.** The printed 34.3% / 23.1% figures read as a catastrophic win rate against
 a 50% reference, and were reported that way in conversation before this review. They are not a
-win rate. The honest summary is that among lines that moved at all, the E4 side lands at a
-coin flip. CLV is **unaffected** — ties contribute exactly 0 to the mean — so `CLV +0.09
-[−0.14, +0.32]` stands as printed and remains the interpretable statistic.
-
-**Resolves with.** A printing change in `eval_version_b.py`: emit the three-way split
-(beat / tie / lost) plus the moved-only rate, rather than one percentage against an implied 50%.
-No registered quantity changes. Offered, not applied.
+win rate. The honest summary is that among lines that moved at all, the E4 side lands near a
+coin flip at \|x\| ≥ 1; the \|x\| ≥ 2 cell is 15 games and says nothing. CLV is **unaffected** —
+ties contribute exactly 0 to the mean — so `CLV +0.09 [−0.14, +0.32]` stands as printed and
+remains the interpretable statistic.
 
 ## F4 — [NOTE] B2's capture-decay estimate currently covers one week
 
@@ -193,5 +195,4 @@ in the component that carries no signal.
 
 1. Does the collector now run Mondays? F1's regime mix is the one thing that can still be
    improved before season end, and only operationally.
-2. The `beat_close` printing fix (F3) — a contained change to `eval_version_b.py` that touches
-   no registered quantity.
+2. ~~The `beat_close` printing fix (F3)~~ — done 2026-09-21, see F3's resolution.
