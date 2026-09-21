@@ -1,6 +1,9 @@
-**Superseded by** [middle-probability-2026-09-21.md](../middle-probability-2026-09-21.md)
+# Live middle probability from drive-start observations — 2026-09-21
 
-# Live middle probability from drive-start observations — 2026-09-18
+Supersedes [middle-probability-2026-09-18.md](../../../archive/docs/middle-probability-2026-09-18.md).
+Two things in that version were wrong and are corrected here: the distribution was
+anchored on its **mean** rather than its median, and the stated direction of the bias
+was **backwards**. Method, data and filters are otherwise unchanged.
 
 ## The question
 
@@ -36,25 +39,51 @@ For each drive start:
 - `pts_so_far` = `startOffenseScore + startDefenseScore`.
 - `rem` = `final_total − pts_so_far` — the target quantity.
 
-The sample is cross-tabbed into `(min_rem bucket, expected remaining bucket)` cells.
-Expected remaining is proxied historically by `pregame_total × min_rem / 60`. Each
-cell stores `n`, the mean of `rem`, and the integer histogram of `rem`.
+The sample is cross-tabbed into `(min_rem bucket, remaining-points bucket)` cells.
+The bucket key is proxied historically by `pregame_total × min_rem / 60`. Each cell
+stores `n`, the mean of `rem`, and the integer histogram of `rem`.
 
-At run time the calculator computes expected remaining as `live_total − current_score`
-— the market's own estimate — picks the matching cell, and shifts that cell's
-histogram so its mean sits on the user's number. The result is a distribution over
-integer final totals, which is folded into the five branches of a totals middle and
-priced.
+At run time the calculator computes the anchor as `live_total − current_score`, picks
+the matching cell, and shifts that cell's histogram so its **median** sits on that
+number. The result is a distribution over integer final totals, which is folded into
+the five branches of a totals middle and priced.
+
+### Why the median and not the mean
+
+A book posting the same price on both sides of a total is posting the number it
+believes is a coin flip — the 50th percentile of its distribution, not its mean.
+Remaining points is right-skewed: a handful of points is typical, a shootout or
+overtime is the tail. So its mean sits above its median, and the gap widens as the
+clock runs down and the tail dominates what is left.
+
+The 2026-09-18 version anchored the mean. That pushed more than half the distribution
+below the live number, and the error grew with the skew:
+
+| Game state | P(final < live total), mean anchor | median anchor |
+| --- | --- | --- |
+| 31 pts, 18:00 left, live 58.5 | 0.498 | 0.521 |
+| 10 pts, 40:00 left, live 51.5 | 0.529 | 0.517 |
+| 45 pts, 9:00 left, live 66.5 | 0.622 | 0.594 |
+| 55 pts, 2:00 left, live 59 | **0.729** | 0.500 |
+
+Under the mean anchor the last row reported the live Under as a +41% edge. That was an
+artifact of the anchor, not a read on the market. Median anchoring pulls every state
+back to roughly a coin flip, which is what a two-way market at matched prices means.
+
+**Limit:** this assumes the two live prices are equal. If a book posts Over −105 /
+Under −115 the fair point is not the median, and the calculator does not take the
+other side's price, so it cannot de-vig to find the right quantile.
 
 ### Recentring
 
-The cell mean is fractional and the user's expected remaining is fractional, but the
-histogram is over integers. Rounding the shift to the nearest integer would bias the
+The cell median is fractional — it is interpolated where the CDF crosses 0.5 rather
+than snapped to an integer, so the shift stays smooth — and the user's anchor is
+fractional, but the histogram is over integers. Rounding the shift to the nearest integer would bias the
 whole distribution by up to half a point, which matters because a half point is
 exactly the difference between a push and a win. So the shift is split across the two
 neighbouring integers:
 
-    shift = expRem − cell.mean
+    shift = anchor − cellMedian(cell)
     k     = floor(shift)
     w     = shift − k
 
@@ -180,16 +209,43 @@ tempting shortcut.
 
 ## What this does not support
 
-**P(middle) and EV are upper bounds.** Expected remaining points are estimated from
-the live total and the clock. The live market prices off strictly more information —
-possession, down and distance, observed pace, a weather turn, an injury. So
+**P(middle) and EV are lower bounds.** The 2026-09-18 version claimed the opposite.
+That was wrong, and the direction matters, so here is the argument and the check.
 
-    Var(rem − bucket estimate) ≥ Var(rem − live line)
+The spread is still too wide. The cells are keyed on the clock and a pace proxy, while
+the live market prices off strictly more — possession, down and distance, observed
+pace, a weather turn, an injury. By the law of total variance,
 
-and the residual spread here is wider than reality. A wider spread puts more mass
-inside the middle window, which overstates both the probability the middle hits and
-the EV. For a betting tool that is the dangerous direction, and the calculator says
-so on the page.
+    Var(rem | clock, proxy) = E[Var(rem | clock, proxy, Z)] + Var(E[rem | clock, proxy, Z])
+                            ≥ E[Var(rem | everything the book sees)]
+
+so the residual spread used here exceeds the market's, on average. That part was right.
+
+What was wrong was the consequence. **A wider spread moves mass *out* of the middle
+window, not into it**, because of where the window sits. You bet the live number, so
+the live number is always one edge of the window, and the distribution is anchored on
+that number. The window is therefore `[live − d, live]` — entirely on one side of the
+anchor, at bounded distance. Mass in a fixed interval ending at the centre falls as
+the distribution widens.
+
+Checked numerically by stretching the real distribution about its own centre and
+repricing. Pregame Over / live Under, $100 a side at −110:
+
+| Window | σ × 0.70 | × 0.85 | × 1.00 | × 1.15 | × 1.30 |
+| --- | --- | --- | --- | --- | --- |
+| 52.5–58.5, 18:00 left | 33.7% / $55 | 26.4% / $41 | 15.6% / $21 | 14.1% / $18 | 13.2% / $16 |
+| 52–56, 6:00 left | 10.5% / $48 | 8.8% / $21 | 7.1% / $14 | 5.1% / $10 | 3.1% / $6 |
+| 44.5–51.5, 40:00 left | 27.9% / $44 | 23.9% / $37 | 19.9% / $29 | 18.5% / $26 | 16.1% / $22 |
+
+Monotone in every window: widening σ lowers both P(middle) and EV. So an inflated σ
+makes this tool **conservative**. `tests/test_middle_ev.py` pins the direction so it
+cannot silently flip and make the caveat false again.
+
+**The live leg is the only live decision.** The pregame stake is sunk; its EV does not
+move with anything entered. A hedge reshapes the payoff, it does not create edge, so
+the page reports the live leg's standalone EV alongside the whole-position EV. On the
+default state the whole position shows +$27 while the live leg alone is −$5 — the
+headline number is almost entirely the pregame bet's own EV, which is not on offer.
 
 Also not supported:
 
@@ -201,8 +257,11 @@ Also not supported:
   the Tier 1 metrics in [`docs/model-evaluation-standard.md`](../../../docs/model-evaluation-standard.md)
   do not apply and no result here should be quoted as forecast skill.
 - **No conditioning on game context.** The cells mix blowouts and one-score games at
-  the same clock and expected total. Recentring fixes the mean; it does not narrow σ
+  the same clock and expected total. Anchoring fixes the centre; it does not narrow σ
   for a game whose remaining variance is genuinely lower.
+- **One price, one CDF point.** A total and one side's price pin roughly one point of
+  the market's implied distribution. They do not identify its dispersion. The σ here
+  comes entirely from history, not from the market.
 - **σ is stratified only weakly.** Across the expected-remaining axis σ moves about
   10% within a time bucket, so 10-point bins were used. Inside a bin σ is treated as
   constant.
@@ -211,6 +270,48 @@ Also not supported:
   These agree in scale but not in information. A game state far off the linear-decay
   path borrows σ from the nearest cell, and the page flags it when the walk is two
   bins or more.
+
+## What the literature pass settled
+
+A deep-research pass was run against the questions in
+[middle-research-prompt-2026-09-18.md](middle-research-prompt-2026-09-18.md). Summary
+of what it established, and what it did not. Its sourcing was not independently
+verified here; the two items acted on were checked against this repo's own data.
+
+**Acted on:**
+
+- **The bound direction was backwards.** Verified numerically above, and fixed.
+- **The sunk first leg.** The live leg's standalone EV is the decision; the page now
+  reports it. This is what surfaced the mean-anchor bug.
+
+**Checked, already handled — no change:**
+
+- *"Derive EV from all outcome regions, not from the middle probability alone."*
+  Already the case: five branches, each with its own probability and net.
+- *"Model discreteness, pushes and overtime explicitly."* Already the case: integer
+  final totals, explicit push branches, overtime retained in the sample.
+
+**Open, not actionable with current data:**
+
+- **Real in-play line history may be purchasable.** The Odds API reportedly carries
+  NCAAF history from June 2020 at five-minute snapshots, with each book's Over and
+  Under price at a shared point. This repo already ingests that vendor —
+  `stg.oa_odds_tick` — but only nine days of it, with 758 post-kickoff totals rows.
+  **A backfill would replace this entire drive-start reconstruction with observed live
+  lines and remove the conditioning bias outright.** That is the single highest-value
+  follow-up. A five-minute snapshot still does not prove a quote was continuously
+  executable, so freshness, suspension and latency filters would be needed.
+- **Alternate-total ladders would identify dispersion.** Several simultaneous totals
+  give several CDF points and a market-implied σ instead of a historical one. Not in
+  the warehouse.
+- **No published σ benchmark exists.** No peer-reviewed table of conditional
+  remaining-points standard deviation for NCAA football was found, so the 15.4 / 10.9
+  / 6.1 figures here have no external check. √t scaling is a consequence of assuming
+  stationary independent increments, not an empirical football result — and it must
+  fail at the boundary, since regulation time hits zero while overtime uncertainty
+  does not.
+- **Profitability is unestablished, not disproven.** No study was found testing live
+  middling net of vig, latency, rejected bets and limits.
 
 ## Reproduce
 

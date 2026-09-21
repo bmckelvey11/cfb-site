@@ -38,6 +38,9 @@ def run_js(bet: dict, dist: dict) -> dict:
         console.log(JSON.stringify({{
             ev: out.ev,
             evPct: out.evPct,
+            preEv: out.preEv,
+            liveEv: out.liveEv,
+            liveEvPct: out.liveEvPct,
             rows: out.rows.map(r => ({{key: r.key, pre: r.pre, live: r.live, net: r.net, prob: r.prob}})),
         }}));
         """
@@ -141,6 +144,32 @@ def test_plus_money_payout():
     b["prePrice"] = 150
     r = rows_by_key(run_js(b, dist))
     assert r["middle"]["net"] == pytest.approx(150 + WIN, abs=TOL)
+
+
+def test_live_leg_ev_is_separable_and_sums_to_the_whole_position():
+    """The pregame stake is sunk, so the live leg's own EV is the real decision."""
+    dist = {48: 0.2, 52: 0.1, 54: 0.3, 56: 0.1, 60: 0.3}
+    out = run_js(bet(), dist)
+    assert out["preEv"] + out["liveEv"] == pytest.approx(out["ev"], abs=TOL)
+    # Under 56 at -110 against P(T < 56) = 0.6, P(push) = 0.1, P(loss) = 0.3.
+    assert out["liveEv"] == pytest.approx(0.6 * WIN - 0.3 * 100, abs=TOL)
+
+
+def test_a_wider_spread_lowers_the_middle_probability():
+    """The live number is always an edge of the window, so the distribution is
+    centred on that edge and the window sits on one side of the mean. Widening
+    the spread pushes mass out of it -- P(middle) falls, it does not rise.
+
+    This pins the direction of the tool's stated bias. If it ever flips, the
+    caveat on the page ("P(middle) is a lower bound") becomes false.
+    """
+    b = bet(pre_num=52.0, live_num=58.0)
+    # Symmetric distributions centred on the live number, 58, widening outward.
+    narrow = {56: 0.2, 57: 0.2, 58: 0.2, 59: 0.2, 60: 0.2}
+    wide = {48: 0.2, 53: 0.2, 58: 0.2, 63: 0.2, 68: 0.2}
+    p_narrow = rows_by_key(run_js(b, narrow))["middle"]["prob"]
+    p_wide = rows_by_key(run_js(b, wide))["middle"]["prob"]
+    assert p_narrow > p_wide, f"widening raised P(middle): {p_narrow} -> {p_wide}"
 
 
 def test_no_middle_window_when_line_moves_the_wrong_way():

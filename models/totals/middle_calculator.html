@@ -93,6 +93,8 @@ input:focus, select:focus{outline:none; border-color:var(--signal-500); box-shad
 .chip{border:1px solid var(--ink-200); border-radius:var(--radius-lg); padding:var(--space-3) var(--space-4)}
 .chip .lbl{font-size:9px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-400)}
 .chip .val{font-family:var(--font-mono); font-size:24px; font-weight:500; letter-spacing:-0.04em; line-height:1.15; margin-top:var(--space-1)}
+.chip-note{font-size:10px; line-height:1.4; color:var(--ink-400); margin-top:var(--space-1)}
+.chip-note:empty{display:none}
 .positive{color:var(--success-500)} .negative{color:var(--error-500)}
 table{width:100%; border-collapse:collapse}
 .table-wrap{border:1px solid var(--ink-200); border-radius:var(--radius-lg); overflow:auto}
@@ -167,8 +169,8 @@ footer p{margin:0 0 var(--space-2)}
     <p class="legs" id="legs"></p>
     <div class="chips">
       <div class="chip"><div class="lbl">Middle hits</div><div class="val" id="pMid">—</div></div>
-      <div class="chip"><div class="lbl">Expected value</div><div class="val" id="ev">—</div></div>
-      <div class="chip"><div class="lbl">EV / risked</div><div class="val" id="evPct">—</div></div>
+      <div class="chip"><div class="lbl">Live leg EV</div><div class="val" id="liveEv">—</div><div class="chip-note">the actual decision — pregame stake is sunk</div></div>
+      <div class="chip"><div class="lbl">Whole position EV</div><div class="val" id="ev">—</div><div class="chip-note" id="evPctNote"></div></div>
     </div>
   </div>
 
@@ -184,7 +186,8 @@ footer p{margin:0 0 var(--space-2)}
 
   <footer>
     <p id="prov"></p>
-    <p><strong>P(middle) is an upper bound.</strong> Expected remaining points are estimated from the live total and clock, which is a weaker signal than the live market itself (it cannot see possession, observed pace, or a weather turn). The residual spread is therefore wider than reality, which puts too much mass inside the middle window and overstates both the probability and the EV.</p>
+    <p><strong>P(middle) is a lower bound.</strong> The spread of remaining points is measured against the clock and a pace proxy, which is a weaker signal than the live market itself — it cannot see possession, observed pace, or a weather turn. So the spread used here is wider than reality. Because you bet the live number, that number is always one edge of the middle window and the distribution is centred on it, so the window sits entirely on one side of the mean at bounded distance. A wider spread pushes mass out of it. Both the probability and the EV shown are therefore conservative, not flattering.</p>
+    <p><strong>The live leg is the only decision.</strong> The pregame stake is already down. Its EV does not change with anything entered here, so a live bet that is bad on its own is not rescued by the position it hedges — "locking in a middle" describes risk, not edge.</p>
     <p>Research tool. Not betting advice. If gambling stops being fun, call 1-800-GAMBLER.</p>
   </footer>
 </div>
@@ -245,7 +248,18 @@ function branches(bet, finalTotals) {
   });
 }
 
-/* Given P(final total), fold it into the five branches and compute EV. */
+/* EV of one leg on its own, over the whole distribution. */
+function legEv(side, number, price, stake, dist) {
+  return Object.keys(dist).reduce(
+    (s, k) => s + dist[k] * legNet(side, number, price, stake, Number(k)), 0);
+}
+
+/* Given P(final total), fold it into the five branches and compute EV.
+
+   `ev` is the whole position. `liveEv` is the live leg alone, which is the
+   only part still up for decision -- the pregame stake is sunk, and its EV
+   does not move with anything the user types. A hedge cannot turn a
+   negative-EV live bet positive; it only reshapes the payoff. */
 function evaluate(bet, dist) {
   const totals = Object.keys(dist).map(Number).sort((a, b) => a - b);
   const rows = branches(bet, totals);
@@ -254,8 +268,15 @@ function evaluate(bet, dist) {
     r.prob = totals.filter(r.test).reduce((s, t) => s + dist[t], 0);
     ev += r.prob * r.net;
   }
+  const liveEv = legEv(bet.liveSide, bet.liveNum, bet.livePrice, bet.liveStake, dist);
   const risked = bet.preStake + bet.liveStake;
-  return { rows, ev, evPct: risked > 0 ? ev / risked : 0, risked };
+  return {
+    rows, ev, liveEv,
+    preEv: legEv(bet.preSide, bet.preNum, bet.prePrice, bet.preStake, dist),
+    evPct: risked > 0 ? ev / risked : 0,
+    liveEvPct: bet.liveStake > 0 ? liveEv / bet.liveStake : 0,
+    risked,
+  };
 }
 
 if (typeof module !== 'undefined') {
@@ -285,17 +306,41 @@ function findCell(tb, eb) {
   return null;
 }
 
+/* The cell's median remaining points, interpolated where the CDF crosses 0.5
+   rather than snapped to an integer, so the shift below stays smooth. */
+function cellMedian(cell) {
+  let cum = 0;
+  for (let i = 0; i < cell.p.length; i++) {
+    const next = cum + cell.p[i];
+    if (next >= 0.5) return cell.lo + i + (0.5 - cum) / cell.p[i];
+    cum = next;
+  }
+  return cell.lo + cell.p.length - 1;
+}
+
 /* P(final total) = P(current score + remaining points), with the cell's
-   histogram recentred on the market's expected remaining. The shift is split
-   between the two neighbouring integers so recentring adds no rounding bias. */
-function finalTotalDist(score, expRem, minRem) {
+   histogram shifted onto the live number.
+
+   Anchor the MEDIAN, not the mean. A book posting the same price on both sides
+   is posting the number it thinks is a coin flip -- the 50th percentile of its
+   distribution. Remaining points is right-skewed (a handful of points is
+   typical, a shootout or overtime is the tail), so its mean sits above its
+   median, and the gap widens as the clock runs down. Anchoring the mean would
+   push half the distribution below the live number and then some, which made
+   the live Under look free late in games: at 55 points with 2:00 left it
+   reported P(final < 59) = 0.73 and a +41% edge that is an artifact of the
+   anchor, not a read on the market.
+
+   The shift is split across the two neighbouring integers so it adds no
+   rounding bias -- half a point is the push-versus-win boundary. */
+function finalTotalDist(score, remAnchor, minRem) {
   const tb = minRemBucket(minRem);
   if (tb === null) return null;
-  const hit = findCell(tb, Math.floor(expRem / MIDDLE_TABLE.expRemBin));
+  const hit = findCell(tb, Math.floor(remAnchor / MIDDLE_TABLE.expRemBin));
   if (!hit) return null;
 
   const { cell } = hit;
-  const shift = expRem - cell.mean;
+  const shift = remAnchor - cellMedian(cell);
   const kLo = Math.floor(shift);
   const w = shift - kLo;
 
@@ -354,14 +399,16 @@ function render() {
   if (res.n < 400) warn.push(`Thin sample for this game state (n = ${res.n.toLocaleString()}).`);
 
   const out = evaluate(bet, res.dist);
-  $('alert').innerHTML = warn.map(w => `<div class="note">${w}</div>`).join('');
 
   const mid = out.rows.find(r => r.key === 'middle');
   $('pMid').textContent = (mid.prob * 100).toFixed(1) + '%';
+  $('liveEv').textContent = money(out.liveEv);
+  $('liveEv').className = 'val ' + (out.liveEv >= 0 ? 'positive' : 'negative');
   $('ev').textContent = money(out.ev);
   $('ev').className = 'val ' + (out.ev >= 0 ? 'positive' : 'negative');
-  $('evPct').textContent = (out.evPct * 100).toFixed(2) + '%';
-  $('evPct').className = 'val ' + (out.evPct >= 0 ? 'positive' : 'negative');
+  $('evPctNote').textContent = `${(out.evPct * 100).toFixed(2)}% of ${money(out.risked)} risked`;
+  if (out.liveEv < 0) warn.push('The live leg is negative-EV on its own at that price. The hedge reshapes the payoff, it does not create edge.');
+  $('alert').innerHTML = warn.map(w => `<div class="note">${w}</div>`).join('');
 
   const pill = o => o ? `<span class="pill ${o}">${o}</span>` : '<span class="pill push">n/a</span>';
   $('branches').innerHTML = out.rows.map(r => `
@@ -376,7 +423,8 @@ function render() {
 }
 
 function blank() {
-  ['pMid', 'ev', 'evPct'].forEach(id => { $(id).textContent = '—'; $(id).className = 'val'; });
+  ['pMid', 'liveEv', 'ev'].forEach(id => { $(id).textContent = '—'; $(id).className = 'val'; });
+  $('evPctNote').textContent = '';
   $('branches').innerHTML = '';
   $('prov').textContent = '';
 }
