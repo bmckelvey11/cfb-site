@@ -24,6 +24,7 @@ PFF showed, and accumulate until the sample can answer.
 | [greenline-pinnacle-shade-2026-09-17.md](greenline-pinnacle-shade-2026-09-17.md) | Does Pinnacle's position at capture (juice lean, line vs PFF's, distance from PFF's projection, limit) predict which unders win? n=38, nothing survives Holm; "Pinnacle already below PFF's line" is 9-2 raw |
 | [greenline-edge-cap-revisit-2026-09-17.md](greenline-edge-cap-revisit-2026-09-17.md) | The 2–4% window on PFF's `value`, re-read: slope p 0.40, the 4%+ bucket is nine games, window floor below break-even. Dropped from the week 3 list; spread filter only |
 | [greenline-w2-grade-2026-09-15.md](greenline-w2-grade-2026-09-15.md) | Week 2's 36 positive-edge unders graded, including the six flags that needed a score or line fallback |
+| [greenline-w3-grade-2026-09-21.md](greenline-w3-grade-2026-09-21.md) | Week 3's 22-pick under list graded at PFF's number and at DraftKings' (11-11, neither price flips a pick), plus all 57 flags |
 | [greenline-archive-2026-09-17.md](greenline-archive-2026-09-17.md) | The pre-2026 PFF archives parsed into one CSV — 2020 season plus three 2022-23 slates. 368 derived picks, price-aware grading, every split below floor; pooled CLV is a moneyline artifact |
 | [../../bankroll/docs/under-selection-profile-2026-09-17.md](../../bankroll/docs/under-selection-profile-2026-09-17.md) *(in `research/bankroll/`)* | Which unders got bet, 2023-25, against every FBS game on the same days — the selection is a high-total rule, and the bet unders sit six points above where Greenline flags |
 
@@ -46,6 +47,7 @@ they silently read a stale capture.
 | 2a | [`../scripts/match_greenline_books.py`](../scripts/match_greenline_books.py) | Reprices each flag at a book's actual number from the-odds-api |
 | 2b | [`../scripts/greenline_vs_pinnacle.py`](../scripts/greenline_vs_pinnacle.py) | Compares the projection to Pinnacle — the reference price, not another book |
 | 3 | [`../scripts/grade_greenline.py`](../scripts/grade_greenline.py) | Grades captured flags against finals, at the line in the capture |
+| 3b | [`../scripts/grade_unders_list.py`](../scripts/grade_unders_list.py) | Grades the published under list only, at PFF's number and the repriced book number side by side, with Wilson intervals |
 | 4 | [`../scripts/greenline_season_review.py`](../scripts/greenline_season_review.py) | Rolls every graded week into the review docs above |
 | 5a | [`../scripts/greenline_bet_stats.py`](../scripts/greenline_bet_stats.py) | Full workup: exact binomial, Beta posterior, bootstrap, heterogeneity, runs test, day-clustered SE |
 | 5b | [`../scripts/greenline_bet_bounds.py`](../scripts/greenline_bet_bounds.py) | Conservative bet test — is a split still +EV at the Wilson *lower* bound? |
