@@ -33,9 +33,15 @@ CONFIGS = (
 STEM = "pooled-bankroll-growth-2026-09-21"
 
 
-def run(paths: int, seed: int, bankroll: float, resize: bool = True, seasons: int = 1) -> list[dict]:
+def run(paths: int, seed: int, bankroll: float, resize: bool = True, seasons: int = 1,
+        only_unit: float | None = None) -> list[dict]:
+    configs = CONFIGS if only_unit is None else tuple(
+        c for c in CONFIGS if abs(c[1] - only_unit) < 1e-9)
+    if not configs:
+        raise SystemExit(f"--only-unit {only_unit} matches none of "
+                         f"{[c[1] for c in CONFIGS]}")
     out = []
-    for label, unit, colour in CONFIGS:
+    for label, unit, colour in configs:
         res = simulate(Config(bankroll=bankroll, paths=paths, gl_unit=unit,
                               seed=seed, resize_weekly=resize, seasons=seasons))
         out.append(dict(label=label, colour=colour, fan=res["fan"], final=res["final"],
@@ -51,7 +57,7 @@ def figure(runs: list[dict], bankroll: float, path: Path, resized: list[dict] | 
     n_weeks = runs[0]["fan"].shape[0] - 1
     weeks = np.arange(n_weeks + 1)  # 0 = now (after week 3 of 2026); 12 = end of 2026
     rows = [runs] + ([resized] if resized else [])
-    fig, axes = plt.subplots(len(rows), len(runs), figsize=(15, 5.2 * len(rows)),
+    fig, axes = plt.subplots(len(rows), len(runs), figsize=(max(7.5, 5.0 * len(runs)), 5.2 * len(rows)),
                              sharey=True, squeeze=False)
     lo, hi = PCTS.index(5), PCTS.index(95)
     q1, q3, med = PCTS.index(25), PCTS.index(75), PCTS.index(50)
@@ -62,12 +68,15 @@ def figure(runs: list[dict], bankroll: float, path: Path, resized: list[dict] | 
             ax.set_title(r["label"] + ("\nunits re-sized weekly" if r["resize"]
                                        else "\nflat units off the start"), fontsize=10.5)
     axes[0, 0].legend(fontsize=8, frameon=False, loc="upper left")
+    narrow = len(runs) == 1  # one panel: the wide-figure title overflows
     fig.suptitle(f"Bankroll by week, planning prior (kappa 0.5: 89.5–70.0, mean 56.1%), "
-                 f"${bankroll:,.0f} start", fontsize=13, fontweight="bold", color=INK)
+                 f"${bankroll:,.0f} start", fontsize=11 if narrow else 13,
+                 fontweight="bold", color=INK, wrap=narrow)
     sub = "Win rate drawn per path from the half-pooled posterior. n58 and pooled readings are in the sweep."
     if resized:
         sub += " Top row: units re-sized off the bankroll each week. Bottom row: flat stakes off the starting bankroll."
-    fig.text(0.5, 0.905 if not resized else 0.95, sub, fontsize=9, color=MUTED, ha="center")
+    fig.text(0.5, 0.905 if not resized else 0.95, sub, fontsize=8 if narrow else 9,
+             color=MUTED, ha="center", wrap=narrow)
     fig.tight_layout(rect=(0, 0, 1, 0.9 if not resized else 0.94))
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=170, facecolor="white")
@@ -116,6 +125,8 @@ def self_check() -> None:
         assert r["fan"][-1, -1] - r["fan"][-1, 0] > r["fan"][1, -1] - r["fan"][1, 0]
     flat = run(paths=3_000, seed=1, bankroll=20_000, resize=False)
     assert all(g["p_bust"] == 0.0 for g in flat)
+    one = run(paths=1_000, seed=1, bankroll=20_000, only_unit=0.01)
+    assert len(one) == 1 and one[0]["unit"] == 0.01
     print("self-check OK")
 
 
@@ -129,13 +140,16 @@ def main() -> None:
     ap.add_argument("--flat-stakes", action="store_true",
                     help="add a second row with flat units off the starting bankroll")
     ap.add_argument("--seasons", type=int, default=1)
+    ap.add_argument("--only-unit", type=float,
+                    help="chart one config only, by its gl_unit (e.g. 0.01)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
     if args.self_check:
         self_check()
         return
-    runs = run(args.paths, args.seed, args.bankroll, seasons=args.seasons)
-    flat = run(args.paths, args.seed, args.bankroll, resize=False, seasons=args.seasons) if args.flat_stakes else None
+    runs = run(args.paths, args.seed, args.bankroll, seasons=args.seasons, only_unit=args.only_unit)
+    flat = run(args.paths, args.seed, args.bankroll, resize=False, seasons=args.seasons,
+               only_unit=args.only_unit) if args.flat_stakes else None
     print(table(runs + (flat or []), args.bankroll))
     if args.out:
         figure(runs, args.bankroll, Path(args.out) / "figs" / f"{STEM}.png", flat)
