@@ -149,7 +149,7 @@ footer p{margin:0 0 var(--space-2)}
       <div class="grid">
         <label class="field"><span>Live total</span><input type="number" id="liveNum" step="0.5" value="58.5"></label>
         <label class="field"><span>Price</span><input type="number" id="livePrice" step="5" value="-110"></label>
-        <label class="field"><span>Stake $</span><input type="number" id="liveStake" step="10" min="0" value="100"></label>
+        <label class="field"><span>Bankroll $</span><input type="number" id="bankroll" step="100" min="1" value="10000"></label>
       </div>
     </fieldset>
 
@@ -168,9 +168,20 @@ footer p{margin:0 0 var(--space-2)}
     <p class="panel-heading">Result</p>
     <p class="legs" id="legs"></p>
     <div class="chips">
+      <div class="chip"><div class="lbl">Stake the live leg</div><div class="val" id="stake">—</div><div class="chip-note" id="stakeNote"></div></div>
       <div class="chip"><div class="lbl">Middle hits</div><div class="val" id="pMid">—</div></div>
-      <div class="chip"><div class="lbl">Live leg EV</div><div class="val" id="liveEv">—</div><div class="chip-note">the actual decision — pregame stake is sunk</div></div>
+      <div class="chip"><div class="lbl">Live leg EV</div><div class="val" id="liveEv">—</div><div class="chip-note">what the hedge costs — pregame stake is sunk</div></div>
       <div class="chip"><div class="lbl">Whole position EV</div><div class="val" id="ev">—</div><div class="chip-note" id="evPctNote"></div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-heading">Why that stake</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Live stake</th><th style="text-align:right">Growth gain</th><th style="text-align:right">Live EV</th><th style="text-align:right">Worst case</th><th style="text-align:right">Best case</th></tr></thead>
+        <tbody id="sizing"></tbody>
+      </table>
     </div>
   </div>
 
@@ -254,6 +265,53 @@ function legEv(side, number, price, stake, dist) {
     (s, k) => s + dist[k] * legNet(side, number, price, stake, Number(k)), 0);
 }
 
+/* Terminal wealth if the final total is `t`, given a live stake of `y`. */
+function wealth(bet, bankroll, y, t) {
+  return bankroll
+    + legNet(bet.preSide, bet.preNum, bet.prePrice, bet.preStake, t)
+    + legNet(bet.liveSide, bet.liveNum, bet.livePrice, y, t);
+}
+
+/* Expected log growth of the bankroll at live stake `y`. -Infinity if any
+   outcome with positive probability would bust. */
+function growth(bet, dist, bankroll, y) {
+  let g = 0;
+  for (const k of Object.keys(dist)) {
+    const w = wealth(bet, bankroll, y, Number(k));
+    if (w <= 0) return -Infinity;
+    g += dist[k] * Math.log(w / bankroll);
+  }
+  return g;
+}
+
+/* The growth-optimal live stake.
+
+   This is the only defensible reading of "optimal". Maximising EV is
+   degenerate -- it says stake nothing when the hedge is -EV and stake
+   everything when it is +EV -- and the equalising convention below optimises
+   nothing at all. Kelly is what trades the hedge's cost against the variance
+   it removes, and it is the reason a -EV hedge can still be worth taking:
+   log utility pays for certainty.
+
+   Expected log wealth is concave in `y`, so a ternary search finds the
+   maximum without derivatives. */
+function kellyStake(bet, dist, bankroll) {
+  let lo = 0, hi = bankroll;
+  for (let i = 0; i < 100; i++) {
+    const a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3;
+    if (growth(bet, dist, bankroll, a) < growth(bet, dist, bankroll, b)) lo = a; else hi = b;
+  }
+  const y = (lo + hi) / 2;
+  return growth(bet, dist, bankroll, y) > growth(bet, dist, bankroll, 0) ? y : 0;
+}
+
+/* The stake that makes both outside outcomes pay the same: y = x * dO / dU.
+   A risk-flattening convention, not an optimum -- it ignores the bankroll and
+   the probabilities entirely, and it overpays the vig to buy symmetry. */
+function equalizingStake(bet) {
+  return bet.preStake * decimalProfit(bet.prePrice) / decimalProfit(bet.livePrice);
+}
+
 /* Given P(final total), fold it into the five branches and compute EV.
 
    `ev` is the whole position. `liveEv` is the live leg alone, which is the
@@ -280,7 +338,8 @@ function evaluate(bet, dist) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { decimalProfit, legOutcome, legNet, branches, evaluate };
+  module.exports = { decimalProfit, legOutcome, legNet, legEv, branches, evaluate,
+                     wealth, growth, kellyStake, equalizingStake };
 }
 
 /* ---- EV_MATH:END ---- */
@@ -369,16 +428,12 @@ function render() {
     preStake: +$('preStake').value,
     liveNum: +$('liveNum').value,
     livePrice: +$('livePrice').value,
-    liveStake: +$('liveStake').value,
+    liveStake: 0,                       // solved for below
   };
   const score = +$('score').value;
   const minRem = +$('minRem').value;
+  const bankroll = +$('bankroll').value;
   const expRem = bet.liveNum - score;
-
-  $('legs').innerHTML = `<strong>${bet.preSide === 'over' ? 'Over' : 'Under'} ${bet.preNum}</strong> `
-    + `at ${bet.prePrice > 0 ? '+' : ''}${bet.prePrice} for ${money(bet.preStake)}, hedged with `
-    + `<strong>${bet.liveSide === 'over' ? 'Over' : 'Under'} ${bet.liveNum}</strong> `
-    + `at ${bet.livePrice > 0 ? '+' : ''}${bet.livePrice} for ${money(bet.liveStake)}.`;
 
   const warn = [];
   const fail = m => { $('alert').innerHTML = `<div class="note err">${m}</div>`; blank(); };
@@ -387,6 +442,8 @@ function render() {
   if (expRem < 0) return fail('The live total is below the points already scored. Check the inputs.');
   // `min`/`max` on a number input only bind the spinner, so a typed value still needs checking.
   if (!(minRem >= 0 && minRem <= 60)) return fail('Minutes remaining must be between 0 and 60. Overtime counts as 0.');
+  if (!(bankroll > 0)) return fail('Bankroll must be greater than zero — the stake is sized against it.');
+  if (bet.preStake >= bankroll) return fail('The pregame stake is your whole bankroll or more. There is nothing left to hedge with.');
 
   const windowOpen = (bet.preSide === 'over' && bet.liveNum > bet.preNum)
                   || (bet.preSide === 'under' && bet.liveNum < bet.preNum);
@@ -398,7 +455,22 @@ function render() {
   if (res.distance >= 2) warn.push('That combination of clock and expected scoring is far outside the historical sample — the spread is borrowed from the nearest comparable game state. Treat the numbers as approximate.');
   if (res.n < 400) warn.push(`Thin sample for this game state (n = ${res.n.toLocaleString()}).`);
 
+  const kelly = kellyStake(bet, res.dist, bankroll);
+  const equal = equalizingStake(bet);
+  bet.liveStake = kelly;
   const out = evaluate(bet, res.dist);
+
+  $('legs').innerHTML = `<strong>${bet.preSide === 'over' ? 'Over' : 'Under'} ${bet.preNum}</strong> `
+    + `at ${bet.prePrice > 0 ? '+' : ''}${bet.prePrice} for ${money(bet.preStake)}, hedged with `
+    + `<strong>${bet.liveSide === 'over' ? 'Over' : 'Under'} ${bet.liveNum} for ${money(kelly)}</strong> `
+    + `at ${bet.livePrice > 0 ? '+' : ''}${bet.livePrice}.`;
+
+  $('stake').textContent = money(kelly);
+  $('stake').className = 'val';
+  $('stakeNote').textContent = kelly > 0
+    ? `growth-optimal — ${(kelly / equal * 100).toFixed(0)}% of the ${money(equal)} that would flatten both outside outcomes`
+    : 'no hedge maximises growth here';
+  if (kelly === 0) warn.push('The growth-optimal stake is zero: at this price the hedge costs more than the variance it removes. Taking it is a preference for certainty, not an edge.');
 
   const mid = out.rows.find(r => r.key === 'middle');
   $('pMid').textContent = (mid.prob * 100).toFixed(1) + '%';
@@ -408,7 +480,6 @@ function render() {
   $('ev').className = 'val ' + (out.ev >= 0 ? 'positive' : 'negative');
   $('evPctNote').textContent = `${(out.evPct * 100).toFixed(2)}% of ${money(out.risked)} risked`;
   if (out.liveEv < 0) warn.push('The live leg is negative-EV on its own at that price. The hedge reshapes the payoff, it does not create edge.');
-  $('alert').innerHTML = warn.map(w => `<div class="note">${w}</div>`).join('');
 
   const pill = o => o ? `<span class="pill ${o}">${o}</span>` : '<span class="pill push">n/a</span>';
   $('branches').innerHTML = out.rows.map(r => `
@@ -418,14 +489,45 @@ function render() {
       <td class="num ${r.net >= 0 ? 'positive' : 'negative'}">${money(r.net)}</td>
     </tr>`).join('');
 
+  const span = y => {
+    const ws = Object.keys(res.dist).map(t => wealth(bet, bankroll, y, Number(t)) - bankroll);
+    return { lo: Math.min(...ws), hi: Math.max(...ws) };
+  };
+  const sizes = [
+    { label: 'No hedge', y: 0 },
+    { label: 'Growth-optimal', y: kelly, mark: true },
+    { label: 'Flatten the outsides', y: equal },
+  ].filter((r, i, a) => i === 0 || a.findIndex(o => Math.abs(o.y - r.y) < 0.005) === i);
+  /* Growth is reported as the GAIN over not hedging, in basis points. The
+     absolute growth rates differ in the fourth decimal and read as identical;
+     the difference between them is the whole decision. */
+  const g0 = growth(bet, res.dist, bankroll, 0);
+  $('sizing').innerHTML = sizes.map(r => {
+    const bp = (growth(bet, res.dist, bankroll, r.y) - g0) * 10000;
+    const e = legEv(bet.liveSide, bet.liveNum, bet.livePrice, r.y, res.dist), s = span(r.y);
+    return `<tr class="${r.mark ? 'is-middle' : ''}">
+      <td>${r.label}<br><span style="color:var(--ink-400)">${money(r.y)}</span></td>
+      <td class="num ${bp > 0 ? 'positive' : bp < 0 ? 'negative' : ''}">${r.y === 0 ? '—' : (bp >= 0 ? '+' : '') + bp.toFixed(2) + ' bp'}</td>
+      <td class="num ${e >= 0 ? 'positive' : 'negative'}">${money(e)}</td>
+      <td class="num negative">${money(s.lo)}</td>
+      <td class="num positive">${money(s.hi)}</td>
+    </tr>`;
+  }).join('');
+
+  const gainBp = (growth(bet, res.dist, bankroll, kelly) - g0) * 10000;
+  if (kelly > 0 && gainBp < 1) warn.push(`Hedging is barely worth it here: the best stake adds ${gainBp.toFixed(2)} basis points of growth. The pregame bet is ${(bet.preStake / bankroll * 100).toFixed(1)}% of the bankroll, small enough that removing its variance buys almost nothing.`);
+
+  $('alert').innerHTML = warn.map(w => `<div class="note">${w}</div>`).join('');
+
   $('prov').textContent = `Remaining-points distribution from ${MIDDLE_TABLE.sampleN.toLocaleString()} drive starts, `
     + `${MIDDLE_TABLE.seasons[0]}–${MIDDLE_TABLE.seasons[1]}. This cell: n = ${res.n.toLocaleString()}.`;
 }
 
 function blank() {
-  ['pMid', 'liveEv', 'ev'].forEach(id => { $(id).textContent = '—'; $(id).className = 'val'; });
-  $('evPctNote').textContent = '';
+  ['stake', 'pMid', 'liveEv', 'ev'].forEach(id => { $(id).textContent = '—'; $(id).className = 'val'; });
+  ['evPctNote', 'stakeNote', 'legs'].forEach(id => { $(id).textContent = ''; });
   $('branches').innerHTML = '';
+  $('sizing').innerHTML = '';
   $('prov').textContent = '';
 }
 

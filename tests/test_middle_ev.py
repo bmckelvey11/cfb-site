@@ -25,24 +25,17 @@ WIN = 100 / 110 * 100  # profit on a $100 -110 winner
 TOL = 0.01
 
 
-def run_js(bet: dict, dist: dict) -> dict:
+def eval_js(bet: dict, dist: dict, expression: str):
+    """Run `expression` against the page's own EV block, with `bet` and `dist` bound."""
     source = BLOCK.search(HTML.read_text(encoding="utf-8"))
     assert source, "EV_MATH block not found in middle_calculator.html"
     script = source.group(1) + textwrap.dedent(
         f"""
         const bet = {json.dumps(bet)};
-        const dist = {json.dumps({str(k): v for k, v in dist.items()})};
-        const numeric = {{}};
-        for (const k of Object.keys(dist)) numeric[Number(k)] = dist[k];
-        const out = evaluate(bet, numeric);
-        console.log(JSON.stringify({{
-            ev: out.ev,
-            evPct: out.evPct,
-            preEv: out.preEv,
-            liveEv: out.liveEv,
-            liveEvPct: out.liveEvPct,
-            rows: out.rows.map(r => ({{key: r.key, pre: r.pre, live: r.live, net: r.net, prob: r.prob}})),
-        }}));
+        const raw = {json.dumps({str(k): v for k, v in dist.items()})};
+        const dist = {{}};
+        for (const k of Object.keys(raw)) dist[Number(k)] = raw[k];
+        console.log(JSON.stringify(({expression})));
         """
     )
     proc = subprocess.run(
@@ -51,6 +44,17 @@ def run_js(bet: dict, dist: dict) -> dict:
     )
     assert proc.returncode == 0, proc.stderr
     return json.loads(proc.stdout)
+
+
+def run_js(bet: dict, dist: dict) -> dict:
+    return eval_js(bet, dist, """(() => {
+        const out = evaluate(bet, dist);
+        return {
+            ev: out.ev, evPct: out.evPct, preEv: out.preEv,
+            liveEv: out.liveEv, liveEvPct: out.liveEvPct,
+            rows: out.rows.map(r => ({key: r.key, pre: r.pre, live: r.live, net: r.net, prob: r.prob})),
+        };
+    })()""")
 
 
 def bet(pre_side="over", pre_num=52.0, live_num=56.0, pre_stake=100, live_stake=100):
@@ -179,3 +183,73 @@ def test_no_middle_window_when_line_moves_the_wrong_way():
     # The 52-56 band loses the Over and loses nothing else -- it is not a middle.
     assert (r["middle"]["pre"], r["middle"]["live"]) == ("loss", "loss")
     assert r["middle"]["net"] == pytest.approx(-200, abs=TOL)
+
+
+# --- stake sizing -------------------------------------------------------------
+
+# Centred on the live number (Under 58 wins half the time), so the hedge is
+# -EV by roughly the vig -- which is what the real table produces. A
+# distribution that made the live leg +EV would turn Kelly into a value bet
+# and none of the hedging properties below would hold.
+SIZING_DIST = {44: 0.15, 50: 0.15, 54: 0.20, 62: 0.25, 70: 0.25}
+
+
+def test_equalizing_stake_makes_both_outside_outcomes_pay_the_same():
+    b = bet(pre_num=52.0, live_num=58.0)
+    b["liveStake"] = eval_js(b, SIZING_DIST, "equalizingStake(bet)")
+    r = rows_by_key(run_js(b, SIZING_DIST))
+    assert r["below"]["net"] == pytest.approx(r["above"]["net"], abs=TOL)
+
+
+def test_equalizing_stake_scales_with_the_price_ratio():
+    """y = x * dO / dU -- equal stakes are right only at equal prices."""
+    b = bet(pre_num=52.0, live_num=58.0)
+    b["prePrice"], b["livePrice"] = 150, -200
+    got = eval_js(b, SIZING_DIST, "equalizingStake(bet)")
+    assert got == pytest.approx(100 * 1.5 / 0.5, abs=TOL)
+
+
+def test_kelly_stake_beats_its_neighbours():
+    """The returned stake maximises expected log growth, so nudging it either
+    way must not improve growth. That is the whole claim behind calling it
+    optimal."""
+    b = bet(pre_num=52.0, live_num=58.0, pre_stake=1000)
+    got = eval_js(b, SIZING_DIST, """(() => {
+        const W = 10000, y = kellyStake(bet, dist, W);
+        return {y, at: growth(bet, dist, W, y),
+                lo: growth(bet, dist, W, y * 0.9),
+                hi: growth(bet, dist, W, y * 1.1)};
+    })()""")
+    assert got["y"] > 0
+    assert got["at"] >= got["lo"] and got["at"] >= got["hi"]
+
+
+def test_kelly_stake_grows_with_the_position_as_a_share_of_bankroll():
+    """A 1%-of-bankroll position barely needs hedging; a 50% one nearly wants
+    the full flattening stake."""
+    fractions = []
+    for stake, bankroll in [(100, 10000), (1000, 10000), (500, 1000)]:
+        b = bet(pre_num=52.0, live_num=58.0, pre_stake=stake)
+        fractions.append(eval_js(b, SIZING_DIST, f"""(() => {{
+            const y = kellyStake(bet, dist, {bankroll});
+            return y / equalizingStake(bet);
+        }})()"""))
+    assert fractions == sorted(fractions), f"not monotone in position size: {fractions}"
+    assert fractions[0] < 0.5 < fractions[-1]
+    # A -EV hedge never wants more than the flattening stake.
+    assert all(f <= 1.0 for f in fractions), fractions
+
+
+def test_kelly_stake_is_zero_when_the_hedge_costs_more_than_it_is_worth():
+    """A tiny position priced at brutal juice: no hedge maximises growth."""
+    b = bet(pre_num=52.0, live_num=58.0, pre_stake=10)
+    b["livePrice"] = -100000
+    assert eval_js(b, SIZING_DIST, "kellyStake(bet, dist, 1000000)") == 0
+
+
+def test_growth_refuses_a_stake_that_could_bust_the_bankroll():
+    b = bet(pre_num=52.0, live_num=58.0, pre_stake=100)
+    assert eval_js(b, SIZING_DIST, "growth(bet, dist, 200, 500) === -Infinity ? 'busts' : 'ok'") == "busts"
+    # Whatever it picks must itself be survivable.
+    assert eval_js(b, SIZING_DIST,
+                   "Number.isFinite(growth(bet, dist, 200, kellyStake(bet, dist, 200)))") is True

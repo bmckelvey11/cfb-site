@@ -119,6 +119,48 @@ A leg's contribution is `stake × decimalProfit(price)` on a win, `0` on a push,
 independent per leg, so unequal sizing works without special-casing. EV is
 `Σ(branch probability × branch net)`.
 
+### Sizing the live leg
+
+The live stake is solved for, not entered. Three readings of "optimal", only one of
+which is a real optimum:
+
+- **Maximise EV.** Degenerate. The live leg's EV is linear in the stake, so this says
+  stake nothing when the hedge is −EV and stake the bankroll when it is +EV.
+- **Equalise the outside outcomes.** Setting `−x + (dU−1)y = (dO−1)x − y` gives
+  `y = x · dO / dU`, so equal stakes are correct only at equal prices. This is a
+  convention for flattening the payoff, not an optimisation — it ignores the bankroll
+  and the probabilities entirely, and it pays vig to buy symmetry nobody asked for.
+- **Maximise expected log growth.** `max_y Σ_t P(t) · log(W + preNet(t) + liveNet(y,t))`.
+  This is what trades the hedge's cost against the variance it removes, and it is why
+  a −EV hedge can still be worth taking: log utility pays for certainty. Expected log
+  wealth is concave in `y`, so a ternary search finds it without derivatives.
+
+Kelly is the headline number. The answer depends almost entirely on how large the
+pregame bet is relative to the bankroll:
+
+| Pregame as % of bankroll | Equalising stake | Kelly stake | Kelly ÷ equalising | Growth gain vs no hedge |
+| --- | --- | --- | --- | --- |
+| 1% ($100 of $10,000) | $100 | $15.86 | 16% | **+0.01 bp** |
+| 10% ($1,000 of $10,000) | $1,000 | $681.85 | 68% | +20.45 bp |
+| 25% ($500 of $2,000) | $500 | $378.95 | 76% | +157.08 bp |
+| 50% ($500 of $1,000) | $500 | $409.65 | 82% | +805.00 bp |
+
+Two things fall out of that table. Hedging a 1%-of-bankroll position is worth
+essentially nothing, and taking the conventional equalising stake there is **actively
+negative** (−0.31 bp) — you pay vig to remove variance that was not hurting you. And
+Kelly approaches the equalising stake as the position grows, which is the sense in
+which the convention is a large-position approximation.
+
+The page reports the gain as basis points over not hedging, because the absolute
+growth rates differ in the fourth decimal and read as identical.
+
+**No fractional-Kelly haircut is applied, deliberately.** Betting a fraction of Kelly
+makes a *bet* safer. A hedge is the reverse: shrinking it leaves you more exposed, not
+less. The usual justification — distrust of the estimated edge — does not pick a
+direction here, and if anything argues for hedging more, toward the equalising stake,
+to buy certainty rather than rely on the model. The repo's quarter-Kelly convention is
+for position sizing and does not transfer.
+
 ### Validation
 
 - **Cell histograms integrate to 1.** Worst cell mass error 1.9 × 10⁻⁴, from rounding
@@ -252,6 +294,11 @@ Also not supported:
 - **No price validation.** Nothing here checks that the quoted live price is
   obtainable, or that the middle survives the vig at the sizes shown. EV is computed
   from the prices the user types in.
+- **The Kelly stake inherits every probability error.** It is solved against this
+  distribution, so a mis-specified spread or anchor moves the recommended stake as
+  well as the probability. It also assumes the bankroll entered is the whole bankroll
+  and that this is the only open position — it does not know about other bets running
+  on the same slate, which are correlated with this one.
 - **No CLV or realised-ROI claim.** This is a pricing tool, not a backtested system.
   Nothing in this document reports a hit rate or ROI against a de-vigged market, so
   the Tier 1 metrics in [`docs/model-evaluation-standard.md`](../../../docs/model-evaluation-standard.md)
