@@ -8,8 +8,9 @@ python scripts/audit_coverage.py --data-dir data       # registry vs disk: is ev
 ```
 
 `audit_endpoints.py` reads the live REST spec (`/api-docs.json`) and partitions all
-74 paths into registered / in-client-but-unregistered / no-client-method, so the
-74-73-1 breakdown below is generated rather than hand-counted. `audit_coverage.py`
+spec paths into registered / in-client-but-unregistered / no-client-method, so every
+breakdown below is generated rather than hand-counted (74-73-1 on 2026-08-28,
+84-76-3-5 on 2026-09-21). `audit_coverage.py`
 is the source of truth for per-endpoint file counts. This note records the things
 neither count can tell you — *why* something is absent.
 
@@ -135,6 +136,8 @@ Other analyses that silently inherit the gap:
 Re-audited **2026-09-21** against live spec **5.27.1** (`python scripts/audit_endpoints.py`).
 The spec has grown 74 → **84 paths**: **76 registered**, **3 in the client but
 unregistered**, **5 with no client method**. The ceiling is the vendored client again.
+The eight unregistered paths split three ways — 5 bump-blocked (`/rushing/*`),
+2 registerable today (`/draft/positions`, `/draft/teams`), 1 deliberate (`/info/usage`).
 
 CFBD's API server is now open source — [`CFBD/cfb-api-v2`](https://github.com/CFBD/cfb-api-v2),
 TypeScript/TSOA, one `src/app/<domain>/controller.ts` per route family, and a
@@ -154,8 +157,12 @@ This is not the same thing as the existing `adjusted_player_rushing` row, which 
 rushing family with `rushDirection` / `attributionStatus` / `isTeamRush` filters.
 
 `cfbd-python/` is pinned at OpenAPI **5.25.0**; PyPI `cfbd` is at **5.27.1**, which is
-exactly the deployed spec. One bump closes all five. Unknown going in: whether the
-5.27.1 wheel still needs `.venv-cfbd` (see [fetch-venv-2026-09-17.md](fetch-venv-2026-09-17.md)).
+exactly the deployed spec. Upstream `main` carries `cfbd/api/rushing_api.py` with the
+five methods a registry row would resolve (`get_rushing_plays`,
+`get_player_rushing_by_season|_by_game`, `get_team_rushing_by_season|_by_game`), so one
+bump closes all five — verified against the upstream repo, not the installed wheel.
+Unknown going in: whether 5.27.1 still needs `.venv-cfbd`
+(see [fetch-venv-2026-09-17.md](fetch-venv-2026-09-17.md)).
 
 ### Registerable now, no bump needed (2 paths)
 
@@ -239,7 +246,9 @@ Audited 2026-08-28 against a downloaded copy of the OpenAPI document
 (`cfbd-openapi (1).json`). It is **identical to the live spec** — same title and version
 (College Football Data API 5.24.2), same 74 paths, GET-only, no path in one and not the
 other. So there is no endpoint-level gap left to find; `scripts/audit_endpoints.py` already
-partitions all 74. The gaps that remain are at the *parameter* level, and one of them is
+partitions all 74. (That held on 2026-08-28. It does not now — the spec has since grown
+to 84 paths and eight are unregistered; see the section above.) The gaps this section
+records are at the *parameter* level, and one of them is
 serious.
 
 ### `seasonType` — closed for all 19 endpoints that accept it
