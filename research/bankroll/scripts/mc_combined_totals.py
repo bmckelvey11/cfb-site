@@ -94,6 +94,14 @@ GL_COVERAGE_HISTORICAL = 0.13
 
 WEEKS_REMAINING = 12  # weeks 4-15 of the 2026 regular season
 
+# Calendar span of each modelled season, for the one annualised number reported.
+# Season 0 is weeks 4-15 of 2026: Sept 24 to Dec 12, 79 days. A later season is
+# modelled on 2025's 15-week shape, whose 2027 equivalent runs late Aug to mid
+# Dec, 105 days -- modelled, not scheduled. Between seasons the bankroll is idle
+# for 259 days (Dec 12 2026 to Aug 28 2027), which is exactly why annualising a
+# single 12-week season is meaningless: horizon_years() below refuses to.
+SEASON0_DAYS, SEASON_DAYS, OFFSEASON_DAYS = 79, 105, 259
+
 PCTS = [5, 25, 50, 75, 95]  # the fan chart's bands
 
 # Prices. over-zero's operational rule is -120 or better; Greenline is graded -110.
@@ -116,6 +124,11 @@ def kelly_unit(p: float, american: int, fraction: float = 0.25, n_simul: float =
     b = payout(american)
     f = max((p * b - (1 - p)) / b, 0.0)
     return fraction * f / (1 + (n_simul - 1) * rho_outcome)
+
+
+def horizon_years(seasons: int) -> float:
+    """Calendar years the money is committed for, counting the idle off-season."""
+    return (SEASON0_DAYS + (seasons - 1) * (OFFSEASON_DAYS + SEASON_DAYS)) / 365.25
 
 
 def planning_p_gl(kappa: float = 0.5) -> float:
@@ -216,6 +229,13 @@ def simulate(cfg: Config) -> dict:
     peak = np.zeros(n)         # running peak of cumulative pnl, for max drawdown
     max_dd = np.zeros(n)       # largest peak-to-trough fall, in dollars
     weeks_under = np.zeros(n)  # weeks ending below the starting bankroll
+    # Week-level cash flow. Dollars are kept for season 0 only: stakes compound, so
+    # pooling a week-27 stake with a week-4 one would make "a week" look bigger than
+    # any week of the season being funded. The percent series is scale-free and does
+    # pool across every week.
+    week_pnl_s0, week_ret = [], []
+    weeks_up = np.zeros(n)     # weeks that ended in profit, per path
+    season_end = []            # bankroll at the end of each modelled season
     oz_remaining = oz_by_season[0].copy()
     cur_season = 0
     # Percentiles of the bankroll after each week. Keeping the quantiles rather than
@@ -230,6 +250,7 @@ def simulate(cfg: Config) -> dict:
         wts_left = [wt for f, wt, s in schedule[w:] if s == s_ix]
         oz_p = oz_wt / sum(wts_left)
         shock = rng.standard_normal(n)
+        week_start = cfg.bankroll + pnl   # bankroll carried into this week
         if cfg.resize_weekly:
             # Weekly compounding: units re-sized off the bankroll as it stands before
             # the week's slate. Within a week stakes are still flat -- Saturday
@@ -265,7 +286,27 @@ def simulate(cfg: Config) -> dict:
         peak = np.maximum(peak, pnl)
         max_dd = np.maximum(max_dd, peak - pnl)
         weeks_under += pnl < 0
+        weeks_up += week_pnl > 0
+        if s_ix == 0:
+            week_pnl_s0.append(week_pnl.copy())
+        week_ret.append(np.where(week_start > 0, week_pnl / np.maximum(week_start, 1e-9), 0.0))
+        if w + 1 == n_weeks or schedule[w + 1][2] != s_ix:
+            season_end.append(cfg.bankroll + pnl.copy())
         fan.append(np.percentile(cfg.bankroll + pnl, PCTS))
+
+    # Growth rates. Per-path, never by dividing medians -- medians do not compound.
+    final = cfg.bankroll + pnl
+    years = horizon_years(cfg.seasons)
+    # A 12-week season has no meaningful annualised rate: the capital is idle for
+    # the other 40 weeks, so scaling 0.22 years up to 1 invents compounding that
+    # never happens. Only report a CAGR once the horizon spans a full year.
+    cagr = (np.maximum(final, 0.0) / cfg.bankroll) ** (1.0 / years) - 1.0 if years >= 1.0 else None
+    # What one FULL season does to the money, for the multi-season frame. Season 0
+    # is 12 of 15 weeks, so it is not comparable and is excluded.
+    full_season_growth = (season_end[1] / np.maximum(season_end[0], 1e-9) - 1.0
+                          if len(season_end) > 1 else None)
+    wk_pnl = np.concatenate(week_pnl_s0)
+    wk_ret = np.concatenate(week_ret)
 
     return {
         "config": dict(cfg.__dict__, weeks=n_weeks),
@@ -276,8 +317,21 @@ def simulate(cfg: Config) -> dict:
         "p_gl_below_breakeven": float((p_gl < breakeven(GL_PRICE)).mean()),
         "p_oz_below_breakeven": float((p_oz < breakeven(OZ_PRICE)).mean()),
         "mean_turnover": float(turnover.mean()),
-        "final": cfg.bankroll + pnl,
+        "final": final,
         "worst_week": worst_week,
+        # --- growth rate and week-level cash flow ---
+        "horizon_years": years,
+        "cagr": cagr,                              # per path, or None under 1 year
+        "full_season_growth": full_season_growth,  # per path, or None for 1 season
+        # percentiles of a single week's profit, season 0 only, in dollars
+        "week_pnl_q": np.percentile(wk_pnl, PCTS),
+        "week_pnl_mean": float(wk_pnl.mean()),
+        # the same thing scale-free, pooled over every modelled week
+        "week_ret_q": np.percentile(wk_ret, PCTS),
+        # share of weeks that end in profit (a losing week is the common case at
+        # these win rates only because juice makes the break-even week rare)
+        "frac_weeks_up": float(weeks_up.sum() / (n * n_weeks)),
+        "weeks_up": weeks_up,  # per path
         # Stakes are flat off the STARTING bankroll with no stop-loss, so a path
         # can go through zero and keep betting. Percentiles on such a path are
         # unreachable in reality -- report the rate rather than hiding it.
@@ -419,6 +473,63 @@ def make_figures(base: Config, scenarios: list[tuple[str, Config]], path: Path) 
     print(f"wrote {path}")
 
 
+def growth_report(bankroll: float, paths: int, seed: int, **kw) -> str:
+    """Growth rate and week-level cash flow at one configuration.
+
+    Two tables the terminal-bankroll percentiles do not answer: what rate the money
+    compounds at, and what a single week of it looks like. Run at the recommended
+    units; `kw` goes straight to Config.
+    """
+    one = simulate(Config(bankroll=bankroll, paths=paths, seed=seed, seasons=1, **kw))
+    two = simulate(Config(bankroll=bankroll, paths=paths, seed=seed, seasons=2, **kw))
+
+    def q(a, p):
+        return float(np.percentile(a, p))
+
+    def usd(v):
+        return f"−${abs(v):,.0f}" if v < 0 else f"${v:,.0f}"
+
+    def pct(v):
+        return (f"−{abs(v):.2%}" if v < 0 else f"+{v:.2%}")
+
+    out = ["### Growth rate", "",
+           "| measure | median | 5th pct | 95th pct |", "|---|---:|---:|---:|"]
+    for label, a, fmt in (
+        ("rest of 2026, 12 weeks (not annualised)", one["final"] / bankroll - 1, "pct"),
+        ("a full 2027 season", two["full_season_growth"], "pct"),
+        (f"CAGR, {two['horizon_years']:.2f} calendar years to Dec 2027", two["cagr"], "pct"),
+        ("ending bankroll through 2027", two["final"], "usd"),
+    ):
+        f = (lambda v: f"−{abs(v):.1%}" if v < 0 else f"+{v:.1%}") if fmt == "pct" else usd
+        out.append(f"| {label} | {f(q(a, 50))} | {f(q(a, 5))} | {f(q(a, 95))} |")
+    out += ["",
+            "The 12-week row is deliberately not annualised: the bankroll is idle for "
+            f"the {OFFSEASON_DAYS} days between seasons, so scaling a "
+            f"{SEASON0_DAYS}-day result up to a year invents compounding that never "
+            "happens. The CAGR row spans the whole funded window, idle months included.",
+            "", "### A week", "",
+            "| measure | value |", "|---|---:|"]
+    wq, rq = one["week_pnl_q"], one["week_ret_q"]
+    out += [
+        f"| weeks in the rest of 2026 | {one['n_weeks']} |",
+        f"| median week, profit | {usd(wq[2])} |",
+        f"| mean week, profit | {usd(one['week_pnl_mean'])} |",
+        f"| middle half of weeks | {usd(wq[1])} to {usd(wq[3])} |",
+        f"| 5th to 95th pct week | {usd(wq[0])} to {usd(wq[4])} |",
+        f"| worst week of a season, median | {usd(np.median(one['worst_week']))} |",
+        f"| share of weeks that end in profit | {one['frac_weeks_up']:.1%} |",
+        f"| weeks ending below the start, median | {np.median(one['weeks_under']):.0f} of {one['n_weeks']} |",
+        f"| median week as a % of that week's bankroll | {pct(rq[2])} |",
+        f"| 5th to 95th pct week, same basis | {pct(rq[0])} to {pct(rq[4])} |",
+        "",
+        "Dollar rows are the 2026 leg only: stakes re-size weekly, so pooling a 2027 "
+        "week with a 2026 one would make a week look bigger than any week being "
+        "funded. The percent rows are scale-free and pool every modelled week.",
+        "",
+    ]
+    return "\n".join(out)
+
+
 def report(res: dict, label: str) -> str:
     f = res["final"]
     b0 = res["config"]["bankroll"]
@@ -540,6 +651,31 @@ def self_check() -> None:
     wide = simulate(Config(paths=5_000, seed=7, oz_extra_sd=0.03))
     assert wide["p_oz_below_breakeven"] > base["p_oz_below_breakeven"]
     assert base["max_dd"].min() >= 0 and base["weeks_under"].max() <= base["n_weeks"]
+
+    # --- growth rate and weekly cash flow ---
+    # one season is under a year, so no CAGR is emitted; two seasons is 1.21 years
+    assert base["cagr"] is None and base["full_season_growth"] is None
+    assert abs(horizon_years(1) - 0.216) < 0.002 and abs(horizon_years(2) - 1.213) < 0.002
+    assert two["cagr"] is not None and two["full_season_growth"] is not None
+    # the CAGR must reproduce the terminal bankroll it was derived from
+    reconstructed = Config().bankroll * (1 + two["cagr"]) ** two["horizon_years"]
+    assert np.allclose(reconstructed, two["final"]), "cagr does not invert to final"
+    # a full 2027 season compounds the season-0 result, so terminal growth must
+    # exceed either leg alone
+    assert np.median(two["final"]) > np.median(base["final"])
+    # season 0's weekly dollars must add up to season 0's profit
+    assert abs(base["week_pnl_mean"] * WEEKS_REMAINING
+               - (np.mean(base["final"]) - Config().bankroll)) < 1.0
+    # a week is a coin flip plus an edge: profitable clearly less than 2/3 of the
+    # time, clearly more than a third, and the median week is small either way
+    assert 0.35 < base["frac_weeks_up"] < 0.65, base["frac_weeks_up"]
+    assert (np.diff(base["week_pnl_q"]) >= 0).all() and (np.diff(base["week_ret_q"]) >= 0).all()
+    # A path's worst week out of 12 lands near the low tail of the pooled week
+    # distribution, so the median of it must sit between the 5th and 25th pooled
+    # percentiles. Outside that bracket the two weekly numbers in the writeup are
+    # measuring different things and would read as a contradiction.
+    assert base["week_pnl_q"][0] <= np.median(base["worst_week"]) <= base["week_pnl_q"][1], (
+        base["week_pnl_q"][0], np.median(base["worst_week"]), base["week_pnl_q"][1])
     print("self-check OK")
 
 
@@ -569,6 +705,8 @@ def main() -> None:
     ap.add_argument("--gl-coverage", type=float, default=1.0,
                     help="fraction of the weekly Greenline flags actually bet")
     ap.add_argument("--seed", type=int, default=20260921)
+    ap.add_argument("--growth", action="store_true",
+                    help="print the growth-rate and week-level tables and stop")
     ap.add_argument("--json", help="write the scenario table here")
     ap.add_argument("--figs", help="write the four-panel figure here (.png)")
     ap.add_argument("--self-check", action="store_true")
@@ -576,6 +714,16 @@ def main() -> None:
 
     if args.self_check:
         self_check()
+        return
+
+    if args.growth:
+        print(growth_report(
+            args.bankroll, args.paths, args.seed, rho=args.rho, oz_unit=args.oz_unit,
+            gl_unit=args.gl_unit, oz_haircut=not args.no_haircut,
+            gl_prior=args.gl_prior or "pooled",
+            gl_kappa=None if args.gl_prior else args.gl_kappa,
+            gl_coverage=args.gl_coverage, resize_weekly=not args.flat_stakes,
+            gl_volume=args.gl_volume, gl_range=tuple(args.gl_range)))
         return
 
     base = Config(bankroll=args.bankroll, paths=args.paths, rho=args.rho,

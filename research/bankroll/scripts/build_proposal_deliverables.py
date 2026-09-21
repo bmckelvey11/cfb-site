@@ -1,4 +1,4 @@
-"""Render the seed-bankroll proposal to PDF and a 9-slide deck.
+"""Render the seed-bankroll proposal to PDF and a 10-slide deck.
 
     python research/bankroll/scripts/build_proposal_deliverables.py
     python research/bankroll/scripts/build_proposal_deliverables.py --self-check
@@ -6,7 +6,9 @@
 Inputs: docs/seed-bankroll-proposal-2026-09-21.md, the two figures in docs/figs/,
 and the sweep CSV. Outputs, next to the markdown:
     seed-bankroll-proposal-2026-09-21.pdf     markdown -> HTML -> Chrome headless print
-    seed-bankroll-proposal-2026-09-21.pptx    python-pptx, numbers read from the CSV
+    seed-bankroll-proposal-2026-09-21.pptx    python-pptx, terminal numbers from the
+                                              sweep CSV, rate and week-level ones
+                                              re-simulated at the same seed
 
 Needs `markdown` and `python-pptx` (system Python has both; the repo .venv does not)
 and Chrome (or Edge) for the PDF step.
@@ -22,9 +24,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mc_combined_totals import (GL_BETS_RANGE, GL_FLAGS_BY_WEEK, OZ_WEEK4PLUS_HISTORY,  # noqa: E402
-                                kelly_unit, planning_p_gl)
+                                Config, kelly_unit, planning_p_gl, simulate)
 
 GL_UNIT_TODAY = 0.01   # the rule's answer today: min(quarter Kelly 1.31%, 3% cap -> 1%)
 
@@ -46,9 +50,24 @@ body{font-family:Segoe UI,Arial,sans-serif;font-size:11pt;color:#1a1d24;max-widt
 h1{font-size:20pt;margin:0 0 .3em}h2{font-size:14pt;color:#2b5d8a;margin:1.2em 0 .3em;border-bottom:1px solid #d8dce3}
 h3{font-size:12pt;margin:1em 0 .3em}table{border-collapse:collapse;font-size:9.5pt;margin:.5em 0;width:100%}
 th,td{border:1px solid #d8dce3;padding:3px 6px;text-align:left}th{background:#f3f4f6}
-code{font-size:9pt;background:#f3f4f6;padding:0 3px}pre{font-size:8.5pt;background:#f3f4f6;padding:6px}
+code{font-size:9pt;background:#f3f4f6;padding:0 3px}pre{font-size:8.5pt;background:#f3f4f6;padding:6px;white-space:pre-wrap;word-break:break-word}
 img{max-width:100%}hr{border:0;border-top:1px solid #d8dce3}
 """
+
+
+GROWTH_PATHS, GROWTH_SEED = 50_000, 20260921  # same run the proposal's tables quote
+
+
+def growth_rows(unit: float) -> tuple[dict, dict]:
+    """(one season, two seasons) at `unit`, for the rate and per-week slide.
+
+    Re-run here rather than read off the sweep CSV: the sweep stores terminal
+    percentiles only, and the rate and week-level series are per-path quantities
+    the CSV never carried. Seed and path count match the proposal's own run, so
+    the slide and the document print the same numbers.
+    """
+    kw = dict(paths=GROWTH_PATHS, seed=GROWTH_SEED, gl_unit=unit, oz_unit=0.01, gl_kappa=0.5)
+    return simulate(Config(seasons=1, **kw)), simulate(Config(seasons=2, **kw))
 
 
 def sweep_rows() -> dict[tuple[str, float], dict]:
@@ -252,8 +271,44 @@ def build_pptx() -> Path:
         "",
         "Same-Saturday correlation is assumed (ρ = 0.10), not measured.",
         "",
-        "Stress-tested under the 3% cap: 1% passes 15 of 25 skeptical scenarios and the combined case on the planning prior; 0.5% passes all 25.",
+        "Stress-tested under the 3% cap: 1% passes 17 of 25 skeptical scenarios and the combined case on the planning prior; 0.5% passes all 25.",
     ], 13)
+
+    # 6b growth rate and a week
+    g1_one, g1_two = growth_rows(0.01)
+    g5_one, g5_two = growth_rows(0.005)
+
+    def pc(a, p=50):
+        v = float(np.percentile(a, p))
+        return f"−{abs(v):.1%}" if v < 0 else f"+{v:.1%}"
+
+    s = slide("The rate, and a week",
+              "Medians, computed per simulated path. A season is the unit that compounds; "
+              "the bankroll is idle 259 days between seasons.")
+    table(s, 0.6, 1.7, 6.1, [
+        ["growth", "1% unit", "0.5% unit"],
+        ["rest of 2026, 12 weeks", pc(g1_one["final"] / 20000 - 1), pc(g5_one["final"] / 20000 - 1)],
+        ["a full 2027 season", pc(g1_two["full_season_growth"]), pc(g5_two["full_season_growth"])],
+        ["CAGR, 1.21 yrs to Dec 2027", pc(g1_two["cagr"]), pc(g5_two["cagr"])],
+        ["ending bankroll, Dec 2027", money(np.median(g1_two["final"])), money(np.median(g5_two["final"]))],
+    ], col_w=[3.1, 1.5, 1.5], size=13)
+    table(s, 7.0, 1.7, 6.0, [
+        ["a week", "1% unit", "0.5% unit"],
+        ["median week", money(g1_one["week_pnl_q"][2]), money(g5_one["week_pnl_q"][2])],
+        ["middle half of weeks", f"{money(g1_one['week_pnl_q'][1])} to {money(g1_one['week_pnl_q'][3])}",
+         f"{money(g5_one['week_pnl_q'][1])} to {money(g5_one['week_pnl_q'][3])}"],
+        ["5th–95th pct week", f"{money(g1_one['week_pnl_q'][0])} to {money(g1_one['week_pnl_q'][4])}",
+         f"{money(g5_one['week_pnl_q'][0])} to {money(g5_one['week_pnl_q'][4])}"],
+        ["worst week, median", money(np.median(g1_one["worst_week"])), money(np.median(g5_one["worst_week"]))],
+        ["weeks ending in profit", f"{g1_one['frac_weeks_up']:.1%}", f"{g5_one['frac_weeks_up']:.1%}"],
+    ], col_w=[2.4, 1.8, 1.8], size=13)
+    text(s, 0.6, 4.6, 12.2, 2.4, [
+        "No annualised figure for 2026 alone: 79 days of betting then 259 idle would turn +8% into something near +43%. "
+        "The CAGR row spans the whole funded window with the idle months counted in.",
+        "A typical week makes $125 and the worst week of a typical season loses $1,055. "
+        "Four weeks in ten lose money at both units — stake size moves the size of the swing, never its frequency.",
+        "Dollar rows are the 2026 leg only; stakes re-size weekly, so a 2027 week is not the same week.",
+    ], 14, color=MUTED)
 
     # 7 does not support
     s = slide("What the numbers do not support")

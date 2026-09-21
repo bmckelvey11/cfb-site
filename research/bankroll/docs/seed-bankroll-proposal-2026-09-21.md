@@ -17,6 +17,7 @@ python research/bankroll/scripts/bankroll_config_sweep.py --paths 50000 --out re
 python research/bankroll/scripts/bankroll_config_sweep.py --paths 50000 --seasons 2
 python research/bankroll/scripts/pooled_growth_chart.py --paths 100000 --seasons 2 --flat-stakes --out research/bankroll/docs
 python research/bankroll/scripts/bankroll_stress.py --paths 50000 --out research/bankroll/docs
+python research/bankroll/scripts/mc_combined_totals.py --growth --paths 50000 --gl-unit 0.01
 ```
 
 ---
@@ -51,6 +52,25 @@ everywhere.
 | through 2027 | 0.5% | $22,410 (+12.0%) | $17,710 – $28,200 | 21.2% | 0.3% | 0 of 50,000 |
 
 Planning prior throughout; the bracket is in §4 and §7.
+
+### The same thing as a rate
+
+| measure | 1% unit | 0.5% unit |
+|---|---:|---:|
+| rest of 2026, 12 weeks | **+8.2%** (5th–95th −15.2% to +36.5%) | +4.5% (−7.9% to +18.1%) |
+| a full 2027 season | **+11.9%** (−15.9% to +47.5%) | +7.3% (−9.3% to +26.6%) |
+| **CAGR, 1.21 calendar years to Dec 2027** | **+16.8%** (−17.9% to +64.6%) | +9.8% (−9.5% to +32.7%) |
+
+Medians, computed per simulated path rather than by dividing one median by
+another, because medians do not compound.
+
+**Why there is no annualised number for 2026 alone.** The rest of this season is
+79 days of betting followed by 259 days in which the money does nothing. Scaling
+a 12-week result up to a year would invent compounding that never happens and
+would turn +8.2% into something near +43%. The CAGR row is the only annualised
+figure here, and it spans the whole funded window with the idle months counted
+in. A season is the unit that actually compounds, which is why the middle row is
+the one to watch across years.
 
 **What changed since September 17.** Week 3 added 22 graded Greenline under picks
 (11–11) and 5 over-zero overs (4–1). The Greenline record the prior is built on
@@ -245,6 +265,44 @@ At the recommended 1% / 1% units, rest of 2026:
 At 1% a season will spend time under water and a 10% drawdown happens in about a
 third of seasons. That is the price of the growth frame; 0.5% halves both.
 
+### What a week looks like
+
+The table above is the season. This is the unit of experience: 6–12 unders and
+the odd over-zero bet settle within a few hours on a Saturday, and the bankroll
+moves once a week.
+
+| measure | 1% unit | 0.5% unit |
+|---|---:|---:|
+| weeks in the rest of 2026 | 12 | 12 |
+| **median week** | **+$125** | +$67 |
+| mean week | +$151 | +$79 |
+| middle half of weeks | −$328 to +$669 | −$171 to +$341 |
+| 5th to 95th percentile week | −$1,080 to +$1,360 | −$556 to +$703 |
+| worst week of the season, median | −$1,055 | −$536 |
+| share of weeks that end in profit | 58.1% | 58.2% |
+| weeks ending below $20,000, median | 2 of 12 | 2 of 12 |
+| median week, as a % of that week's bankroll | +0.56% | +0.32% |
+| 5th to 95th percentile week, same basis | −5.27% to +6.27% | −2.68% to +3.44% |
+
+Three things worth saying plainly about that table.
+
+1. **A typical week is small and a bad week is not.** The median week makes $125
+   and the worst week of a typical season loses $1,055 — eight times the median
+   in the other direction. The season median is positive because the good weeks
+   are frequent, not because the bad ones are mild.
+2. **Four weeks in ten lose money.** 58.1% of weeks end in profit. At a 56% win
+   rate against −110 juice that is what the arithmetic gives; a run of two or
+   three losing Saturdays is ordinary and is not a signal that anything broke.
+3. **Doubling the unit doubles the week in both directions and changes nothing
+   else.** The share of winning weeks is identical at 0.5% and 1%. Stake size
+   moves the size of the swing, never its frequency — the same point the sweep
+   makes about the downside ratio in §6.
+
+Dollar rows are the 2026 leg only. Stakes re-size weekly, so pooling a 2027 week
+with a 2026 one would make "a week" look bigger than any week being funded; the
+percent rows are scale-free and pool every modelled week. The worst-week row is
+the same number as "worst single week, median" in the table above.
+
 **The recommendation was stress-tested.** An outside review asked whether the unit
 holds when the over-zero haircut is uncertain, the Greenline prior is weaker, bets 7–12
 each week are worse, and same-slate correlation is up to five times the assumed value.
@@ -267,6 +325,14 @@ written when 1% passed 15 of 25 on the thinner week-2 prior.
   under board 55.2% to 52.3% over two weeks, on 58 picks. That is not a finding.
 - **The 2027 numbers as a forecast.** They assume the edge persists unchanged on 2025's
   schedule. They are what the current record implies, not what will happen.
+- **The CAGR as an investment return.** +16.8% over 1.21 years is what the model
+  says this bankroll does if the edge holds; it is not a yield, not a rate anyone
+  is offering, and not comparable to a market return. The 5th percentile of the
+  same distribution is −17.9% a year. It is in the document because "what rate
+  does it compound at" is a fair question, not because the answer is a promise.
+- **The weekly table as a schedule.** A median week of +$125 is the middle of a
+  distribution, not an expectation for any particular Saturday. Four weeks in ten
+  lose money and the worst week of a typical season is −$1,055.
 - **Over-zero's 2026 record as model performance.** 21–9 is a settled-bet record of a
   published board, not walk-forward folds, on early-season boards the signal selects
   for. The projection plans on 58.2%, not 70%.
