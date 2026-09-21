@@ -33,7 +33,16 @@ change. The cost of sweeping first is that the guard cannot be proved by a real
 wrong-root until the cutover; verification checks 5-7 test it directly instead, with a
 bogus root, which is stronger than waiting.
 
-### Commit 1 — the sweep (old root still in place, everything keeps working)
+### Commit 1 — the sweep ✅ **DONE 2026-09-21, `d237275`**
+
+Landed as committed. Scope grew from 31 to **35** during execution: the resolver scan
+found four test skip-guards resolving `Path("")` and
+`scripts/rebuild_pregame_features.py:23` (`default=Path("data")`), none of which four
+rounds of review had enumerated. Verified: 1147 passed, 1 skipped, phase-1 scan clean,
+all three guard negatives exit 3 creating nothing, `test_browser_smoke` runs for real.
+
+Carved out of seven files that also held unrelated uncommitted work; the staged tree was
+proved independently in a throwaway worktree before committing.
 
 1. Add the **root marker and guard** (see Key decisions). Create `.cfb-data-root` in the
    current root first, so nothing breaks mid-commit.

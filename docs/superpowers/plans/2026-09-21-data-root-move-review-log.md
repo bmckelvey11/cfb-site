@@ -289,4 +289,41 @@ rejected in round 1 on a mis-cited line number without grepping, then half-accep
 round 2 on a grep whose backslashes the shell consumed. It holds 16 executable commands and
 the old absolute root, and would have survived the entire change untouched.
 
-_Awaiting user sign-off before any code is written._
+User signed off. Claude implemented; a fresh read-only Codex session cross-inspected.
+
+## Post-build inspection
+
+Commit under review: `d237275`. Reviewer: a **new** Codex thread, not the Phase 2 one, so
+it saw the code cold rather than through its own plan critiques. One round.
+
+It found a **P0 that Claude's own verification had missed**, and the reason is the finding:
+
+> "The claimed '1147 passed' must have run against the dirty working tree, not commit
+> `d237275`."
+
+Correct. Every test run during the build used the working tree. The commit was carved out
+of it, so the two were never the same artifact, and nothing checked the one that shipped.
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| P0 | `tests/test_core_agreement.py` imports `MEDIAN_PROVIDER`, absent from the committed `normalize.py` — the committed suite cannot collect | **Accepted.** The file was staged wholesale as "pure mine"; it carried in-progress median-line work coupled to an unstaged `normalize.py`. Restored to pre-commit state plus only the resolver change. |
+| P1 | The prune guard call landed **inside a SQL string literal** | **Accepted.** Splitting a merged hunk changed its added-line count, shifting every later hunk target. Restaged from the working tree, with the call verified as a real `ast.Expr` rather than trusting the diff. |
+| P1 | `floor_bias_1h.py` evaluates `DATA_ROOT` 14 lines before importing it — `NameError` on import | **Accepted.** `ast.parse` accepts that ordering; only importing catches it. All 24 converted modules are now import-checked, not merely compiled. |
+| P1 | The sweep missed live resolvers and the scan cannot see them — three script defaults, eight `--data-dir data` operator messages in web templates, HTML and notebooks excluded, no pattern for `ROOT / "data"` or `default="data/cfb.duckdb"` | **Accepted.** Widened to `.html`/`.ipynb`, added both patterns, anchored the `/ "data" /` pattern to a repo-root variable so docs asset directories are not flagged. Seven more live resolvers fixed. |
+| P1 | The version guard does not prove the local warehouse is *still* the promoted state — an in-place rebuild leaves the stamp valid | **Accepted as a limitation, not fixed.** The anchor+version gate raises the bar from "any directory" to "a complete warehouse matching the promoted stamp"; closing the remaining window needs promote/prune to agree on a freshness token, which is its own change. Recorded here rather than silently left. |
+| P1 | Explicit `--data-dir` still bypasses marker validation on every non-`web` command, contradicting README's "every entry point refuses to run" | **Accepted, outstanding.** Real overclaim. Guarding `--data-dir` repo-wide is a separate change; the README wording and the guard should land together. |
+| P1 | `rebuild_pregame_features.py` passes `--pregame --target-seasons` to a script that defines but never reads them | **Rejected as out of scope.** Verified pre-existing: `rebuild_pregame_features.py` was not dirty at session start, so that call predates this work. Real, and reported to the user, but not this change's to fix. |
+
+Claude also found, while fixing the above, that **`tests/test_tv_grid.py` cannot collect on
+`master` for the same reason** — `scripts/tv_grid.py` (`ddd3c4b`) imports `median_line` from
+the unstaged `normalize.py`. Older, someone else's, reported not fixed.
+
+Fixes landed in `0316be1`, verified in a throwaway worktree built **from the index**: 1118
+passed, 1 skipped, phase-1 scan clean, zero import-ordering bugs. The two remaining
+failures (`test_sql_course[B5]`, `test_system_versions`) reproduce on clean `HEAD` with none
+of these changes.
+
+**Process lesson, recorded because it caused the P0:** verifying a carved commit against the
+working tree proves nothing about the commit. The throwaway-worktree check existed and was
+run on the *staged tree* before committing — but only for compile and a subset of tests, not
+the full suite. It now runs the full suite.
