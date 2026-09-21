@@ -5,9 +5,13 @@ to `done` with a date, and the worklog at the bottom gets an entry saying what w
 actually found. Nothing is deleted — a step that turns out to be wrong is struck with the
 reason, so the next pass does not re-open it.
 
-**Status 2026-09-10: S1–S5, S7 and S8 done. S6's gates are all met — it now waits only on the secrets rotation and a go.** 2025 is audited, flattened, mapped to CFBD and
-loading into `stg.pff_*` — 21 tables, 1.20 M rows. 2025 is the reference season — the process gets proven and trimmed against it before
-a single backfill call is made, because a backfill pays every inefficiency eleven times.
+**Status 2026-09-21: S1–S5, S7 and S8 done. S6 is half done — `PFF_API` was rotated, the go
+was given for two seasons, and 2024 and 2026 are pulled and audit clean. 2014–2023 remain,
+at ~1,800 reads + 6,090 exports.** 2025 stays the reference season: the process was proven
+and trimmed against it before any backfill call, because a backfill pays every inefficiency
+once per season. Applying it to 2024 cost two corrections — the season-level leaderboards
+`--player-facets` does not plan, and two direction codes 2025 never emitted — both recorded
+in the 2026-09-21 worklog entry.
 
 **Scope: `data/raw/pff/` only.** The other scrapers (CFBD, Action Network, Massey) already
 land in the warehouse through `refresh_cfbd.py` and are not in this plan. Widen it only if
@@ -680,3 +684,33 @@ ids in `SKIP_FACETS`, pinned out because PFF 500s on them.
 which the pacing drift above puts nearer 8 hours in practice, plus ~2 min a season of
 season-level leaderboards the planner omits. Fixing `#pff-export-skip-ignores-size` before
 that run is cheap insurance — otherwise every zero-byte export it produces is permanent.
+
+**Addendum — the flatten and load hop, same day.** The entry above stopped at hop 1. Hops
+2 and 3 ran after it: `pff_flatten.py --validate` over every season on disk, then
+`check_pff_pin.py`.
+
+Every column resolved — none of 2024's three column-drift ops broke the split rule, which
+was the live risk, since the rule fails hard on an unrecognized column. **One table did
+fail**: `pff_rushing_direction`, on `CHECK constraint failed`. Two direction codes the
+2025-only pull never emitted — `NV` (39 rows across all raw files) and `LP-R` (1) — against
+a CHECK enumerating 19. Both are real: `NV` rows carry ordinary attempts and yards, so it
+is an uncharted-run bucket, not a null marker. Widened to 21 in `pff-sample-schema.sql`
+with the reasoning at the constraint; `--validate` then reported 0 FAILs across 21 tables
+and `check_pff_pin.py` exited 0 (21/21 tables, types ok, join ok).
+
+**Scope of that failure, stated precisely:** the CHECK exists only in the sample DDL, which
+`--validate` loads into. `cfb_system_maker/pff_schema.py` has no direction constraint, so
+the live load was never at risk and the nightly would have taken both values silently. This
+was documentation drift that `--validate` caught — which is the argument for running it by
+hand after a new season rather than trusting the next scheduled refresh.
+
+**`stg` is still at the pre-2024 counts** (1,429,515 rows) and that is expected. The
+processed CSVs now hold ~2.67 M rows, and `refresh_cfbd.py` calls `_flatten_pff()` before
+`build_duckdb`, so the next scheduled refresh loads them. No hand rebuild was run: a full
+rebuild is ~26 min and has twice dropped `stg.an_*` under memory pressure, which is not a
+risk worth taking to land data the nightly picks up anyway.
+
+**Untouched, and named so it is not mistaken for done:** S6's done-when has a second clause
+— *"and the 2026 weekly pull is on the same schedule as the Action Network history job."*
+Nothing here scheduled anything. 2026 is complete through wk3 because it was pulled by
+hand today, not because a job keeps it that way.
