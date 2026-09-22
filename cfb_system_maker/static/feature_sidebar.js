@@ -62,6 +62,13 @@
       // A group with no matches disappears entirely, legend included, so the
       // user does not scroll past a stack of empty legends.
       group.fieldset.style.display = term !== "" && matched === 0 ? "none" : "";
+      var toggle = group.fieldset.querySelector(".feature-group__toggle");
+      if (toggle) {
+        var expanded = term !== "" || !group.fieldset.classList.contains("is-collapsed");
+        toggle.setAttribute("aria-expanded", String(expanded));
+        toggle.setAttribute("aria-label", (expanded ? "Collapse " : "Expand ") + group.label);
+        toggle.textContent = expanded ? "−" : "+";
+      }
     });
   }
 
@@ -73,6 +80,7 @@
     // Read the label before appending anything, or it picks up the badge count
     // and the toggle glyph.
     var label = legend.textContent.trim();
+    group.label = label;
 
     // Counts the same data-has-filter chips the rows already render as solid
     // pills, so the badge and the pills can never disagree. A team-scoped stat
@@ -92,13 +100,15 @@
     var toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "feature-group__toggle";
-    // Groups start expanded: search, not collapse, is what solves "scroll to
-    // find Wind Speed", and collapsing by default would hide the whole sidebar.
-    toggle.setAttribute("aria-expanded", "true");
-    toggle.setAttribute("aria-label", "Collapse " + label);
-    toggle.textContent = "−";
+    var initiallyCollapsed = active === 0 && groups.indexOf(group) > 0;
+    group.fieldset.classList.toggle("is-collapsed", initiallyCollapsed);
+    toggle.setAttribute("aria-expanded", initiallyCollapsed ? "false" : "true");
+    toggle.setAttribute("aria-label", (initiallyCollapsed ? "Expand " : "Collapse ") + label);
+    toggle.textContent = initiallyCollapsed ? "+" : "−";
     toggle.addEventListener("click", function () {
-      var collapsed = group.fieldset.classList.toggle("is-collapsed");
+      var wasExpanded = toggle.getAttribute("aria-expanded") === "true";
+      if (search && search.value.trim()) { search.value = ""; apply(); }
+      var collapsed = group.fieldset.classList.toggle("is-collapsed", wasExpanded);
       toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
       toggle.setAttribute("aria-label", (collapsed ? "Expand " : "Collapse ") + label);
       toggle.textContent = collapsed ? "+" : "−";

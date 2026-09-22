@@ -26,7 +26,7 @@
       {% if error == "missing_data" %}
         <div class="empty-state">
           <h2>No processed data found</h2>
-          <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025</code>, then refresh.</p>
+          <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025 --data-dir data</code>, then refresh.</p>
         </div>
       {% else %}
       <div class="dash-columns">
@@ -76,7 +76,7 @@
                       <td class="system-cell">
                         {% if tab == 'examples' %}
                           <span class="system-name">{{ row.name }}</span>
-                          {% if row.theory %}<p class="example-theory">{{ row.theory }}</p>{% endif %}
+                          {% if row.theory %}<details class="example-description"><summary>Read theory</summary><p>{{ row.theory }}</p></details>{% endif %}
                         {% else %}
                           <a class="system-link" href="{{ url_for('index') }}?load_system={{ row.name|urlencode }}">{{ row.name }}</a>
                           {% if row.source == 'search' %}<span class="badge-search">Search</span>{% endif %}
@@ -124,12 +124,13 @@
           {% if panel.state == 'missing' %}
             <div class="empty-state cm-empty">
               <h3>No upcoming games data</h3>
-              <p>Run <code>python -m cfb_system_maker upcoming</code> to fetch this week's games and lines.</p>
+              <p>Run <code>python -m cfb_system_maker upcoming --data-dir data</code> to fetch this week's games and lines.</p>
             </div>
           {% elif panel.state == 'no_systems' %}
             <div class="empty-state cm-empty">
-              <h3>No saved systems yet</h3>
-              <p>Build a system in the editor, or open one from Example Systems to see its matches.</p>
+              <p>Upcoming matches appear here after you save a system.</p>
+              <a href="{{ url_for('index') }}">Create your first system</a>
+              <a href="{{ url_for('dashboard', tab='examples') }}">Browse Example Systems</a>
             </div>
           {% else %}
             <p class="cm-timestamp">Lines as of {{ panel.fetched_at }}</p>

@@ -632,24 +632,23 @@ def test_index_has_grouped_launchers_and_fallback(tmp_path):
         "core:week",
         "core:team",
         "core:conference",
-        "core:provider",
+        # core:provider is gone: the builder grades against the median across books, so
+        # there is no single provider to filter on.
         "core:spread_range",
         "core:total_range",
         "feature:neutralSite",
         "feature:running_win_pct",
         "feature:team_talent",
         "feature:team_state",
-        "feature:attendance",
+        "feature:havoc_offense_rate",
     ):
         assert f'data-candidate-id="{candidate}"' in html
     assert html.count('id="filter-modal"') == 1
     assert 'name="filter_weeks"' in html
     assert 'name="ff_enable"' in html
     assert 'data-fallback-for="core:season"' in html
-    assert "lookahead — analysis only" in html
-    assert (
-        'class="feature-group lookahead"' in html or "feature-group lookahead" in html
-    )
+    assert 'data-candidate-id="feature:attendance"' not in html
+    assert "feature-group lookahead" not in html
 
 
 def test_filter_modal_js_has_table_search_sort_and_commit():

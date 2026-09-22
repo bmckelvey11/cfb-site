@@ -40,7 +40,7 @@ from cfb_system_maker.features import (
     resolve_feature_value,
 )
 from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SavedSystem, SystemFilter
-from cfb_system_maker.narration import NarrationError, narrate_run
+from cfb_system_maker.narration import NarrationError, narrate_run, write_theory
 from cfb_system_maker.storage import (
     delete_system,
     rename_system,
@@ -457,10 +457,24 @@ def parse_system_strict(args: MultiDict | None = None) -> SystemFilter:
     return _system_from_form(form)
 
 
+def _grade_bucket(value: float | None, bad: float, good: float) -> int | None:
+    """Map a stat onto bucket 0 (bad) .. 10 (good) for the red-to-green gradient.
+
+    Buckets rather than an inline style because the CSP forbids inline styles.
+    `good` may be below `bad` for metrics where smaller is better (p-values, ICC).
+    Returns None when there is nothing to colour.
+    """
+    if value is None or bad == good:
+        return None
+    fraction = (float(value) - bad) / (good - bad)
+    return round(min(max(fraction, 0.0), 1.0) * 10)
+
+
 def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
     app = Flask(__name__)
     app.config["DATA_DIR"] = Path(data_dir)
     app.jinja_env.globals["query_href"] = _query_href
+    app.jinja_env.globals["grade"] = _grade_bucket
 
     @app.before_request
     def _reject_cross_origin_posts():
@@ -621,13 +635,16 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
             saved_systems=list_systems(app.config["DATA_DIR"]),
             version_names=list_versions(str(form.get("save_name", "")), app.config["DATA_DIR"]),
             result=result,
-            bets=result.bet_details[:250],
+            bets=_recent_bets_first(result.bet_details)[:250],
             chart=_range_chart(result),
             cumulative_chart=_cumulative_chart(result),
+            cluster_chart=_cluster_chart(result),
+            picks=_system_picks_panel(system, app.config["DATA_DIR"]),
             coverage=coverage,
             season_sign_consistency=sign_consistency(result.season_breakdown),
             tab=tab,
             sentences=sentences,
+            displayed_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             core_filters=CORE_FILTER_META,
         )
 
@@ -867,6 +884,37 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
             text = narrate_run(run)
         except NarrationError:
             return jsonify({"error": "narration_unavailable"}), 502
+
+        return jsonify({"text": text})
+
+    @app.post("/theory/suggest")
+    def suggest_theory():
+        """Draft the theory text for the system currently in the editor form.
+
+        Takes the filters off the request rather than a saved system so the button works
+        on an unsaved work-in-progress, which is when the rationale is actually being
+        written. Shares the narrate cooldown: both spend the same API budget.
+        """
+        try:
+            system = parse_system_strict(request.form or request.args)
+        except StrictParseError as exc:
+            return jsonify({"error": exc.error, "message": exc.message}), 400
+
+        try:
+            games, feature_map = _load_data_cached(app.config["DATA_DIR"])
+        except FileNotFoundError:
+            return jsonify({"error": "missing_data"}), 503
+
+        now = _time.monotonic()
+        if now - _NARRATE_LAST["t"] < _NARRATE_COOLDOWN_S:
+            return jsonify({"error": "rate_limited"}), 429
+        _NARRATE_LAST["t"] = now
+
+        result = _cached_backtest(system, games, feature_map, app.config["DATA_DIR"])
+        try:
+            text = write_theory(system, result)
+        except NarrationError:
+            return jsonify({"error": "theory_unavailable"}), 502
 
         return jsonify({"text": text})
 
@@ -1520,12 +1568,16 @@ def _system_from_form(form: dict[str, object]) -> SystemFilter:
         home=bool(form["home"]),
         away=bool(form["away"]),
         fade=bool(form["fade"]),
-        providers=_str_set(str(form["provider"])),
+        # The builder grades against the median across books (normalize.median_line), so
+        # there is no single provider to filter on: every record carries provider="median".
+        # Legacy URLs and saved systems may still carry these keys -- parsed, then dropped
+        # here, so they read as "no provider filter" instead of matching zero games.
+        providers=frozenset(),
         exclude_seasons=_int_set(str(form.get("exclude_season", ""))),
         exclude_weeks=_int_set(str(form.get("exclude_week", ""))),
         exclude_teams=_str_set(str(form.get("exclude_team", ""))),
         exclude_conferences=_str_set(str(form.get("exclude_conference", ""))),
-        exclude_providers=_str_set(str(form.get("exclude_provider", ""))),
+        exclude_providers=frozenset(),
         min_spread=_optional_float(str(form["min_spread"])),
         max_spread=_optional_float(str(form["max_spread"])),
         min_total=_optional_float(str(form["min_total"])),
@@ -1681,6 +1733,79 @@ def _range_chart(result: BacktestResult) -> dict[str, object]:
     }
 
 
+def _recent_bets_first(details: list[BetDetail]) -> list[BetDetail]:
+    """Newest first, so the truncated match table shows the most recent bets."""
+    return sorted(
+        details,
+        key=lambda bet: (bet.season, 0 if bet.season_type == "regular" else 1, bet.week, bet.game_id),
+        reverse=True,
+    )
+
+
+def _cluster_chart(result: BacktestResult) -> dict[str, object]:
+    """Profit per (season, season_type, week) cluster, chronological.
+
+    Same grouping backtest.cluster_dependence_stats uses for the cluster-robust
+    CI, so the bars are the units that bootstrap actually resamples: a bar is
+    one shared market/weather shock, not one bet.
+    """
+    decided = [bet for bet in result.bet_details if bet.result in {"win", "loss"}]
+    if not decided:
+        return {"bars": [], "zero_y": 85, "min_label": None, "max_label": None, "count": 0}
+
+    clusters: dict[tuple[int, str, int], list[float]] = {}
+    for bet in decided:
+        clusters.setdefault((bet.season, bet.season_type, bet.week), []).append(bet.profit)
+
+    def _order(key: tuple[int, str, int]) -> tuple[int, int, int]:
+        season, season_type, week = key
+        return (season, 0 if season_type == "regular" else 1, week)
+
+    items = sorted(clusters.items(), key=lambda item: _order(item[0]))
+
+    width = 520
+    height = 170
+    pad_x = 28
+    pad_y = 18
+    plot_w = width - pad_x * 2
+    plot_h = height - pad_y * 2
+
+    profits = [round(sum(values), 4) for _, values in items]
+    min_profit = min(profits + [0.0])
+    max_profit = max(profits + [0.0])
+    span = max_profit - min_profit or 1
+
+    zero_y = height - pad_y - ((0 - min_profit) / span) * plot_h
+    slot = plot_w / len(items)
+    bar_w = max(1.0, min(slot * 0.8, 14.0))
+
+    bars = []
+    for index, ((season, season_type, week), values) in enumerate(items):
+        profit = profits[index]
+        value_y = height - pad_y - ((profit - min_profit) / span) * plot_h
+        bars.append({
+            "x": round(pad_x + slot * index + (slot - bar_w) / 2, 2),
+            "y": round(min(value_y, zero_y), 2),
+            "width": round(bar_w, 2),
+            "height": round(max(abs(value_y - zero_y), 0.75), 2),
+            "profit": profit,
+            "bets": len(values),
+            "season": season,
+            "week": week,
+            "postseason": season_type != "regular",
+        })
+
+    first = items[0][0]
+    last = items[-1][0]
+    return {
+        "bars": bars,
+        "zero_y": round(zero_y, 2),
+        "min_label": f"{first[0]} wk{first[2]}",
+        "max_label": f"{last[0]} wk{last[2]}",
+        "count": len(items),
+    }
+
+
 def _cumulative_chart(result: BacktestResult) -> dict[str, object]:
     if not result.bet_details:
         return {"points": [], "polyline": "", "area": "", "zero_y": 85, "min_x": None, "max_x": None}
@@ -1799,7 +1924,7 @@ def _humanize_sentence_key(key: str) -> str:
     # Same wording and separator the stat-row launcher buttons use, and labels
     # already ending in "(pregame)" must not pick up a second parenthetical.
     side = PERSPECTIVE_PREFIX.get(perspective, perspective.replace("_", " "))
-    return f"{label} \u2014 {side}"
+    return f"{label} — {side}"
 
 
 def _compare_differences(rows: list[dict[str, object]]) -> dict[str, list[object]]:
@@ -1823,7 +1948,7 @@ def _compare_differences(rows: list[dict[str, object]]) -> dict[str, list[object
         else:
             differing.append({
                 "label": _humanize_sentence_key(key),
-                "cells": [value or "\u2014" for value in values],
+                "cells": [value or "—" for value in values],
             })
     return {"differing": differing, "shared": shared}
 
@@ -1841,7 +1966,7 @@ def _saved_systems_newest_first(data_dir: Path) -> list[SavedSystem]:
 def _data_fingerprint(data_dir: Path) -> tuple:
     """Size+mtime of the files the figures derive from, so a rebuild invalidates."""
     parts = []
-    for name in ("games.csv", "features.json"):
+    for name in ("games.csv", "features.duckdb"):
         path = Path(data_dir) / "processed" / name
         try:
             stat = path.stat()
@@ -2105,6 +2230,55 @@ def _try_load_upcoming_features(data_dir: Path) -> dict[int, dict]:
         return load_features_from(upcoming_features_path(data_dir))
     except (FileNotFoundError, OSError, ValueError, KeyError, json.JSONDecodeError):
         return {}
+
+
+_PICKS_SHOWN = 25
+
+
+def _system_picks_panel(system: SystemFilter, data_dir: Path) -> dict[str, object]:
+    """Upcoming games the system on screen would bet, unsaved filter edits included.
+
+    Sibling of _current_matches_panel, which answers the same question across every
+    saved system; this one follows the live editor form, so it keeps working while
+    a system is still being built. Same relaxed-played matching path (D-18); no
+    grading, because an upcoming game has no result.
+    """
+    try:
+        games, kickoffs = load_upcoming_games(data_dir)
+        meta = load_upcoming_meta(data_dir)
+    except (FileNotFoundError, OSError, ValueError, KeyError, json.JSONDecodeError):
+        return {"state": "missing"}
+
+    feature_map = _try_load_upcoming_features(data_dir)
+
+    rows: list[dict[str, object]] = []
+    for record in games:
+        if not matches_system(record, system, feature_map, require_played=False):
+            continue
+        kickoff = kickoffs.get(record.game_id, {})
+        rows.append(
+            {
+                "_sort": _parse_kickoff(kickoff.get("start_date")) or _KICKOFF_SORT_SENTINEL,
+                "kickoff": _kickoff_label(kickoff),
+                "matchup": f"{record.away_team} @ {record.home_team}",
+                "play": _play_text(system, record),
+            }
+        )
+
+    rows.sort(key=lambda row: row["_sort"])
+    for row in rows:
+        del row["_sort"]
+
+    fetched = _parse_kickoff(meta.get("fetched_at"))
+    return {
+        "state": "populated",
+        "fetched_at": _format_kickoff_local(fetched) if fetched is not None else "",
+        "is_fallback": bool(meta.get("is_fallback")),
+        # A loose system matches most of the slate; the panel is a sanity check on
+        # what the filters select, not the bet slip, so it shows the next few.
+        "rows": rows[:_PICKS_SHOWN],
+        "total": len(rows),
+    }
 
 
 def _current_matches_panel(saved_systems: list[SavedSystem], data_dir: Path) -> dict[str, object]:

@@ -10,7 +10,8 @@
   <body>
     {% from "_macros.html" import money %}
     <main class="app-shell">
-      <aside class="filter-panel" aria-label="System filters">
+      <button type="button" class="filter-panel-toggle" aria-controls="system-filters" aria-expanded="false">Show filters</button>
+      <aside class="filter-panel" id="system-filters" aria-label="System filters">
         <div class="brand">
           <span class="brand-mark">CFB</span>
           <div>
@@ -21,7 +22,7 @@
         </div>
 
         <form id="filters-form" method="get" class="filters" autocomplete="off">
-          {# Exclusions have no inline control -- the filter modal writes them.
+          {# Exclusions have no inline control; the filter modal writes them.
              Hidden inputs keep them on the query string across submissions. #}
           <input type="hidden" name="filter_exclude_seasons" id="filter-exclude-seasons" value="{{ form.exclude_season }}">
           <input type="hidden" name="filter_exclude_weeks" id="filter-exclude-weeks" value="{{ form.exclude_week }}">
@@ -30,7 +31,7 @@
           <input type="hidden" name="filter_exclude_providers" id="filter-exclude-providers" value="{{ form.exclude_provider }}">
           <fieldset>
             <legend>Bet Type</legend>
-            <select name="bet_type">
+            <select name="bet_type" aria-label="Bet type">
               <option value="spread" {% if form.bet_type == "spread" %}selected{% endif %}>Spread</option>
               <option value="total" {% if form.bet_type == "total" %}selected{% endif %}>Over/Under</option>
             </select>
@@ -66,7 +67,6 @@
               ("core:week", core_filters["core:week"]),
               ("core:team", core_filters["core:team"]),
               ("core:conference", core_filters["core:conference"]),
-              ("core:provider", core_filters["core:provider"]),
             ] %}
             <div class="filter-launch-row{% if candidate_id == 'core:provider' %} full-width{% endif %}">
               <button
@@ -161,8 +161,9 @@
           {% if features_enabled %}
           <section class="feature-filters">
             <h3>Feature Filters</h3>
+            <p class="feature-hint">Search by statistic or expand a group. Bet-side means your selected team; Opponent means the team facing it. NGT excludes garbage-time plays. Open a filter for its definition and coverage.</p>
             {% if stale_registry %}
-            <p class="stale-warning">features.json was built with an older field registry — run <code>python -m cfb_system_maker enrich</code> to refresh.</p>
+            <p class="stale-warning">features.json was built with an older field registry. Run <code>python -m cfb_system_maker enrich --data-dir data</code>, then reload.</p>
             {% endif %}
             <p class="feature-hint filter-fallback">Check a filter to enable it. Un-checked filters are ignored.</p>
             {# Deliberately has NO name attribute: this input sits inside
@@ -175,7 +176,7 @@
                 <legend>
                   {{ group.group|replace('_', ' ')|title }}
                   {% if group.group == 'result_lookahead' %}
-                    <span class="lookahead-warning">lookahead — analysis only</span>
+                    <span class="lookahead-warning">lookahead: analysis only</span>
                   {% endif %}
                 </legend>
                 {% for feature in group.features %}
@@ -210,7 +211,7 @@
                   <div class="filter-launch-row">
                     {% if feature.team_scoped and form.bet_type == "spread" %}
                       {# One row per stat: the name once, then a compact button per
-                         side. Each side is its own filter -- independently set,
+                         side. Each side is its own filter, independently set,
                          edited and removed. #}
                       <div class="stat-row">
                         <span class="stat-row__label">{{ feature.label }}</span>
@@ -269,7 +270,7 @@
                           {% set perspective = (active.gte or active.lte or active.filt).perspective if (active.gte or active.lte or active.filt) else 'single' %}
                           {% if feature.team_scoped %}
                             {# Two independent bound-pairs: the team being bet on, and its
-                               opponent. Each pair has a FIXED hidden perspective -- picking
+                               opponent. Each pair has a FIXED hidden perspective; picking
                                one no longer replaces the other. #}
                             <div class="feature-row" data-numeric-bound="min" data-bound-perspective="{{ primary_p }}">
                               <input type="hidden" name="ff_perspective" value="{{ primary_p }}">
@@ -416,19 +417,28 @@
             {% endfor %}
           </section>
           {% else %}
-          <p class="feature-disabled">Run <code>python -m cfb_system_maker enrich</code> to enable feature filters.</p>
+          <p class="feature-disabled">Run <code>python -m cfb_system_maker enrich --data-dir data</code> to enable feature filters.</p>
           {% endif %}
 
-          <label class="theory-field full-width">Theory<textarea name="theory" placeholder="Add the theory behind your system.">{{ form.theory }}</textarea></label>
+          <div class="theory-field full-width">
+            <div class="theory-heading">
+              <span class="theory-label">Theory</span>
+              <button type="button" id="theory-suggest">Write with AI</button>
+            </div>
+            <label class="visually-hidden" for="theory-input">Theory</label>
+            <textarea id="theory-input" name="theory" placeholder="Add the theory behind your system.">{{ form.theory }}</textarea>
+            <p class="theory-status" id="theory-status" aria-live="polite"></p>
+          </div>
 
           {% if request.args.get('save_error') == 'missing_name' %}
           <p class="save-error">Enter a name to save this system.</p>
           {% elif request.args.get('save_error') == 'invalid_name' %}
-          <p class="save-error">That name can't be used — letters, numbers, dashes and underscores only.</p>
+          <p class="save-error">Use only letters, numbers, dashes and underscores in the system name.</p>
           {% endif %}
 
           <div class="form-actions">
-            <button type="submit">Run system</button>
+            <button type="submit" id="run-system">{{ 'Run system' if sentences else 'Run baseline' }}</button>
+            <a href="{{ url_for('index') }}">Clear all filters</a>
             <label class="save-inline">Save as
               <input name="save_name" value="{{ form.save_name }}" placeholder="my-system">
             </label>
@@ -462,19 +472,19 @@
         {% if error == "missing_data" %}
           <div class="empty-state">
             <h2>No processed data found</h2>
-            <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025</code>, then refresh.</p>
+            <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025 --data-dir data</code>, then refresh.</p>
           </div>
         {% else %}
           <header class="workspace-header">
             <div>
-              <h2>Backtest Results</h2>
-              <p>Showing first {{ bets|length }} matched bets.</p>
+              <h2>{{ loaded_system or ('Backtest Results' if sentences else 'Full-dataset baseline') }}</h2>
+              <p>{{ result.bets }} matched bets. Match table shows most recent {{ bets|length }}.</p>
             </div>
             <label class="check"><input type="checkbox" name="fade" form="filters-form" {% if form.fade %}checked{% endif %}> Fade System</label>
           </header>
 
           {% if parse_warning %}
-          <p class="save-error">Some filter values in the URL couldn't be read and were ignored — check the active filters below.</p>
+          <p class="save-error">Some filter values in the URL couldn't be read and were ignored. Check the active filters below.</p>
           {% endif %}
 
           <section class="metrics stat-chips" aria-label="Backtest metrics">
@@ -493,7 +503,9 @@
           </section>
           {% endif %}
 
-          <section class="active-filters-panel">
+          <section class="active-filters-panel" aria-label="Current system">
+            <div class="system-summary-heading"><h3>Current system</h3><button type="submit" form="filters-form">{{ 'Run system' if sentences else 'Run baseline' }}</button><a href="{{ url_for('index') }}">Clear all</a></div>
+            <p class="system-run-status" aria-live="polite">{{ result.bets }} matched bets · {{ sentences|length }} filter {{ 'rule' if sentences|length == 1 else 'rules' }} · Displayed {{ displayed_at }}</p>
             {% if sentences %}
             <ul class="active-filters">
               {% for row in sentences %}
@@ -520,7 +532,31 @@
               {% endfor %}
             </ul>
             {% else %}
-            <p class="no-active-filters">No filters applied yet — every game in the dataset is included.</p>
+            <p class="no-active-filters"><strong>Baseline only.</strong> No filters applied yet; every game in the dataset is included. Choose filters to test a hypothesis, or use Run baseline to repeat this comparison.</p>
+            {% endif %}
+          </section>
+
+          <section class="picks-panel" aria-label="This week's picks">
+            <div class="picks-heading">
+              <h3>This Week's Picks{% if picks.state == 'populated' and picks.total %} ({{ picks.total }}){% endif %}</h3>
+              {% if picks.state == 'populated' and picks.fetched_at %}<span class="picks-timestamp">Lines as of {{ picks.fetched_at }}</span>{% endif %}
+            </div>
+            {% if picks.state == 'missing' %}
+              <p class="picks-none">No upcoming games data. Run <code>python -m cfb_system_maker upcoming --data-dir data</code>.</p>
+            {% elif picks.rows %}
+              {% if picks.is_fallback %}<p class="picks-none">No games with posted lines this week &mdash; showing the most recent week that has them.</p>{% endif %}
+              <ul class="picks-list">
+                {% for row in picks.rows %}
+                  <li>
+                    <span class="picks-kickoff">{{ row.kickoff }}</span>
+                    <span class="picks-play">{{ row.play }}</span>
+                    <span class="picks-matchup">{{ row.matchup }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+              {% if picks.total > picks.rows|length %}<p class="picks-none">Showing the next {{ picks.rows|length }} of {{ picks.total }}.</p>{% endif %}
+            {% else %}
+              <p class="picks-none">This system matches no upcoming game. Matches change as lines move.</p>
             {% endif %}
           </section>
 
@@ -532,19 +568,21 @@
           {% if tab == 'graph' %}
 
           {% if result.stats %}
+          {% macro g(bucket) %}{% if bucket is not none %}class="graded grade-{{ bucket }}"{% endif %}{% endmacro %}
+          {% include "_metric_help.html" %}
           <section class="metrics stats-panel" aria-label="System quality statistics">
             <article><span>Break-even</span><strong>{{ "%.2f%%"|format(result.stats.break_even_rate * 100) }}</strong></article>
-            <article><span>Edge</span><strong>{{ "%.2f%%"|format(result.stats.edge * 100) }}</strong></article>
-            <article><span>Wilson CI</span><strong>{{ "%.1f"|format(result.stats.wilson_low * 100) }}–{{ "%.1f"|format(result.stats.wilson_high * 100) }}%</strong></article>
-            <article><span>p-value</span><strong>{{ "%.4f"|format(result.stats.p_value) }}</strong></article>
-            <article><span>Permutation p</span><strong>{{ "%.4f"|format(result.stats.permutation_p_value) }}</strong></article>
-            <article><span>ROI t-stat</span><strong>{{ "%.2f"|format(result.stats.roi_t_stat) }}</strong></article>
+            <article {{ g(grade(result.stats.edge, -0.03, 0.03)) }}><span>Edge</span><strong>{{ "%.2f%%"|format(result.stats.edge * 100) }}</strong></article>
+            <article {{ g(grade(result.stats.wilson_low - result.stats.break_even_rate, -0.05, 0.05)) }}><span>Wilson CI</span><strong>{{ "%.1f"|format(result.stats.wilson_low * 100) }}–{{ "%.1f"|format(result.stats.wilson_high * 100) }}%</strong></article>
+            <article {{ g(grade(result.stats.p_value, 0.20, 0.01)) }}><span>p-value</span><strong>{{ "%.4f"|format(result.stats.p_value) }}</strong></article>
+            <article {{ g(grade(result.stats.permutation_p_value, 0.20, 0.01)) }}><span>Permutation p</span><strong>{{ "%.4f"|format(result.stats.permutation_p_value) }}</strong></article>
+            <article {{ g(grade(result.stats.roi_t_stat, -2, 2)) }}><span>ROI t-stat</span><strong>{{ "%.2f"|format(result.stats.roi_t_stat) }}</strong></article>
             <article><span>Streaks</span><strong>W{{ result.stats.max_win_streak }} / L{{ result.stats.max_loss_streak }}</strong></article>
-            {% if result.stats.mde is not none %}<article><span>MDE</span><strong>{{ "%.2f%%"|format(result.stats.mde * 100) }}</strong></article>{% endif %}
-            <article><span>Clusters</span><strong>{{ result.stats.cluster_count }}{% if result.stats.cluster_count < 40 %} (few){% endif %}</strong></article>
-            {% if result.stats.effective_n is not none %}<article><span>Effective N</span><strong>{{ "%.0f"|format(result.stats.effective_n) }}</strong></article>{% endif %}
-            {% if result.stats.icc is not none %}<article><span>ICC</span><strong>{{ "%.3f"|format(result.stats.icc) }}</strong></article>{% endif %}
-            {% if result.stats.cluster_low is not none and result.stats.cluster_high is not none %}<article><span>Cluster ROI CI</span><strong>{{ "%.2f"|format(result.stats.cluster_low * 100) }}–{{ "%.2f"|format(result.stats.cluster_high * 100) }}%</strong></article>{% endif %}
+            {% if result.stats.mde is not none %}<article {{ g(grade(result.stats.mde, 0.10, 0.02)) }}><span>MDE</span><strong>{{ "%.2f%%"|format(result.stats.mde * 100) }}</strong></article>{% endif %}
+            <article {{ g(grade(result.stats.cluster_count, 20, 60)) }}><span>Clusters</span><strong>{{ result.stats.cluster_count }}{% if result.stats.cluster_count < 40 %} (few){% endif %}</strong></article>
+            {% if result.stats.effective_n is not none %}<article {{ g(grade(result.stats.effective_n, 30, 300)) }}><span>Effective N</span><strong>{{ "%.0f"|format(result.stats.effective_n) }}</strong></article>{% endif %}
+            {% if result.stats.icc is not none %}<article {{ g(grade(result.stats.icc, 0.30, 0.0)) }}><span>ICC</span><strong>{{ "%.3f"|format(result.stats.icc) }}</strong></article>{% endif %}
+            {% if result.stats.cluster_low is not none and result.stats.cluster_high is not none %}<article {{ g(grade(result.stats.cluster_low, -0.05, 0.05)) }}><span>Cluster ROI CI</span><strong>{{ "%.2f"|format(result.stats.cluster_low * 100) }}–{{ "%.2f"|format(result.stats.cluster_high * 100) }}%</strong></article>{% endif %}
             {% if result.stats.low_sample %}<article class="warning"><span>Sample</span><strong>Low n</strong></article>{% endif %}
           </section>
           {% if result.verdict %}<p class="stats-verdict">{{ result.verdict }}</p>{% endif %}
@@ -580,6 +618,11 @@
           </section>
           {% endif %}
 
+          <details class="metric-help">
+            <summary>Chart values as tables</summary>
+            <div class="table-wrap"><table><caption>Profit by line range</caption><thead><tr><th>Line</th><th>Profit ($100 unit)</th></tr></thead><tbody>{% for point in chart.points %}<tr><td>{{ point.line }}</td><td>{{ money(point.profit) }}</td></tr>{% endfor %}</tbody></table></div>
+            <div class="table-wrap"><table><caption>Cumulative profit: first {{ [cumulative_chart.points|length, 250]|min }} bets of {{ cumulative_chart.points|length }}</caption><thead><tr><th>Bet</th><th>Cumulative profit ($100 unit)</th></tr></thead><tbody>{% for point in cumulative_chart.points[:250] %}<tr><td>{{ point.order + 1 }}</td><td>{{ money(point.profit) }}</td></tr>{% endfor %}</tbody></table></div>
+          </details>
           <section class="filter-detail">
             <div class="range-chart chart-card" aria-label="Money Won by Line Range">
               <h3>Money Won</h3>
@@ -634,6 +677,22 @@
             </svg>
             <div class="chart-axis"><span>Bet {{ (cumulative_chart.min_x + 1) if cumulative_chart.min_x is not none else "-" }}</span><span>Bet {{ (cumulative_chart.max_x + 1) if cumulative_chart.max_x is not none else "-" }}</span></div>
           </section>
+
+          {% if cluster_chart.bars %}
+          <section class="cluster-chart chart-card" aria-label="Money Won by Season/Week Cluster">
+            <h3>Money Won by Cluster</h3>
+            <p class="chart-note">{{ cluster_chart.count }} season/week clusters &mdash; the groups the cluster-robust CI resamples. A tall lone bar means the edge leans on one week.</p>
+            <svg viewBox="0 0 520 170" role="img" preserveAspectRatio="none" class="money-chart">
+              <line x1="28" x2="492" y1="{{ cluster_chart.zero_y }}" y2="{{ cluster_chart.zero_y }}" class="zero-line" />
+              {% for bar in cluster_chart.bars %}
+                <rect class="cluster-bar {{ 'positive' if bar.profit >= 0 else 'negative' }}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ bar.height }}">
+                  <title>{{ bar.season }} {{ 'postseason ' if bar.postseason }}week {{ bar.week }}: {% if bar.profit >= 0 %}+{% endif %}${{ "%.2f"|format(bar.profit * 100) }} on {{ bar.bets }} bet{{ '' if bar.bets == 1 else 's' }}</title>
+                </rect>
+              {% endfor %}
+            </svg>
+            <div class="chart-axis"><span>{{ cluster_chart.min_label }}</span><span>{{ cluster_chart.max_label }}</span></div>
+          </section>
+          {% endif %}
 
           {% else %}
 
@@ -728,6 +787,8 @@
 
     <script src="{{ url_for('static', filename='filter_modal.js') }}" defer></script>
     <script src="{{ url_for('static', filename='feature_sidebar.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='editor_usability.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='theory_suggest.js') }}" defer></script>
     {% include "_footer.html" %}
   </body>
 </html>

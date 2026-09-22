@@ -216,7 +216,7 @@ def test_web_index_loads_filters_and_default_results(tmp_path):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "CFB System Maker" in html
-    assert "Run system" in html
+    assert "Run baseline" in html
     assert "Michigan" in html
 
     expected = run_backtest(games, SystemFilter(side="home"))
@@ -340,7 +340,7 @@ def test_web_loaded_system_never_shows_parse_warning(tmp_path):
     assert "couldn't be read and were ignored" not in response.get_data(as_text=True)
 
 
-def test_web_margin_chip_shows_em_dash_for_total_bet_systems(tmp_path):
+def test_web_margin_chip_shows_points_cleared_for_total_bet_systems(tmp_path):
     games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
     save_processed_games(tmp_path, games)
     app = create_app(data_dir=tmp_path)
@@ -349,7 +349,9 @@ def test_web_margin_chip_shows_em_dash_for_total_bet_systems(tmp_path):
 
     assert response.status_code == 200
     metrics_html = _metrics_section(response.get_data(as_text=True))
-    assert '<article><span>Margin</span><strong class="">&mdash;</strong></article>' in metrics_html
+    # Total bets carry a margin too: average points cleared over the number.
+    assert "<span>Margin</span>" in metrics_html
+    assert '<article><span>Margin</span><strong class="">&mdash;</strong></article>' not in metrics_html
 
 
 def test_editor_tolerates_malformed_numeric_params(tmp_path):
@@ -431,7 +433,7 @@ def test_web_money_won_chip_renders_unsigned_zero_for_no_matched_bets(tmp_path):
     assert response.status_code == 200
     metrics_html = _metrics_section(response.get_data(as_text=True))
     assert '<article><span>Money Won</span><strong class="">$0</strong></article>' in metrics_html
-    # zero matched bets also leaves average_margin at None -> em dash, same as total-bet systems
+    # zero matched bets leaves average_margin at None -> em dash
     assert '<article><span>Margin</span><strong class="">&mdash;</strong></article>' in metrics_html
 
 
@@ -924,7 +926,23 @@ def test_web_no_active_filters_shows_empty_state_copy(tmp_path):
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "No filters applied yet — every game in the dataset is included." in html
+    assert "Full-dataset baseline" in html
+    assert "No filters applied yet; every game in the dataset is included." in html
+    assert "How to read these results" in html
+    assert "Chart values as tables" in html
+
+
+def test_filtered_results_have_scope_count_and_clear_action(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    client = create_app(data_dir=tmp_path).test_client()
+    html = client.get("/system?filter_seasons=2023").get_data(as_text=True)
+    assert "<h2>Backtest Results</h2>" in html
+    assert "<h2>Full-dataset baseline</h2>" not in html
+    assert 'aria-label="Current system"' in html
+    assert "1 filter rule" in html
+    assert "Displayed " in html
+    assert 'href="/system">Clear all</a>' in html
 
 
 def test_web_active_filter_sentence_renders_with_remove_control(tmp_path):
@@ -1177,7 +1195,7 @@ def test_editor_is_served_at_system(tmp_path):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert 'id="filters-form"' in html
-    assert "Run system" in html
+    assert "Run baseline" in html
 
 
 def test_dashboard_loads_no_javascript(tmp_path):
@@ -1961,7 +1979,7 @@ def test_current_matches_missing_upcoming_file_names_the_cli_command(tmp_path):
 
     assert response.status_code == 200
     panel = _panel(response.get_data(as_text=True))
-    assert "python -m cfb_system_maker upcoming" in panel
+    assert "python -m cfb_system_maker upcoming --data-dir data" in panel
 
 
 def test_current_matches_no_saved_systems_points_at_examples(tmp_path):
@@ -2238,7 +2256,8 @@ def test_exclude_params_parse_into_system(tmp_path):
     assert system.exclude_conferences == {"Big Ten"}
     assert system.exclude_seasons == {2020}
     assert system.exclude_weeks == {1}
-    assert system.exclude_providers == {"consensus"}
+    # Provider filters are parsed but dropped: every record is the median across books.
+    assert system.exclude_providers == frozenset()
 
 
 def test_exclude_params_absent_default_empty(tmp_path):
@@ -2355,3 +2374,135 @@ def test_rename_onto_an_existing_name_is_refused(tmp_path):
     # Neither system is destroyed by the refused rename.
     assert (tmp_path / "systems" / "keeper.json").exists()
     assert (tmp_path / "systems" / "other.json").exists()
+
+
+# --- Editor "This Week's Picks" panel ----------------------------------------
+
+
+def _picks_panel(html: str) -> str:
+    start = html.index('aria-label="This week\'s picks"')
+    return html[start:html.index("</section>", start)]
+
+
+def test_editor_picks_panel_lists_upcoming_games_the_form_system_matches(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    _write_upcoming(tmp_path, [_upcoming_game(9001, "Georgia", "Clemson")], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    app = create_app(data_dir=tmp_path)
+
+    html = app.test_client().get("/system?bet_type=spread&side=home").get_data(as_text=True)
+
+    panel = _picks_panel(html)
+    assert "Play Georgia -7" in panel
+    assert "Clemson @ Georgia" in panel
+
+
+def test_editor_picks_panel_follows_unsaved_filter_edits(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    _write_upcoming(tmp_path, [_upcoming_game(9001, "Georgia", "Clemson", home_conf="SEC")], _kick(9001, "2025-09-06T19:30:00+00:00"))
+    app = create_app(data_dir=tmp_path)
+
+    # Nothing is saved here: the panel has to follow the query string, which is
+    # what the editor form posts while a system is still being built.
+    panel = _picks_panel(app.test_client().get("/system?bet_type=spread&side=home&conference=Big+Ten").get_data(as_text=True))
+
+    assert "matches no upcoming game" in panel
+
+
+def test_editor_picks_panel_reports_missing_upcoming_data(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    panel = _picks_panel(app.test_client().get("/system").get_data(as_text=True))
+
+    assert "No upcoming games data" in panel
+
+
+# --- "Write with AI" theory drafting ------------------------------------------
+
+
+def test_theory_suggest_returns_draft_for_the_posted_filters(tmp_path, monkeypatch):
+    import cfb_system_maker.web as web_module
+
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+
+    seen = {}
+
+    def _fake(system, result, **kwargs):
+        seen["bet_type"] = system.bet_type
+        seen["bets"] = result.bets
+        return "  Night unders lean on tempo.  "
+
+    monkeypatch.setattr(web_module, "write_theory", _fake)
+    monkeypatch.setattr(web_module, "_NARRATE_LAST", {"t": 0.0})
+
+    app = web_module.create_app(str(tmp_path))
+    response = app.test_client().post("/theory/suggest", data={"bet_type": "total", "total_side": "under"})
+
+    assert response.status_code == 200
+    assert response.get_json() == {"text": "  Night unders lean on tempo.  "}
+    # The draft is built from the posted filters, not a saved system.
+    assert seen["bet_type"] == "total"
+    assert seen["bets"] > 0
+
+
+def test_theory_suggest_returns_502_when_the_model_is_unavailable(tmp_path, monkeypatch):
+    import cfb_system_maker.web as web_module
+    from cfb_system_maker.narration import NarrationError
+
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+
+    def _raise(system, result, **kwargs):
+        raise NarrationError("no key")
+
+    monkeypatch.setattr(web_module, "write_theory", _raise)
+    monkeypatch.setattr(web_module, "_NARRATE_LAST", {"t": 0.0})
+
+    app = web_module.create_app(str(tmp_path))
+    response = app.test_client().post("/theory/suggest", data={"bet_type": "spread"})
+
+    assert response.status_code == 502
+    assert response.get_json()["error"] == "theory_unavailable"
+
+
+def test_theory_suggest_rate_limits_a_second_call(tmp_path, monkeypatch):
+    import cfb_system_maker.web as web_module
+
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    monkeypatch.setattr(web_module, "write_theory", lambda system, result, **kwargs: "Draft.")
+    monkeypatch.setattr(web_module, "_NARRATE_LAST", {"t": 0.0})
+
+    app = web_module.create_app(str(tmp_path))
+    client = app.test_client()
+    assert client.post("/theory/suggest", data={"bet_type": "spread"}).status_code == 200
+    assert client.post("/theory/suggest", data={"bet_type": "spread"}).status_code == 429
+
+
+def test_theory_suggest_rejects_malformed_filters(tmp_path, monkeypatch):
+    import cfb_system_maker.web as web_module
+
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    monkeypatch.setattr(web_module, "_NARRATE_LAST", {"t": 0.0})
+
+    app = web_module.create_app(str(tmp_path))
+    response = app.test_client().post("/theory/suggest", data={"min_spread": "not-a-number"})
+
+    assert response.status_code == 400
+
+
+def test_editor_renders_the_write_with_ai_button(tmp_path):
+    games = normalize_games(SAMPLE_GAMES_2023, SAMPLE_LINES_2023, provider="consensus")
+    save_processed_games(tmp_path, games)
+    app = create_app(data_dir=tmp_path)
+
+    html = app.test_client().get("/system").get_data(as_text=True)
+
+    assert 'id="theory-suggest"' in html
+    assert 'id="theory-input"' in html
+    assert "theory_suggest.js" in html
