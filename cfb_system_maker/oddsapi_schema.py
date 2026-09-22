@@ -47,13 +47,17 @@ def column_types(header: list[str]) -> dict[str, str]:
 # `OA_MAX_MASCOT_TOKENS` in research/spread/scripts/weekly_slate.py.
 MAX_MASCOT_TOKENS = 2
 
-# The only three snapshot names with no `core.dim_team` row under a mascot strip, measured
-# 2026-09-10 -- see docs/oddsapi-team-name-join-2026-09-10.md. Grows the way OA_ALIASES
+# Snapshot names with no `core.dim_team` row under a mascot strip. The first three were
+# measured 2026-09-10 -- see docs/oddsapi-team-name-join-2026-09-10.md. Grows the way OA_ALIASES
 # does: add a line when a name shows up unresolved.
 ALIASES = {
     "appalachian state": "app state",
     "southern mississippi": "southern miss",
     "umass": "massachusetts",
+    # Added 2026-09-22, unresolved in that day's refresh.
+    "liu": "long island university",
+    "southeastern louisiana": "se louisiana",
+    "william and mary": "william mary",
 }
 
 

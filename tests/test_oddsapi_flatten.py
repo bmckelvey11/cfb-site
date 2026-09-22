@@ -104,6 +104,11 @@ def test_norm_folds_the_two_cfbd_spellings_that_bite():
 def test_the_alias_list_is_reachable_through_the_mascot_strip():
     assert "app state" in candidates("Appalachian State Mountaineers")
     assert set(ALIASES) <= {norm(k) for k in ALIASES}, "alias keys must already be normed"
+    # Values must be norm() of CFBD's exact `school` spelling, or they never meet it.
+    for vendor, cfbd in (("LIU Sharks", "Long Island University"),
+                         ("Southeastern Louisiana Lions", "SE Louisiana"),
+                         ("William and Mary Tribe", "William & Mary")):
+        assert norm(cfbd) in candidates(vendor)
 
 
 def test_school_of_prefers_the_longest_head():
