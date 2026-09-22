@@ -42,3 +42,29 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# Empty root stub; the real warehouse lives under data/ (see cfb_paths.py).
+/cfb.duckdb
+
+# Editor/notebook/tool scratch dirs.
+.impeccable/
+.ipynb_checkpoints/
+.spyproject/
+__marimo__/
+
+# Site build tarballs (~121MB); regenerable from models/over_zero/site.
+models/over_zero/redpanda-*.tar.gz
+
+# Root scratch files.
+/temp.py
+/test
+/untitled.chat
+/db.py
+/over-zero.py
+/marimo.py
+
+# Personal wager ledger: real stakes and P&L, and this remote is public.
+ledgers/bet_history.csv
+
+# Documents the live site's auth design; keep local while the remote is public.
+models/over_zero/docs/site-password-chat-2026-09-18.md
