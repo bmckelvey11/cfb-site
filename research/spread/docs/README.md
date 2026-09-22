@@ -109,7 +109,7 @@ fitters, grids, 1-SE rule). Their `main()`s produce the archived margin-era tabl
 | `migrate_book_set_version.py` | One-time, idempotent: stamps `book_set_version=1` on forward-log rows written before amendment S2 promoted the-odds-api books into `book_fair` |
 | `collect_line_timing.py history` | Mondays: Action Network tick histories → `raw/actionnetwork/history_event_<id>.json` (version B's closes) |
 | `collect_line_timing.cmd` | Scheduled-task wrapper; exits 3 if `CFB_DATA_ROOT` is unset. Runbook: `docs/line-timing-collector.md`. |
-| `scrape_dratings.py` | DRatings FBS power ratings (overall, SOS, standard, inference, Vegas + ranks) → `ingest/dratings/fbs_ratings_<updated>.csv`. Page is overwritten weekly with no history; not yet wired into any model. |
+| `scrape_dratings.py` | DRatings FBS power ratings (overall, SOS, standard, inference, Vegas + ranks) → `ingest/dratings/fbs_ratings_<updated>.csv`. Page is overwritten weekly with no history; runs Mondays from `collect_line_timing.py history`. Not wired into any model. |
 
 ## Data
 

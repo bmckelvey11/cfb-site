@@ -25,7 +25,7 @@ the only failure mode here that cannot be repaired after the fact.
 | Task | Command | Schedule | Repairable if missed? |
 |---|---|---|---|
 | `CFB-PT-Snapshot` | `collect_line_timing.cmd snapshot` | every 6 hours, from 00:30 | **No** |
-| `CFB-AN-History` | `collect_line_timing.cmd history --weeks 1-16` | Mondays 09:00 | Yes — just run it. Also runs `collector_health.py` and `eval_version_b.py`. |
+| `CFB-AN-History` | `collect_line_timing.cmd history --weeks 1-16` | Mondays 09:00 | Yes — just run it. Also runs `collector_health.py`, `scrape_dratings.py` and `eval_version_b.py`. |
 
 When a snapshot is actually new, the snapshot run also executes `predict_upcoming.py` and
 `weekly_slate.py` on it, so `pt_upcoming_predictions.csv`, `weekly_slate_<stamp>.csv` and
@@ -55,6 +55,8 @@ ingest/pt_snapshots/
     ncaapredictions_20260829T134307Z.meta.json  captured_at, sha256, byte count, row count
 raw/actionnetwork/
     history_event_{id}.json                     full-game price path, one file per game
+ingest/dratings/
+    fbs_ratings_{updated}.csv                   DRatings FBS ratings, keyed on the page's Updated time
 logs/
     line_timing.log                             every run, appended, never rotated
 ```
