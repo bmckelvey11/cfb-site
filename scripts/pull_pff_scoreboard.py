@@ -55,7 +55,16 @@ both opener and current), so re-running gives a fresh state, not an appended one
 Greenline is the exception: every pull (live or `--from-dump`) also archives the raw
 `[{game, matchup}]` payload as `greenline_dumps/pff_greenline_<season>_w<week>_<UTC>.json`,
 because PFF deletes the props at kickoff and the capture is the only copy. Re-flatten
-any archived dump with `--from-dump`; never re-pull for a week that is already archived.
+any archived dump with `--from-dump`.
+
+RE-PULLING A WEEK IS SAFE ONLY BEFORE ITS FIRST KICKOFF. The dumps are additive --
+timestamped, and never overwritten -- but the CSV is not: `write_csv` truncates, so a
+second pull replaces every row with whatever is priced at that moment. Before the first
+kickoff a later pull is a superset (PFF prices more of the board as the week goes on) and
+replacing the file loses nothing. After it, the games that already kicked come back
+without props and silently drop out of the CSV, and `--from-dump` re-flattens one dump,
+never a union of two. So: re-pull to fill the board early in the week; after the first
+kickoff, keep the capture you have.
 """
 
 from __future__ import annotations
