@@ -99,7 +99,7 @@ def build_core(
             built.append("fact_drive_postgame")
         _add_phase_1_indexes(con)
         _build_core_views(con)
-        built.append("v_game")
+        built += ["v_game", "v_game_book_median"]
         # Last: the dictionary classifies whatever tables the build actually left
         # behind, and the relationship edges are measured against them.
         build_dictionary(con)
@@ -1874,5 +1874,39 @@ def _build_core_views(con: duckdb.DuckDBPyConnection) -> None:
         LEFT JOIN core.fact_game_line t
           ON t.game_id = g.game_id
          AND t.provider_key = g.selected_total_provider_key
+        """
+    )
+    # One row per fact_game game. Medians are across books in fact_game_line, each
+    # column over the books that posted that number, so every median carries its
+    # own count. consensus is an average of books, not a book: it enters a column
+    # only when no book posted that number, and then n_books_* is 0 beside a
+    # non-NULL median. DuckDB's median() interpolates on an even count (-3 and
+    # -3.5 give -3.25). A game with no line at all keeps its row with NULLs.
+    # Checked 2026-09-22: the four Caesars/William Hill keys never share a game,
+    # and spread signs agree with consensus, so every book is one home-spread vote.
+    con.execute(
+        """
+        CREATE OR REPLACE VIEW core.v_game_book_median AS
+        WITH book_median AS (
+          SELECT
+            game_id,
+            coalesce(median(spread_open) FILTER (is_book),
+                     any_value(spread_open) FILTER (NOT is_book))  AS median_spread_open,
+            count(spread_open) FILTER (is_book)                    AS n_books_spread_open,
+            coalesce(median(spread_close) FILTER (is_book),
+                     any_value(spread_close) FILTER (NOT is_book)) AS median_spread_close,
+            count(spread_close) FILTER (is_book)                   AS n_books_spread_close,
+            coalesce(median(total_open) FILTER (is_book),
+                     any_value(total_open) FILTER (NOT is_book))   AS median_total_open,
+            count(total_open) FILTER (is_book)                     AS n_books_total_open,
+            coalesce(median(total_close) FILTER (is_book),
+                     any_value(total_close) FILTER (NOT is_book))  AS median_total_close,
+            count(total_close) FILTER (is_book)                    AS n_books_total_close
+          FROM (SELECT *, provider_key <> 'consensus' AS is_book FROM core.fact_game_line)
+          GROUP BY game_id
+        )
+        SELECT g.*, m.* EXCLUDE (game_id)
+        FROM core.fact_game g
+        LEFT JOIN book_median m USING (game_id)
         """
     )

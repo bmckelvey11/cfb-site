@@ -131,7 +131,7 @@ Four schemas:
 |---|---|---|
 | `raw` | One table per dump, one row per source file, payload as JSON. REST under the endpoint name, GraphQL as `gql_<table>` | Never read for analysis; it is the replay log |
 | `stg` | Typed, exploded tables. REST keeps endpoint names; GraphQL lands under its bare snake_case name, `_gql` suffix only on the three colliders (`calendar_gql`, `draft_picks_gql`, `predicted_points_gql`) | The default place to query. One collapsed schema since ADR-0003; there is no `stg_gql` |
-| `core` | Kimball dims and facts, plus the `v_game` view | What models should join to |
+| `core` | Kimball dims and facts, plus the `v_game` and `v_game_book_median` views | What models should join to |
 | `meta` | `load_report` (what the rebuild did), `table_dictionary` and `relationship` (what everything *is*) | Where the warehouse describes itself |
 
 **Start in `meta` when you do not know which table you want.** The dictionary and the
@@ -203,6 +203,7 @@ absent:
 | `fact_poll_rank` | `stg.poll_rank` + `dim_poll_type` | `SELECT DISTINCT` -- the 2022 dump emits 150 byte-identical duplicate ballots |
 | `fact_drive_postgame` | `stg.drives` | result-informed; offense/defense ids LEFT JOINed from school names |
 | `v_game` (view) | `fact_game` + `dim_venue` + `dim_week` + `fact_game_line` | the selected spread and total are joined **separately**: their provider keys differ on 2,943 games, so one join gets one market wrong |
+| `v_game_book_median` (view) | `fact_game` + `fact_game_line` | median spread/total, open and close, across books; `consensus` (an average, not a book) fills a column only when no book posted it, with `n_books_*` = 0; close medians are not decision-time |
 | `meta.table_dictionary`, `meta.relationship` | every table in the file; orphan counts measured at build | written last, so they describe what the build actually left behind |
 
 Conventions that bite: `stg.games` is REST and regular season; `stg.game` is GraphQL with

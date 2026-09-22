@@ -225,6 +225,13 @@ TABLE_NOTES: dict[tuple[str, str], str] = {
         "provider keys differ on 2,943 games, so one join returns the wrong "
         "book's number for one market. Carries no derived result column."
     ),
+    ("core", "v_game_book_median"): (
+        "VIEW. fact_game plus the median spread and total, open and close, across "
+        "the sportsbooks in fact_game_line. The consensus row is not a book: it is "
+        "used for a column only when no book posted that number, and then "
+        "n_books_* is 0. Each median has an n_books_* count beside it. Close "
+        "medians are closing lines, not decision-time."
+    ),
     # -- meta -----------------------------------------------------------------
     ("meta", "load_report"): (
         "One row per load job of the last rebuild: schema, name, files, rows, "
