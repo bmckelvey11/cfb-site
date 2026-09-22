@@ -979,15 +979,24 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
         CREATE TABLE stg.an_history (
           event_id BIGINT, book_id INTEGER, period VARCHAR,
           market_type VARCHAR, side VARCHAR, team_id BIGINT,
-          line DOUBLE, odds BIGINT, _source_file VARCHAR
+          line DOUBLE, odds BIGINT, is_live BOOLEAN, _source_file VARCHAR
         )
         """
     )
+    # The two live rows are the regression: Action Network labels an in-game price
+    # `period = 'event'` exactly as it labels the pregame one, and the pivot is a MAX,
+    # so without the `is_live` filter the 99.5 total and the -40.5 spread win the
+    # full-game aggregate for book 71. Priced above the real line on purpose -- a MAX
+    # hides a live row that happens to be lower.
     con.execute(
         """
         INSERT INTO stg.an_history VALUES
-          (100, 15, 'firsthalf', 'spread', 'home', 1, -3.5, -110, 'history.json'),
-          (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, 'history.json')
+          (100, 15, 'firsthalf', 'spread', 'home', 1, -3.5, -110, false, 'history.json'),
+          (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, false, 'history.json'),
+          (100, 71, 'event', 'spread', 'home', 1, -6.0, -110, false, 'history.json'),
+          (100, 71, 'event', 'total', 'over', NULL, 44.0, -110, false, 'history.json'),
+          (100, 71, 'event', 'spread', 'home', 1, -40.5, -110, true, 'history.json'),
+          (100, 71, 'event', 'total', 'over', NULL, 99.5, -110, true, 'history.json')
         """
     )
     explode_an_children(con)
@@ -1015,6 +1024,14 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
         """
     ).fetchone()
     assert half[0] == -3.5 and half[1] == 24.5 and half[3] == "actionnetwork"
+    live = con.execute(
+        """
+        SELECT spread, overUnder
+        FROM stg.game_lines
+        WHERE gameId = 99 AND linesProviderId = 38 AND period = 'game'
+        """
+    ).fetchone()
+    assert live == (-6.0, 44.0), "an in-game tick must not become the full-game line"
     names = {
         row[0]
         for row in con.execute("SELECT name FROM stg.lines_provider").fetchall()

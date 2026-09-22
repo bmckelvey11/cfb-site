@@ -105,18 +105,33 @@ banner pointing forward. Their conclusions are kept here so nothing is lost with
   `pff_franchise.cfbd_team_id`; 6 games have no Pinnacle row and 3 have a null close.
 - The numbers **do** move between capture and close — 65 of 73 matched games differ — so it
   is a real second observation and not a copy of the captured line.
-- **But roughly one in nine is corrupt.** Against the median close of the other six or seven
-  books on the same game: 160 of 193 agree within a point, and **22 are off by more than 3**.
-  The bad rows are not a join error — the matchups are right — they look like a
-  half-game or alternate market landing in the game-close field. Western Kentucky at Georgia
-  reads a 82.5 total with a −66.5 spread; Colgate at Central Michigan reads 24.5 against a
-  49.5 consensus, almost exactly half.
+- **Roughly one in nine was corrupt, and the cause is now known.** Against the median close
+  of the other six or seven books on the same game: 160 of 193 agree within a point, and
+  **22 are off by more than 3** — Western Kentucky at Georgia reading a 82.5 total with a
+  −66.5 spread, Colgate at Central Michigan reading 24.5 against a 49.5 consensus.
+- **They are live, in-game prices, not half markets — and not a Pinnacle problem.** Action
+  Network labels an in-game reprice `period = 'event'`, the same label it puts on the pregame
+  line, and the loader's `MAX` pivot took it. **Fixed 2026-09-22** in `_backfill_gamelines`;
+  152 totals and 133 spreads across six books move on the next warehouse rebuild. Full record:
+  [an-live-lines](../../../cfb_system_maker/docs/an-live-lines-2026-09-22.md).
+- **`_source = 'gql'` on these rows does not mean the CFBD GraphQL feed.** It means the
+  `stg.game_lines` side of `_merge_game_lines`, which is the merged CFBD **+ ActionNetwork**
+  tape. Pinnacle is AN-only (`linesProviderId` 9000049). The first bullet above is wrong on
+  that point and is left standing as what was believed when it was written.
 
-**So the work is: filter first, then measure.** Any CLV run must drop or repair Pinnacle
-closes that disagree with the multi-book median by more than a point or two, and report how
-many it dropped — an unfiltered CLV over these rows would be measuring the feed's bugs. The
-underlying loader issue is a warehouse problem, not a totals problem, and is worth fixing at
-the source rather than worked around here.
+**So the work is: rebuild first, re-count, then measure.**
+
+- The fix is in the loader. Until `scripts/refresh_cfbd.py` runs, `core.fact_game_line` still
+  holds the bad values, and any CLV run against it must drop closes that disagree with the
+  multi-book median by more than a point or two and report how many it dropped.
+- **After the rebuild Pinnacle gets smaller, not cleaner.** 36 of its 37 bad 2026 games had
+  *no* pregame row behind the live one, so they go null rather than correct. The 97-of-106
+  coverage above needs re-counting before it sizes anything.
+- **The multi-book median is not a clean reference either.** Circa publishes no live prices
+  at all, yet sits 5–10 points off the consensus on roughly a third of 2026 games, and traced
+  to source those are genuinely what Circa posted. Stale opener, real position, or capture
+  timing is **open and untested**.
+
 
 ## Standing cautions
 

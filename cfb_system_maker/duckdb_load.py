@@ -706,6 +706,8 @@ def backfill_gamelines_from_actionnetwork(
     CFBD ``gameLines`` is full-game only. AN history is 1H/1Q; scoreboard
     ``markets`` is full-game per book. Existing CFBD numbers win; AN fills
     nulls and inserts missing ``(gameId, linesProviderId, period)`` rows.
+
+    **Live prices are excluded.** See the comment on ``an_long`` below.
     """
     owns_connection = not isinstance(db, duckdb.DuckDBPyConnection)
     con = duckdb.connect(str(db)) if owns_connection else db
@@ -782,6 +784,7 @@ def _backfill_gamelines(
         SELECT event_id, book_id, period, market_type, side, line, odds, _source_file
         FROM stg.an_history
         WHERE market_type IN ('spread', 'total', 'moneyline')
+          AND is_live IS NOT TRUE
         """
         if has_history
         else """
@@ -815,7 +818,19 @@ def _backfill_gamelines(
           SELECT event_id, book_id, period, market_type, side, line, odds,
                  _source_file
           FROM stg.an_market
+          WHERE is_live IS NOT TRUE
         ),
+        -- Both inputs are filtered to `is_live IS NOT TRUE` at their source above.
+        -- An Action Network offering carries in-game prices under the same
+        -- `period = 'event'` label as the pregame line, and the pivot below is
+        -- `MAX(...)`, not "last" -- `stg.an_history` has no timestamp to order on.
+        -- A live tick therefore wins the aggregate whenever it is the larger number,
+        -- and wins outright on the 38 Pinnacle games whose only full-game row is live.
+        -- That is where `core.fact_game_line` got a 82.5 total and a -66.5 spread on
+        -- Western Kentucky at Georgia against a 56.0 consensus. Measured 2026-09-22 by
+        -- `scripts/audit_an_live_lines.py`: 153 `total_close` values across six books
+        -- move once live rows are dropped. `IS NOT TRUE` rather than `= false` because
+        -- Circa (book 30) spells the flag NULL on every row it publishes.
         an_long AS (
           SELECT * FROM sb_long
           WHERE market_type IN ('spread', 'total', 'moneyline')
