@@ -84,6 +84,34 @@ def heterogeneity(groups: dict[str, list[dict]]) -> tuple[float, float, int]:
     return stat, 1 - chi2.cdf(stat, df), df
 
 
+def hetero_mde(ns: list[int], p_bar: float = 0.54, alpha: float = 0.05, power: float = 0.80) -> float:
+    """Smallest max-min spread across len(ns) groups the `heterogeneity()` chi-square above
+    would catch 80% of the time, holding each group's true rate evenly spread around p_bar.
+
+    Bisects on the spread and scores it with the noncentral chi-square power at that
+    noncentrality -- the same test statistic `heterogeneity()` computes, read backwards.
+    A p-value near 1 on that test says "consistent with one rate at THIS resolution"; this
+    is the resolution.
+    """
+    from scipy.stats import chi2, ncx2
+    k = len(ns)
+    if k < 2:
+        return float("nan")
+    crit = chi2.ppf(1 - alpha, k - 1)
+    lo, hi = 0.0, 0.9
+    for _ in range(60):
+        spread = (lo + hi) / 2
+        ps = [p_bar - spread / 2 + spread * i / (k - 1) for i in range(k)]
+        pb = sum(n * p for n, p in zip(ns, ps)) / sum(ns)
+        lam = sum(n * (p - pb) ** 2 for n, p in zip(ns, ps)) / (pb * (1 - pb))
+        pw = 1 - ncx2.cdf(crit, k - 1, lam)
+        if pw < power:
+            lo = spread
+        else:
+            hi = spread
+    return hi
+
+
 def runs_test(seq: list[bool]) -> tuple[int, float, float]:
     """Wald-Wolfowitz: observed runs, expected, two-sided p. Fewer runs than expected = streaky."""
     from scipy.stats import norm
@@ -230,6 +258,8 @@ def self_check() -> None:
     mdd, longest, n = drawdown([dict(net=-1.0, win=False)] * 3 + [dict(net=0.909, win=True)] * 5)
     assert mdd == -3.0 and longest == 3 and n == 8
     assert 3 < expected_longest_streak(0.45, 100) < 8
+    assert 0.17 < hetero_mde([130, 88, 106]) < 0.23         # matches the pooled doc's ~0.20 spread
+    assert hetero_mde([1000, 1000, 1000]) < hetero_mde([50, 50, 50])  # more n, finer resolution
     print("self-check ok")
 
 

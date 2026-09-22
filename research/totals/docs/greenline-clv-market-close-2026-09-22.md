@@ -59,25 +59,35 @@ the result is not an artefact of picking 1.0 points:
 Anywhere from half a point to five points of tolerance gives the same answer. Only *no* gate
 gives a different one.
 
-## The answer: there is no closing-line value
+## The answer: no CLV clears its own detection floor, except one split that does
 
 Default policy (`drop`, tolerance 1.0): **79 of 106 flags scored** — 18 dropped for
-contradicting the books, 9 with no Pinnacle row at all.
+contradicting the books, 9 with no Pinnacle row at all. `mde` is the smallest true mean CLV
+(pts) this split's n would detect 80% of the time, one-sided; a mean inside its own mde is a
+bound, not a measurement of zero.
 
-| split | n | mean CLV (pts, 95%) | ~win prob | beat-lost-flat |
-| --- | ---: | ---: | ---: | ---: |
-| **all flags** | 79 | **+0.06 ± 0.48** | +0.2pp | 35-18-26 |
-| unders | 65 | −0.02 ± 0.56 | −0.1pp | 30-15-20 |
-| overs | 14 | +0.43 ± 0.77 | +1.7pp | 5-3-6 |
-| week 2 | 24 | −0.62 ± 1.47 | −2.5pp | 9-10-5 |
-| week 3 | 55 | +0.35 ± 0.25 | +1.4pp | 26-8-21 |
+| split | n | mean CLV (pts, 95%) | mde (pts) | ~win prob | beat-lost-flat |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| **all flags** | 79 | **+0.06 ± 0.48** | 0.61 | +0.2pp | 35-18-26 |
+| unders | 65 | −0.02 ± 0.56 | 0.71 | −0.1pp | 30-15-20 |
+| overs | 14 | +0.43 ± 0.77 | 0.97 | +1.7pp | 5-3-6 |
+| week 2 | 24 | −0.62 ± 1.47 | 1.87 | −2.5pp | 9-10-5 |
+| week 3 | 55 | +0.35 ± 0.25 | 0.31 | +1.4pp | 26-8-21 |
 
-**+0.06 points, interval −0.42 to +0.54.** Zero sits in the middle of it. Every gated policy
-agrees: −0.20, −0.17, +0.06. Greenline's flags do not lead the market, and the three
-policies bracket the answer tightly enough that the choice between them does not matter.
+**+0.06 points, interval −0.42 to +0.54, mde 0.61.** The mean sits well inside its own
+detection floor: this split could not have distinguished +0.06 from a true CLV as large as
+0.61 points either way, so "zero" is a bound this n imposes, not a measured zero. Every
+gated policy still agrees in sign and magnitude — −0.20, −0.17, +0.06 — none clears its own
+mde, and the three policies bracket the answer tightly enough that the choice between them
+does not matter.
 
-The two weeks disagree in sign (−0.62 and +0.35) on 24 and 55 picks, which is what noise
-looks like at this size, not a trend.
+**Week 3 alone does not fit that pattern.** +0.35 ± 0.25 against an mde of 0.31 means the
+mean *exceeds* its own 80%-power threshold — one-sided p ≈ 0.003 on n=55, unadjusted. Week 2
+is the opposite sign and larger (−0.62 ± 1.47, mde 1.87, itself uninformative). Two weekly
+splits is not enough to call a trend, and no correction has been applied across them, so this
+is registered as a thing to watch — not reweighted into the headline number — rather than
+smoothed into "which is what noise looks like at this size." If week 4 lands positive again
+at a similar magnitude, this stops being dismissible on multiplicity grounds alone.
 
 **Beating the close does not predict winning the bet**: flags that beat the close went 20-15
 (57.1%), flags that lost to it went 11-7 (61.1%). These are two views of the same picks, so

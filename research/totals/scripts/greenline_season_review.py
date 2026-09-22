@@ -150,6 +150,19 @@ def mde(n: int, p0: float = BREAK_EVEN, alpha_z: float = 1.645, power_z: float =
     return p0 + (alpha_z + power_z) * math.sqrt(0.25 / n) if n else float("nan")
 
 
+def mde_diff(n1: int, n2: int, alpha_z: float = 1.96, power_z: float = 0.84) -> float:
+    """Smallest |p1 - p2| a two-sided test on n1 vs n2 would detect 80% of the time.
+
+    Uses the same p=0.5 variance approximation as `mde()` above, for the same reason: it
+    is the conservative (widest) case near the win rates this tree actually sees, and it
+    keeps the two functions readable side by side rather than plumbing the observed rates
+    through a fussier two-stage null/alternative variance calc for a documentation line.
+    """
+    if not n1 or not n2:
+        return float("nan")
+    return (alpha_z + power_z) * math.sqrt(0.25 * (1 / n1 + 1 / n2))
+
+
 def brier(rows: list[dict], key: str) -> float | None:
     xs = [(r[key], 1.0 if r["result"] == "win" else 0.0) for r in rows if r["result"] != "push" and r.get(key) is not None]
     return st.mean((p - y) ** 2 for p, y in xs) if xs else None
@@ -482,6 +495,7 @@ def self_check() -> None:
     lo, hi = wilson(21, 36)
     assert 0.41 < lo < 0.43 and 0.72 < hi < 0.74, (lo, hi)
     assert abs(mde(40) - 0.72) < 0.01
+    assert 0.19 < mde_diff(270, 54) < 0.22                  # matches the pooled doc's overs-vs-unders gap
     print("self-check ok")
 
 

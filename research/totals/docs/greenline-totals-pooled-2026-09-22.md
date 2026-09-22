@@ -98,6 +98,14 @@ capture formats, and the win rates are as alike as random draws from one rate. P
 defensible on this evidence — which is the *only* reason the pooled row above is quoted at
 all.
 
+**At these era sizes, this test detects a max-min spread of about 20 percentage points at
+80% power.** A p of 0.93 says the eras are consistent with one rate at that resolution; it
+does not say the true rates sit within a point or two of each other — spreads under ~20pp
+are statistically invisible to this test. The pooled return is already era-dependent in a
+way this test could not have seen: strip 2020 and the unders ROI moves from +4.0% to -0.2%
+(see [Money](#money--price-bearing-rows-only), below). The homogeneity test licenses
+pooling the *record*; it says nothing about whether the *return* is uniform across eras.
+
 The pooled win-rate SE is 2.77pp iid and 1.98pp clustered by game day (51 distinct days).
 Clustering does not widen the interval here, so the iid Wilson above stands as the headline
 and is the conservative choice. Read nothing further into it: these "days" span 2020, 2022,
@@ -121,6 +129,11 @@ is overwhelmingly an unders number by composition — but the 54 overs land at t
 which is evidence against treating "the under tilt" as the thing that wins. The 2026 overs
 at 66.7% are 18 picks and the one split here anybody would be tempted to read; its floor is
 81.7%.
+
+**At 270 unders vs 54 overs, this test detects a gap of about 21 percentage points at 80%
+power.** A p of 0.96 rules out a large under/over gap; it does not rule out a small one, and
+the two-point raw gap observed (54.1% vs 53.7%) is far too small for this design to have
+seen either way.
 
 ## The published 2026 under lists — nested, not added
 

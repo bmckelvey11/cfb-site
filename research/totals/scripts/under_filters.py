@@ -1,12 +1,23 @@
 """Do any pre-registered situational filters separate winning Greenline unders from losing ones?
 
-The 2023-25 personal unders are treated as Greenline unders (they were mostly the same
-flags, taken as bets) and pooled with the graded 2026 under flags. The two are kept as
-strata: every filter reports history / 2026 / pooled, and the logistic fit carries a
-source dummy plus a filter x source interaction so a population difference cannot pass
-as a filter effect.
+Runs on the 270 Greenline-only unders across all three graded eras (2020 PFF_hist, 2022-23
+exports, 2026 flags) -- the same population `pool_totals_record.py` establishes. The
+2023-25 personal book unders are NOT included: `pool_totals_record.overlap()` measured, on
+the only days both a Greenline board and a book bet exist, that 3 of 12 checkable personal
+bets took the side Greenline flagged *against*. A population that disagrees with the vendor
+on a quarter of checkable picks is a different selector, not a Greenline stand-in, and using
+it here would let a personal-betting pattern pass as a Greenline finding.
 
-Filters were fixed before this script was run (2026-09-17), not after looking:
+(Superseded 2026-09-22: the original 2026-09-17 run pooled the 2023-25 personal unders with
+the 2026 flags on that same premise, five days before the overlap was measured and found
+false. See `../../../archive/docs/greenline-under-filters-2026-09-17.md`.)
+
+Filters are stratified by era and tested with Cochran-Mantel-Haenszel, the same tool
+`totals_rule_search.py` uses for the same reason: a filter that only shows up because one
+era is a different population (2020 has no weather rows, 2026 sits on different totals)
+cancels under CMH instead of reporting itself as a finding.
+
+Filters were fixed before this script was first run (2026-09-17), not after looking:
 
     line_fell   market total closed below its open (steam toward the under)
     windy       wind >= 12 mph, outdoors
@@ -16,7 +27,9 @@ Filters were fixed before this script was run (2026-09-17), not after looking:
     short_rest  either team on <= 6 days of rest
 
 Every feature is available before kickoff. Pace and rest use only games played before
-the one being bet; week-1 pace falls back to the prior season.
+the one being bet; week-1 pace falls back to the prior season. Pace features require
+`stg.advanced_game_stats`, which only covers 2022+ -- 2020 rows are missing that feature
+by construction, not by data loss, and are dropped from `slow` only.
 
 Run from repo root:
     python research/totals/scripts/under_filters.py [--out research/totals/docs]
@@ -31,7 +44,6 @@ import math
 import sys
 from pathlib import Path
 
-import numpy as np
 from scipy import stats
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -39,8 +51,12 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "research" / "totals" / "scripts"))
 sys.path.insert(0, str(ROOT / "research" / "bankroll" / "scripts"))
 
-from cfb_paths import DB_PATH, INGEST  # noqa: E402
-from greenline_season_review import BREAK_EVEN, load, mde, personal_totals, wilson  # noqa: E402
+from cfb_paths import DB_PATH  # noqa: E402
+from greenline_season_review import BREAK_EVEN, mde, wilson  # noqa: E402
+from pool_totals_record import load  # noqa: E402
+from totals_rule_search import cmh  # noqa: E402  -- reused so this and the rule search cannot drift apart
+
+ERAS = ["2020 PFF_hist", "2022-23 exports", "2026 flags"]
 
 FILTERS = [
     ("line_fell", "total closed below open", lambda f: None if f["total_open"] is None or f["total_close"] is None
@@ -57,40 +73,45 @@ FILTERS = [
 
 # ---------------------------------------------------------------- sample
 
-def history_unders() -> list[dict]:
-    """2023-25 bet unders with a warehouse game_id, via the bankroll unit's matcher."""
-    import duckdb
-    from under_selection_profile import attach, bet_unders, fbs_slate
-    con = duckdb.connect(str(DB_PATH), read_only=True)
-    bet, _, unmatched = attach(bet_unders(), fbs_slate(con))
-    con.close()
-    return [{"source": "history", "game_id": int(b["game_id"]), "date": b["date"], "line": b["line"],
-             "result": b["result"]} for b in bet if b["result"] in ("win", "loss")]
+def greenline_unders() -> list[dict]:
+    """Every graded Greenline under across all three eras, resolved to a CFBD game_id.
 
-
-def flag_unders(season: int = 2026) -> list[dict]:
-    """Graded 2026 under flags with a warehouse game_id, via pff_franchise -> cfbd_team_id."""
+    2020 and 2022-23 already carry the CFBD game_id on the row (the join audit fixed it).
+    2026 flags carry PFF's own game id and are resolved through the same
+    pff_franchise -> cfbd_team_id -> team-pair match `flag_unders()` used before this
+    rewrite, because PFF and CFBD do not share an id space.
+    """
     import duckdb
     from greenline_bet_log import _flag_cfbd_ids
+
+    picks = [r for r in load() if r["side"] == "under" and r["result"] in ("win", "loss")]
+    out = []
+    for r in picks:
+        if r["era"] != "2026 flags":
+            try:
+                gid = int(r["game_id"])
+            except (TypeError, ValueError):
+                continue  # no CFBD match on this archive row; excluded, not miscounted
+            out.append({"era": r["era"], "game_id": gid, "date": r["date"], "line": r["line"],
+                        "result": r["result"]})
+
+    flags = [r for r in picks if r["era"] == "2026 flags"]
     ids = _flag_cfbd_ids()
-    graded, _ = load(season)
-    rows = [r for r in graded if r["market"] == "total" and r["side"] == "under" and r["result"] in ("win", "loss")]
     con = duckdb.connect(str(DB_PATH), read_only=True)
     games = con.execute("select game_id, home_team_id, away_team_id, start_date::date::varchar "
-                        "from core.fact_game where season = ?", [season]).fetchall()
+                        "from core.fact_game where season = 2026").fetchall()
     con.close()
     by_pair = {}
     for gid, h, a, d in games:
         by_pair.setdefault(frozenset((str(h), str(a))), []).append((gid, d))
-    out = []
-    for r in rows:
-        pair = ids.get(r["pff_game_id"])
+    for r in flags:
+        pair = ids.get(r["game_id"])
         cands = by_pair.get(pair, []) if pair else []
         if not cands:
             continue
         d0 = dt.date.fromisoformat(r["date"])
         gid = min(cands, key=lambda c: abs((dt.date.fromisoformat(c[1]) - d0).days))[0]
-        out.append({"source": "2026", "game_id": int(gid), "date": r["date"], "line": r["line"],
+        out.append({"era": "2026 flags", "game_id": int(gid), "date": r["date"], "line": r["line"],
                     "result": r["result"]})
     return out
 
@@ -114,7 +135,7 @@ ln as (
     ) where rn = 1
 ),
 w as (select gameId as game_id, windSpeed as wind, gameIndoors as indoors from stg.weather),
--- every team-game with plays, for pregame pace
+-- every team-game with plays, for pregame pace (2022+ only -- stg.advanced_game_stats has no earlier seasons)
 tg as (
     select s.gameId as game_id, f.season, f.start_date, s.team, s.offense_plays as plays
     from stg.advanced_game_stats s join core.fact_game f on f.game_id = s.gameId
@@ -191,35 +212,6 @@ def two_prop(w1, n1, w2, n2) -> float:
     return stats.fisher_exact([[w1, n1 - w1], [w2, n2 - w2]])[1]
 
 
-def logit_interaction(rows: list[dict], flag: list[bool]) -> dict:
-    """win ~ filter + source + filter:source, SE clustered by calendar day.
-
-    The interaction is only identified when all four filter x source cells hold both a
-    win and a loss. Otherwise (a 3-0 cell, or a stratum with no tagged rows) it is
-    dropped and the fit is filter + source, flagged `sep`."""
-    import warnings
-    import statsmodels.api as sm
-    y = np.array([r["result"] == "win" for r in rows], dtype=float)
-    f = np.array(flag, dtype=float)
-    s = np.array([r["source"] == "2026" for r in rows], dtype=float)
-    cells = [y[(f == a) & (s == b)] for a in (0, 1) for b in (0, 1)]
-    sep = any(len(c) == 0 or c.min() == c.max() for c in cells)
-    X = np.column_stack([np.ones(len(y)), f, s] + ([] if sep else [f * s]))
-    if s.min() == s.max():  # one stratum only: source is constant
-        X = X[:, [0, 1]]
-    groups = np.unique([r["date"] for r in rows], return_inverse=True)[1]
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            m = sm.Logit(y, X).fit(disp=0, cov_type="cluster", cov_kwds={"groups": groups})
-    except Exception as e:
-        return {"ok": False, "err": type(e).__name__}
-    out = {"ok": True, "sep": sep, "b_filter": m.params[1], "se_filter": m.bse[1], "p_filter": m.pvalues[1]}
-    if not sep:
-        out.update(b_inter=m.params[3], se_inter=m.bse[3], p_inter=m.pvalues[3])
-    return out
-
-
 def holm(ps: list[float]) -> list[float]:
     order = sorted(range(len(ps)), key=lambda i: (math.isnan(ps[i]), ps[i]))
     out, m, run = [float("nan")] * len(ps), len(ps), 0.0
@@ -233,128 +225,131 @@ def holm(ps: list[float]) -> list[float]:
 
 # ---------------------------------------------------------------- report
 
-def evaluate(rows: list[dict], feats: dict[int, dict]) -> list[dict]:
+def evaluate(rows: list[dict], feats: dict[int, dict], filters=None) -> list[dict]:
     res = []
-    for name, desc, fn in FILTERS:
+    for name, desc, fn in (FILTERS if filters is None else filters):
         tagged = []
         for r in rows:
             f = feats.get(r["game_id"])
             v = fn(f) if f else None
             if v is not None:
                 tagged.append((r, bool(v)))
-        strata = {}
-        for src in ("history", "2026", "pooled"):
-            sub = [(r, v) for r, v in tagged if src == "pooled" or r["source"] == src]
+        by_era = {}
+        for e in ERAS:
+            sub = [(r, v) for r, v in tagged if r["era"] == e]
             on = rec([r for r, v in sub if v])
             off = rec([r for r, v in sub if not v])
-            strata[src] = {"on": on, "off": off, "p": two_prop(on[0], sum(on), off[0], sum(off))}
-        fit = logit_interaction([r for r, _ in tagged], [v for _, v in tagged]) if tagged else {"ok": False}
-        n_on = sum(strata["pooled"]["on"])
+            by_era[e] = {"on": on, "off": off, "p": two_prop(on[0], sum(on), off[0], sum(off))}
+        groups = [(by_era[e]["on"][0], by_era[e]["on"][1], by_era[e]["off"][0], by_era[e]["off"][1]) for e in ERAS]
+        cmh_stat, cmh_p = cmh(groups)
+        pooled_on = rec([r for r, v in tagged if v])
+        pooled_off = rec([r for r, v in tagged if not v])
+        pooled_p = two_prop(pooled_on[0], sum(pooled_on), pooled_off[0], sum(pooled_off))
+        n_on = sum(pooled_on)
         res.append({"name": name, "desc": desc, "n_tagged": len(tagged), "n_missing": len(rows) - len(tagged),
-                    "strata": strata, "fit": fit, "mde_on": mde(n_on) if n_on else float("nan")})
-    hp = holm([r["strata"]["pooled"]["p"] for r in res])
+                    "by_era": by_era, "pooled_on": pooled_on, "pooled_off": pooled_off, "pooled_p": pooled_p,
+                    "cmh_stat": cmh_stat, "cmh_p": cmh_p, "mde_on": mde(n_on) if n_on else float("nan")})
+    hp = holm([r["cmh_p"] for r in res])
     for r, p in zip(res, hp):
         r["p_holm"] = p
     return res
 
 
-def render(rows: list[dict], res: list[dict], H: int, F: int) -> str:
+def render(rows: list[dict], res: list[dict], by_era_n: dict[str, int]) -> str:
     w, l = rec(rows)
     lo, hi = wilson(w, w + l)
     L = [f"# Situational filters on Greenline unders, {dt.date.today().isoformat()}", "",
          "Reproduce: `python research/totals/scripts/under_filters.py --out research/totals/docs`.", "",
+         "**Supersedes** [greenline-under-filters-2026-09-17.md](../../../archive/docs/greenline-under-filters-2026-09-17.md), "
+         "which pooled the 2023-25 personal unders with the 2026 flags on the premise that they were mostly the same "
+         "picks -- a premise `pool_totals_record.overlap()` later measured and found false on 3 of 12 checkable days.", "",
          "## Question", "",
          "Does any pre-registered, pregame situational filter separate winning Greenline unders from losing ones?",
-         "The 2023-25 personal unders are treated as Greenline unders and pooled with the graded 2026 flags,",
-         "kept as strata so a population difference cannot pass as a filter effect.", "",
-         "## Data", "",
-         f"- History 2023-25: {H} bet unders matched to `core.fact_game` (`data/ingest/bet_history/history.csv`).",
-         f"- 2026 flags: {F} graded under flags matched through `pff_franchise.cfbd_team_id`.",
-         f"- Pooled: {w}-{l} ({w / (w + l) * 100:.1f}%, 95% Wilson {lo * 100:.0f}–{hi * 100:.0f}%). "
-         f"MDE for the whole pool: {mde(w + l) * 100:.1f}%. Break-even {BREAK_EVEN * 100:.2f}%.",
-         "- Features from the local warehouse: `core.fact_game_line` (open/close), `stg.weather` (wind, indoors),",
-         "  `stg.advanced_game_stats` (plays, season-to-date before kickoff), `core.fact_game` (spread, kickoff, rest).",
-         "  A row missing a feature is dropped from that filter only; the count is in the table.", "",
-         "## Filters, fixed before running", "", "| filter | rule |", "|---|---|"]
+         "Runs on the 270 Greenline-only unders across all three graded eras, stratified by era via",
+         "Cochran-Mantel-Haenszel so a filter that is really era composition (2020 has no weather rows, 2026 sits",
+         "on different totals) cancels here instead of reporting itself as a finding.", "",
+         "## Data", ""]
+    for e in ERAS:
+        L.append(f"- {e}: {by_era_n[e]} graded unders.")
+    L += ["- 3 of the pooled 270 graded Greenline unders (all 2020 PFF_hist) carry a result but no CFBD "
+          "`game_id` -- their final came with the archive row directly rather than through a CFBD join -- "
+          "so they cannot be joined to a feature and are excluded here, not miscounted.", "",
+          f"- Pooled: {w}-{l} ({w / (w + l) * 100:.1f}%, 95% Wilson {lo * 100:.0f}–{hi * 100:.0f}%). "
+          f"MDE for the whole pool: {mde(w + l) * 100:.1f}%. Break-even {BREAK_EVEN * 100:.2f}%.",
+          "- Features from the local warehouse: `core.fact_game_line` (open/close), `stg.weather` (wind, indoors),",
+          "  `stg.advanced_game_stats` (plays, season-to-date before kickoff, 2022+ only), `core.fact_game`",
+          "  (spread, kickoff, rest). A row missing a feature is dropped from that filter only; the count is in",
+          "  the table.", "",
+          "## Filters, fixed before running", "", "| filter | rule |", "|---|---|"]
     L += [f"| {n} | {d} |" for n, d, _ in FILTERS]
-    L += ["", "## Records: filter on vs off", "",
-          "| filter | stratum | on | off | Fisher p |", "|---|---|---|---|---:|"]
+    L += ["", "## Records: filter on vs off, by era", "",
+          "| filter | era | on | off | Fisher p |", "|---|---|---|---|---:|"]
     for r in res:
-        for src in ("history", "2026", "pooled"):
-            s = r["strata"][src]
-            L.append(f"| {r['name']} | {src} | {fmt(*s['on'])} | {fmt(*s['off'])} | {s['p']:.3f} |")
-    L += ["", "## Pooled test with the strata inside it", "",
-          "Logistic: win ~ filter + source + filter×source, SE clustered by calendar day. `b_filter` is the",
-          "log-odds shift the filter gives in the history stratum; `b_inter` is how much that shift differs in 2026.",
-          "A filter whose interaction is large and opposite-signed is a population difference, not a filter.",
-          "`sep` means a filter×source cell had no losses (or no rows), so the interaction is not identified",
-          "and the fit is filter + source only.",
-          "Holm corrects the pooled Fisher p across the six filters. `MDE on` is the smallest win rate the",
-          "filter's kept rows could distinguish from break-even at their own n.", "",
-          "| filter | n tagged | missing | b_filter ± se | p | b_inter ± se | p_inter | Fisher p (pooled) | Holm p | MDE on |",
-          "|---|---:|---:|---|---:|---|---:|---:|---:|---:|"]
+        for e in ERAS:
+            s = r["by_era"][e]
+            L.append(f"| {r['name']} | {e} | {fmt(*s['on'])} | {fmt(*s['off'])} | {s['p']:.3f} |")
+        L.append(f"| {r['name']} | pooled (descriptive) | {fmt(*r['pooled_on'])} | {fmt(*r['pooled_off'])} "
+                 f"| {r['pooled_p']:.3f} |")
+    L += ["", "## Era-stratified test", "",
+          "Cochran-Mantel-Haenszel across the three eras -- the pooled Fisher p above is descriptive only; this",
+          "is the inferential test, because it cancels a split that is really era composition instead of reporting",
+          "it as a finding. Holm corrects across the six filters. `MDE on` is the smallest win rate the filter's",
+          "kept rows could distinguish from break-even at their own pooled n.", "",
+          "| filter | n tagged | missing | CMH stat | CMH p | Holm p | MDE on |",
+          "|---|---:|---:|---:|---:|---:|---:|"]
     for r in res:
-        f = r["fit"]
-        if f.get("ok") and not f["sep"]:
-            fit = (f"{f['b_filter']:+.2f} ± {f['se_filter']:.2f} | {f['p_filter']:.3f} | "
-                   f"{f['b_inter']:+.2f} ± {f['se_inter']:.2f} | {f['p_inter']:.3f}")
-        elif f.get("ok"):
-            fit = f"{f['b_filter']:+.2f} ± {f['se_filter']:.2f} | {f['p_filter']:.3f} | sep | --"
-        else:
-            fit = f"-- ({f.get('err', 'no fit')}) | -- | -- | --"
-        L.append(f"| {r['name']} | {r['n_tagged']} | {r['n_missing']} | {fit} | "
-                 f"{r['strata']['pooled']['p']:.3f} | {r['p_holm']:.3f} | {r['mde_on'] * 100:.0f}% |")
+        L.append(f"| {r['name']} | {r['n_tagged']} | {r['n_missing']} | {r['cmh_stat']:.2f} | {r['cmh_p']:.3f} | "
+                 f"{r['p_holm']:.3f} | {r['mde_on'] * 100:.0f}% |")
     keep = [r for r in res if r["p_holm"] < 0.05]
     L += ["", "## Reading", ""]
     if keep:
-        L += [f"- Filters that survive Holm at 5%: {', '.join(r['name'] for r in keep)}. Check the interaction"
-              " column before treating any as a rule: same sign in both strata is required."]
+        L += [f"- Filters that survive Holm at 5%: {', '.join(r['name'] for r in keep)}."]
     else:
         L += ["- No filter survives the Holm correction at 5%. None of the six is a rule yet."]
-    best = min(res, key=lambda r: r["strata"]["pooled"]["p"] if not math.isnan(r["strata"]["pooled"]["p"]) else 9)
-    bs = best["strata"]["pooled"]
-    L += [f"- Strongest raw split is `{best['name']}` (pooled Fisher p {bs['p']:.3f}, Holm {best['p_holm']:.3f}): "
-          f"on {fmt(*bs['on'])} vs off {fmt(*bs['off'])}.",
-          "- The strata differ in population (history is a high-total selection, 2026 flags sit six points",
-          "  lower), so a filter that only shows in one stratum is a selection artifact until the other confirms it.",
+    best = min(res, key=lambda r: r["cmh_p"] if not math.isnan(r["cmh_p"]) else 9)
+    L += [f"- Strongest era-stratified split is `{best['name']}` (CMH p {best['cmh_p']:.3f}, Holm "
+          f"{best['p_holm']:.3f}): pooled on {fmt(*best['pooled_on'])} vs off {fmt(*best['pooled_off'])}.",
+          "- Per-era rows are printed above precisely so a filter that only shows up in one era (a selection",
+          "  artifact or a feature-coverage gap) is visible before the CMH line averages it away.",
           "", "## What this does not support", "",
-          "- Applying any filter to a live slate. Six looks at ~240 rows; the Holm column is the honest p.",
-          "- Reading a missing-feature filter (wind, pace) as null: 2026 weather coverage is a fifth of games,",
-          "  so those rows are mostly history.",
-          "- Treating history as out-of-sample. It was not selected by these filters, but it was selected by",
-          "  a high-total rule that correlates with several of them (pace, big favorites).",
+          "- Applying any filter to a live slate. Six looks at 270 rows; the Holm column is the honest p.",
+          "- Reading a missing-feature filter (wind, pace) as null on 2020: `stg.weather` and",
+          "  `stg.advanced_game_stats` do not cover that era, so those rows are dropped, not zero.",
+          "- Treating any era as out-of-sample for the others. All three are graded Greenline flags; none was",
+          "  selected by these filters.",
           "", "## What settles it", "",
-          "- Rerun after each graded week. The 2026 stratum is the confirmation set; at ~150 2026 unders a",
-          "  filter needs ~64% on its kept half to clear floor on 2026 alone.",
-          "- A filter that holds: same sign in both strata, interaction p > 0.10, Holm p < 0.05."]
+          "- Rerun after each graded 2026 week; it is the era that keeps growing.",
+          "- A filter that holds: consistent sign across eras (see the per-era table), CMH p Holm < 0.05."]
     return "\n".join(L) + "\n"
 
 
 # ---------------------------------------------------------------- entry
 
 def self_check() -> None:
-    rows = [{"source": "history", "game_id": i, "date": f"2024-09-{7 + i % 3:02d}", "line": 55.5,
+    rows = [{"era": "2020 PFF_hist", "game_id": i, "date": f"2020-09-{7 + i % 3:02d}", "line": 55.5,
              "result": "win" if i % 3 else "loss"} for i in range(30)]
-    rows += [{"source": "2026", "game_id": 100 + i, "date": f"2026-09-{12 + i % 2:02d}", "line": 50.5,
+    rows += [{"era": "2022-23 exports", "game_id": 1000 + i, "date": f"2022-10-{2 + i % 2:02d}", "line": 52.5,
+              "result": "win" if i % 3 else "loss"} for i in range(20)]
+    rows += [{"era": "2026 flags", "game_id": 2000 + i, "date": f"2026-09-{12 + i % 2:02d}", "line": 50.5,
               "result": "win" if i % 2 else "loss"} for i in range(20)]
     feats = {r["game_id"]: {"spread": 20 if r["game_id"] % 5 < 2 else 3, "total_open": 55.0,
                             "total_close": 54.0 if r["game_id"] % 4 else 56.0, "wind": None, "indoors": False,
-                            "hour": 20 if r["game_id"] % 3 else 12, "home_pace": 60.0, "away_pace": 70.0,
-                            "fbs_pace": 65.0, "home_rest": 7, "away_rest": 7} for r in rows}
+                            "hour": 20 if r["game_id"] % 3 else 12,
+                            "home_pace": 60.0, "away_pace": 70.0, "fbs_pace": 65.0,
+                            "home_rest": 7, "away_rest": 7} for r in rows}
+    by_era_n = {e: sum(1 for r in rows if r["era"] == e) for e in ERAS}
     res = evaluate(rows, feats)
     by = {r["name"]: r for r in res}
-    assert by["windy"]["n_tagged"] == 0 and by["windy"]["n_missing"] == 50
-    assert by["big_fav"]["n_tagged"] == 50
-    assert sum(by["big_fav"]["strata"]["pooled"]["on"]) == 20
-    assert by["slow"]["strata"]["pooled"]["on"] == (0, 0)  # away pace above mean -> never both slow
+    assert by["windy"]["n_tagged"] == 0 and by["windy"]["n_missing"] == 70
+    assert by["big_fav"]["n_tagged"] == 70
+    assert sum(by["big_fav"]["pooled_on"]) == 28
+    assert by["slow"]["pooled_on"] == (0, 0)  # away pace above mean -> never both slow
     assert all(0 <= r["p_holm"] <= 1 for r in res if not math.isnan(r["p_holm"]))
-    assert by["big_fav"]["fit"]["ok"] and not by["big_fav"]["fit"]["sep"]
-    one = evaluate([r for r in rows if r["source"] == "history"], feats)  # single stratum still fits
-    assert {r["name"]: r for r in one}["big_fav"]["fit"]["ok"]
+    assert 0 <= by["big_fav"]["cmh_p"] <= 1
     assert holm([0.01, 0.04, 0.03]) == [0.03, 0.06, 0.06]
     assert 0.6 < mde(120) < 0.66
-    out = render(rows, res, 30, 20)
-    assert "| big_fav | pooled |" in out
+    out = render(rows, res, by_era_n)
+    assert "| big_fav | 2020 PFF_hist |" in out and "Era-stratified test" in out
     print("self-check ok")
 
 
@@ -367,18 +362,18 @@ def main() -> None:
     if a.self_check:
         self_check()
         return
-    H, F = history_unders(), flag_unders()
-    rows = H + F
+    rows = greenline_unders()
+    by_era_n = {e: sum(1 for r in rows if r["era"] == e) for e in ERAS}
     feats = features([r["game_id"] for r in rows])
     res = evaluate(rows, feats)
-    text = render(rows, res, len(H), len(F))
+    text = render(rows, res, by_era_n)
     if a.dump:
         with a.dump.open("w", newline="", encoding="utf-8") as fh:
             wri = csv.writer(fh)
-            wri.writerow(["source", "game_id", "date", "line", "result"] + [n for n, _, _ in FILTERS])
+            wri.writerow(["era", "game_id", "date", "line", "result"] + [n for n, _, _ in FILTERS])
             for r in rows:
                 f = feats.get(r["game_id"], {})
-                wri.writerow([r["source"], r["game_id"], r["date"], r["line"], r["result"]]
+                wri.writerow([r["era"], r["game_id"], r["date"], r["line"], r["result"]]
                              + [fn(f) if f else None for _, _, fn in FILTERS])
     if a.out:
         p = a.out / f"greenline-under-filters-{dt.date.today().isoformat()}.md"

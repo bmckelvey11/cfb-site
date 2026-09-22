@@ -54,8 +54,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bankroll" / "scripts"))
 from cfb_paths import DB_PATH, INGEST  # noqa: E402
 from greenline_bet_log import book_totals  # noqa: E402  -- the ledger owns the team resolver
-from greenline_season_review import BREAK_EVEN, decimal, mde, personal_totals, wilson  # noqa: E402
-from greenline_bet_stats import beta_post, binom_p, bootstrap, clustered_se, heterogeneity  # noqa: E402
+from greenline_season_review import BREAK_EVEN, decimal, mde, mde_diff, personal_totals, wilson  # noqa: E402
+from greenline_bet_stats import beta_post, binom_p, bootstrap, clustered_se, heterogeneity, hetero_mde  # noqa: E402
 
 IN_DIR = INGEST / "pff_scoreboard"
 ARCHIVE = IN_DIR / "greenline_history_archive.csv"
@@ -281,6 +281,8 @@ def report(pool: list[dict]) -> str:
 
     # Are the eras consistent enough to pool at all?
     stat, p, df = heterogeneity({e: [r for r in by_era[e] if r["result"] != "push"] for e in eras})
+    era_ns = [len([r for r in by_era[e] if r["result"] != "push"]) for e in eras]
+    h_mde = hetero_mde(era_ns, p_bar=t["w"] / t["n"])
     iid, cl, g = clustered_se(live)
     bp = binom_p(t["w"], t["n"])
     post, med, p5 = beta_post(t["w"], t["n"])
@@ -290,6 +292,11 @@ def report(pool: list[dict]) -> str:
              if p >= 0.05 else
              "the eras differ more than one win rate explains, so the pooled number is an average "
              "of unlike things and should not be read as a single skill estimate."), "",
+          f"**At these era sizes, this test detects a max-min spread of about {h_mde * 100:.0f} "
+          f"percentage points at 80% power.** A p of {p:.2f} says the eras are consistent with one "
+          "rate at that resolution; it does not say the true rates are within a point or two of "
+          "each other. The pooled ROI is already era-dependent in a way this test could not have "
+          "seen: strip 2020 and the unders return moves from +4.0% to -0.2% (see Money, below).", "",
           f"Pooled win rate SE is {iid * 100:.2f}pp iid and {cl * 100:.2f}pp clustered by game day "
           f"({g} distinct days); same-day games share weather and slate-wide shocks, so the "
           f"clustered figure is the honest one.", "",
@@ -307,7 +314,12 @@ def report(pool: list[dict]) -> str:
             L.append(rec_row(f"{e}, {side}s", [r for r in by_era[e] if r["side"] == side]))
     L.append("")
     sstat, sp, sdf = heterogeneity({s: [r for r in live if r["side"] == s] for s in ("under", "over")})
-    L += [f"Under vs over, chi-square {sstat:.2f} on {sdf} df, p {sp:.3f}.", ""]
+    n_under = len([r for r in live if r["side"] == "under"])
+    n_over = len([r for r in live if r["side"] == "over"])
+    d_mde = mde_diff(n_under, n_over)
+    L += [f"Under vs over, chi-square {sstat:.2f} on {sdf} df, p {sp:.3f}. At {n_under} unders vs "
+          f"{n_over} overs, this test detects a gap of about {d_mde * 100:.0f} percentage points at "
+          "80% power -- a p of 0.96 rules out a large gap, not a small one.", ""]
 
     # The 2023-25 book unders, as a fourth stratum -- compared, never pooled in.
     per = personal_unders()

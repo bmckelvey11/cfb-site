@@ -15,8 +15,10 @@ a 52.38% break-even. The eras are statistically one thing (p 0.91), the money in
 contains zero, and **no filter on it survives testing** — not bands, not edge thresholds, not
 situational splits, not Pinnacle agreement. The honest position is a small, mechanical,
 unfiltered allocation sized for uncertainty, and a recommendation on the table to cut the
-unit from 1% to 0.6%. Against a real market close the flags show **no CLV at all** — +0.06 ±
-0.48 points — so whatever the board is, it is not early.
+unit from 1% to 0.6%. Against a real market close the flags show **no CLV clearing its own
+detection floor** — +0.06 ± 0.48 points against an mde of 0.61 — so whatever the board is,
+it is not demonstrably early, though a true CLV under 0.6 points would look the same either
+way.
 
 ---
 
@@ -25,18 +27,18 @@ unit from 1% to 0.6%. Against a real market close the flags show **no CLV at all
 | # | Finding | Established in |
 | --- | --- | --- |
 | 1 | **The pooled board is 175-149, 54.0%, Wilson 48.6–59.4.** Below its own 59.3% detection floor, so it is a bound, not proof. Posterior P(true rate > break-even) 72%. | [pooled](greenline-totals-pooled-2026-09-22.md) |
-| 2 | **The three eras are one thing.** Chi-square 0.15 on 2 df, p 0.93 across 2020, 2022-23 and 2026. This is what licenses quoting a pooled number at all. | [pooled](greenline-totals-pooled-2026-09-22.md) |
-| 3 | **Overs match unders.** 53.7% vs 54.1%, p 0.96. No story that needs the edge to live on the under side is supported. | [pooled](greenline-totals-pooled-2026-09-22.md) |
+| 2 | **The three eras are consistent with one rate to within ~20 points.** Chi-square 0.15 on 2 df, p 0.93 across 2020, 2022-23 and 2026 — the resolution this n's test has, not proof the eras match closely. Licenses pooling the record; the pooled *return* is already era-dependent (2020 stripped, unders ROI +4.0% → -0.2%). | [pooled](greenline-totals-pooled-2026-09-22.md) |
+| 3 | **Overs match unders to within ~21 points.** 53.7% vs 54.1%, p 0.96, at a resolution too coarse to see a smaller gap either way. No story that needs the edge to live on the under side is supported, but none is ruled out either. | [pooled](greenline-totals-pooled-2026-09-22.md) |
 | 4 | **No edge × band rule exists.** Best cell of 60 is 63.6%; a within-era shuffle matches it 54.7% of the time. The walk-forward is not runnable — the eras' boards barely share cells. | [rule search](greenline-totals-rule-search-2026-09-22.md) |
 | 5 | **Nothing survives Holm** across four pre-registered splits (top quintile, middle quintiles, 55+, 4%+). Smallest adjusted p 0.232. | [rule search](greenline-totals-rule-search-2026-09-22.md) |
 | 6 | **The 55+ / sub-4% cell is a 2026 artifact.** 57.6% pooled, but 54.5% / 52.0% / **77.4%** by era, p 0.049 — it fails the homogeneity test the whole board passes. | [rule search](greenline-totals-rule-search-2026-09-22.md) |
 | 7 | **Overs are not estimable.** n=54, largest cell 13, would need ~87% to separate from break-even. | [rule search](greenline-totals-rule-search-2026-09-22.md) |
 | 8 | **The personal 2023-25 unders overlap the board partially.** 7 of 12 checkable bets the same pick, **3 the opposite side**, 2 unflagged. Neither independent evidence nor poolable. | [pooled](greenline-totals-pooled-2026-09-22.md) |
-| 9 | **No situational filter works.** Line move, wind, pace, big favorite, night, short rest — nothing survives Holm. | [under filters](greenline-under-filters-2026-09-17.md) |
+| 9 | **No situational filter works, on the corrected population.** Line move, wind, pace, big favorite, night, short rest — nothing survives Holm on the 270 Greenline-only unders, era-stratified. Rerun 2026-09-22 after the original run's premise (personal unders ≈ Greenline flags) was found false; `big_fav`, its best candidate, weakens from Holm 0.256 to 0.906 on the corrected population. | [under filters](greenline-under-filters-2026-09-22.md) |
 | 10 | **Pinnacle's position does not rank the unders.** Juice lean, line vs PFF's, distance from projection, limit — n=38, nothing survives Holm. | [pinnacle shade](greenline-pinnacle-shade-2026-09-17.md) |
 | 11 | **The 2022-23 exports carry no price**, so they contribute a record and never a return. Integrity gate, not a rounding choice. | [export picks](greenline-export-picks-graded-2026-09-21.md) |
 | 12 | **The archive's CFBD joins are clean** after one repaired transposition and a matcher fix. `is_greenline_pick` is copied onto all three snapshots — a known trap. | [join audit](greenline-archive-join-audit-2026-09-21.md) |
-| 13 | **The flags carry no closing-line value.** +0.06 ± 0.48 points against a gated market close, n=79; all three gated policies land between −0.20 and +0.06. Beating the close does not predict winning the bet either. | [clv](greenline-clv-market-close-2026-09-22.md) |
+| 13 | **No closing-line value clears its own detection floor overall** — +0.06 ± 0.48 pts against a gated market close, n=79, mde 0.61 pts, so this is a bound under 0.6 pts, not a measured zero. All three gated policies land between −0.20 and +0.06, none clearing its own mde. Beating the close does not predict winning the bet either. **Week 3 alone is the exception**: +0.35 ± 0.25 exceeds its mde of 0.31 (one-sided p≈0.003, n=55, unadjusted); week 2 is negative and uninformative. Registered to watch, not yet a finding. | [clv](greenline-clv-market-close-2026-09-22.md) |
 | 14 | **The Pinnacle feed must be gated before use.** Ungated CLV reads +0.24; the 18 corrupt rows that inflate it carry +1.06 on their own and span −15 to +27 points. Stable from 0.5 to 5 points of tolerance. | [clv](greenline-clv-market-close-2026-09-22.md) |
 
 ## Open

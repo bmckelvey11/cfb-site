@@ -61,9 +61,10 @@ def unders(flags: list[dict], max_edge: float | None = None, min_edge: float = 0
     week 2's 4%+ bucket went 3-5 while the rest went 18-10, so the option exists -- on eight
     games, so it is a choice, not a finding (see greenline_bet_bounds.py, edge sweep).
     `max_spread` drops flags where |market spread| exceeds it: unders on 14+ point favorites
-    went 31-36 vs 105-67 on the rest, same sign in both strata, Holm p 0.26
-    (docs/greenline-under-filters-2026-09-17.md). A choice, not a finding. A flag with no
-    spread is kept."""
+    went 45-50 vs 99-73 on the rest across the 270 Greenline-only graded unders, same
+    direction in all three eras but era-stratified CMH Holm p 0.906
+    (docs/greenline-under-filters-2026-09-22.md). Not a finding. A flag with no spread is
+    kept."""
     out = []
     for f in flags:
         line, value = num(f.get("market_over_under")), num(f.get("total_best_value"))
@@ -90,8 +91,8 @@ def markdown(rows: list[dict], season: int, week: str, captured: str, n_flags: i
              "Lines are PFF's shown number at capture — reprice before betting."
              + (f" Only flags with PFF edge in the {min_edge * 100:.1f}-{max_edge * 100:.1f}% window are listed "
                 f"(week 2: inside 17-8, outside 4-7; see greenline_edge_window.py)." if max_edge else "")
-             + (f" Flags with |spread| > {max_spread} are dropped (big-favorite unders 31-36 pooled vs 105-67; "
-                "see greenline-under-filters-2026-09-17.md)." if max_spread is not None else ""), "",
+             + (f" Flags with |spread| > {max_spread} are dropped (big-favorite unders 45-50 pooled vs 99-73, "
+                "Holm p 0.906; see greenline-under-filters-2026-09-22.md)." if max_spread is not None else ""), "",
              "`value` = PFF's win probability minus the 52.38% break-even at -110. Band record is YOUR",
              "under history 2023-08 → 2025-12 in that total range, not PFF's.", "",
              "| # | kickoff | game | line | PFF proj | p(under) | edge | spread | band | your record | band ROI |",

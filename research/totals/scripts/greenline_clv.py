@@ -166,6 +166,14 @@ def scored(flags: list[dict], closes: dict, prefer: str = "drop") -> tuple[list[
     return kept, why
 
 
+ONE_SIDED_80 = 1.645 + 0.84  # z_alpha(0.05, one-sided) + z_power(80%)
+
+
+def clv_mde(se: float) -> float:
+    """Smallest true mean CLV (pts) this n's SE would detect 80% of the time, one-sided."""
+    return ONE_SIDED_80 * se if se == se else float("nan")  # se != se catches NaN (n <= 1)
+
+
 def summarise(rows: list[dict], label: str) -> list[str]:
     if not rows:
         return [f"| {label} | 0 | -- | -- | -- | -- |"]
@@ -175,8 +183,10 @@ def summarise(rows: list[dict], label: str) -> list[str]:
     beat = sum(1 for x in c if x > 0)
     lost = sum(1 for x in c if x < 0)
     lo, hi = wilson(beat, beat + lost) if beat + lost else (0.0, 0.0)
-    return [f"| {label} | {len(rows)} | {m:+.2f} ± {1.96 * se:.2f} | {m * PP_PER_POINT * 100:+.1f}pp "
-            f"| {beat}-{lost}-{len(c) - beat - lost} | {lo * 100:.0f}–{hi * 100:.0f}% |"]
+    mde_str = f"{clv_mde(se):.2f}" if se == se else "--"
+    return [f"| {label} | {len(rows)} | {m:+.2f} ± {1.96 * se:.2f} | {mde_str} "
+            f"| {m * PP_PER_POINT * 100:+.1f}pp | {beat}-{lost}-{len(c) - beat - lost} "
+            f"| {lo * 100:.0f}–{hi * 100:.0f}% |"]
 
 
 def report(flags: list[dict], closes: dict, prefer: str) -> str:
@@ -193,8 +203,10 @@ def report(flags: list[dict], closes: dict, prefer: str) -> str:
           "books on the same game; roughly one Pinnacle row in nine is corrupt in the CFBD "
           "GraphQL feed, so an unfiltered run would be scoring the feed's bugs.", "",
           "## Closing-line value", "",
-          "| split | n | mean CLV (pts, 95%) | ~win prob | beat-lost-flat | beat rate 95% |",
-          "| --- | ---: | ---: | ---: | ---: | ---: |"]
+          "`mde` is the smallest true mean CLV (pts) this split's n would detect 80% of the time, "
+          "one-sided. A mean inside its own mde is a bound on CLV, not a measurement of zero.", "",
+          "| split | n | mean CLV (pts, 95%) | mde (pts) | ~win prob | beat-lost-flat | beat rate 95% |",
+          "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
     L += summarise(rows, "**all flags**")
     for side in ("under", "over"):
         L += summarise([r for r in rows if r["side"] == side], f"{side}s")
