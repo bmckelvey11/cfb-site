@@ -40,7 +40,7 @@ unit from 1% to 0.6%.
 
 | # | Question | Status |
 | --- | --- | --- |
-| A | **Does a Greenline flag beat a real market close?** CLV is worth far more per observation than win/loss — hundreds of picks rather than thousands. Today's CLV is computed against PFF's *own* board close, which asks whether PFF agrees with itself. | Not started. The highest-value test available. |
+| A | **Does a Greenline flag beat a real market close?** CLV is worth far more per observation than win/loss — hundreds of picks rather than thousands. Today's CLV is computed against PFF's *own* board close, which asks whether PFF agrees with itself. | **Reachable, with a gate — checked 2026-09-22.** See below. |
 | B | **Were the 2020 prices real?** That era is priced at PFF's published break-evens, median implied −107. Strip 2020 and the unders pool goes +4.0% → **−0.2%**. | Not started. Cheap, and it either confirms or deflates every ROI here. |
 | C | **Do unders at `value` ≥ 0.04 underperform?** Registered 2026-09-22 at a frozen raw cut. Currently 8-16 against 138-108. | **Registered. No look until 56 prospective picks have graded** (from week 4 forward, ~6 weeks). |
 | D | **Does a flag predict line movement?** A bet-free test of whether PFF knows anything, accruing every week regardless of what gets bet. | Not started. |
@@ -92,6 +92,31 @@ banner pointing forward. Their conclusions are kept here so nothing is lost with
 | --- | --- | --- |
 | **Is the market-total band split real?** | 2026-09-17, n=240 (201 of them personal bets), bands taken from `greenline_unders.BANDS`. Not significant; band ordering withdrawn from the weekly list. | Confirmed on 270 Greenline-only unders with pre-registered bands: 55+ vs below 55 is CMH p 0.295, Holm 0.384. The original also *used* the contaminated `BANDS` cutpoints it was testing — the re-test does not. |
 | **Does a cap or floor on PFF's `value` help?** | 2026-09-17, n=36, week 2 only. Slope p 0.40, the 4%+ bucket nine games. Window dropped from the week-3 list; spread filter only. | Confirmed on 270 unders: 4%+ vs below is CMH p 0.058, Holm 0.232. Its own closing line asked for exactly this re-run. The cut survives as a *registered hypothesis* (row C), not as a filter. |
+
+### Open question A: is a Pinnacle close actually reachable? (checked 2026-09-22)
+
+**Yes for 2026, and only 2026, and not before a validation gate.**
+
+- `core.fact_game_line` carries `provider_key = 'pinnacle'` with a `total_close`, sourced
+  entirely from the CFBD GraphQL feed (`_source = 'gql'`). 204 rows: 2025 weeks 8-13
+  sparsely, then **2026 weeks 1-3 densely** (51, 71, 71 games). Nothing for 2020 or 2022-23,
+  so CLV is a 2026-forward test and cannot be run on the archive eras.
+- **97 of the 106 graded 2026 flags have one.** The PFF → CFBD join resolves all 106 via
+  `pff_franchise.cfbd_team_id`; 6 games have no Pinnacle row and 3 have a null close.
+- The numbers **do** move between capture and close — 65 of 73 matched games differ — so it
+  is a real second observation and not a copy of the captured line.
+- **But roughly one in nine is corrupt.** Against the median close of the other six or seven
+  books on the same game: 160 of 193 agree within a point, and **22 are off by more than 3**.
+  The bad rows are not a join error — the matchups are right — they look like a
+  half-game or alternate market landing in the game-close field. Western Kentucky at Georgia
+  reads a 82.5 total with a −66.5 spread; Colgate at Central Michigan reads 24.5 against a
+  49.5 consensus, almost exactly half.
+
+**So the work is: filter first, then measure.** Any CLV run must drop or repair Pinnacle
+closes that disagree with the multi-book median by more than a point or two, and report how
+many it dropped — an unfiltered CLV over these rows would be measuring the feed's bugs. The
+underlying loader issue is a warehouse problem, not a totals problem, and is worth fixing at
+the source rather than worked around here.
 
 ## Standing cautions
 
