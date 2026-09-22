@@ -143,6 +143,18 @@ def overlap(personal: list[dict], greenline: list[dict]) -> dict:
     Greenline flag archive exists for 2024 or 2025. Both sides resolve to a CFBD team-id
     pair -- `book_totals()` from the ledger for the book export, `core.fact_game` for the
     archive -- because the two sources disagree on dozens of abbreviations.
+
+    Dates match exactly rather than within a day. `import_book()` allows a day because it
+    compares a book export against PFF's Eastern-local kickoffs; here both sides are UTC
+    (archive `kickoff_utc` ends `+00:00`, the export's `Start Time` ends `Z`), so a Saturday
+    night game reads as Sunday in BOTH and an exact match is correct. A one-day tolerance
+    only drags in bets from days the export slate never covered -- it moves 2023-10-20
+    SMU@TEM into the window and scores it "Greenline never flagged", which is false: the
+    export simply has no Friday board. The tolerance changes nothing else (7/3/2 becomes
+    7/3/3), so it would add one wrong row and no right ones.
+
+    The `book_totals()` index is deliberately unfiltered by season: it is only ever queried
+    by keys taken from the 2023-25 personal set, so a later season in the export is inert.
     """
     import duckdb
 
@@ -405,6 +417,13 @@ def self_check() -> None:
     # The standing caveat says these were "mostly the same Greenline flags". Where it is
     # checkable it is 7 of 12, with 3 taking the side Greenline flagged against.
     assert (ov["same"], ov["opposite"], ov["absent"], ov["checkable"]) == (7, 3, 2, 12), ov
+    # Exact-date matching is only sound because both sides are UTC. Pin that, or a source
+    # that switches to local kickoffs would silently start missing night games.
+    kicks = [r["kickoff_utc"] for r in csv.DictReader(ARCHIVE.open(encoding="utf-8"))
+             if r["snapshot"] == "export" and r["kickoff_utc"]]
+    assert kicks and all(k.endswith("+00:00") for k in kicks), kicks[:3]
+    raw =(INGEST / "bet_history" / "history.csv").read_text(encoding="utf-8-sig").splitlines()
+    assert next(r["Start Time"] for r in csv.DictReader(raw[1:]) if r["Start Time"]).endswith("Z")
     print("self-check ok")
 
 

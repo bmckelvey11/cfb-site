@@ -148,6 +148,14 @@ Greenline board and a book bet both exist: the three 2022-23 export slates, ten 
 direction. Both sides resolve to a CFBD team-id pair first, because the book and PFF
 disagree on dozens of abbreviations.
 
+Dates are matched exactly, not within a day. That is safe here only because both sides are
+UTC — the archive's `kickoff_utc` carries `+00:00` and the book export's `Start Time` carries
+`Z` — so a Saturday night game reads as Sunday in both and lines up. A one-day tolerance
+would pull in 2023-10-20 SMU@TEM and score it "Greenline never flagged", which is false: the
+export has no Friday board at all. It changes nothing else (7/3/2 → 7/3/3), so it adds one
+wrong row and no right ones. `--self-check` pins that both sources are UTC, because a source
+switching to local kickoffs would silently start missing night games.
+
 | of the 12 personal unders on those days | n |
 | --- | ---: |
 | Greenline flagged the same side | 7 |
