@@ -1,3 +1,11 @@
+**Superseded by** [greenline-under-filters-2026-09-22.md](../../research/totals/docs/greenline-under-filters-2026-09-22.md).
+This run pooled the 2023-25 personal unders with the 2026 flags on the premise that they were
+mostly the same picks. `pool_totals_record.overlap()` (2026-09-22) measured that premise for
+the first time and found it false on 3 of 12 checkable days -- personal bets that took the side
+Greenline flagged *against*. The rerun uses the 270 Greenline-only unders across all three eras
+instead, stratified by era via CMH. Its strongest candidate here, `big_fav` (pooled Fisher p
+0.043, Holm 0.256), weakens to CMH p 0.151, Holm 0.906 on the corrected population.
+
 # Situational filters on Greenline unders, 2026-09-17
 
 Reproduce: `python research/totals/scripts/under_filters.py --out research/totals/docs`.
