@@ -32,10 +32,14 @@ idea that has no code yet, belongs here.
   the numbers here, and do not describe any split as an edge until a review says it clears
   its own floor.
 
-- **The personal 2023-25 unders are not an independent sample.** They were mostly the same
-  Greenline flags, taken as bets — see `greenline_bet_stats.py`'s docstring. Pool them as
-  prior evidence if a method calls for it, never as an independent baseline and never as
-  out-of-sample confirmation of a Greenline result.
+- **The personal 2023-25 unders are not an independent sample, and not a fourth era
+  either.** The overlap is measured, not assumed: on the only days where a Greenline board
+  and a book bet both exist, 7 of 12 are the same pick, **3 take the side Greenline flagged
+  against**, and 2 are games it never flagged
+  (`greenline-totals-pooled-2026-09-22.md`). Too entangled to be out-of-sample confirmation,
+  too different to be pooled in. Report them as a comparison stratum beside a Greenline
+  record with their own interval, never as an independent baseline and never as a row inside
+  the pool.
 
 - PFF's `value` is its stated win probability minus the 52.38% break-even at -110. It is
   PFF's own claim, not a measured edge; `greenline_edge_window.py` is the script that asks
