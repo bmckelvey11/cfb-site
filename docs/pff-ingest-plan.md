@@ -6,8 +6,8 @@ actually found. Nothing is deleted — a step that turns out to be wrong is stru
 reason, so the next pass does not re-open it.
 
 **Status 2026-09-21: S1–S5, S7 and S8 done. S6 is half done — `PFF_API` was rotated, the go
-was given for two seasons, and 2024 and 2026 are pulled and audit clean. 2014–2023 remain,
-at ~1,800 reads + 6,090 exports.** 2025 stays the reference season: the process was proven
+was given, and 2023, 2024 and 2026 are pulled and audit clean. 2014–2022 remain,
+at ~1,620 reads + 5,480 exports.** 2025 stays the reference season: the process was proven
 and trimmed against it before any backfill call, because a backfill pays every inefficiency
 once per season. Applying it to 2024 cost two corrections — the season-level leaderboards
 `--player-facets` does not plan, and two direction codes 2025 never emitted — both recorded
@@ -31,7 +31,7 @@ wins on what is finished.
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
 | S5 | loader entries → `stg` | S6 | **done** | 2026-09-09 |
-| S6 | Backfill 2014–2024, finish 2026 | — | **part 1 done** — 2024 + 2026 clean; 2014–2023 open | 2026-09-21 |
+| S6 | Backfill 2014–2024, finish 2026 | — | **parts 1–2 done** — 2023 + 2024 + 2026 clean; 2014–2022 open | 2026-09-21 |
 | S7 | Trim the pull plan using 2025 as the reference season | S6 | **done** | 2026-09-10 |
 | S8 | Decide the player tier: finish it or delete the smoke test | — | **done** — deleted | 2026-09-10 |
 
@@ -187,7 +187,7 @@ against the live warehouse).
 **Done when:** a rebuild lands the PFF tables, `scripts/check_an_tick_pin.py`'s sibling
 check passes for PFF, and row counts match the processed CSVs.
 
-## S6 — Backfill and 2026 ▶ part 1 done 2026-09-21 — 2024 + 2026 clean, 2014–2023 open
+## S6 — Backfill and 2026 ▶ parts 1–2 done 2026-09-21 — 2023 + 2024 + 2026 clean, 2014–2022 open
 
 > **2026-09-21.** Both blockers below are cleared — `PFF_API` was rotated and the go was
 > given, scoped to two seasons. **2024 and 2026 are pulled and audit clean**; 2014–2023
@@ -714,3 +714,63 @@ risk worth taking to land data the nightly picks up anyway.
 — *"and the 2026 weekly pull is on the same schedule as the Action Network history job."*
 Nothing here scheduled anything. 2026 is complete through wk3 because it was pulled by
 hand today, not because a job keeps it that way.
+
+### 2026-09-21 (later) — S6 part 2: 2023 closed, and its residual is a vendor gap
+
+2023 was pulled earlier the same evening (raw file mtimes run 20:21–21:22, ~1 h). This entry
+covers the residual sweep that closed it, not that pull.
+
+`audit_pff_pull.py --season 2023` at the start: **770 files, 8 defects, 55 missing cells**.
+`pull_pff_modeling.py --seasons 2023 --player-facets` planned **0 reads, 54 exports, ~3 min**
+and ran in **3.8 min, 0 failed** — and landed **zero new files**. That is not a failure: all 54
+cells are weeks **14 and 16**, and both come back `SKIP: no data` (blank CSV *and* an empty JSON
+body, `pull_pff_facet.pull_one`). Probed directly to be sure the week ids were not the problem:
+
+| cell | result |
+| --- | --- |
+| `facet-defense-coverage` 2023 wk14 | `SKIP: no data` |
+| `facet-defense-coverage` 2023 wk16 | `SKIP: no data` |
+| `facet-defense-coverage` 2023 wk15 (control) | `ok  17 rows, 40 cols` |
+
+**Both weeks are correct, not vendor defects** — the schedule explains them, and the reason is
+worth recording because it will recur in 2014–2022:
+
+- **wk16 had no games at all.** `games_2023_wk16.json` is `{"games": []}`, and all 8 audit
+  defects are that same week's team files (`games`, 7 × `team_stats`).
+- **wk14 had 8 games and every one was FCS** — Chattanooga @ Furman, NDSU @ Montana State,
+  Richmond @ Albany, and five more playoff games. The leaderboard exports are `--division fbs`
+  pinned (`docs/pff-cli.md`: never leave it unpinned on NCAA), so an empty FBS leaderboard for
+  an all-FCS week is the right answer.
+
+`team-stats` is the apparent contradiction and resolves the same way: it is **not**
+division-pinned, so `team_stats_2023_wk14_offense-passing.json` carries **16 rows — the 16 FCS
+teams that played** — against 150 in wk13, 10 in wk15 (5 games) and 0 in wk16. wk15 returning
+17 leaderboard rows is Army @ Navy, the one FBS game in it. Everything lines up.
+
+2024 and 2025 carry all 21 weeks for the same op because both had FBS games in every week.
+Nothing to fix here; re-pulling costs 3 min and correctly returns nothing.
+
+**One cell was a real gap and is now filled.** The audit counted 55 where the planner counted
+54; the 55th was the **season-level** (no-`--week`) `facet-offense-pass-blocking`, which
+`--player-facets` never plans — the same omission recorded for 2024 above.
+`pull_pff_facet.py facet-offense-pass-blocking --league ncaa --season 2023 --division fbs`
+returned **3,075 rows × 30 cols**. 2023's season-level count is now **26**, matching 2024 and
+2025 exactly (diffed by name, zero residual).
+
+**Final audit: 771 files (763 usable), tiers {leaderboard: 581, team: 190}, weeks 0–20, exit 0.**
+Everything it still reports is named:
+
+- **8 defects** — 2023 wk16, a week with no games.
+- **54 missing cells** — 2023 wk14 (all-FCS week, FBS-pinned export) and wk16 (no games).
+- **133 team-coverage gaps** — the per-team report tier S7 dropped; the expected reading for a
+  trimmed season, same as 2024's 134.
+- **3 column-drift ops, 3 JSON-only leaderboards** — pre-existing and unchanged by this sweep.
+
+`team_game.csv` stands at **13,312 rows** — 2023 3,268, 2024 3,340, 2025 3,406, 2026 3,228, plus
+the ~90 probe rows. 2023's share landed in the earlier run, not this sweep; every
+`pull_pff_modeling.py` run rebuilds the file from all seasons on disk, so the 3.8-min run
+reproduced the same number from the same inputs. No warehouse rebuild was run, for the reason
+given in the addendum above: `refresh_cfbd.py` reflattens before `build_duckdb`, so the one new
+CSV lands on the next scheduled refresh.
+
+**Still open: 2014–2022.** The TODO's ~8 h figure was priced for 2014–2023; 2023 is now off it.
