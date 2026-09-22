@@ -88,7 +88,7 @@ week, flat within the week.
 ### Over-zero (floor-bias OVERs)
 
 A model built in this repository. It finds games where the market total is pinned
-too low by the way books price a heavy favorite's opponent, and bets the OVER when
+too low by the way books price a heavy favorite's opponent and bets the OVER when
 the expected bias clears a threshold.
 
 | fact | value | source |
