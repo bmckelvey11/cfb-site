@@ -835,7 +835,21 @@ n must equal the completed 2024 regular games from A2/C1 (3,745). Median between
 
 ### The idea, then the SQL, then the reading
 
-**Plain language.** Any rate you measure from data (a cover rate, an over rate) is an estimate; a different sample would give a slightly different number. The standard error quantifies that wobble. For a proportion $p$ from $n$ games, $SE = \sqrt{p(1-p)/n}$ [1], and a 95% interval is $p \pm 1.96\,SE$ [2].
+**Plain language.** Any rate you measure from data (a cover rate, an over rate) is an estimate; a different sample would give a slightly different number. The standard error quantifies that wobble. For a proportion from $n$ games, the standard error [1] and 95% interval [2] are:
+
+$$
+\begin{gathered}
+SE = \sqrt{\frac{p(1-p)}{n}}, \qquad \text{95\% interval} = p \pm 1.96\,SE \\[1em]
+\begin{array}{rl}
+\text{where}\quad p: & \text{observed rate (e.g. share of games that went over), between 0 and 1} \\
+n: & \text{number of games the rate is computed from} \\
+SE: & \text{standard error of } p \text{, on the same 0–1 scale} \\
+1.96: & \text{standard normal value leaving 2.5\% in each tail}
+\end{array}
+\end{gathered}
+$$
+
+$SE$ shrinks with $\sqrt{n}$, so four times the games halves the wobble. Example: a system that covered 55% of 200 games has $SE = \sqrt{0.55 \times 0.45 / 200} \approx 0.035$, so the 95% interval is roughly 48% to 62%. That range includes 52.4%, the break-even at −110, so 200 games cannot tell this system apart from one with no edge. The formula is a normal approximation; it gets unreliable when $p$ is near 0 or 1 or $n$ is small.
 
 **The SQL.** Compute `p` with a conditional average, `n` with `count(*)`, then the SE inline. `approx_count_distinct` gives a fast HyperLogLog distinct estimate [duckdb.org/docs/sql/functions/aggregates]; `USING SAMPLE 10%` subsamples rows [duckdb.org/docs/sql/query_syntax/sample]; `generate_series` plus `random()` powers a bootstrap.
 
@@ -893,7 +907,22 @@ The analytic CI half-width equals `1.96 * se`. The bootstrap SD should land with
 
 **Plain language.** A hypothesis test asks: could the difference I see be pure chance? The two-proportion z-test compares two rates; the Welch t-test compares two means with unequal variances; chi-square compares observed vs expected counts in a table. Each yields a test statistic you convert to a p-value — the probability of a result this extreme if nothing is going on.
 
-**The SQL.** DuckDB has no built-in p-value function and no native error function (`erf` is not in this build), so approximate the standard normal CDF with the Abramowitz–Stegun polynomial in exercise 1. The two-proportion z is $z = (p_1 - p_2)/\sqrt{\hat p(1-\hat p)(1/n_1 + 1/n_2)}$ [4] with pooled $\hat p$.
+**The SQL.** DuckDB has no built-in p-value function and no native error function (`erf` is not in this build), so approximate the standard normal CDF with the Abramowitz–Stegun polynomial in exercise 1. The two-proportion z [4] is:
+
+$$
+\begin{gathered}
+z = \frac{p_1 - p_2}{\sqrt{\hat p(1-\hat p)\left(\frac{1}{n_1} + \frac{1}{n_2}\right)}}, \qquad \hat p = \frac{x_1 + x_2}{n_1 + n_2} \\[1em]
+\begin{array}{rl}
+\text{where}\quad p_1,\ p_2: & \text{observed rates in group 1 and group 2 (e.g. over rate in wind vs. calm games)} \\
+n_1,\ n_2: & \text{number of games in each group} \\
+x_1,\ x_2: & \text{number of hits in each group, so } p_1 = x_1/n_1 \\
+\hat p: & \text{pooled rate: both groups combined, the best guess if there is no real difference} \\
+z: & \text{difference in standard-error units; positive means group 1 is higher}
+\end{array}
+\end{gathered}
+$$
+
+The denominator is the standard error of the difference under the assumption that both groups share one true rate, which is why it uses the pooled $\hat p$. Feed $z$ to the normal CDF to get a p-value; $|z| > 1.96$ is significant at 5% two-sided. Example: 55% of 200 vs. 50% of 200 gives $\hat p = 0.525$ and $z \approx 0.05 / 0.050 = 1.0$, not significant.
 
 **Worked solution.** Compare the home-cover rate vs the away-cover rate (they are complementary in a two-outcome grade, so this doubles as a test that the home cover rate differs from 0.5). Sample size of gradeable spread games, 2014–2024 regular:
 
@@ -947,7 +976,21 @@ For (1), a |z| of 1.96 must map to p ≈ 0.05. Validate the CDF approximation at
 
 ### The idea, then the SQL, then the reading
 
-**Plain language.** Correlation $r$ measures how tightly two variables move together, from -1 to 1. Simple linear regression fits $y = a + b x$; the slope $b$ is the expected change in $y$ per unit $x$, and $R^2$ is the fraction of $y$'s variance the line explains. Residual = actual − predicted; what is left after the model.
+**Plain language.** Correlation $r$ measures how tightly two variables move together, from -1 to 1. Simple linear regression fits a straight line:
+
+$$
+\begin{gathered}
+y = a + b\,x \\[1em]
+\begin{array}{rl}
+\text{where}\quad x: & \text{predictor (in the exercise below, the market total } \texttt{selected\_total}\text{)} \\
+y: & \text{outcome (in the exercise, actual points } \texttt{home\_points + away\_points}\text{)} \\
+a: & \text{intercept, the predicted } y \text{ when } x = 0 \text{ (often outside the data, so not meaningful alone)} \\
+b: & \text{slope, the expected change in } y \text{ per one-unit increase in } x
+\end{array}
+\end{gathered}
+$$
+
+In the exercise, $b = 1$ and $a = 0$ would mean the market total is right on average, one point of actual score per point of line. $b < 1$ would mean high totals come in under and low totals over, i.e. the market spreads its totals too wide. $R^2$ is the fraction of $y$'s variance the line explains, between 0 and 1; in simple regression it equals $r^2$. Residual = actual − predicted; what is left after the model.
 
 **The SQL.** DuckDB has the full `regr_*` family and `corr`/`covar_samp` as aggregates [duckdb.org/docs/sql/functions/aggregates]. No procedural code needed for a one-variable fit.
 
@@ -998,7 +1041,35 @@ The live worked run returned exactly n=6492, r=0.3777, slope=0.8517, intercept=8
 
 ### The idea, then the SQL, then the reading
 
-**Plain language.** American odds encode a price. Negative odds $o<0$: implied prob $= \frac{-o}{-o+100}$ [5]; positive: $\frac{100}{o+100}$ [6]. Two sides' implied probabilities sum to >1 — the excess is the vig; divide each by the sum to get fair (no-vig) probabilities. Expected value of a unit bet at decimal odds $d$ with true prob $p$ is $EV = p\,(d-1) - (1-p)$ [7]. The Kelly fraction is $f^\* = \frac{p(d-1)-(1-p)}{d-1}$ [8]. Calibration asks: when I say 60%, does it happen 60% of the time? Brier score is mean squared error of probabilities [9]; log loss penalises confident wrong calls harshly [10].
+**Plain language.** American odds encode a price. The implied probability is [5][6]:
+
+$$
+\begin{gathered}
+q = \begin{cases} \dfrac{-o}{-o+100} & o < 0 \\[1em] \dfrac{100}{o+100} & o > 0 \end{cases} \\[1em]
+\begin{array}{rl}
+\text{where}\quad o: & \text{American odds; negative = favorite (risk } |o| \text{ to win 100), positive = underdog (risk 100 to win } o\text{)} \\
+q: & \text{implied probability, the win rate at which the bet breaks even}
+\end{array}
+\end{gathered}
+$$
+
+Example: −110 gives $110/210 \approx 0.524$; +150 gives $100/250 = 0.40$. Two sides' implied probabilities sum to more than 1 — the excess is the vig; divide each by the sum to get fair (no-vig) probabilities. At −110/−110 the sum is 1.048, and each side's fair probability is 0.50.
+
+Expected value [7] and the Kelly stake [8] for a bet you think wins with probability $p$:
+
+$$
+\begin{gathered}
+EV = p\,(d-1) - (1-p), \qquad f^{*} = \frac{p\,(d-1) - (1-p)}{d-1} = \frac{EV}{d-1} \\[1em]
+\begin{array}{rl}
+\text{where}\quad p: & \text{your (true or model) probability that the bet wins} \\
+d: & \text{decimal odds, total returned per 1 staked; } d - 1 \text{ is the profit on a win} \\
+EV: & \text{expected profit per 1 unit staked} \\
+f^{*}: & \text{Kelly fraction, the share of bankroll to stake; bet nothing if } f^{*} \le 0
+\end{array}
+\end{gathered}
+$$
+
+$EV$ weighs the win profit by $p$ and the lost stake by $1-p$. Kelly divides that edge by the payout, so the same edge earns a smaller stake on a longshot. Example: $p = 0.55$ at −110 ($d \approx 1.909$) gives $EV = 0.55 \times 0.909 - 0.45 \approx 0.050$, a 5% edge, and $f^{*} \approx 0.050 / 0.909 \approx 0.055$, or 5.5% of bankroll. Kelly assumes $p$ is exact; errors in $p$ make full Kelly too aggressive, which is why fractional Kelly is the norm. Calibration asks: when I say 60%, does it happen 60% of the time? Brier score is mean squared error of probabilities [9]; log loss penalises confident wrong calls harshly [10].
 
 **The SQL.** All are arithmetic over `fact_game_line` / `fact_game_odds` columns (`moneyline_home`, `odds`). Bucket predictions with `least(floor(implied_home_prob * 10) + 1, 10)`, then compare mean predicted to realised in each bucket. DuckDB 1.5.5 has no `width_bucket`.
 
@@ -1063,7 +1134,22 @@ Brier score for a coin-flip predictor (always 0.5) is 0.25 — your market Brier
 
 **Plain language.** A pre-game feature may use only information available before kickoff. Any feature touching the game's own result is a leak and must be flagged `result_lookahead`. Rolling means need a frame that excludes the current row (A6). Exponentially weighted means weight recent games more; rest days come from the gap between a team's consecutive `start_date`s; travel needs venue coordinates.
 
-**The SQL.** Rolling frames use `ROWS BETWEEN n PRECEDING AND 1 PRECEDING`. EWMA is naturally recursive: $s_t = \alpha x_{t} + (1-\alpha) s_{t-1}$ [11], built with `WITH RECURSIVE`. Rest days: `date_diff('day', lag(start_date) OVER (...), start_date)`. Travel: `dim_venue.latitude/longitude` with a haversine expression.
+**The SQL.** Rolling frames use `ROWS BETWEEN n PRECEDING AND 1 PRECEDING`. EWMA is naturally recursive [11]:
+
+$$
+\begin{gathered}
+s_t = \alpha\,x_t + (1-\alpha)\,s_{t-1} \\[1em]
+\begin{array}{rl}
+\text{where}\quad t: & \text{game number in the team's sequence} \\
+x_t: & \text{the stat observed in game } t \text{ (e.g. offensive PPA)} \\
+s_t: & \text{smoothed value after game } t \\
+s_{t-1}: & \text{smoothed value after the previous game} \\
+\alpha \in (0,1]: & \text{weight on the newest game; higher reacts faster, lower is steadier}
+\end{array}
+\end{gathered}
+$$
+
+Each game's weight decays by a factor of $1-\alpha$ per later game, so old games never drop out entirely; they just fade. Example: $\alpha = 0.3$, previous $s = 0.20$, new game $x = 0.40$ gives $s = 0.3 \times 0.40 + 0.7 \times 0.20 = 0.26$. For a pre-game feature, use $s_{t-1}$ (through the previous game), never $s_t$, or the feature includes the game being predicted. Build it with `WITH RECURSIVE`. Rest days: `date_diff('day', lag(start_date) OVER (...), start_date)`. Travel: `dim_venue.latitude/longitude` with a haversine expression.
 
 The organising principle is a single question asked of every column: *would this value have been knowable at kickoff?* Rolling means with a `1 PRECEDING` frame pass; a season-to-date average that includes the current game fails; opponent strength computed from the opponent's *full* season (including games after this one) fails subtly and is the most common real-world leak. Rest and travel are safe because they depend only on the schedule, which is fixed in advance. Tag each engineered feature with the timestamp of the latest input it used, and you can later run the `result_lookahead` audit mechanically: any feature whose as-of timestamp is not strictly before `start_date` is disqualified, no human judgement required.
 
