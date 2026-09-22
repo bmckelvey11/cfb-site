@@ -58,6 +58,23 @@ Reproduce with:
 python research/totals/scripts/pool_totals_record.py
 ```
 
+## Coverage — is this every Greenline total?
+
+Audited 2026-09-22, source by source. **Yes, every graded Greenline totals pick is in.**
+What is out, and why:
+
+| left out | n | why |
+| --- | --- | --- |
+| 2026 week 4 | 20 flags | Captured 2026-09-22 06:15Z; the games kick 9/24–9/26. Not played, so not graded. The script names any captured-but-unpooled week in its output so this cannot become a silent hole |
+| 2026 week 1 | — | No capture exists. PFF deletes the board at kickoff and capture began in week 2 |
+| Archive `close` and `open_market` snapshots | 131 each | The same 131 2020 picks at a different snapshot, not new picks. The unit grades at the open, never the close |
+| 2020 rows with no pick flag | 16 | Eight week-1 games PFF never priced — no `difference`, no `breakeven_prob`, both sides blank. Not picks |
+| `ncaa-best-bets (2) - Copy - Copy.csv` | 162 rows | Byte-identical (MD5 `569ad71e…`) to the `(1)` file already parsed. The parser drops identical copies whole |
+| `PFF_hist.xlsx` sheet "2019" | 2,584 rows | Identical to sheet "2020" and its Season column reads 2020 throughout — a mislabelled duplicate tab, not a second season |
+| `week*_picks.xlsx`, `2023-week*_picks.xlsx` | 28 files | Not Greenline. These are your own model's output (`game, line, pick, stake, edge, lineavg, linestd`) — a different question |
+| Spread and moneyline picks | 132 + 123 | Different markets. Graded in [greenline-export-picks-graded-2026-09-21.md](greenline-export-picks-graded-2026-09-21.md) and [greenline-archive-2026-09-17.md](greenline-archive-2026-09-17.md) |
+| 1 export pick, 3 pushes | 4 | One export slot never matched a CFBD game, so it has no final. Pushes are excluded from the denominator, not counted as losses |
+
 ## Record
 
 `mde%` is the smallest true win rate the sample could separate from 52.38%, one-sided,

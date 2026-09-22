@@ -192,6 +192,18 @@ def overlap(personal: list[dict], greenline: list[dict]) -> dict:
             "unresolved": unresolved, "days": len(board_days)}
 
 
+def uncaptured_weeks(pool: list[dict]) -> list[str]:
+    """Captured 2026 weeks that the pool does not hold, so a graded week cannot go missing.
+
+    A capture with no graded rows is normal right up until its games are played and
+    `grade_greenline.py` is re-run; it is a silent hole afterwards. Naming it in the report
+    is what makes the difference visible instead of a number that quietly stopped growing.
+    """
+    have = {r.get("week") for r in pool if r["era"] == "2026 flags"}
+    weeks = sorted(p.stem.rsplit("_w", 1)[1] for p in IN_DIR.glob("pff_greenline_2026_w*.csv"))
+    return [w for w in weeks if w not in have]
+
+
 def under_list_2026(pool: list[dict]) -> list[dict]:
     """The published under lists, as the nested subset of the 2026 flags that they are."""
     keep: set[tuple[str, str]] = set()
@@ -259,6 +271,13 @@ def report(pool: list[dict]) -> str:
         L.append(rec_row(e, by_era[e]))
     L.append(rec_row("**pooled**", pool))
     L.append("")
+    missing = uncaptured_weeks(pool)
+    if missing:
+        L += [f"**Captured but not pooled: 2026 week{'s' if len(missing) > 1 else ''} "
+              f"{', '.join(missing)}.** A capture holds no graded rows until its games are "
+              "played and `grade_greenline.py` is re-run. Re-run this script after that and "
+              "the week joins the pool; if a week stays named here past its slate, the pool "
+              "has a hole.", ""]
 
     # Are the eras consistent enough to pool at all?
     stat, p, df = heterogeneity({e: [r for r in by_era[e] if r["result"] != "push"] for e in eras})
