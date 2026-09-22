@@ -53,15 +53,15 @@ Any failure at the integrity layer should invalidate the financial score rather 
 
 ### Proper scoring rules
 
-For a binary event with model probability \(p_i\) and outcome \(y_i \in \{0,1\}\), use:
+For a binary event with model probability $p_i$ and outcome $y_i \in \{0,1\}$, use:
 
-\[
+$$
 \text{Brier}=\frac{1}{n}\sum_{i=1}^{n}(p_i-y_i)^2
-\]
+$$
 
-\[
+$$
 \text{LogLoss}=-\frac{1}{n}\sum_{i=1}^{n}\left[y_i\log(p_i)+(1-y_i)\log(1-p_i)\right]
-\]
+$$
 
 Brier and logarithmic loss are strictly proper scoring rules, meaning that their expected value is optimized by reporting the true probability; log loss penalizes confidently wrong forecasts more heavily. Use both: Brier is interpretable and stable, while log loss is a stronger warning against dangerous overconfidence.[^6][^7][^8][^9]
 
@@ -71,9 +71,9 @@ For three-way ordered outcomes such as home/draw/away, report **Ranked Probabili
 
 An absolute Brier score is hard to interpret across sports, seasons, and markets with different base rates. Convert it to a skill score against a stated benchmark:
 
-\[
+$$
 \text{Brier Skill}=1-\frac{\text{Brier}_{model}}{\text{Brier}_{reference}}
-\]
+$$
 
 A value above zero means improvement over the reference; one is perfect; a negative value means the model is worse. For betting work, calculate skill against at least three references: a base-rate model, the de-vigged market probability available at decision time, and the incumbent production model.[^10][^11][^12]
 
@@ -83,9 +83,9 @@ The most important comparison is generally **incremental skill over the market a
 
 Brier score can be decomposed into reliability, resolution, and uncertainty:
 
-\[
+$$
 \text{Brier}=\text{Reliability}-\text{Resolution}+\text{Uncertainty}
-\]
+$$
 
 Reliability measures probability calibration, resolution measures the ability to separate events into meaningfully different risk groups, and uncertainty reflects the outcome's base-rate difficulty. This decomposition matters because two systems can have similar Brier scores for different reasons: one may be calibrated but timid, while another may be sharp but systematically overconfident.[^13][^14][^6]
 
@@ -114,8 +114,8 @@ CLV asks whether the wager obtained a better price than a predefined later bench
 For a binary market, de-vig both sides of the reference close and express CLV in economically comparable terms. Useful portfolio statistics are:
 
 - **Probability CLV:** de-vigged close probability minus the break-even probability of the bet price.
-- **Price-ratio CLV:** \(o_{bet}/o_{close,fair}-1\) using decimal odds.
-- **Expected return at close:** \(p_{close,fair}o_{bet}-1\).
+- **Price-ratio CLV:** $o_{bet}/o_{close,fair}-1$ using decimal odds.
+- **Expected return at close:** $p_{close,fair}o_{bet}-1$.
 - **Beat-close rate:** proportion with positive CLV.
 - **Median and stake-weighted CLV:** robust center and portfolio exposure.
 - **CLV confidence interval:** preferably clustered or block-bootstrapped.
@@ -136,11 +136,11 @@ Positive CLV does not by itself prove that:
 
 CLV is therefore best viewed as a **price-acquisition and market-direction diagnostic**. The deeper question is whether the system has information incremental to the market. Test this by fitting an out-of-sample market-conditioned model such as
 
-\[
+$$
 \operatorname{logit}P(Y=1)=\alpha+\beta\operatorname{logit}(p_{market})+\gamma z_{model},
-\]
+$$
 
-where \(z_{model}\) is the model's residual signal or log-odds difference from the market. A stable, correctly signed \(\gamma\), improved out-of-sample proper score, and better calibration show that the model contributes information beyond simply echoing market odds. Forecast-encompassing tests are designed to ask whether one forecast explains variation that the other cannot.[^26][^27]
+where $z_{model}$ is the model's residual signal or log-odds difference from the market. A stable, correctly signed $\gamma$, improved out-of-sample proper score, and better calibration show that the model contributes information beyond simply echoing market odds. Forecast-encompassing tests are designed to ask whether one forecast explains variation that the other cannot.[^26][^27]
 
 Also test whether returns and win rates rise monotonically across **predeclared model-edge deciles**. If the model's 8% edges do not perform better than its 2% edges, its probability scale or selection logic is suspect even when aggregate ROI is positive.
 
@@ -150,9 +150,9 @@ Also test whether returns and win rates rise monotonically across **predeclared 
 
 Use turnover ROI, commonly called yield in some markets, as the primary realized-efficiency statistic:
 
-\[
+$$
 \text{ROI}_{turnover}=\frac{\sum_i \text{net profit}_i}{\sum_i \text{stake}_i}.
-\]
+$$
 
 Published betting studies commonly define ROI as net profit divided by total amount wagered. Report it with total turnover, net profit, number of independent events, and a confidence interval; a naked ROI percentage conceals both scale and uncertainty.[^28][^29][^30]
 
@@ -171,7 +171,7 @@ Also report **gross ROI and net ROI**. Net calculations should include commissio
 
 ### Break-even and edge capture
 
-For each bet, compute break-even probability \(p_{BE}=1/o_i\) from decimal odds and model expected return \(EV_i=p_i o_i-1\). Aggregate:
+For each bet, compute break-even probability $p_{BE}=1/o_i$ from decimal odds and model expected return $EV_i=p_i o_i-1$. Aggregate:
 
 - Mean and stake-weighted ex-ante EV.
 - Realized ROI minus ex-ante EV.

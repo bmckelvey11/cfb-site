@@ -835,7 +835,7 @@ n must equal the completed 2024 regular games from A2/C1 (3,745). Median between
 
 ### The idea, then the SQL, then the reading
 
-**Plain language.** Any rate you measure from data (a cover rate, an over rate) is an estimate; a different sample would give a slightly different number. The standard error quantifies that wobble. For a proportion \(p\) from \(n\) games, \(SE = \sqrt{p(1-p)/n}\) [1], and a 95% interval is \(p \pm 1.96\,SE\) [2].
+**Plain language.** Any rate you measure from data (a cover rate, an over rate) is an estimate; a different sample would give a slightly different number. The standard error quantifies that wobble. For a proportion $p$ from $n$ games, $SE = \sqrt{p(1-p)/n}$ [1], and a 95% interval is $p \pm 1.96\,SE$ [2].
 
 **The SQL.** Compute `p` with a conditional average, `n` with `count(*)`, then the SE inline. `approx_count_distinct` gives a fast HyperLogLog distinct estimate [duckdb.org/docs/sql/functions/aggregates]; `USING SAMPLE 10%` subsamples rows [duckdb.org/docs/sql/query_syntax/sample]; `generate_series` plus `random()` powers a bootstrap.
 
@@ -893,7 +893,7 @@ The analytic CI half-width equals `1.96 * se`. The bootstrap SD should land with
 
 **Plain language.** A hypothesis test asks: could the difference I see be pure chance? The two-proportion z-test compares two rates; the Welch t-test compares two means with unequal variances; chi-square compares observed vs expected counts in a table. Each yields a test statistic you convert to a p-value — the probability of a result this extreme if nothing is going on.
 
-**The SQL.** DuckDB has no built-in p-value function and no native error function (`erf` is not in this build), so approximate the standard normal CDF with the Abramowitz–Stegun polynomial in exercise 1. The two-proportion z is \(z = (p_1 - p_2)/\sqrt{\hat p(1-\hat p)(1/n_1 + 1/n_2)}\) [4] with pooled \(\hat p\).
+**The SQL.** DuckDB has no built-in p-value function and no native error function (`erf` is not in this build), so approximate the standard normal CDF with the Abramowitz–Stegun polynomial in exercise 1. The two-proportion z is $z = (p_1 - p_2)/\sqrt{\hat p(1-\hat p)(1/n_1 + 1/n_2)}$ [4] with pooled $\hat p$.
 
 **Worked solution.** Compare the home-cover rate vs the away-cover rate (they are complementary in a two-outcome grade, so this doubles as a test that the home cover rate differs from 0.5). Sample size of gradeable spread games, 2014–2024 regular:
 
@@ -947,7 +947,7 @@ For (1), a |z| of 1.96 must map to p ≈ 0.05. Validate the CDF approximation at
 
 ### The idea, then the SQL, then the reading
 
-**Plain language.** Correlation \(r\) measures how tightly two variables move together, from -1 to 1. Simple linear regression fits \(y = a + b x\); the slope \(b\) is the expected change in \(y\) per unit \(x\), and \(R^2\) is the fraction of \(y\)'s variance the line explains. Residual = actual − predicted; what is left after the model.
+**Plain language.** Correlation $r$ measures how tightly two variables move together, from -1 to 1. Simple linear regression fits $y = a + b x$; the slope $b$ is the expected change in $y$ per unit $x$, and $R^2$ is the fraction of $y$'s variance the line explains. Residual = actual − predicted; what is left after the model.
 
 **The SQL.** DuckDB has the full `regr_*` family and `corr`/`covar_samp` as aggregates [duckdb.org/docs/sql/functions/aggregates]. No procedural code needed for a one-variable fit.
 
@@ -998,7 +998,7 @@ The live worked run returned exactly n=6492, r=0.3777, slope=0.8517, intercept=8
 
 ### The idea, then the SQL, then the reading
 
-**Plain language.** American odds encode a price. Negative odds \(o<0\): implied prob \(= \frac{-o}{-o+100}\) [5]; positive: \(\frac{100}{o+100}\) [6]. Two sides' implied probabilities sum to >1 — the excess is the vig; divide each by the sum to get fair (no-vig) probabilities. Expected value of a unit bet at decimal odds \(d\) with true prob \(p\) is \(EV = p\,(d-1) - (1-p)\) [7]. The Kelly fraction is \(f^\* = \frac{p(d-1)-(1-p)}{d-1}\) [8]. Calibration asks: when I say 60%, does it happen 60% of the time? Brier score is mean squared error of probabilities [9]; log loss penalises confident wrong calls harshly [10].
+**Plain language.** American odds encode a price. Negative odds $o<0$: implied prob $= \frac{-o}{-o+100}$ [5]; positive: $\frac{100}{o+100}$ [6]. Two sides' implied probabilities sum to >1 — the excess is the vig; divide each by the sum to get fair (no-vig) probabilities. Expected value of a unit bet at decimal odds $d$ with true prob $p$ is $EV = p\,(d-1) - (1-p)$ [7]. The Kelly fraction is $f^\* = \frac{p(d-1)-(1-p)}{d-1}$ [8]. Calibration asks: when I say 60%, does it happen 60% of the time? Brier score is mean squared error of probabilities [9]; log loss penalises confident wrong calls harshly [10].
 
 **The SQL.** All are arithmetic over `fact_game_line` / `fact_game_odds` columns (`moneyline_home`, `odds`). Bucket predictions with `least(floor(implied_home_prob * 10) + 1, 10)`, then compare mean predicted to realised in each bucket. DuckDB 1.5.5 has no `width_bucket`.
 
@@ -1063,7 +1063,7 @@ Brier score for a coin-flip predictor (always 0.5) is 0.25 — your market Brier
 
 **Plain language.** A pre-game feature may use only information available before kickoff. Any feature touching the game's own result is a leak and must be flagged `result_lookahead`. Rolling means need a frame that excludes the current row (A6). Exponentially weighted means weight recent games more; rest days come from the gap between a team's consecutive `start_date`s; travel needs venue coordinates.
 
-**The SQL.** Rolling frames use `ROWS BETWEEN n PRECEDING AND 1 PRECEDING`. EWMA is naturally recursive: \(s_t = \alpha x_{t} + (1-\alpha) s_{t-1}\) [11], built with `WITH RECURSIVE`. Rest days: `date_diff('day', lag(start_date) OVER (...), start_date)`. Travel: `dim_venue.latitude/longitude` with a haversine expression.
+**The SQL.** Rolling frames use `ROWS BETWEEN n PRECEDING AND 1 PRECEDING`. EWMA is naturally recursive: $s_t = \alpha x_{t} + (1-\alpha) s_{t-1}$ [11], built with `WITH RECURSIVE`. Rest days: `date_diff('day', lag(start_date) OVER (...), start_date)`. Travel: `dim_venue.latitude/longitude` with a haversine expression.
 
 The organising principle is a single question asked of every column: *would this value have been knowable at kickoff?* Rolling means with a `1 PRECEDING` frame pass; a season-to-date average that includes the current game fails; opponent strength computed from the opponent's *full* season (including games after this one) fails subtly and is the most common real-world leak. Rest and travel are safe because they depend only on the schedule, which is fixed in advance. Tag each engineered feature with the timestamp of the latest input it used, and you can later run the `result_lookahead` audit mechanically: any feature whose as-of timestamp is not strictly before `start_date` is disqualified, no human judgement required.
 
