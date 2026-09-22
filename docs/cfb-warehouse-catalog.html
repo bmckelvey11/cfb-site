@@ -305,6 +305,13 @@
       .mono {
         font-family: "IBM Plex Mono", ui-monospace, monospace;
       }
+      /* Grain prose runs to 311 characters on the worst nested stg table.
+         Clamp it and leave the full text on the title attribute. */
+      td.grain {
+        max-width: 34ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
       tr.peekable {
         cursor: pointer;
       }
@@ -4084,6 +4091,12 @@
         done(legacyCopy(text));
       }
 
+      // A stat column's grain is its table's grain -- `DATA.grain` is keyed
+      // `schema.table`, so nothing per-column needs generating for this.
+      function grainOf(s) {
+        return DATA.grain[`${s.s}.${s.t}`] || "";
+      }
+
       function exportWarehouseCsv() {
         const rows = sortBy(filteredWarehouse(), state.whSort, (s, col) => {
           if (col === "t") return s.t;
@@ -4092,12 +4105,31 @@
           if (col === "k") return s.k;
           if (col === "g") return s.g;
           if (col === "unit") return unitOf(s.t, s.g);
+          if (col === "grain") return grainOf(s);
           return s.c;
         });
         downloadCsv(
           "warehouse-stat-columns.csv",
-          ["column", "table", "unit", "schema", "type", "kind", "domain"],
-          rows.map((s) => [s.c, s.t, unitOf(s.t, s.g), s.s, s.y, s.k, s.g]),
+          [
+            "column",
+            "table",
+            "unit",
+            "schema",
+            "type",
+            "kind",
+            "domain",
+            "grain",
+          ],
+          rows.map((s) => [
+            s.c,
+            s.t,
+            unitOf(s.t, s.g),
+            s.s,
+            s.y,
+            s.k,
+            s.g,
+            grainOf(s),
+          ]),
         );
       }
       function exportNamedCsv() {
@@ -4522,6 +4554,7 @@
             if (col === "k") return s.k;
             if (col === "g") return s.g;
             if (col === "unit") return unitOf(s.t, s.g);
+            if (col === "grain") return grainOf(s);
             return s.c;
           });
           const cols = [
@@ -4532,10 +4565,12 @@
             { label: "Type", col: "y" },
             { label: "Kind", col: "k" },
             { label: "Domain", col: "g" },
+            { label: "Grain", col: "grain" },
           ];
           const body = rows
-            .map(
-              (s) => `<tr>
+            .map((s) => {
+              const grain = grainOf(s);
+              return `<tr>
       <td class="mono">${esc(s.c)}</td>
       <td class="mono">${esc(s.t)}</td>
       <td>${esc(unitOf(s.t, s.g))}</td>
@@ -4543,13 +4578,14 @@
       <td>${esc(s.y)}</td>
       <td>${esc(s.k)}</td>
       <td>${esc(s.g)}</td>
-    </tr>`,
-            )
+      <td class="grain" title="${esc(grain)}">${esc(grain)}</td>
+    </tr>`;
+            })
             .join("");
           html += `<div class="sec-h"><h3>Exploded warehouse stats</h3>
       <button type="button" class="pill" data-export="warehouse">Export CSV</button></div>
       <p class="sub">Numeric and boolean columns on stg + core after JSON explode / flatten. IDs, season/week/year, and nested STRUCT leftovers are omitted.</p>
-      <div class="tbl-wrap"><table data-sort="whSort">${headers(cols, "whSort", ["left", "left", "left", "left", "left", "left", "left"])}<tbody>${body}</tbody></table></div>
+      <div class="tbl-wrap"><table data-sort="whSort">${headers(cols, "whSort", ["left", "left", "left", "left", "left", "left", "left", "left"])}<tbody>${body}</tbody></table></div>
       <p class="sub">${fmt(filtered.length)} of ${fmt(DATA.wstats.length)} columns${q ? " matching “" + esc(q) + "”" : ""}</p>`;
         }
 
