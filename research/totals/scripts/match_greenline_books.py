@@ -66,6 +66,7 @@ NAME_ALIASES = {
     "umass": "massachusetts minutemen",
     "nc state": "north carolina state wolfpack",
     "hawai i": "hawaii rainbow warriors",   # CFBD writes Hawai'i; the apostrophe splits the token
+    "army west point": "army",              # "West" here is the academy's name, not a direction
 }
 
 # Tokens too common to identify a school on their own. "Georgia State" and "Kansas State"

@@ -106,11 +106,11 @@ Two detectors were tried and both are incomplete:
   `Mississippi`/`Ole Miss`, `Hawaii`/`Hawai'i`). It also *misses* both real defects,
   because both share a token with the game they were wrongly matched to.
 
-**Score consistency is the complete test.** The final scores in the archive come from PFF,
-independently of the join, so they can referee it: a slot whose points cannot be reconciled
-with its joined CFBD game's points — in either orientation — is matched to the wrong game.
-Run over all 626 slots that carry a `game_id` and a final score, it returns exactly the two
-above and nothing else.
+**Score consistency is the complete test.** The final scores in the archive come from PFF
+(`Game|Home Score` / `Game|Away Score`), independently of the join, so they can referee it:
+a slot whose points cannot be reconciled with its joined CFBD game's points — in either
+orientation — is matched to the wrong game. Run over all 626 slots that carried a `game_id`
+and a final score before the fix, it returned exactly the two above and nothing else.
 
 Six week-number disagreements survive as legitimate: LSU@Florida, Louisville@Virginia,
 Air Force@Army, Georgia@Missouri, Minnesota@Wisconsin are 2020 COVID reschedules where
@@ -126,15 +126,55 @@ names and scores agree, and PFF's weeks 17–18 are the postseason CFBD restarts
   a spread-sign or margin check would do.
 - **Three of 368 picks** sit on a wrong game id, all in the UTEP/North Texas slot. That is
   0.8% of picks and would not move a result that was already below its detection floor.
-- **The parser is not fixed here.** This audit was scoped to inspecting the file. The fix
-  is to try the flipped orientation in the week-scoped pass before falling back, and to
-  make the season-wide fallback reject a match whose only shared token drops a directional
-  qualifier (`Eastern`/`Western`/`North`/`South`). Re-running the parser also requires the
-  OneDrive sources, which are outside the repo.
+- **Finding 1 is a usage trap, not a defect.** The replication is deliberate — the parser
+  carries one flag per bet onto all three snapshots "so a snapshot filter never changes
+  the pick set". It was left as-is. Only Finding 2 was fixed.
+
+## Fix — landed 2026-09-21
+
+Finding 2 fixed in [`parse_greenline_history.py`](../scripts/parse_greenline_history.py);
+the archive was re-parsed from the OneDrive sources and now passes the audit.
+
+Two changes, both scoped to this parser so the 2026 pipeline's `strong()` is untouched:
+
+1. **`same_school()`** replaces the bare `strong()` name test. A shared strong token is
+   now necessary but not sufficient — a `QUALIFIERS` token held by one name and not the
+   other means a different school. The set is empirical, not a rule: `north`/`northern`/
+   `south`/`southern`/`east`/`eastern`/`west`/`western`/`central`/`state`/`tech`/`monroe`/
+   `m`, where every entry closes a mismatch the audit actually caught. `tech` and `m` were
+   added on the second pass, after the orientation search reached Louisiana for
+   "Louisiana Tech Bulldogs".
+2. **Each scope tries the orientation flip before the next one widens.** A flipped row no
+   longer skips its own week and falls through to a season-wide search that can return one
+   wrong game. Flips are printed, not silent.
+
+One alias added in `match_greenline_books.py`: `army west point` → `army`. "West" there is
+the academy's name, and the new qualifier rule would otherwise have unmatched Army.
+
+Effect on the file — 8,772 rows and 368 picks unchanged, and **no column other than
+`game_id` changed anywhere**:
+
+| | slots |
+| --- | --- |
+| corrected (Marshall/Eastern Kentucky, UTEP/North Texas) | 2 |
+| newly matched, previously unmatched | 9 |
+| lost | 0 |
+
+`game_id` coverage rises from 8,328 to 8,454 rows. The audit now reports 0 wrong games
+over 635 slots, and 3 surviving orientation flips (San José State ×2, UTEP/North Texas) —
+same game, PFF and CFBD disagreeing about who hosted, which is allowed.
+
+Not fixed, because neither is a matcher bug:
+
+- **PFF's team→score pairing for Marshall / Eastern Kentucky is still wrong** in the source
+  (it has Marshall scoring 0; Marshall won 59–0). The audit cannot see it — the points line
+  up positionally with CFBD's — so this stays a known bad row, not a gate.
+- The `is_greenline_pick` replication of Finding 1, which is deliberate.
 
 ## Reproduce
 
 ```bash
+python research/totals/scripts/parse_greenline_history.py
 python research/totals/scripts/audit_archive_joins.py
 ```
 

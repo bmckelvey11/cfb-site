@@ -70,6 +70,19 @@ HIST_MARKETS = {"Spread": "spread", "Total": "total", "Money Line": "moneyline"}
 # Kickoffs drift between feeds; a few slots need a window plus a unique name match.
 KICK_WINDOW = pd.Timedelta(hours=6)
 
+# Tokens that distinguish two schools sharing a root. Held by one name and not the
+# other, they mean "different school" no matter how much else overlaps: Eastern vs
+# Western Kentucky, North Texas vs Texas, Mississippi vs Mississippi State, Louisiana
+# Tech vs Louisiana, Texas A&M vs Texas ("a&m" tokenizes to `a` + `m`, and `a` is
+# already weak). Local to this parser -- `WEAK_TOKENS` in match_greenline_books.py
+# answers the opposite question (which shared tokens prove nothing) and the 2026
+# pipeline depends on it.
+#
+# This list is empirical, not a rule: every entry closes a mismatch that
+# audit_archive_joins.py actually caught. Run that audit after touching it.
+QUALIFIERS = {"north", "northern", "south", "southern", "east", "eastern",
+              "west", "western", "central", "state", "tech", "monroe", "m"}
+
 OUT_COLS = [
     "season", "week", "game_id", "kickoff_utc", "home_team", "away_team",
     "market", "side", "market_line", "greenline_line",
@@ -326,14 +339,38 @@ def read_hist(path: Path) -> tuple[pd.DataFrame, list[str]]:
             if frames else pd.DataFrame()), notes
 
 
+def same_school(a: set[str], b: set[str]) -> bool:
+    """Do two token sets name the same school?
+
+    `strong()` alone is not enough here. It only asks whether *some* non-weak token is
+    shared, so "Eastern Kentucky" and "Western Kentucky" match on `kentucky`, and
+    "North Texas Mean Green" and "Texas" match on `texas`. Both of those mismatches were
+    live in the archive (see greenline-archive-join-audit-2026-09-21.md).
+
+    So a shared strong token is necessary but not sufficient: a directional or `state`
+    qualifier carried by one name and not the other makes them different schools. The
+    tokens either side adds beyond that are mascots, which CFBD omits and PFF includes.
+    """
+    return strong(a & b) and not ((a ^ b) & QUALIFIERS)
+
+
 def match_by_name(df: pd.DataFrame, games: pd.DataFrame):
     """PFF_hist has no kickoff, so join on season + week + both school names.
 
     PFF numbers the postseason straight on from the regular season (weeks 17-18) while
     CFBD restarts it, so a week-scoped join drops the bowls. Anything the week-scoped
-    pass misses is retried against the whole season, which is safe here because the
-    pairing itself is unique within a season -- a rematch would show up as >1 candidate
-    and stay unmatched.
+    pass misses is retried against the whole season.
+
+    ORIENTATION: PFF and CFBD disagree about who hosted a few 2020 games, and the name
+    test is orientation-sensitive, so a flipped row misses its own week. The season-wide
+    retry then searches ~800 games instead of ~50 and can return exactly one *wrong*
+    candidate, which `len(best) == 1` accepts silently -- that is precisely how the
+    week-15 UTEP/North Texas rows ended up on the week-2 UTEP/Texas game. Each scope
+    therefore tries the flip before the next one widens, and the flip is reported.
+
+    The docstring this replaces claimed the season-wide retry was safe because "a
+    rematch would show up as >1 candidate and stay unmatched". That holds only when
+    candidates are matched exactly; under token matching a near-name is a silent hit.
     """
     by_week: dict[tuple, list] = defaultdict(list)
     by_season: dict[int, list] = defaultdict(list)
@@ -343,23 +380,34 @@ def match_by_name(df: pd.DataFrame, games: pd.DataFrame):
 
     def candidates(pool, home_t, away_t):
         return [g for g in pool
-                if strong(home_t & toks(g.home_team))
-                and strong(away_t & toks(g.away_team))]
+                if same_school(home_t, toks(g.home_team))
+                and same_school(away_t, toks(g.away_team))]
 
     out: dict[tuple, object] = {}
     missed: list[tuple] = []
+    flips: list[tuple] = []
     for key in df[["Game|Season", "Game|Week", "Game|Home Team",
                    "Game|Away Team"]].dropna().drop_duplicates().itertuples(index=False):
         season, week, home, away = int(key[0]), int(key[1]), key[2], key[3]
         ht, at = toks(home), toks(away)
-        best = candidates(by_week.get((season, week), []), ht, at)
-        if len(best) != 1:
-            best = candidates(by_season.get(season, []), ht, at)
+        best, flipped = [], False
+        # Narrowest scope first, and within each scope the stated orientation before
+        # its flip. Widening only happens when neither reading is unique.
+        for pool in (by_week.get((season, week), []), by_season.get(season, [])):
+            best = candidates(pool, ht, at)
+            if len(best) == 1:
+                break
+            alt = candidates(pool, at, ht)
+            if len(alt) == 1:
+                best, flipped = alt, True
+                break
         if len(best) == 1:
             out[(season, week, home, away)] = best[0]
+            if flipped:
+                flips.append((season, week, home, away, best[0].game_id))
         else:
             missed.append((season, week, home, away, len(best)))
-    return out, missed
+    return out, missed, flips
 
 
 def build_hist(path: Path, con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
@@ -371,10 +419,14 @@ def build_hist(path: Path, con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
 
     seasons = {int(s) for s in df["Game|Season"].dropna().unique()}
     games = load_games(con, seasons)
-    hit, missed = match_by_name(df, games)
+    hit, missed, flips = match_by_name(df, games)
     slots = len(df[["Game|Season", "Game|Week", "Game|Home Team",
                     "Game|Away Team"]].dropna().drop_duplicates())
     print(f"    game slots matched:   {len(hit)}/{slots}")
+    if flips:
+        print(f"    home/away flipped vs CFBD: {len(flips)}")
+        for f in flips:
+            print(f"      FLIPPED {f[0]} wk{f[1]} {f[3]} @ {f[2]} -> {f[4]}")
     if missed:
         by_week: dict[int, int] = defaultdict(int)
         for m in missed:
@@ -501,6 +553,44 @@ def self_check() -> None:
     assert solved["MST"] == "Mississippi State", solved
     assert solved["BAMA"] == "Alabama", solved
     assert solved["UK"] == "Kentucky" and solved["LSU"] == "Louisiana State", solved
+
+    # A qualifier on one side only means a different school, however much else overlaps.
+    assert not same_school(toks("Eastern Kentucky"), toks("Western Kentucky"))
+    assert not same_school(toks("North Texas Mean Green"), toks("Texas"))
+    assert not same_school(toks("Mississippi Rebels"), toks("Mississippi State"))
+    assert not same_school(toks("Georgia Southern Eagles"), toks("Georgia"))
+    # Mascots are not qualifiers: CFBD omits them, PFF carries them.
+    assert same_school(toks("Western Kentucky Hilltoppers"), toks("Western Kentucky"))
+    assert same_school(toks("Mississippi State Bulldogs"), toks("Mississippi State"))
+    assert same_school(toks("Texas Longhorns"), toks("Texas"))
+    assert same_school(toks("Louisiana-Monroe Warhawks"), toks("UL Monroe"))
+
+    # The two archive defects, end to end: each row's home/away is flipped against
+    # CFBD, so the stated orientation misses its own week. The week-scoped flip must
+    # win before the season-wide pass can offer a token-sharing wrong game.
+    hist = pd.DataFrame([
+        {"Game|Season": 2020, "Game|Week": 15,
+         "Game|Home Team": "North Texas Mean Green", "Game|Away Team": "UTEP Miners"},
+        {"Game|Season": 2020, "Game|Week": 1,
+         "Game|Home Team": "Eastern Kentucky", "Game|Away Team": "Marshall"},
+    ])
+    pool = pd.DataFrame([
+        # The wrong games the old fallback reached for, both token-sharing.
+        {"season": 2020, "week": 2, "game_id": 401236222,
+         "home_team": "Texas", "away_team": "UTEP"},
+        {"season": 2020, "week": 6, "game_id": 401207146,
+         "home_team": "Western Kentucky", "away_team": "Marshall"},
+        # The right ones, each with home and away the other way round.
+        {"season": 2020, "week": 15, "game_id": 401257816,
+         "home_team": "UTEP", "away_team": "North Texas"},
+        {"season": 2020, "week": 1, "game_id": 401237353,
+         "home_team": "Marshall", "away_team": "Eastern Kentucky"},
+    ])
+    hit, missed, flips = match_by_name(hist, pool)
+    assert not missed, missed
+    assert hit[(2020, 15, "North Texas Mean Green", "UTEP Miners")].game_id == 401257816
+    assert hit[(2020, 1, "Eastern Kentucky", "Marshall")].game_id == 401237353
+    assert len(flips) == 2, flips
 
     print("self-check ok")
 
