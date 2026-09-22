@@ -30,6 +30,7 @@ investigations). This directory holds what is specific to *this* unit's code.
 
 | Doc | What it delivered |
 | --- | --- |
+| [feature-store-duckdb-2026-09-18.md](feature-store-duckdb-2026-09-18.md) | DuckDB sidecar schema (`features` + `meta`), in-place regeneration vs file swap on Windows, measured size/load vs legacy JSON, and scope limits (not `games.csv`, not `cfb.duckdb`). |
 | [editor-usability-2026-09-10.md](editor-usability-2026-09-10.md) | The five priority findings from the Impeccable review of the System Maker editor, plus accessibility and copy fixes. |
 | [pregame-filter-migration-2026-09-10.md](pregame-filter-migration-2026-09-10.md) | Removing Attendance and replacing the Result Lookahead filters with pre-kickoff equivalents. Carries the definitions and limits for the replacements. |
 
