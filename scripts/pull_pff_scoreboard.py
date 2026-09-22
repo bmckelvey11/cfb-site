@@ -31,6 +31,12 @@ or env.env). To get it: signed into pff.com, open DevTools -> Network on any
 value. It is a credential; it expires, and a 401 or a `premium: False` row means
 re-copy it.
 
+THE COOKIE IS GOOD FOR SIXTY SECONDS. Its `__session` is a Clerk JWT minted with a
+60s TTL and refreshed in the background by the page; the copy you paste is a
+snapshot of that JWT, so a paste, a file save and a run in three separate steps
+loses the race. Copy, save, and run in one motion. `web_cookie()` reads the JWT's
+own `exp` and refuses before spending 69 requests to discover the same thing.
+
 CURRENT SEASON ONLY, and that is a server-side fact, not a missing parameter.
 Swept 2019-2027 for NCAA and 2025-2026 for NFL against a premium session: every
 season but 2026 returns zero games, with or without `&week=`. Asking the matchup
@@ -55,6 +61,7 @@ any archived dump with `--from-dump`; never re-pull for a week that is already a
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
 import json
 import os
@@ -116,15 +123,45 @@ def get(path: str, query: str, cookie: str | None = None) -> dict:
         return json.load(fh)
 
 
+def session_expiry(cookie: str) -> int | None:
+    """Unix `exp` of the cookie's Clerk `__session` JWT, or None if it is missing or
+    unreadable. Reads the token's own payload, which is not the signature."""
+    for part in cookie.split(";"):
+        name, _, token = part.strip().partition("=")
+        if name != "__session":
+            continue
+        try:
+            payload = token.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            return int(json.loads(base64.urlsafe_b64decode(payload))["exp"])
+        except Exception:
+            return None
+    return None
+
+
+def check_fresh(cookie: str, now: float | None = None) -> str:
+    """Refuse a cookie whose session JWT already expired. Without this the run spends a
+    request per game to learn the same thing, and reports it as `expired or not premium`
+    -- two causes with different fixes."""
+    now = int(now if now is not None else time.time())
+    exp = session_expiry(cookie)
+    if exp is not None and exp < now:
+        raise SystemExit(
+            f"PFF_WEB_COOKIE's __session JWT expired {now - exp}s ago -- Clerk mints it "
+            "with a 60s TTL, so copy the cookie, save it, and re-run inside the minute"
+        )
+    return cookie
+
+
 def web_cookie() -> str:
     value = os.environ.get("PFF_WEB_COOKIE")
     if value:
-        return value
+        return check_fresh(value)
     env_file = Path(__file__).resolve().parents[1] / "env.env"
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():
             if line.startswith("PFF_WEB_COOKIE="):
-                return line.split("=", 1)[1].strip()
+                return check_fresh(line.split("=", 1)[1].strip())
     raise SystemExit(
         "PFF_WEB_COOKIE not set -- Greenline needs a logged-in premium session; "
         "see the module docstring for how to copy the cookie header"
@@ -349,6 +386,21 @@ def self_check() -> None:
     assert next_week(weeks, now="2026-09-09T22:00:00") == "2"
     assert next_week(weeks, now="2026-09-12T00:00:00") == "3"
     assert next_week(weeks, now="2026-12-31T00:00:00") is None
+
+    def jwt(exp: int) -> str:
+        body = base64.urlsafe_b64encode(json.dumps({"exp": exp}).encode()).decode().rstrip("=")
+        return f"CookieConsent=1; __session=header.{body}.sig; AWSALB=x"
+
+    assert session_expiry(jwt(1790056378)) == 1790056378
+    assert session_expiry("CookieConsent=1; AWSALB=x") is None
+    assert session_expiry("__session=not.a.jwt") is None
+    assert check_fresh(jwt(1790056378), now=1790056340).startswith("CookieConsent")
+    try:
+        check_fresh(jwt(1790056378), now=1790056563)
+    except SystemExit as exc:
+        assert "expired 185s ago" in str(exc), exc
+    else:
+        raise AssertionError("an expired session JWT must not pass check_fresh")
     print("self-check ok")
 
 
