@@ -101,6 +101,7 @@ def grade_one(flag: dict, game: dict, finals: list[dict] = (), lines: dict | Non
         final, score_source = warehouse_final(game, finals), "warehouse"
     if final is None:
         return None
+    proj = num(flag.get("greenline_total_projection"))
     actual = sum(final)
     if actual == line:
         result = "push"
@@ -112,8 +113,13 @@ def grade_one(flag: dict, game: dict, finals: list[dict] = (), lines: dict | Non
             "pff_week": flag.get("pff_week"),
             "away_abbreviation": flag.get("away_abbreviation"),
             "home_abbreviation": flag.get("home_abbreviation"),
-            "line": line, "projection": num(flag.get("greenline_total_projection")),
-            "d": (num(flag.get("greenline_total_projection")) or 0) - line,
+            "line": line, "projection": proj,
+            # No projection means no disagreement to measure. The old `(proj or 0) - line`
+            # turned a missing projection into `-line`, which reads as a 60-point gap
+            # between model and market instead of a blank -- harmless for a PFF capture,
+            # where the projection is always there, and pure noise for the 2022-23 export
+            # replay, which publishes an edge without the number it came from.
+            "d": None if proj is None else proj - line,
             "side": side, "value": num(flag.get("total_best_value")),
             "actual_total": actual, "result": result,
             "score_source": score_source, "line_source": line_source}
@@ -225,6 +231,12 @@ def self_check() -> None:
     # Exact landing on a whole-number line is a push, not a loss.
     push = grade_one(dict(flag, market_over_under="44"), fin)
     assert push["result"] == "push", push
+
+    # `d` is the projection's disagreement with the line, so it needs a projection.
+    assert grade_one(flag, fin)["d"] == 48.0 - 50.5
+    blank = grade_one(dict(flag, greenline_total_projection=""), fin)
+    assert blank["result"] == "win", blank          # still gradeable: the line is enough
+    assert blank["projection"] is None and blank["d"] is None, blank
 
     # PFF calls a TBD-kickoff game Canceled and never scores it; the warehouse does.
     canceled = {"is_over": "False", "status": "Canceled", "kickoff_raw": "2026-09-12T00:00:00",

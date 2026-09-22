@@ -155,6 +155,16 @@ already carries a `game_id` resolved by the parser. **The replay is strictly wea
 finding the game**, which is why the headline record in this document is the one from
 `grade_export_picks.py`.
 
+### `projection` and `d` come out blank
+
+The exports publish an edge without the projection it came from, so the replay's
+`projection` column is empty and `d` — the projection's disagreement with the line — is
+empty with it. `grade_greenline.py` previously computed `d` as `(projection or 0) - line`,
+which turned a missing projection into `-line` and read as a 60-point gap between model and
+market rather than a blank. Fixed in the same change; the 2026 output is unaffected, where
+a projection is always present, and regrading it reproduces `greenline_graded.csv` byte for
+byte.
+
 ### Ignore the replay's ROI column
 
 `grade_greenline.py` prints units and ROI at a flat −110 (`PAYOUT = 100/110`), which is
