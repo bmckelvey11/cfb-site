@@ -8,10 +8,12 @@ full-game aggregate whenever it was the larger number -- and won outright on the
 whose only full-game row is live.
 
 This reports, per book, how many ``(game, book)`` full-game totals and spreads differ
-between a MAX over every offering and a MAX over the pregame ones. On a fixed warehouse
-``changed`` is what the fix removed; on a stale one it is what is still wrong. It reads
-``stg`` directly rather than ``core.fact_game_line`` so it answers the same question
-whether or not the warehouse has been rebuilt since the fix landed.
+between a MAX over every offering and a MAX over the pregame ones. It reads ``stg``
+directly rather than ``core.fact_game_line``, so **the count does not go to zero once the
+fix is deployed** -- the filter lives in the backfill, not the explode, and the live rows
+stay in ``stg.an_market`` and ``stg.an_history`` forever. ``changed`` is a property of the
+Action Network tape: how much damage a missing ``is_live`` filter would do, now and on
+every future tape. It grows when a new scrape lands, never shrinks.
 
 Read-only. Exits 0 always -- it reports, it does not decide.
 
@@ -29,6 +31,19 @@ import duckdb
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import cfb_paths  # noqa: E402
+from cfb_system_maker.duckdb_load import (  # noqa: E402
+    _AN_BOOK_PROVIDER,
+    _AN_ID_OFFSET,
+    _an_provider_id,
+)
+
+# `_an_provider_id`'s rule, in SQL: the books CFBD also knows take its id, the rest are
+# offset out of its range. Derived from the loader's own constants rather than restated --
+# the AN book ids have been remapped once already, and a hand-copied version would quietly
+# start printing bare book numbers while the script still exited 0.
+BOOK_TO_PROVIDER = "CASE v.book_id " + " ".join(
+    f"WHEN {book} THEN {_an_provider_id(book)}" for book in sorted(_AN_BOOK_PROVIDER)
+) + f" ELSE v.book_id + {_AN_ID_OFFSET} END"
 
 # The same event -> game join `_backfill_gamelines` makes, restated rather than imported:
 # that function builds it inside one big CREATE TABLE and does not expose it.
@@ -91,11 +106,13 @@ SELECT coalesce(p.name, 'book ' || CAST(v.book_id AS VARCHAR))      AS book,
                                                                     AS spread_changed,
        count(*) FILTER (WHERE v.total_pregame IS NULL
                           AND v.total_all IS NOT NULL)              AS total_live_only,
-       round(max(abs(v.total_all - v.total_pregame)), 1)            AS worst_total_delta
+       -- Only the games that had a pregame line to be repriced *away from*. The
+       -- live-only ones have no second number to subtract, so they would drop out of a
+       -- plain max() and drag the column down -- exactly the games that matter most.
+       -- `total_live_only` beside it is where those are counted.
+       round(max(abs(v.total_all - v.total_pregame)), 1)            AS worst_delta_repriced
 FROM _pivot v
-LEFT JOIN stg.lines_provider p
-  ON p.linesProviderId = CASE v.book_id WHEN 15 THEN 888888 WHEN 71 THEN 38
-                                        ELSE v.book_id + 9000000 END
+LEFT JOIN stg.lines_provider p ON p.linesProviderId = {book_to_provider}
 GROUP BY 1, 2
 ORDER BY total_changed DESC, spread_changed DESC
 """
@@ -106,9 +123,7 @@ SELECT g.season, g.week, g.awayTeam || ' @ ' || g.homeTeam AS matchup,
        v.total_all, v.total_pregame, v.spread_all, v.spread_pregame
 FROM _pivot v
 JOIN stg.games g ON g.gameId = v.game_id
-LEFT JOIN stg.lines_provider p
-  ON p.linesProviderId = CASE v.book_id WHEN 15 THEN 888888 WHEN 71 THEN 38
-                                        ELSE v.book_id + 9000000 END
+LEFT JOIN stg.lines_provider p ON p.linesProviderId = {book_to_provider}
 WHERE v.total_all IS DISTINCT FROM v.total_pregame
 ORDER BY abs(coalesce(v.total_all, 0) - coalesce(v.total_pregame, 0)) DESC
 LIMIT ?
@@ -125,8 +140,12 @@ def main() -> int:
     try:
         for sql in (MAP_SQL, OFFERS_SQL, PIVOT_SQL):
             con.execute(sql)
-        books = con.execute(BY_BOOK_SQL).fetchdf()
-        worst = con.execute(WORST_SQL, [args.top]).fetchdf()
+        books = con.execute(
+            BY_BOOK_SQL.format(book_to_provider=BOOK_TO_PROVIDER)
+        ).fetchdf()
+        worst = con.execute(
+            WORST_SQL.format(book_to_provider=BOOK_TO_PROVIDER), [args.top]
+        ).fetchdf()
     finally:
         con.close()
 

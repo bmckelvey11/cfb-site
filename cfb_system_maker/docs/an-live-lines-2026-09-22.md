@@ -19,7 +19,9 @@ radius was then measured across every book by running the loader's own pivot twi
 the same rows, once with live offerings and once without.
 
 Reproduce with `python scripts/audit_an_live_lines.py`. Data as of 2026-09-22; the
-Action Network tape covers 2026 weeks 1–3 densely and little else.
+Action Network tape covers 2026 weeks 1–3 densely and little else. The script reads `stg`,
+not `core`, so **its count does not fall to zero after the fix** — the filter is in the
+backfill and the live rows stay staged. It measures the tape, not the warehouse's health.
 
 ## What the source actually says
 
