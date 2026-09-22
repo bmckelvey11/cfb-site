@@ -88,6 +88,18 @@ def _assert_local_is_the_promoted_warehouse(con) -> None:
         )
 
 
+def load_token_from_env_file() -> None:
+    """Fall back to env.env so the caller does not have to export the token."""
+    if os.environ.get("motherduck_token") or os.environ.get("MOTHERDUCK_TOKEN"):
+        return
+    if not os.path.exists("env.env"):
+        return
+    with open("env.env", encoding="utf-8") as fh:
+        for line in fh:
+            key, _, value = line.partition("=")
+            if key.strip().upper() == "MOTHERDUCK_TOKEN":
+                os.environ["MOTHERDUCK_TOKEN"] = value.strip()
+                return
 
 
 def main() -> int:
@@ -107,6 +119,8 @@ def main() -> int:
         print("Refusing to drop without --yes (md:cfb is shared).", file=sys.stderr)
         print("Run with --dry-run first to see what would be dropped.", file=sys.stderr)
         return 1
+
+    load_token_from_env_file()
 
     con = duckdb.connect()
     con.execute(f"ATTACH '{src_path}' AS src (READ_ONLY)")

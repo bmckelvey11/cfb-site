@@ -7,7 +7,7 @@ REM
 REM   pull_oddspapi.cmd
 REM   pull_oddspapi.cmd --bookmakers pinnacle,circasports
 REM
-REM Registered as scheduled task CFB-Pinnacle-Snapshot, daily at 08:00: one request a run
+REM Registered as scheduled task CFB-Pinnacle-Snapshot, daily at 06:15: one request a run
 REM is ~30/month against oddspapi's free plan of 250, which leaves room for ad-hoc pulls.
 REM Changing the cadence here means changing the request math -- see docs/oddsapi-ingest.md.
 REM
@@ -33,10 +33,12 @@ set "LOGDIR=%CFB_DATA_ROOT%\logs"
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
 set "LOG=%LOGDIR%\oddspapi_pull.log"
 
+for /f %%i in ('powershell -NoProfile -NonInteractive -Command "(Get-Date).ToString('s')"') do set "START=%%i"
 echo.>> "%LOG%"
 echo ==== %DATE% %TIME% :: %* ====>> "%LOG%"
 REM -u: unbuffered so a killed run keeps its partial trail in the log.
 "%PYTHON%" -u "%REPO%\scripts\pull_oddspapi.py" %*>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- exited %RC% ---->> "%LOG%"
+call "%REPO%\scripts\task_ledger.cmd" "pinnacle_snapshot" "%START%" %RC%
 exit /b %RC%

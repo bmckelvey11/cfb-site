@@ -30,9 +30,11 @@ set "LOGDIR=%CFB_DATA_ROOT%\logs"
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
 set "LOG=%LOGDIR%\line_timing.log"
 
+for /f %%i in ('powershell -NoProfile -NonInteractive -Command "(Get-Date).ToString('s')"') do set "START=%%i"
 echo.>> "%LOG%"
 echo ==== %DATE% %TIME% :: %* ====>> "%LOG%"
 "%PYTHON%" "%REPO%\research\spread\scripts\collect_line_timing.py" %*>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- exited %RC% ---->> "%LOG%"
+call "%REPO%\scripts\task_ledger.cmd" "line_timing_%1" "%START%" %RC%
 exit /b %RC%

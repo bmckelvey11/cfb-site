@@ -47,9 +47,9 @@ def _get(d, *path):
     return d
 
 
-def build_team_seasons(raw: Path) -> pd.DataFrame:
+def build_team_seasons(raw: Path, seasons=SEASONS) -> pd.DataFrame:
     rows = []
-    for y in SEASONS:
+    for y in seasons:
         for r in json.loads((raw / f"advanced_season_stats_{y}.json").read_text(encoding="utf-8")):
             o, d = r.get("offense") or {}, r.get("defense") or {}
             rows.append(dict(
@@ -71,9 +71,9 @@ def build_team_seasons(raw: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def attach_coaches(ts: pd.DataFrame, raw: Path) -> pd.DataFrame:
+def attach_coaches(ts: pd.DataFrame, raw: Path, seasons=SEASONS) -> pd.DataFrame:
     cmap: dict[tuple[int, str], tuple[str, int, float | None]] = {}
-    for y in SEASONS:
+    for y in seasons:
         for c in json.loads((raw / f"coaches_{y}.json").read_text(encoding="utf-8")):
             name = f"{c.get('firstName', '')} {c.get('lastName', '')}".strip()
             for s in c.get("seasons") or []:
@@ -127,6 +127,64 @@ def name_clusters(profiles: pd.DataFrame) -> dict[int, str]:
     return names
 
 
+def pregame_snapshot(raw: Path, target_season: int) -> dict:
+    """Fit every transform from earlier seasons only; assign last year's coach.
+
+    Avoid current-season coach assignments: choosing the season's principal
+    coach retrospectively could leak a later coaching change into opening week.
+    """
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
+
+    seasons = [y for y in SEASONS if y < target_season
+               and (raw / f"advanced_season_stats_{y}.json").exists()
+               and (raw / f"coaches_{y}.json").exists()]
+    snapshot = {"training_seasons": seasons, "coach_assignment_season": target_season - 1, "teams": {}}
+    if len(seasons) < MIN_SEASONS:
+        return snapshot
+    team_seasons = attach_coaches(build_team_seasons(raw, seasons), raw, seasons)
+    if team_seasons.empty:
+        return snapshot
+    coach = coach_matrix(team_seasons)
+    coach = coach.replace([np.inf, -np.inf], np.nan).dropna(subset=FEATS)
+    if len(coach) < K:
+        return snapshot
+    matrix = StandardScaler().fit_transform(coach[FEATS].astype(float).values)
+    model = KMeans(n_clusters=K, n_init=25, random_state=0).fit(matrix)
+    coach["cluster"] = model.labels_
+    if coach.cluster.nunique() != K:
+        return snapshot
+    names = name_clusters(coach.groupby("cluster")[FEATS].mean())
+    mapping = {name: names[cluster] for name, cluster in coach.cluster.items()}
+    path = raw / f"coaches_{target_season - 1}.json"
+    if not path.exists():
+        return snapshot
+    assignments = {}
+    # The newer coach-season endpoint has completed counts when legacy coaches
+    # snapshots still show preseason zeroes. Both sources are from year S-1.
+    attributed = raw / f"coach_seasons_{target_season - 1}.json"
+    if attributed.exists():
+        for record in json.loads(attributed.read_text(encoding="utf-8")):
+            if record.get("year") != target_season - 1:
+                continue
+            coach_info, team_info = record.get("coach") or {}, record.get("team") or {}
+            name = f"{coach_info.get('firstName', '')} {coach_info.get('lastName', '')}".strip()
+            team = team_info.get("school")
+            games = record.get("games") or 0
+            if team and games >= 6 and games > assignments.get(team, (None, -1))[1]:
+                assignments[team] = (name, games)
+    for record in json.loads(path.read_text(encoding="utf-8")):
+        name = f"{record.get('firstName', '')} {record.get('lastName', '')}".strip()
+        for season in record.get("seasons") or []:
+            if season.get("year") != target_season - 1:
+                continue
+            team, games = season.get("school"), season.get("games") or 0
+            if team and games >= 6 and games > assignments.get(team, (None, -1))[1]:
+                assignments[team] = (name, games)
+    snapshot["teams"] = {team: mapping[name] for team, (name, _) in assignments.items() if name in mapping}
+    return snapshot
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", default=DATA_ROOT)
@@ -134,6 +192,20 @@ def main() -> None:
     parser.add_argument("--target-seasons", nargs="+", type=int)
     args = parser.parse_args()
     raw = Path(args.data_dir) / "raw"
+    if args.pregame:
+        years = args.target_seasons or sorted({int(p.stem.rsplit("_", 1)[1]) for p in raw.glob("games_*.json") if p.stem.rsplit("_", 1)[1].isdigit()})
+        payload = {"method": "expanding-prior-seasons-v1", "seasons": {}}
+        for year in years:
+            snapshot = pregame_snapshot(raw, year)
+            payload["seasons"][str(year)] = snapshot
+            print(f"{year}: {len(snapshot['teams'])} teams, trained on {snapshot['training_seasons']}", flush=True)
+        path = Path(args.data_dir) / "processed" / "pregame_coach_styles.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        temporary.replace(path)
+        print(f"wrote {path}")
+        return
 
     from sklearn.cluster import KMeans
     from sklearn.preprocessing import StandardScaler

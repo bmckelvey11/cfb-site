@@ -34,6 +34,7 @@ set "LOGDIR=%CFB_DATA_ROOT%\logs"
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
 set "LOG=%LOGDIR%\odds_pull.log"
 
+for /f %%i in ('powershell -NoProfile -NonInteractive -Command "(Get-Date).ToString('s')"') do set "START=%%i"
 echo.>> "%LOG%"
 echo ==== %DATE% %TIME% :: %* ====>> "%LOG%"
 REM -u: Python block-buffers stdout when redirected, so a killed run (sleep,
@@ -41,4 +42,5 @@ REM shutdown) loses everything it had printed. Unbuffered keeps the partial trai
 "%PYTHON%" -u "%REPO%\scripts\pull_odds.py" %*>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- exited %RC% ---->> "%LOG%"
+call "%REPO%\scripts\task_ledger.cmd" "odds_snapshot" "%START%" %RC%
 exit /b %RC%
