@@ -225,14 +225,30 @@ def write_doc(seasons, bins, pooled, path, fig_path, threshold):
         f"which is what {pooled['n_min']}–{pooled['n_max']} bets a season "
         f"buys you. Single seasons are not the unit of evidence here; the "
         f"pooled row is.")
+    # The decay-watch bullet is about the most recent season, but "largest"
+    # and "flattest" are facts to check, not properties the last row inherits
+    # by being last -- they were both true of 2025 and neither is of 2026.
+    supers = []
+    if last is max(live_s, key=lambda r: r["n"]):
+        supers.append("the largest sample")
+    if last is min(live_s, key=lambda r: abs(r["roi"])):
+        supers.append("the flattest result")
+    lead = (f"{last['label']} is " + " and ".join(supers)) if supers else (
+        f"{last['label']} is the most recent season")
+    spans = (last["roi_lo"] <= pooled["roi"] <= last["roi_hi"]
+             and last["roi_lo"] <= 0.0 <= last["roi_hi"])
+    verdict = (
+        "contains both the pooled estimate and break-even, so it is not "
+        "evidence of decay on its own"
+        if spans else
+        "does not contain both the pooled estimate and break-even — read it "
+        "against `run_monitor.py` before treating it either way")
     last_line = (
-        f"- **{last['label']} is the largest sample and the flattest "
-        f"result**: {last['wins']}–{last['losses']}, "
+        f"- **{lead}**: {last['wins']}–{last['losses']}, "
         f"{last['roi']*100:+.2f}% ROI on n={last['n']}, against a pooled "
         f"{pooled['roi']*100:+.2f}%. Its interval "
-        f"[{last['roi_lo']*100:+.1f}%, {last['roi_hi']*100:+.1f}%] contains "
-        f"both the pooled estimate and break-even, so it is not evidence of "
-        f"decay on its own. `run_monitor.py` is the test that measures decay "
+        f"[{last['roi_lo']*100:+.1f}%, {last['roi_hi']*100:+.1f}%] {verdict}. "
+        f"`run_monitor.py` is the test that measures decay "
         f"directly, and as of its last run it finds none.")
     backload_line = (
         f"- **The sample is back-loaded**: {pooled['n_min']}–"
@@ -240,6 +256,7 @@ def write_doc(seasons, bins, pooled, path, fig_path, threshold):
         f"{pooled['recent_share']*100:.0f}% of all bets coming from "
         f"{pooled['recent_from']} onward. The pooled figure is mostly recent "
         f"data.")
+    partial_line = (pooled["partial"] + chr(10)) if pooled["partial"] else ""
     bins_line = (
         f"This is the mechanism check, not a menu of bets. Censoring theory "
         f"predicts that more expected bias means more mispricing, so the "
@@ -296,7 +313,7 @@ Two things worth naming rather than leaving for the reader to find:
 ## Caveats that apply to every number above
 
 {caveat_line}
-- Every ROI here is priced at −110 flat. The operational rule says −120 or
+{partial_line}- Every ROI here is priced at −110 flat. The operational rule says −120 or
   better; see the price-sensitivity panel in `figs/roi_report.png` for what
   the vig costs.
 - Wilson intervals assume independent bets. Games on the same slate are not
@@ -309,7 +326,9 @@ walk-forward game, all of them, not just the ones clearing the filter. Group
 by `season` (filtering `passes_filter == 1`) for the first table, bucket
 `bias` on the bin edges for the second. The file's `threshold` column records
 which filter produced it. Regenerate both file and doc with
-`python monitor/roi_report.py && python monitor/roi_hitrate_doc.py`.
+`python monitor/roi_report.py --season {pooled['season_arg']}` then
+`python monitor/roi_hitrate_doc.py --season {pooled['season_arg']}`
+(both default to 2013-2025, so the range is not optional).
 
 The `kelly_units` / `kelly_units_pnl` columns are live only on rows where
 `passes_filter == 1`; elsewhere they are what Kelly would have staked, not
@@ -342,6 +361,23 @@ def _self_check():
     # Empty group renders without raising.
     assert "| z | 0 |" in _table([{"label": "z", "n": 0}], "g")
     print("self-check OK")
+
+
+def _partial_note(data, years):
+    """Text for the final season when it has graded far fewer games than a
+    full one, else "". Compares against the median of the finished seasons."""
+    counts = {y: len(data[y][0]) for y in years}
+    last = years[-1]
+    prior = sorted(counts[y] for y in years[:-1])
+    if not prior:
+        return ""
+    median = prior[len(prior) // 2]
+    if counts[last] >= 0.6 * median:
+        return ""
+    return (f"- **{last} is a partial season**: {counts[last]} graded games "
+            f"so far against a ~{median}-game full season, so its row is a "
+            f"few weeks of results and will move as the season fills in. It "
+            f"is pooled in with the rest.")
 
 
 def main():
@@ -396,6 +432,11 @@ def main():
         "recent_share": sum(r["n"] for r in live
                             if int(r["label"]) >= recent_from) / n,
         "provenance": _provenance(years, args.min_train, args.threshold, n),
+        "season_arg": " ".join(str(y) for y in years),
+        # A season still being played grades far fewer games than a finished
+        # one, and its row moves every week. Flag it rather than let the
+        # footer's "data A-B" imply B is complete.
+        "partial": _partial_note(data, years),
     }
 
     print(f"\nHIT RATE AND ROI — filter bias > {args.threshold}, "

@@ -262,6 +262,19 @@ CSV_COLUMNS = [
 DEPLOYED_THRESHOLD = 1.75
 
 
+def _last_supers(rows):
+    """Superlatives actually true of the newest season. Both held for
+    2025 and neither holds for 2026, so they are checked, not inherited
+    by the row being last."""
+    last, live = rows[-1], [r for r in rows if r["n"]]
+    out = []
+    if last is max(live, key=lambda r: r["n"]):
+        out.append("largest sample")
+    if last is min(live, key=lambda r: abs(r["roi"])):
+        out.append("flattest result")
+    return out
+
+
 def default_csv_path(threshold):
     """The deployed file has a fixed name; anything else gets its own, so an
     exploratory `--threshold 1.0` run cannot quietly overwrite the committed
@@ -586,12 +599,14 @@ def make_figure(stats, path):
                         (x, top * 0.55 if vals[x] > 0 else bot * 0.55),
                         ha="center", va="center", fontsize=6.8,
                         color=INK, fontweight="bold", zorder=6)
-    # The newest season is also the largest and the flattest. Call it out:
+    # Call the newest season out: which superlatives apply is checked,
+    # not assumed from the row being last -- see _last_supers.
     # a reader finds that bar in three seconds, and silence there reads as
     # concealment. Its own CI is what says it is not yet evidence of decay.
     last = rows[-1]
+    _sup_txt = ", ".join(_last_supers(rows)) or "newest season"
     ax.annotate(f"{last['season']}: {last['wins']}–{last['n']-last['wins']}, "
-                f"{last['roi']*100:+.1f}%\nlargest sample, flattest result\n"
+                f"{last['roi']*100:+.1f}%\n{_sup_txt}\n"
                 f"CI [{last['lo']*100:+.0f}, {last['hi']*100:+.0f}] — wide "
                 f"enough that\nthis is not yet decay (see monitor.py)",
                 (len(rows) - 1, last["roi"] * 100),
@@ -825,9 +840,10 @@ def main():
               f"ROI={r['roi']*100:+7.2f}%  "
               f"95% [{r['lo']*100:+7.2f}, {r['hi']*100:+7.2f}]")
     last = rows[-1]
-    print(f"\n  NOTE: {last['season']} is the largest sample "
-          f"(n={last['n']}) and the flattest result "
-          f"({last['roi']*100:+.2f}%).")
+    _sup = _last_supers(rows)
+    _lead = (" and ".join(_sup)) if _sup else "the newest season"
+    print(f"\n  NOTE: {last['season']} is {_lead} "
+          f"(n={last['n']}, ROI {last['roi']*100:+.2f}%).")
     print(f"  Its interval [{last['lo']*100:+.1f}, {last['hi']*100:+.1f}] "
           f"spans both the pooled estimate and break-even, so it is not "
           f"evidence\n  of decay on its own -- monitor/monitor.py is the "
