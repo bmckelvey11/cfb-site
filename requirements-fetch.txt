@@ -12,5 +12,9 @@
 numpy>=1.26,<3
 scipy>=1.11,<2
 duckdb>=1.3,<2
+# Not imported by our code: duckdb's executemany probes for pandas on every batch,
+# and a failed import re-walks sys.path each time. Without it, build_core's
+# fact_game_line insert took 35+ min on 2026-09-22 instead of seconds.
+pandas
 pytz
 tzdata
