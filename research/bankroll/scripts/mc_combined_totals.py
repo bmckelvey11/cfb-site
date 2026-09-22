@@ -57,7 +57,14 @@ OZ_WINS, OZ_LOSSES = 151, 83
 #              same signal in earlier seasons, never independent confirmation.
 #  pff-window  the same pooling restricted to 2024-25 (72-50), the slice most
 #              strongly identified as PFF-driven. Sensitivity only.
-GL_PRIORS = {"n58": (32, 26), "pooled": (146, 113), "pff-window": (104, 76)}
+#  gl-history  146-124: every graded Greenline UNDER across all three eras -- 2020
+#              PFF_hist, the 2022-23 export slates, and 2026 weeks 2-3
+#              (research/totals/docs/greenline-totals-pooled-2026-09-22.md). The only
+#              prior here with no personal selection in it at all: 212 of its 270 picks
+#              predate any bet of ours, so nothing in it was filtered by which flags we
+#              chose to take. Mean 54.1% against the other priors' 55-56%.
+GL_PRIORS = {"n58": (32, 26), "pooled": (146, 113), "pff-window": (104, 76),
+             "gl-history": (146, 124)}
 
 # MODEL_GUIDE.md: the 1.75 threshold was chosen on this data, so the 64.5% point
 # estimate is selection-inflated. The guide says plan on the 58.2% lower bound.
