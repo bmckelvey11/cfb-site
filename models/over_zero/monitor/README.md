@@ -10,7 +10,7 @@ python monitor/run_monitor.py                 # decay tables, 2013–2025
 python monitor/run_monitor.py --width 3       # trailing-window width
 python monitor/run_walkforward.py             # train ≤ t−1, bet season t
 python monitor/run_walkforward.py --threshold 1.75 --min-train 5
-python monitor/roi_report.py                  # ROI of the deployed filter + figure
+python monitor/roi_report.py --season $(seq 2013 2026)   # ROI of the deployed filter + figure
 ```
 
 Files: `monitor.py` (per-season/trailing stats, Wilson CIs, slope trend test),
@@ -79,7 +79,7 @@ the decay drivers keep). Same walk-forward protocol; the only addition is a
 season label per bet, which the equity curve and per-season bars need.
 
 ```bash
-python monitor/roi_report.py                        # table + figure + CSV
+python monitor/roi_report.py --season $(seq 2013 2026)   # table + figure + CSV
 python monitor/roi_report.py --threshold 1.0        # compare filters
 python monitor/roi_report.py --self-check           # ROI maths assertions
 python monitor/roi_report.py --no-fig --no-csv      # table only
@@ -97,28 +97,29 @@ Three ROI definitions, ranked as MODEL_GUIDE ranks them:
   map, so its interval is bootstrapped (10k resamples).
 - **compounded bankroll** — equity curve only, labelled order-dependent.
 
-Result (2013–2025 data, bet seasons 2016–2025, run 2026-08-28):
+Result (2013–2026 data, bet seasons 2016–2026, run 2026-09-22; 2026 is a
+partial season — see [ROI_HITRATE.md](../docs/ROI_HITRATE.md)):
 
 | metric | value | 95% interval |
 |--------|-------|--------------|
-| record | 151–83 (64.53%) over N=234 | win [58.21%, 70.38%] |
-| flat-stake ROI @ −110 | **+23.19%** per unit risked | [+11.13%, +34.36%] |
-| flat profit | **+54.27u** on 234u risked | — |
-| ¼-Kelly ROI | +23.58% per unit staked | [+11.45%, +35.77%] (boot) |
-| ¼-Kelly profit | +310.36u on 1,316u staked | — |
-| ROI @ −120 | +18.30% | planning bound +6.72% |
-| max drawdown | 6.18u flat / 35.4u Kelly | — |
+| record | 178–97 (64.73%) over N=275 | win [58.91%, 70.14%] |
+| flat-stake ROI @ −110 | **+23.57%** per unit risked | [+12.47%, +33.90%] |
+| flat profit | **+64.82u** on 275u risked | — |
+| ¼-Kelly ROI | +25.12% per unit staked | [+13.71%, +36.13%] (boot) |
+| ¼-Kelly profit | +385.30u on 1,534u staked | — |
+| ROI @ −120 | +18.67% | planning bound +8.01% |
+| max drawdown | 6.18u flat / 35.0u Kelly | — |
 
 ### Kelly in units — why flat is what ships
 
-The two ROI percentages look interchangeable (+23.19% vs +23.58%) and are
+The two ROI percentages look interchangeable (+23.57% vs +25.12%) and are
 not: flat's denominator is units *risked*, Kelly's is units *staked*, and
-Kelly's turnover is **5.6× larger**. Converting to units makes the
+Kelly's turnover is **5.58× larger**. Converting to units makes the
 distinction visible, and makes the stake sizes visible with it:
 
 | ¼-Kelly stake | min | median | mean | max |
 |---|---|---|---|---|
-| units (= % of bankroll) | 1.37u | 5.25u | 5.63u | **11.20u** |
+| units (= % of bankroll) | 1.38u | 5.21u | 5.58u | **11.15u** |
 
 Quarter-Kelly wants **11% of bankroll on a single game**, and 5% on the
 median one. That is what Kelly says when it is sized off a point-estimate
@@ -126,7 +127,7 @@ win probability with no allowance for estimation error — at p ≈ 0.65 and
 b = 0.909, full Kelly is ~26% of bankroll and the quarter is ~6.6%. Add that
 a college slate settles simultaneously (several 5u bets live at once, which
 sequential Kelly does not model) and the realised drawdown is 35u against
-flat's 6u for the same 151–83.
+flat's 6u for the same 178–97.
 
 Flat 1u per qualifying bet is the deployable rule. The Kelly column is there
 to show the edge is big enough that a stake rule *could* exploit it harder,
@@ -135,7 +136,7 @@ not as a recommendation.
 ### Raw backtest CSV
 
 `docs/backtest_bets.csv` — one row per graded walk-forward game, **all
-10,255 of them**, not just the 234 clearing the filter, so the bias-bin table
+11,048 of them**, not just the 275 clearing the filter, so the bias-bin table
 in [ROI_HITRATE.md](../docs/ROI_HITRATE.md) is reproducible from the file
 alone. Columns: game identity (`game_id`, `season`, `week`, `date`, teams),
 the inputs (`spread`, `total`, `fav_pts`, `dog_pts`, `actual_total`), the
