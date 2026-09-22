@@ -26,6 +26,7 @@ PFF showed, and accumulate until the sample can answer.
 | [greenline-w2-grade-2026-09-15.md](greenline-w2-grade-2026-09-15.md) | Week 2's 36 positive-edge unders graded, including the six flags that needed a score or line fallback |
 | [greenline-w3-grade-2026-09-21.md](greenline-w3-grade-2026-09-21.md) | Week 3's 22-pick under list graded at PFF's number and at DraftKings' (11-11, neither price flips a pick), plus all 57 flags |
 | [greenline-archive-2026-09-17.md](greenline-archive-2026-09-17.md) | The pre-2026 PFF archives parsed into one CSV — 2020 season plus three 2022-23 slates. 368 derived picks, price-aware grading, every split below floor; pooled CLV is a moneyline artifact |
+| [greenline-archive-join-audit-2026-09-21.md](greenline-archive-join-audit-2026-09-21.md) | Is the parsed archive safe to query? `is_greenline_pick` is copied onto all three snapshots (1,104 rows vs 368 picks), and two slots are joined to the wrong CFBD game via a weak-token name match |
 | [../../bankroll/docs/under-selection-profile-2026-09-17.md](../../bankroll/docs/under-selection-profile-2026-09-17.md) *(in `research/bankroll/`)* | Which unders got bet, 2023-25, against every FBS game on the same days — the selection is a high-total rule, and the bet unders sit six points above where Greenline flags |
 
 > **Read the MDE line before quoting any record.** Each review states the smallest true win
@@ -57,6 +58,7 @@ they silently read a stale capture.
 | — | [`../scripts/greenline_pricing.py`](../scripts/greenline_pricing.py) | Side analysis: reverse-engineers the arithmetic behind PFF's displayed numbers |
 | — | [`../scripts/parse_greenline_history.py`](../scripts/parse_greenline_history.py) | Off-pipeline: parses the pre-2026 OneDrive archives (`PFF_hist.xlsx`, `ncaa-best-bets*.csv`) into one long-form CSV. Derives the pick from the opening Greenline snapshot, never the close |
 | — | [`../scripts/greenline_archive_review.py`](../scripts/greenline_archive_review.py) | Grades that archive — break-even from the quoted price per market, ROI, and MDE per split |
+| — | [`../scripts/audit_archive_joins.py`](../scripts/audit_archive_joins.py) | Audits that archive's `game_id` joins against CFBD by score consistency — the only test that catches a wrong match sharing a school-name token. Exits 1 on failure |
 | — | [`../../bankroll/scripts/greenline_bet_log.py`](../../bankroll/scripts/greenline_bet_log.py) *(in `research/bankroll/`)* | **The ledger of which flags actually got bet.** Reads these captures; seed after every one |
 | — | [`../../bankroll/scripts/under_selection_profile.py`](../../bankroll/scripts/under_selection_profile.py) *(in `research/bankroll/`)* | Profiles the 2023-25 bet unders against the slate they were picked from |
 
