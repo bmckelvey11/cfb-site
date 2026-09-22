@@ -93,6 +93,7 @@ CORE_NOTES = {
     "coach_name_conflicts": "Audit: one name, several coach ids",
     "coach_season_unmatched": "Audit: coach seasons that would not join",
     "fact_game_line_conflicts": "Audit: REST and GraphQL disagree on a line",
+    "game_projections": "Per-site projected spread and total (teamrankings, numberfire)",
 }
 
 DATA_SPAN = re.compile(r"(const DATA = \{)(.*?)(\n      \};)", re.S)

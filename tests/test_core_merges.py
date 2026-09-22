@@ -198,8 +198,14 @@ def test_the_line_merge_did_not_lose_a_rest_offer(con):
             key = _provider_key(_first(line, "provider"))
             if key is not None:
                 rest_keys.add((int(game_id), key))
+    # Union `game_projections`: the projection sites were split out of the line tape,
+    # so "still in core" is now two tables. Checking only `fact_game_line` would read
+    # a deliberate move as 13,354 lost offers.
     kept = set(con.execute(
         "SELECT game_id, provider_key FROM core.fact_game_line"
+        " WHERE _source IN ('rest', 'both')"
+        " UNION"
+        " SELECT game_id, provider_key FROM core.game_projections"
         " WHERE _source IN ('rest', 'both')").fetchall())
     assert rest_keys, "REST unnest produced no offers"
     missing = rest_keys - kept

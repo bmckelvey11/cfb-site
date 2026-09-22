@@ -58,6 +58,8 @@ def build_core(
         built.append("fact_game_line")
         if _merge_game_lines(con):
             built.append("fact_game_line_conflicts")
+        _build_game_projections(con)
+        built.append("game_projections")
         _build_dim_lines_provider(con)
         built.append("dim_lines_provider")
         _build_fact_game_team(con)
@@ -287,8 +289,19 @@ def _lines_list(value: Any) -> list[dict[str, Any]]:
     return out
 
 
+# Model projection sites, not sportsbooks. They post a number for every game, which is
+# why they win an array-order fallback so often, and that number was never tradeable.
+PROJECTION_PROVIDERS = ("teamrankings", "numberfire")
+
+
 def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
-    """All REST games + has_line; selected books clone normalize._select_line/_select_total."""
+    """All REST games + has_line; selected books clone normalize._select_line/_select_total.
+
+    One documented departure from the clone: projection sites are filtered out before
+    spread selection (see ``PROJECTION_PROVIDERS``), so core and ``games.csv`` disagree
+    on 197 projection-only games. ``tests/test_core_agreement.py`` asserts that
+    divergence positively.
+    """
     con.execute("DROP TABLE IF EXISTS core.fact_game")
     con.execute(
         f"""
@@ -388,7 +401,22 @@ def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
             continue
 
         lines = lines_by_id.get(int(game_id), [])
-        selected = _select_line(lines, provider)
+        # Spread selection sees books only. `_select_line` falls back to array order when
+        # no preferred provider matches, and the projection sites quote every game, so
+        # they won that fallback on 203 games -- a model number sitting in
+        # `selected_spread` as if a book had hung it. 197 of those 203 have no book
+        # spread at all, so they lose `has_line` rather than reroute; that is the honest
+        # answer for a game nobody took a price on.
+        #
+        # `_select_total` still gets the unfiltered list: totals are a separate column
+        # with a separate fallback, and narrowing them here would null ~2,901 more games
+        # in a change that was scoped to spreads.
+        books = [
+            line
+            for line in lines
+            if _provider_key(_first(line, "provider")) not in PROJECTION_PROVIDERS
+        ]
+        selected = _select_line(books, provider)
         has_line = selected is not None
         spread_provider = total_provider = None
         spread = total = None
@@ -715,8 +743,57 @@ def _merge_game_lines(con: duckdb.DuckDBPyConnection) -> bool:
     return True
 
 
+def _build_game_projections(con: duckdb.DuckDBPyConnection) -> None:
+    """Split the projection sites off ``fact_game_line`` into ``core.game_projections``.
+
+    ``teamrankings`` and ``numberfire`` are model projection sites, not sportsbooks --
+    their numbers were never tradeable, and sitting on the line tape they get picked up
+    by anything that treats a ``provider_key`` as a book (see the manual
+    ``NON_BOOK_PROVIDERS`` filters in ``scripts/analyze_wind_totals.py`` and
+    ``research/totals/scripts/kicker_totals_effect.py``, which this makes redundant).
+
+    Runs **after** ``_merge_game_lines``, not inside ``_build_fact_game_line``: the merge
+    drops and recreates the whole table from a FULL OUTER against ``stg.game_lines``, and
+    both providers are present on the GraphQL side too, so a filter upstream of it would
+    be silently undone. Running after also means the new table inherits the merge's
+    ``coalesce(rest, gql)`` value resolution for free.
+
+    Narrow by measurement: across all 13,354 projection rows ``spread_open``,
+    ``total_open`` and both moneylines are 100% NULL, and open/close is not a distinction
+    a projection has. ``fact_game_line_conflicts`` needs no cleanup -- it holds zero rows
+    for either provider, the two sources never disagreed.
+
+    ``_build_fact_game`` no longer lets a projection win ``selected_spread_provider_key``.
+    ``selected_total_provider_key`` still resolves to one on 3,104 games, and since
+    3,098 of those have no book total at all, narrowing totals nulls them rather than
+    rerouting -- a separate decision, deliberately not taken here.
+    """
+    con.execute("DROP TABLE IF EXISTS core.game_projections")
+    con.execute(
+        """
+        CREATE TABLE core.game_projections AS
+        SELECT game_id,
+               provider_key,
+               spread_close AS projected_spread,
+               total_close  AS projected_total,
+               formatted_spread,
+               _source
+        FROM core.fact_game_line
+        WHERE provider_key IN (SELECT unnest($providers))
+        """,
+        {"providers": list(PROJECTION_PROVIDERS)},
+    )
+    con.execute(
+        "ALTER TABLE core.game_projections ADD PRIMARY KEY (game_id, provider_key)"
+    )
+    con.execute(
+        "DELETE FROM core.fact_game_line WHERE provider_key IN (SELECT unnest($providers))",
+        {"providers": list(PROJECTION_PROVIDERS)},
+    )
+
+
 def _build_dim_lines_provider(con: duckdb.DuckDBPyConnection) -> None:
-    """Distinct books on the full line tape (+ selected close keys)."""
+    """Distinct providers on the line tape and projections (+ selected close keys)."""
     con.execute("DROP TABLE IF EXISTS core.dim_lines_provider")
     con.execute(
         """
@@ -724,6 +801,8 @@ def _build_dim_lines_provider(con: duckdb.DuckDBPyConnection) -> None:
         SELECT DISTINCT provider_key
         FROM (
           SELECT provider_key FROM core.fact_game_line
+          UNION
+          SELECT provider_key FROM core.game_projections
           UNION
           SELECT selected_spread_provider_key AS provider_key FROM core.fact_game
           UNION

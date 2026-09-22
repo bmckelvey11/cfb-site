@@ -158,6 +158,11 @@ TABLE_NOTES: dict[tuple[str, str], str] = {
         "the two disagree REST wins and the loser is kept in "
         "fact_game_line_conflicts."
     ),
+    ("core", "game_projections"): (
+        "One row per game x projection site (teamrankings, numberfire). Model "
+        "numbers, not tradeable prices -- split off fact_game_line so a "
+        "provider_key there is always a sportsbook."
+    ),
     ("core", "fact_game_line_conflicts"): (
         "Rows where the REST and GraphQL line tapes disagreed for a game x book. "
         "Audit trail, not a join target."
@@ -320,6 +325,8 @@ _EDGES: tuple[tuple[str, str, str, str, str], ...] = (
     ),
     ("fact_game_line", "game_id", "fact_game", "game_id", ""),
     ("fact_game_line", "provider_key", "dim_lines_provider", "provider_key", ""),
+    ("game_projections", "game_id", "fact_game", "game_id", ""),
+    ("game_projections", "provider_key", "dim_lines_provider", "provider_key", ""),
     ("fact_game_team", "game_id", "fact_game", "game_id", ""),
     (
         "fact_game_team",
