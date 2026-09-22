@@ -158,6 +158,40 @@ era composition cancels instead of reporting itself as a finding.
 
 **Nothing survives Holm**, smallest adjusted p 0.232.
 
+## The 55+ and sub-4% unders, asked for by name
+
+Added 2026-09-22 on request. This is the **intersection** of two of the four splits above,
+asked for after the grid was read — not a fifth pre-registered split. It is here because it
+gets asked, with the table that settles it.
+
+| population | n | W-L | hit% | Wilson 95% | mde% | ROI (priced n) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| market total 55+ | 195 | 110-85 | 56.4% | 49.4 – 63.2 | 61.3% | +13.3% (143) |
+| edge below 4% | 246 | 138-108 | 56.1% | 49.8 – 62.2 | 60.3% | +7.9% (191) |
+| **both: 55+ and below 4%** | 191 | 110-81 | **57.6%** | 50.5 – 64.4 | 61.4% | **+14.9%** (141) |
+| all unders, for contrast | 270 | 146-124 | 54.1% | 48.1 – 59.9 | 59.9% | +4.0% (213) |
+
+Read on its own that is a 57.6% cell returning +14.9%. Then split it by era:
+
+| era | n | W-L | hit% | ROI (priced n) |
+| --- | ---: | ---: | ---: | ---: |
+| 2020 PFF_hist | 110 | 60-50 | 54.5% | +5.7% (110) |
+| 2022-23 exports | 50 | 26-24 | 52.0% | no price |
+| **2026 flags** | 31 | **24-7** | **77.4%** | **+47.8%** (31) |
+
+**Chi-square across eras: 6.05 on 2 df, p 0.049.** This is the test the pooled board passes
+at p 0.91 — six years, three capture formats, one rate. **The cell fails it.** 57.6% is an
+average over 54.5%, 52.0% and 77.4%, and it describes none of them. The 2026 version of the
+cell differs from the same cell in the other two eras at Fisher p 0.017.
+
+The return sits in the same 31 picks: strip 2026 and the cell returns +5.7%, on rows priced
+at PFF's own published break-even rather than a book's. Strip 2020 instead and the whole
+unders pool goes from +4.0% to **−0.2%**, which is worth knowing on its own — the pooled
+positive return leans on the era whose prices we cannot verify.
+
+So: a real-looking cell, 31 picks wide, in the era it was found in. Exactly the shape the
+permutation test above exists to catch.
+
 ## Walk-forward — and why it cannot be run
 
 | direction | rule chosen | training half | held-out half | held-out n |
@@ -220,6 +254,40 @@ era-stratified exactly as the four above.
 If it holds out of sample it is a genuine and slightly funny finding — the vendor's own
 confidence ranking inverted at its top end. If it does not, it was the grid talking, and this
 paragraph is the record that it was called in advance.
+
+## What to test next, ranked
+
+Win/loss is a low-information signal and this corpus has nearly exhausted it: separating a
+54% true rate from break-even needs about 5,900 graded picks, eight-plus seasons at this
+board's volume. So the highest-value tests are the ones that **change the currency** or
+**check what the current number leans on** — not more of the same accumulation.
+
+1. **Closing-line value against a real market close.** A pick's CLV is worth far more per
+   observation than its win or loss, because it is measured against a price rather than a
+   coin flip — the same corpus that needs ~5,900 results to resolve a hit rate can resolve a
+   CLV signal in a few hundred. The tree currently computes CLV against *PFF's own board
+   close*, which asks whether PFF agrees with itself. Against Pinnacle's close it asks the
+   question that matters. `models/totals/clv.py` and the weekly
+   `greenline_vs_pinnacle_*` captures are already the pieces; what is missing is a close.
+   **This is the one that could change the verdict within a season, and it is where the
+   next hour should go.**
+2. **The 2020 price claim.** The pooled ROI leans on 2020, and 2020 is priced at PFF's
+   published break-evens — median implied −107, better than any total we have ever seen
+   offered. Strip 2020 and the unders return −0.2%. Either the prices were real, in which
+   case the number stands, or they were a modeled best-available and every ROI in this tree
+   is optimistic. Check a sample of 2020 break-evens against any surviving historical odds
+   source. Cheap, and it either confirms or invalidates a number three docs now quote.
+3. **The registered `value` ≥ 0.04 hypothesis** — already frozen, with a 56-pick stopping
+   rule. Not a new test, just: do not look early.
+4. **Whether the board's edge lives in line movement rather than in results.** Does a
+   Greenline flag predict which way the market total moves between capture and close? That
+   is a bet-free test of whether PFF knows something, it accrues every week whether or not
+   anything is bet, and the spread side of this repo has the machinery for exactly this
+   question.
+5. **Not worth testing further:** bands, edge thresholds, overs, Pinnacle shade, and the
+   situational filters. Each has now been tested at least twice and returned nothing, and
+   every additional look on the same 324 picks costs multiplicity without buying
+   information.
 
 ## Method notes
 

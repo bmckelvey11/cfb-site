@@ -46,8 +46,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from greenline_bet_stats import heterogeneity  # noqa: E402
 from greenline_season_review import BREAK_EVEN, mde, wilson  # noqa: E402
-from pool_totals_record import load  # noqa: E402
+from pool_totals_record import DASH, load  # noqa: E402
 
 ERAS = ["2020 PFF_hist", "2022-23 exports", "2026 flags"]
 
@@ -218,6 +219,52 @@ def holm(ps: list[float]) -> list[float]:
     return out
 
 
+def roi(rs: list[dict], flat: bool = False) -> str:
+    """ROI over the price-bearing rows only. The exports carry no price at all."""
+    p = [r for r in rs if r["payout"] is not None]
+    if not p:
+        return "no price"
+    u = sum(((DASH if flat else r["payout"]) if r["win"] else -1.0) for r in p)
+    return f"{u:+.2f}u, {u / len(p) * 100:+.1f}% ({len(p)})"
+
+
+def named_cells(unders: list[dict]) -> list[str]:
+    """The intersection people actually ask about, with the era breakdown that reads it.
+
+    `55+ and under 4%` is not one of the four pre-registered splits -- it is the INTERSECTION
+    of two of them, asked for after the grid was read. It is reported because it gets asked,
+    with the one table that settles it.
+    """
+    cell = [r for r in unders if r["line"] >= 55 and r["value"] < REGISTERED_CUT]
+    comp = [("market total 55+", [r for r in unders if r["line"] >= 55]),
+            ("edge below 4%", [r for r in unders if r["value"] < REGISTERED_CUT]),
+            ("**both: 55+ and below 4%**", cell),
+            ("all unders, for contrast", unders)]
+    L = ["", "## The 55+ and sub-4% unders, asked for by name", "",
+         "| population | n | W-L | hit% | Wilson 95% | mde% | ROI (priced n) |",
+         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
+    for lab, s in comp:
+        w, l, h = rec(s)
+        lo, hi = wilson(w, len(s))
+        L.append(f"| {lab} | {len(s)} | {w}-{l} | {h * 100:.1f}% | {lo * 100:.1f} – {hi * 100:.1f} "
+                 f"| {mde(len(s)) * 100:.1f}% | {roi(s)} |")
+    stat, p, df = heterogeneity({e: [r for r in cell if r["era"] == e] for e in ERAS})
+    L += ["", "### The same cell, era by era", "",
+          "| era | n | W-L | hit% | ROI (priced n) |", "| --- | ---: | ---: | ---: | ---: |"]
+    for e in ERAS:
+        s = [r for r in cell if r["era"] == e]
+        w, l, h = rec(s)
+        L.append(f"| {e} | {len(s)} | {w}-{l} | {h * 100:.1f}% | {roi(s)} |")
+    L += ["", f"**Chi-square across eras: {stat:.2f} on {df} df, p {p:.3f}.** The pooled board "
+          "passes this same test at p 0.91 — it really is one thing across six years. This cell "
+          "does not. Its headline rate is an average over eras that differ, so quoting it as a "
+          "rate is quoting a number that describes none of them.", "",
+          f"Its return is in the same place: the ROI is carried by the {len([r for r in cell if r['era'] == '2026 flags'])} "
+          "2026 picks, and the 2020 rows underneath it are priced at PFF's own published "
+          "break-even rather than a book's.", ""]
+    return L
+
+
 def report(rs: list[dict], reps: int) -> str:
     hdr = "| split | n | W-L | hit% | Wilson 95% | mde% |\n| --- | ---: | ---: | ---: | ---: | ---: |"
     L = [f"`research/totals/scripts/totals_rule_search.py`. {len(rs)} graded Greenline totals "
@@ -315,6 +362,8 @@ def report(rs: list[dict], reps: int) -> str:
                if not survivors else
                f"**Survives Holm: {', '.join(survivors)}.**"), ""]
 
+    L += named_cells(U)
+
     L += ["## Walk-forward — does the rule survive being chosen elsewhere?", "",
           "| direction | rule chosen | on the training half | on the held-out half | held-out n |",
           "| --- | --- | ---: | ---: | ---: |",
@@ -389,6 +438,14 @@ def self_check() -> None:
     assert REGISTERED_CUT == 0.04 and abs(q5 - 0.040035076) < 1e-9, (REGISTERED_CUT, q5)
     ua = [r for r in rs if r["side"] == "under" and r["value"] >= REGISTERED_CUT]
     assert (sum(r["win"] for r in ua), len(ua)) == (8, 24), (sum(r["win"] for r in ua), len(ua))
+
+    U = [r for r in rs if r["side"] == "under"]
+    cell = [r for r in U if r["line"] >= 55 and r["value"] < REGISTERED_CUT]
+    w = sum(r["win"] for r in cell)
+    assert (w, len(cell)) == (110, 191), (w, len(cell))
+    e26 = [r for r in cell if r["era"] == "2026 flags"]
+    assert (sum(r["win"] for r in e26), len(e26)) == (24, 31)   # the cell IS 2026
+    assert heterogeneity({e: [r for r in cell if r["era"] == e] for e in ERAS})[1] < 0.05
 
     assert holm([0.01, 0.04]) == [0.02, 0.04]
     assert holm([0.5, 0.5, 0.5]) == [1.0, 1.0, 1.0]
