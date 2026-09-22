@@ -6,8 +6,8 @@ actually found. Nothing is deleted — a step that turns out to be wrong is stru
 reason, so the next pass does not re-open it.
 
 **Status 2026-09-21: S1–S5, S7 and S8 done. S6 is half done — `PFF_API` was rotated, the go
-was given, and 2023, 2024 and 2026 are pulled and audit clean. 2014–2022 remain,
-at ~1,620 reads + 5,480 exports.** 2025 stays the reference season: the process was proven
+was given, and 2021, 2022, 2023, 2024 and 2026 are pulled and audit clean. 2014–2020 remain,
+at ~1,260 reads + 4,263 exports, ~7.1 h at the observed pace.** 2025 stays the reference season: the process was proven
 and trimmed against it before any backfill call, because a backfill pays every inefficiency
 once per season. Applying it to 2024 cost two corrections — the season-level leaderboards
 `--player-facets` does not plan, and two direction codes 2025 never emitted — both recorded
@@ -31,7 +31,7 @@ wins on what is finished.
 | S3 | `scripts/pff_flatten.py` — raw → `data/processed/pff/` | S5 | **done** | 2026-09-08 |
 | S4 | `pff_franchise` map — PFF slug → `cfbd_team_id` | S5 | **done** | 2026-09-09 |
 | S5 | loader entries → `stg` | S6 | **done** | 2026-09-09 |
-| S6 | Backfill 2014–2024, finish 2026 | — | **parts 1–2 done** — 2023 + 2024 + 2026 clean; 2014–2022 open | 2026-09-21 |
+| S6 | Backfill 2014–2024, finish 2026 | — | **parts 1–3 done** — 2021–2024 + 2026 clean; 2014–2020 open | 2026-09-22 |
 | S7 | Trim the pull plan using 2025 as the reference season | S6 | **done** | 2026-09-10 |
 | S8 | Decide the player tier: finish it or delete the smoke test | — | **done** — deleted | 2026-09-10 |
 
@@ -187,7 +187,7 @@ against the live warehouse).
 **Done when:** a rebuild lands the PFF tables, `scripts/check_an_tick_pin.py`'s sibling
 check passes for PFF, and row counts match the processed CSVs.
 
-## S6 — Backfill and 2026 ▶ parts 1–2 done 2026-09-21 — 2023 + 2024 + 2026 clean, 2014–2022 open
+## S6 — Backfill and 2026 ▶ parts 1–3 done 2026-09-22 — 2021–2024 + 2026 clean, 2014–2020 open
 
 > **2026-09-21.** Both blockers below are cleared — `PFF_API` was rotated and the go was
 > given, scoped to two seasons. **2024 and 2026 are pulled and audit clean**; 2014–2023
@@ -774,3 +774,77 @@ given in the addendum above: `refresh_cfbd.py` reflattens before `build_duckdb`,
 CSV lands on the next scheduled refresh.
 
 **Still open: 2014–2022.** The TODO's ~8 h figure was priced for 2014–2023; 2023 is now off it.
+
+### 2026-09-22 — S6 part 3: 2021 and 2022 pulled from scratch, both audit clean
+
+The first genuinely from-scratch backfill of this step. 2023 had been pulled the evening before
+and only needed a residual sweep; 2021 and 2022 held **9 files each** (the shared
+`team_directory_<season>.json` and friends) and came down whole.
+
+`pull_pff_modeling.py --seasons 2021,2022 --player-facets` planned **360 reads + 1,218 exports,
+~75 min**, and ran **122.2 min — 1.63× the plan**, well past the 1.28× drift 2024 showed. Pace
+was not uniform: 5.9 s/export through the first third, 3.75 s/export by 2021 wk19, 4.68 s/export
+in 2022. `EXPORT_PACING_SECONDS = 3.5` is the floor, not the expectation; **price a full season
+at ~60 min, not ~37**.
+
+**One failure, and it was transport, not entitlement:**
+
+```
+FAIL facet-offense-pass-blocking: reading response body for GET
+https://api.pff.com/v1/facet/offense/pass_blocking?...season=2021&week=5...: read tcp
+```
+
+Re-pulled by hand at **1,390 rows × 30 cols**. Worth noting the shape: `pull_one` deletes the
+destination on a failed read, so this left no zero-byte file — `#pff-export-skip-ignores-size`
+would not have been re-triggered — but the *run* still exited non-zero, and that mattered (below).
+
+**The chained season-level sweep did not run, and the `&&` is why.** The command was
+`pull_pff_modeling.py ... && pull_pff_facet.py all ...`; one failed export makes the first exit
+non-zero, so the sweep was skipped silently. Re-run afterwards as two single-season calls:
+**26/28 exported each**, the two misses being `facet-defense-coverage-matchup` and
+`facet-receiving-coverage`, the same `upstream 500` pair `SKIP_FACETS` pins out. Both seasons now
+hold **26 season-level files, matching 2023/2024/2025**. *Use `;` rather than `&&` when chaining
+the sweep, or run it as its own step — a pull that is 99.9% successful should not skip it.*
+
+**Audit: both seasons identical and clean.**
+
+| | 2021 | 2022 |
+| --- | --- | --- |
+| Files (usable) | 796 (788) | 796 (788) |
+| Tiers | leaderboard 606, team 190 | leaderboard 606, team 190 |
+| Defects | 8 | 8 |
+| Missing cells | 29 | 29 |
+| Weeks | 0–20 | 0–20 |
+
+**Every missing cell in both seasons is week 16, and both wk16s had no games at all.**
+`games_2021_wk16.json` and `games_2022_wk16.json` are `{"games": []}`, and all 8 defects per
+season are that same week's team files (`games`, 7 × `team_stats`). Checked exhaustively rather
+than from the audit's truncated list: enumerating every op's week set against 0–20 returns **zero
+non-wk16 gaps** in either season.
+
+This is *simpler* than 2023, and the difference is worth keeping. 2023 had two empty weeks — wk16
+with no games and **wk14 with 8 games that were all FCS**, against `--division fbs` exports. 2021
+and 2022 have no such week: their wk14 and wk15 are thin but not empty (27 and 18 leaderboard rows
+in 2021, 26 and 24 in 2022, against 1,789 and 1,740 in wk13). **Do not carry a week-number pattern
+forward to 2014–2020** — classify each season's empty weeks against its own `games_*.json`.
+
+**Flatten and validate: 0 FAILs, and the schema question these seasons existed to answer is
+answered.** `pff_flatten.py --validate` over every season on disk resolved every column across 21
+tables from 29 sources and reported **ok on all 21**, with the five DDL-backed tables passing keys
+and CHECKs. That includes **`pff_rushing_direction` at 165,670 rows** — the widened 21-value
+direction CHECK from `eb1b53b` holds against 2021–2022, which are the **first pre-2024 seasons to
+test it**, and pre-2024 is exactly where an uncharted direction code was most likely to appear. No
+new code appeared.
+
+**State after this run.** Processed tables total **5,973,602 rows** (from ~2.67 M after the 2024
+run). `team_game.csv` is **19,614 rows** — 2021 3,142, 2022 3,202, 2023 3,268, 2024 3,340, 2025
+3,406, 2026 3,228, plus ~30 probe rows. `data/raw/pff` grew ~490 MB → **986 MB**.
+
+No warehouse rebuild was run, for the standing reason: `refresh_cfbd.py` calls `_flatten_pff()`
+before `build_duckdb`, so `stg` picks these up on the next scheduled refresh, and a hand rebuild is
+~26 min that has twice dropped `stg.an_*` under memory pressure.
+
+**Still open: 2014–2020**, seven seasons. At the pace actually observed — 180 reads and 609 exports
+a season, 61 min a season — that is **~1,260 reads + ~4,263 exports, ~7.1 h**, plus ~2 min a season
+of season-level leaderboards the planner omits. 2020 is COVID-shortened and should come in under
+that. The ~8 h figure the TODO carried was priced for nine seasons; seven remain.
