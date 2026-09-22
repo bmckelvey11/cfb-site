@@ -27,6 +27,9 @@
         --chip: #eae3d7;
         --chip-on: #1c1916;
         --chip-on-fg: #fffdf8;
+        --glyph-num: #7b5ea7;
+        --glyph-time: #3f7f6f;
+        --glyph-nest: #9a6b3f;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -46,6 +49,9 @@
           --chip: #2a251f;
           --chip-on: #ece7de;
           --chip-on-fg: #161411;
+          --glyph-num: #b49ad8;
+          --glyph-time: #7fbfab;
+          --glyph-nest: #d0a173;
         }
       }
       * {
@@ -304,6 +310,87 @@
       }
       .mono {
         font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      /* Compact column list in a table's detail pane. */
+      .colview-h {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 0 0 8px;
+      }
+      .colview-h input {
+        flex: 1;
+        min-width: 0;
+      }
+      ul.colview {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 420px;
+        overflow: auto;
+      }
+      ul.colview li {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 5px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      ul.colview li:hover {
+        background: var(--chip);
+      }
+      .glyph {
+        flex: none;
+        width: 3ch;
+        text-align: center;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .g-int,
+      .g-real {
+        color: var(--glyph-num);
+      }
+      .g-time {
+        color: var(--glyph-time);
+      }
+      .g-list,
+      .g-nested {
+        color: var(--glyph-nest);
+      }
+      .cname {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nanflag {
+        flex: none;
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        padding: 1px 5px;
+        border-radius: 3px;
+        background: var(--chip);
+        color: var(--muted);
+      }
+      /* The share of null rows, with the bar drawn behind the figure. */
+      .nullbar {
+        flex: none;
+        position: relative;
+        width: 7ch;
+        padding: 2px 6px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        background: linear-gradient(
+          to right,
+          var(--chip) var(--w, 0%),
+          transparent var(--w, 0%)
+        );
+      }
+      .nullbar.nul {
+        color: var(--muted);
+        background: none;
       }
       /* Grain prose runs to 311 characters on the worst nested stg table.
          Clamp it and leave the full text on the title attribute. */
@@ -3958,6 +4045,11 @@
         namedSort: "name:asc",
         coreSort: "n:asc",
         statUnit: "all",
+        // Table-detail column view: "overview" is the compact glyph + null-%
+        // list, "details" the full min/max/distinct table.
+        peekView: "overview",
+        peekQ: "",
+        peekOrder: "table",
       };
 
       function fmt(n) {
@@ -4457,6 +4549,68 @@
         DATA.wstats.map((w) => [`${w.s}.${w.t}.${w.c}`, w.k]),
       );
 
+      // Rows per table, so the overview can turn a null count into a share.
+      const TABLE_ROWS = new Map(
+        DATA.tables.map((t) => [`${t.s}.${t.n}`, t.r]),
+      );
+
+      // One glyph per type family, in the spirit of a database browser's column
+      // list: the family is what you scan for, the exact type is in Details.
+      function typeGlyph(type) {
+        const t = String(type).toUpperCase();
+        if (t.endsWith("[]")) return { g: "[ ]", k: "list", n: "list" };
+        if (t.startsWith("JSON") || t.startsWith("STRUCT") || t.startsWith("MAP"))
+          return { g: "{ }", k: "nested", n: "nested" };
+        if (t === "BOOLEAN") return { g: "0/1", k: "bool", n: "boolean" };
+        if (t.startsWith("TIMESTAMP") || t === "DATE" || t.startsWith("TIME"))
+          return { g: "◷", k: "time", n: "date / time" };
+        if (t.startsWith("VARCHAR") || t === "BLOB" || t === "UUID")
+          return { g: "T", k: "text", n: "text" };
+        if (t.startsWith("DOUBLE") || t.startsWith("FLOAT") || t.startsWith("DECIMAL") || t === "REAL")
+          return { g: "#", k: "real", n: "decimal" };
+        if (t.includes("INT")) return { g: "123", k: "int", n: "integer" };
+        return { g: "?", k: "other", n: t.toLowerCase() };
+      }
+      const GLYPH_ORDER = ["time", "int", "real", "bool", "text", "list", "nested", "other"];
+
+      // The compact column list: glyph, name, null share. NaN is called out
+      // separately -- a GraphQL numeric can be 100% NaN and 0% null, and a bare
+      // "—" there would read as a full column.
+      function overviewRows(key, cols) {
+        const rows = TABLE_ROWS.get(key) || 0;
+        const q = state.peekQ.trim().toLowerCase();
+        let list = cols.filter((c) => !q || c[0].toLowerCase().includes(q));
+        if (state.peekOrder === "type") {
+          list = list
+            .slice()
+            .sort(
+              (a, b) =>
+                GLYPH_ORDER.indexOf(typeGlyph(a[1]).k) -
+                  GLYPH_ORDER.indexOf(typeGlyph(b[1]).k) ||
+                a[0].localeCompare(b[0]),
+            );
+        }
+        if (!list.length) {
+          return `<p class="sub">no column matches “${esc(state.peekQ)}”</p>`;
+        }
+        return `<ul class="colview">${list
+          .map(([name, type, , , , nn, na]) => {
+            const gl = typeGlyph(type);
+            const pct = rows && nn ? (nn / rows) * 100 : 0;
+            const cell = pct
+              ? `<span class="nullbar" style="--w:${Math.min(100, pct).toFixed(1)}%">${pct < 1 ? "<1" : Math.round(pct)}%</span>`
+              : `<span class="nullbar nul">—</span>`;
+            return `<li title="${esc(name)} · ${esc(type)} · ${fmt(nn || 0)} of ${fmt(rows)} null">
+      <span class="glyph g-${gl.k}" aria-label="${esc(gl.n)}">${gl.g}</span>
+      <span class="cname mono">${esc(name)}</span>
+      ${na ? `<span class="nanflag" title="${fmt(na)} NaN">NaN</span>` : ""}
+      ${cell}
+    </li>`;
+          })
+          .join("")}</ul>
+    <p class="sub" style="margin:7px 0 0">${list.length} of ${cols.length} column${cols.length === 1 ? "" : "s"} · the right-hand figure is the share of rows that are null. Switch to Details for type, role, min, max, distinct and NaN.</p>`;
+      }
+
       function statCell(v) {
         return v === null || v === undefined
           ? `<td class="num mono nul">—</td>`
@@ -4510,11 +4664,20 @@
           ? `<div class="tbl-wrap"><table><thead><tr>${head}</tr></thead><tbody>${sampleRows}</tbody></table></div>`
           : `<p class="sub">table is empty</p>`;
 
+        const overview = state.peekView === "overview";
+        const colBody = overview
+          ? `<div class="colview-h">
+        <input type="search" id="peekQ" placeholder="Search columns…" value="${esc(state.peekQ)}">
+        ${pill(state.peekOrder === "type" ? "Type ▾" : "Table order ▾", state.peekOrder === "type", `data-k="peekOrder" data-v="${state.peekOrder === "type" ? "table" : "type"}"`)}
+      </div>
+      ${overviewRows(key, d.c)}`
+          : `<div class="tbl-wrap"><table><thead><tr><th>Column</th><th>Type</th><th>Role</th><th class="num">Min</th><th class="num">Max</th><th class="num">Distinct</th><th class="num">Nulls</th><th class="num">NaN</th></tr></thead><tbody>${colRows}</tbody></table></div>
+      <p class="sub" style="margin:7px 0 0">Min/max/distinct/nulls are omitted for nested (JSON/STRUCT) and BLOB columns. Underlined column names have a PFF definition — hover for it.</p>`;
+
         return `<tr class="peek"><td colspan="${span}"><div class="peek-b">
-    <div><div class="sec-h"><h4>${d.c.length} columns</h4><button type="button" class="pill" data-copy="${esc(key)}" title="Copy the column names, comma-separated">Copy</button></div>
+    <div><div class="sec-h"><h4>${d.c.length} columns</h4><span class="pills">${pill("Overview", overview, 'data-k="peekView" data-v="overview"')}${pill("Details", !overview, 'data-k="peekView" data-v="details"')}<button type="button" class="pill" data-copy="${esc(key)}" title="Copy the column names, comma-separated">Copy</button></span></div>
       ${grainNote ? `<p class="sub" style="margin:0 0 7px">${esc(grainNote)}</p>` : ""}
-      <div class="tbl-wrap"><table><thead><tr><th>Column</th><th>Type</th><th>Role</th><th class="num">Min</th><th class="num">Max</th><th class="num">Distinct</th><th class="num">Nulls</th><th class="num">NaN</th></tr></thead><tbody>${colRows}</tbody></table></div>
-      <p class="sub" style="margin:7px 0 0">Min/max/distinct/nulls are omitted for nested (JSON/STRUCT) and BLOB columns. Underlined column names have a PFF definition — hover for it.</p></div>
+      ${colBody}</div>
     <div><h4>First ${d.s.length} row${d.s.length === 1 ? "" : "s"}</h4>${sample}
       <p class="sub" style="margin:7px 0 0">Ordered by every scalar column for a deterministic sample. Cells over 60 characters are truncated; paths are shown relative to the data root.</p></div>
   </div></td></tr>`;
@@ -4679,6 +4842,17 @@
           state.q = e.target.value;
           document.getElementById("paneBody").innerHTML =
             state.pane === "tables" ? renderTablesPane() : renderStatsPane();
+        }
+        if (e.target.id === "peekQ") {
+          // Re-rendering the pane replaces the input, so put the caret back.
+          const caret = e.target.selectionStart;
+          state.peekQ = e.target.value;
+          document.getElementById("paneBody").innerHTML = renderTablesPane();
+          const next = document.getElementById("peekQ");
+          if (next) {
+            next.focus();
+            next.setSelectionRange(caret, caret);
+          }
         }
       });
 
