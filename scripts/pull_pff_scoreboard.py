@@ -140,10 +140,21 @@ def session_expiry(cookie: str) -> int | None:
 
 
 def check_fresh(cookie: str, now: float | None = None) -> str:
-    """Refuse a cookie whose session JWT already expired. Without this the run spends a
-    request per game to learn the same thing, and reports it as `expired or not premium`
-    -- two causes with different fixes."""
+    """Refuse a cookie that cannot authenticate: no `__session` at all, or one whose JWT
+    already expired. Without this the run spends a request per game to learn the same
+    thing, and reports it as `expired or not premium` -- causes with different fixes.
+
+    The `no __session` case is a wrong copy, not a stale one: a pff.com page fires
+    requests at analytics and CDN hosts too, and those carry their own cookie header
+    with no Clerk keys in it."""
     now = int(now if now is not None else time.time())
+    keys = [part.strip().split("=", 1)[0] for part in cookie.split(";") if "=" in part]
+    if "__session" not in keys:
+        raise SystemExit(
+            "PFF_WEB_COOKIE carries no __session -- that header came from a request to "
+            "some other host. Copy it from a www.pff.com/api/scoreboard request. "
+            f"Keys seen: {', '.join(sorted(set(keys))) or 'none'}"
+        )
     exp = session_expiry(cookie)
     if exp is not None and exp < now:
         raise SystemExit(
@@ -395,6 +406,13 @@ def self_check() -> None:
     assert session_expiry("CookieConsent=1; AWSALB=x") is None
     assert session_expiry("__session=not.a.jwt") is None
     assert check_fresh(jwt(1790056378), now=1790056340).startswith("CookieConsent")
+    try:
+        check_fresh("AWSALB=x; ph_phc_x=y")
+    except SystemExit as exc:
+        assert "carries no __session" in str(exc), exc
+        assert "AWSALB, ph_phc_x" in str(exc), exc
+    else:
+        raise AssertionError("a cookie with no __session must not pass check_fresh")
     try:
         check_fresh(jwt(1790056378), now=1790056563)
     except SystemExit as exc:
