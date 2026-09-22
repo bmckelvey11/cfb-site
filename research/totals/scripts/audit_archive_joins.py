@@ -34,7 +34,11 @@ import pandas as pd
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[3]))
 
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
+
 from cfb_paths import DB_PATH, INGEST  # noqa: E402
+from match_greenline_books import toks  # noqa: E402
+from parse_greenline_history import same_school  # noqa: E402
 
 ARCHIVE = INGEST / "pff_scoreboard" / "greenline_history_archive.csv"
 
@@ -62,6 +66,42 @@ FLIP_SQL = AUDIT_SQL.replace(
     "        OR (a.ap = g.home_points AND a.hp = g.away_points))",
     "WHERE a.ap = g.home_points AND a.hp = g.away_points AND a.ap <> a.hp",
 )
+
+
+TRANSPOSE_SQL = """
+SELECT DISTINCT a.game_id::BIGINT AS gid, a.week, a.home_team AS ht, a.away_team AS at_,
+       a.home_points AS hp, a.away_points AS ap,
+       g.home_team AS gh, g.away_team AS ga, g.home_points AS ghp, g.away_points AS gap
+FROM archive a JOIN core.fact_game g ON g.game_id = a.game_id
+WHERE a.game_id IS NOT NULL AND a.home_points IS NOT NULL
+  AND a.home_points <> a.away_points
+"""
+
+
+def transposed(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
+    """Slots whose team-name columns contradict their own scores.
+
+    A wrong-game join is not the only way a row can lie about who did what. PFF_hist had
+    one game -- Marshall 59, Eastern Kentucky 0 -- joined to the right CFBD game with its
+    `Home Team`/`Away Team` labels swapped, so the archive claimed Marshall scored 0. The
+    points still lined up with CFBD positionally, which is exactly why the score check
+    above cannot see it: only the names were wrong.
+
+    Names must be compared with the parser's alias-aware `toks`, not raw tokens --
+    Ole Miss/Mississippi, UL Monroe/Louisiana-Monroe and Hawai'i/Hawaii all fail a naive
+    comparison and would swamp this in false positives.
+    """
+    rows = con.sql(TRANSPOSE_SQL).df()
+    out = []
+    for r in rows.itertuples():
+        ht = toks(r.ht)
+        names_flipped = (same_school(ht, toks(r.ga))
+                         and not same_school(ht, toks(r.gh)))
+        if names_flipped and r.hp == r.ghp and r.ap == r.gap:
+            out.append({"gid": r.gid, "week": r.week,
+                        "archive": f"{r.at_} @ {r.ht}", "cfbd": f"{r.ga} @ {r.gh}",
+                        "archive_pts": f"{r.ap}-{r.hp}", "cfbd_pts": f"{r.gap}-{r.ghp}"})
+    return pd.DataFrame(out)
 
 
 def audit(con: duckdb.DuckDBPyConnection) -> tuple[pd.DataFrame, pd.DataFrame, int]:
@@ -101,7 +141,13 @@ def main() -> int:
         print(flipped[["gid", "week", "pff_away", "pff_home",
                        "cfbd_away", "cfbd_home"]].to_string(index=False, max_colwidth=28))
 
-    return 1 if len(bad) else 0
+    swapped = transposed(con)
+    print()
+    print(f"TEAM NAMES TRANSPOSED -- names contradict the row's own scores: {len(swapped)}")
+    if len(swapped):
+        print(swapped.to_string(index=False, max_colwidth=32))
+
+    return 1 if (len(bad) or len(swapped)) else 0
 
 
 def self_check() -> None:
@@ -114,7 +160,10 @@ def self_check() -> None:
         INSERT INTO core.fact_game VALUES
             (1, 'UTEP', 'Texas', 3, 59),          -- the game the bad slot grabbed
             (2, 'North Texas', 'UTEP', 45, 43),   -- the game it should have grabbed
-            (3, 'Rice', 'Tulane', 10, 20);
+            (3, 'Rice', 'Tulane', 10, 20),
+            -- right game, but the archive row below labels the host Eastern Kentucky
+            -- while booking the home score as Marshall's 59.
+            (4, 'Eastern Kentucky', 'Marshall', 0, 59);
     """)
     con.execute("""
         CREATE TABLE archive (game_id BIGINT, week INT, home_team VARCHAR,
@@ -122,14 +171,23 @@ def self_check() -> None:
         INSERT INTO archive VALUES
             (3, 5, 'Tulane', 'Rice', 20, 10),            -- exact agreement -> pass
             (2, 15, 'North Texas', 'UTEP', 45, 43),      -- flipped labels -> pass
-            (1, 15, 'North Texas', 'UTEP', 45, 43);      -- wrong game      -> FAIL
+            (1, 15, 'North Texas', 'UTEP', 45, 43),      -- wrong game      -> FAIL
+            (4, 1, 'Eastern Kentucky', 'Marshall', 59, 0); -- names transposed -> FAIL
     """)
     bad = con.sql(AUDIT_SQL).df()
     assert list(bad["gid"]) == [1], f"expected only gid 1 to fail, got {list(bad['gid'])}"
 
     flipped = con.sql(FLIP_SQL).df()
     assert list(flipped["gid"]) == [2], f"expected gid 2 flipped, got {list(flipped['gid'])}"
-    print("self-check OK: correct join passes, pure flip passes, wrong game fails")
+
+    # The transposition is invisible to the score check -- gid 4 agrees with CFBD
+    # positionally -- so it needs its own detector.
+    assert 4 not in list(bad["gid"]), "score check should not see the transposition"
+    swapped = transposed(con)
+    assert list(swapped["gid"]) == [4], f"expected gid 4 transposed, got {swapped.to_dict()}"
+
+    print("self-check OK: correct join passes, pure flip passes, "
+          "wrong game fails, transposed names fail")
 
 
 if __name__ == "__main__":

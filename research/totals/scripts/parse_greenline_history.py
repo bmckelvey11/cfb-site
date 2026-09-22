@@ -410,6 +410,38 @@ def match_by_name(df: pd.DataFrame, games: pd.DataFrame):
     return out, missed, flips
 
 
+def transposed_name_slots(df: pd.DataFrame, hit: dict) -> set:
+    """Slots whose team-name columns contradict their own scores.
+
+    PFF_hist carries one 2020 game -- Marshall 59, Eastern Kentucky 0 -- with `Home Team`
+    and `Away Team` swapped while every other column stays in true home/away order: the
+    home row holds the -3000 moneyline, the -23.5 spread and the 59 points, all of which
+    are Marshall. So the labels are the only thing wrong, and swapping them back is the
+    whole fix -- the numbers must not be touched.
+
+    CFBD referees, and only where it is unambiguous: the names must point one way, the
+    scores the other, and a tie is not decidable. Returns the slot keys to swap.
+    """
+    scores: dict[tuple, tuple] = {}
+    cols = ["Game|Season", "Game|Week", "Game|Home Team", "Game|Away Team",
+            "Game|Home Score", "Game|Away Score"]
+    for r in df[cols].dropna().drop_duplicates().itertuples(index=False):
+        scores[(int(r[0]), int(r[1]), r[2], r[3])] = (parse_int(r[4]), parse_int(r[5]))
+
+    out = set()
+    for key, g in hit.items():
+        hp, ap = scores.get(key, (None, None))
+        if hp is None or ap is None or hp == ap:
+            continue
+        ht = toks(key[2])
+        names_flipped = (same_school(ht, toks(g.away_team))
+                         and not same_school(ht, toks(g.home_team)))
+        scores_straight = (hp == g.home_points and ap == g.away_points)
+        if names_flipped and scores_straight:
+            out.add(key)
+    return out
+
+
 def build_hist(path: Path, con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     df, notes = read_hist(path)
     for n in notes:
@@ -427,6 +459,11 @@ def build_hist(path: Path, con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
         print(f"    home/away flipped vs CFBD: {len(flips)}")
         for f in flips:
             print(f"      FLIPPED {f[0]} wk{f[1]} {f[3]} @ {f[2]} -> {f[4]}")
+    transposed = transposed_name_slots(df, hit)
+    if transposed:
+        print(f"    team-name columns transposed in source: {len(transposed)}")
+        for t in sorted(transposed, key=lambda k: (k[0], k[1])):
+            print(f"      RELABELLED {t[0]} wk{t[1]} {t[3]} @ {t[2]} -> {t[2]} @ {t[3]}")
     if missed:
         by_week: dict[int, int] = defaultdict(int)
         for m in missed:
@@ -449,6 +486,11 @@ def build_hist(path: Path, con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
         market = HIST_MARKETS.get(str(rec.get("Bet Side|Bet Type")))
         if market is None:
             continue
+        # Labels only. Every other column -- scores, lines, side, result -- is already in
+        # true home/away order, which is how the transposition was detected.
+        home_out, away_out = home, away
+        if (int(season), int(week), home, away) in transposed:
+            home_out, away_out = away, home
         diff = parse_num(rec.get(pick_col))
         for block, tag in (("Opening Market Line", "open_market"),
                            ("Opening Greenline Line", "open_greenline"),
@@ -459,8 +501,8 @@ def build_hist(path: Path, con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
                 "game_id": None if game is None else int(game.game_id),
                 "kickoff_utc": None if game is None else pd.Timestamp(
                     game.utc).isoformat(),
-                "home_team": home,
-                "away_team": away,
+                "home_team": home_out,
+                "away_team": away_out,
                 "market": market,
                 "side": rec.get("Bet Side|Side"),
                 "market_line": parse_num(rec.get(f"{block}|Market Line")),
@@ -577,20 +619,35 @@ def self_check() -> None:
     pool = pd.DataFrame([
         # The wrong games the old fallback reached for, both token-sharing.
         {"season": 2020, "week": 2, "game_id": 401236222,
-         "home_team": "Texas", "away_team": "UTEP"},
+         "home_team": "Texas", "away_team": "UTEP",
+         "home_points": 59, "away_points": 3},
         {"season": 2020, "week": 6, "game_id": 401207146,
-         "home_team": "Western Kentucky", "away_team": "Marshall"},
+         "home_team": "Western Kentucky", "away_team": "Marshall",
+         "home_points": 14, "away_points": 38},
         # The right ones, each with home and away the other way round.
         {"season": 2020, "week": 15, "game_id": 401257816,
-         "home_team": "UTEP", "away_team": "North Texas"},
+         "home_team": "UTEP", "away_team": "North Texas",
+         "home_points": 43, "away_points": 45},
         {"season": 2020, "week": 1, "game_id": 401237353,
-         "home_team": "Marshall", "away_team": "Eastern Kentucky"},
+         "home_team": "Marshall", "away_team": "Eastern Kentucky",
+         "home_points": 59, "away_points": 0},
     ])
     hit, missed, flips = match_by_name(hist, pool)
     assert not missed, missed
     assert hit[(2020, 15, "North Texas Mean Green", "UTEP Miners")].game_id == 401257816
     assert hit[(2020, 1, "Eastern Kentucky", "Marshall")].game_id == 401237353
     assert len(flips) == 2, flips
+
+    # Transposed name columns: PFF calls Eastern Kentucky the host and still books the
+    # home score as 59, which is Marshall's. Names lose to the row's own numbers. The
+    # UTEP slot names its host the other way round *and* scores it that way, so it is
+    # self-consistent and must be left alone.
+    scored = hist.assign(**{"Game|Home Score": [45, 59], "Game|Away Score": [43, 0]})
+    swap = transposed_name_slots(scored, hit)
+    assert swap == {(2020, 1, "Eastern Kentucky", "Marshall")}, swap
+    # A tie cannot decide which way round the labels go, so it is never swapped.
+    tied = hist.assign(**{"Game|Home Score": [45, 30], "Game|Away Score": [43, 30]})
+    assert transposed_name_slots(tied, hit) == set()
 
     print("self-check ok")
 

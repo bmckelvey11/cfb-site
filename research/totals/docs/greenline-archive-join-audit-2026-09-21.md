@@ -89,9 +89,10 @@ pass miss, and the weak-token fallback is what converts a miss into a wrong answ
 On the underlying vendor data, the two behave differently and should not be pooled:
 
 - **Marshall / Eastern Kentucky**: PFF's team→score pairing is **wrong**. It has Marshall
-  scoring 0; Marshall won 59–0. Swapping the two team-name columns reproduces CFBD exactly,
-  so one swap explains it — but it cannot be told from here whether the swap is PFF's or
-  the parser's column mapping.
+  scoring 0; Marshall won 59–0. The source settles where the swap comes from — `PFF_hist`
+  itself labels the host Eastern Kentucky while booking the home score, the −3000 moneyline
+  and the −23.5 spread, all of which are Marshall's. Two name columns transposed in the
+  vendor file; every number is right. Fixed below.
 - **UTEP / North Texas**: PFF's team→score pairing is **right** (UTEP 43, North Texas 45).
   Only the home/away designation disagrees with CFBD. 2020 had relocations, so PFF is not
   necessarily the wrong one about the venue.
@@ -126,9 +127,13 @@ names and scores agree, and PFF's weeks 17–18 are the postseason CFBD restarts
   a spread-sign or margin check would do.
 - **Three of 368 picks** sit on a wrong game id, all in the UTEP/North Texas slot. That is
   0.8% of picks and would not move a result that was already below its detection floor.
+- **The audit gates two defect classes, not one.** Score consistency catches a wrong
+  game; `transposed()` catches right-game-wrong-labels. A third class — PFF and CFBD
+  disagreeing about the venue with everything else self-consistent — is reported and
+  allowed, not failed.
 - **Finding 1 is a usage trap, not a defect.** The replication is deliberate — the parser
   carries one flag per bet onto all three snapshots "so a snapshot filter never changes
-  the pick set". It was left as-is. Only Finding 2 was fixed.
+  the pick set". It was left as-is. Finding 2 and the transposed game were fixed.
 
 ## Fix — landed 2026-09-21
 
@@ -151,8 +156,12 @@ Two changes, both scoped to this parser so the 2026 pipeline's `strong()` is unt
 One alias added in `match_greenline_books.py`: `army west point` → `army`. "West" there is
 the academy's name, and the new qualifier rule would otherwise have unmatched Army.
 
-Effect on the file — 8,772 rows and 368 picks unchanged, and **no column other than
-`game_id` changed anywhere**:
+3. **`transposed_name_slots()`** repairs the one game whose team-name columns contradict
+   its own scores (below).
+
+Effect on the file — 8,772 rows and 368 picks unchanged, and the only columns that move
+are `game_id`, its derived `kickoff_utc` (162 rows, the re-matched slots) and the two
+team-name columns (18 rows, one game):
 
 | | slots |
 | --- | --- |
@@ -161,15 +170,32 @@ Effect on the file — 8,772 rows and 368 picks unchanged, and **no column other
 | lost | 0 |
 
 `game_id` coverage rises from 8,328 to 8,454 rows. The audit now reports 0 wrong games
-over 635 slots, and 3 surviving orientation flips (San José State ×2, UTEP/North Texas) —
-same game, PFF and CFBD disagreeing about who hosted, which is allowed.
+and 0 transposed names over 635 slots, and 3 surviving orientation flips (San José State
+×2, UTEP/North Texas) — same game, PFF and CFBD disagreeing about who hosted, which is
+allowed and left as PFF wrote it.
 
-Not fixed, because neither is a matcher bug:
+### The transposed game
 
-- **PFF's team→score pairing for Marshall / Eastern Kentucky is still wrong** in the source
-  (it has Marshall scoring 0; Marshall won 59–0). The audit cannot see it — the points line
-  up positionally with CFBD's — so this stays a known bad row, not a gate.
-- The `is_greenline_pick` replication of Finding 1, which is deliberate.
+`PFF_hist.xlsx` labels the week-1 Marshall game **Marshall @ Eastern Kentucky** while
+every number on the row is in true home/away order:
+
+| PFF column | value | whose |
+| --- | --- | --- |
+| `Home Score` | 59 | Marshall |
+| home moneyline | −3000 | Marshall (FBS over an FCS visitor) |
+| home spread | −23.5 | Marshall |
+
+So only the two name columns are wrong, and the archive was asserting Marshall scored 0.
+The parser now swaps the labels back and leaves every number alone. CFBD referees, and
+only where it is unambiguous: the names must point one way, the scores the other, and a
+tie is not decidable. Across all 635 slots this fires exactly once.
+
+The score check in the audit cannot see this — the points agree with CFBD positionally —
+so `transposed()` was added to the audit as a second detector, name-aware and using the
+parser's aliases. Compared with raw tokens it would drown in false positives: Ole Miss /
+Mississippi, UL Monroe / Louisiana-Monroe and Hawai'i / Hawaii all fail a naive match.
+
+Not fixed, deliberately: the `is_greenline_pick` replication of Finding 1.
 
 ## Reproduce
 
