@@ -26,7 +26,7 @@ Symbols reused throughout. Each equation below also declares its own variables.
 
 | Symbol | Meaning |
 | --- | --- |
-| $g$ | One game. Rows are indexed by game (and prediction timestamp, when there are several). |
+| $g$ | A single game (rows are indexed by game, and by prediction timestamp if multiple forecasts per game). |
 | $i$ | One team. |
 | $t$ | A prediction cutoff (for example, Wednesday 18:00 ET of a given week). |
 | $y_g$ | The realized outcome for game $g$: margin, total, or a 0/1 event, depending on the target. |
