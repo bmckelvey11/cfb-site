@@ -49,6 +49,7 @@ way.
 | C | **Do unders at `value` ≥ 0.04 underperform?** Registered 2026-09-22 at a frozen raw cut. Currently 8-16 against 138-108. | **Registered. No look until 56 prospective picks have graded** (from week 4 forward, ~6 weeks). |
 | D | **Does a flag predict line movement?** A bet-free test of whether PFF knows anything, accruing every week regardless of what gets bet. | Not started. |
 | E | **Closed — do not reopen.** Bands, edge thresholds, overs, Pinnacle shade, situational filters. Each tested at least twice, each null. Further looks on the same 324 picks cost multiplicity and buy nothing. | Closed. |
+| F | **Do team-level PFF stats filter the unders?** Five features registered 2026-09-22 in `pff_under_filters.py` (pass rush, run-heavy, no-deep, weak QB, coverage), each requiring both teams on the under side of the FBS median. | **Blocked on power, not started.** `stg.pff_*` begins at 2025, so only the 88 2026-flag unders can carry a feature — the 2020 and 2022-23 eras cannot. MDE 65.6% at n=88, above the 65% gate the script enforces, so the search does not run. Rerun when the flag board grades enough unders to bring it under. |
 
 ## The 2026 season on its own, all three markets
 
