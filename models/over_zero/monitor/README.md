@@ -112,29 +112,29 @@ for what the source switch changed):
 | record | 141–69 (67.14%) over N=210 | win [60.53%, 73.14%] |
 | flat-stake ROI @ −110 | **+28.18%** per unit risked | [+15.56%, +39.63%] |
 | flat profit | **+59.18u** on 210u risked | — |
-| ¼-Kelly ROI | +25.12% per unit staked | [+13.71%, +36.13%] (boot) |
+| ¼-Kelly ROI | +28.09% per unit staked | [+15.30%, +40.43%] (boot) |
 | ¼-Kelly profit | +423.98u on 1,509u staked | — |
-| ROI @ −120 | +18.67% | planning bound +8.01% |
-| max drawdown | 6.18u flat / 35.0u Kelly | — |
+| ROI @ −120 | +23.14% | planning bound +11.05% |
+| max drawdown | 4.27u flat / 38.0u Kelly | — |
 
 ### Kelly in units — why flat is what ships
 
-The two ROI percentages look interchangeable (+23.57% vs +25.12%) and are
+The two ROI percentages look interchangeable (+28.18% vs +28.09%) and are
 not: flat's denominator is units *risked*, Kelly's is units *staked*, and
-Kelly's turnover is **5.58× larger**. Converting to units makes the
+Kelly's turnover is **7.19× larger**. Converting to units makes the
 distinction visible, and makes the stake sizes visible with it:
 
 | ¼-Kelly stake | min | median | mean | max |
 |---|---|---|---|---|
-| units (= % of bankroll) | 1.38u | 5.21u | 5.58u | **11.15u** |
+| units (= % of bankroll) | 4.25u | 6.56u | 7.19u | **13.47u** |
 
-Quarter-Kelly wants **11% of bankroll on a single game**, and 5% on the
+Quarter-Kelly wants **13.5% of bankroll on a single game**, and 6.6% on the
 median one. That is what Kelly says when it is sized off a point-estimate
 win probability with no allowance for estimation error — at p ≈ 0.65 and
 b = 0.909, full Kelly is ~26% of bankroll and the quarter is ~6.6%. Add that
 a college slate settles simultaneously (several 5u bets live at once, which
-sequential Kelly does not model) and the realised drawdown is 35u against
-flat's 6u for the same 141–69.
+sequential Kelly does not model) and the realised drawdown is 38u against
+flat's 4u for the same 141–69.
 
 Flat 1u per qualifying bet is the deployable rule. The Kelly column is there
 to show the edge is big enough that a stake rule *could* exploit it harder,

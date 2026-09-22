@@ -80,8 +80,13 @@ an artefact of grading against numbers nobody could bet. It does **not** mean
 the strategy now earns 28% — see the caveats below, especially the threshold
 reuse.
 
-Flat +59.18u on 210u risked; ¼-Kelly +423.98u on 1,509u staked. 7/7 bet seasons
-profitable on the point estimate.
+Flat +59.18u on 210u risked, max drawdown 4.27u; ¼-Kelly +423.98u on 1,509u
+staked (7.19× the turnover), max drawdown 38.0u, largest single stake 13.5% of
+bankroll. Flat 1u remains the deployable rule. 7/7 bet seasons profitable on the
+point estimate, 4 of 7 clearing break-even on their own interval.
+
+Decay, re-measured on this configuration rather than inherited from the raw run:
+slope trend **+0.0022 units/yr, p = 0.839**, R² 0.01 — flat, no decay.
 
 ### By bias bin
 
