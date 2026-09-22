@@ -15,7 +15,8 @@ a 52.38% break-even. The eras are statistically one thing (p 0.91), the money in
 contains zero, and **no filter on it survives testing** — not bands, not edge thresholds, not
 situational splits, not Pinnacle agreement. The honest position is a small, mechanical,
 unfiltered allocation sized for uncertainty, and a recommendation on the table to cut the
-unit from 1% to 0.6%.
+unit from 1% to 0.6%. Against a real market close the flags show **no CLV at all** — +0.06 ±
+0.48 points — so whatever the board is, it is not early.
 
 ---
 
@@ -35,12 +36,13 @@ unit from 1% to 0.6%.
 | 10 | **Pinnacle's position does not rank the unders.** Juice lean, line vs PFF's, distance from projection, limit — n=38, nothing survives Holm. | [pinnacle shade](greenline-pinnacle-shade-2026-09-17.md) |
 | 11 | **The 2022-23 exports carry no price**, so they contribute a record and never a return. Integrity gate, not a rounding choice. | [export picks](greenline-export-picks-graded-2026-09-21.md) |
 | 12 | **The archive's CFBD joins are clean** after one repaired transposition and a matcher fix. `is_greenline_pick` is copied onto all three snapshots — a known trap. | [join audit](greenline-archive-join-audit-2026-09-21.md) |
+| 13 | **The flags carry no closing-line value.** +0.06 ± 0.48 points against a gated market close, n=79; all three gated policies land between −0.20 and +0.06. Beating the close does not predict winning the bet either. | [clv](greenline-clv-market-close-2026-09-22.md) |
+| 14 | **The Pinnacle feed must be gated before use.** Ungated CLV reads +0.24; the 18 corrupt rows that inflate it carry +1.06 on their own and span −15 to +27 points. Stable from 0.5 to 5 points of tolerance. | [clv](greenline-clv-market-close-2026-09-22.md) |
 
 ## Open
 
 | # | Question | Status |
 | --- | --- | --- |
-| A | **Does a Greenline flag beat a real market close?** CLV is worth far more per observation than win/loss — hundreds of picks rather than thousands. Today's CLV is computed against PFF's *own* board close, which asks whether PFF agrees with itself. | **Reachable, with a gate — checked 2026-09-22.** See below. |
 | B | **Were the 2020 prices real?** That era is priced at PFF's published break-evens, median implied −107. Strip 2020 and the unders pool goes +4.0% → **−0.2%**. | Not started. Cheap, and it either confirms or deflates every ROI here. |
 | C | **Do unders at `value` ≥ 0.04 underperform?** Registered 2026-09-22 at a frozen raw cut. Currently 8-16 against 138-108. | **Registered. No look until 56 prospective picks have graded** (from week 4 forward, ~6 weeks). |
 | D | **Does a flag predict line movement?** A bet-free test of whether PFF knows anything, accruing every week regardless of what gets bet. | Not started. |
@@ -93,9 +95,11 @@ banner pointing forward. Their conclusions are kept here so nothing is lost with
 | **Is the market-total band split real?** | 2026-09-17, n=240 (201 of them personal bets), bands taken from `greenline_unders.BANDS`. Not significant; band ordering withdrawn from the weekly list. | Confirmed on 270 Greenline-only unders with pre-registered bands: 55+ vs below 55 is CMH p 0.295, Holm 0.384. The original also *used* the contaminated `BANDS` cutpoints it was testing — the re-test does not. |
 | **Does a cap or floor on PFF's `value` help?** | 2026-09-17, n=36, week 2 only. Slope p 0.40, the 4%+ bucket nine games. Window dropped from the week-3 list; spread filter only. | Confirmed on 270 unders: 4%+ vs below is CMH p 0.058, Holm 0.232. Its own closing line asked for exactly this re-run. The cut survives as a *registered hypothesis* (row C), not as a filter. |
 
-### Open question A: is a Pinnacle close actually reachable? (checked 2026-09-22)
+### The Pinnacle close: reachable, and what the gate has to do
 
-**Yes for 2026, and only 2026, and not before a validation gate.**
+**Yes for 2026, and only 2026, and not before a validation gate.** The gate was then tested
+rather than assumed, and it is load-bearing — see
+[clv](greenline-clv-market-close-2026-09-22.md).
 
 - `core.fact_game_line` carries `provider_key = 'pinnacle'` with a `total_close`, sourced
   entirely from the CFBD GraphQL feed (`_source = 'gql'`). 204 rows: 2025 weeks 8-13
