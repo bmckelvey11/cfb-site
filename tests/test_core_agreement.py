@@ -9,10 +9,10 @@ import duckdb
 import pytest
 
 from cfb_system_maker.cli import main
-from cfb_system_maker.duckdb_core import _provider_key, build_core
+from cfb_system_maker.duckdb_core import PROJECTION_PROVIDERS, _provider_key, build_core
 from cfb_system_maker.enrich import _build_line_move_index
 from cfb_system_maker.models import GameRecord
-from cfb_system_maker.normalize import _select_line, _select_total, normalize_games
+from cfb_system_maker.normalize import MEDIAN_PROVIDER, _select_line, _select_total, normalize_games
 from cfb_system_maker.running_stats import compute_running_stats
 from cfb_system_maker.storage import load_processed_games, save_processed_games
 
@@ -144,6 +144,42 @@ def _seed_phase_1a_warehouse(db: Path) -> None:
         """
     )
     con.execute("INSERT INTO stg.lines VALUES (2, [])")
+    # Game 5 is quoted ONLY by a projection site. `normalize` still counts it as lined
+    # (games.csv grades the median over every provider), but core excludes projections
+    # from spread selection, so it must come back has_line = false with all four
+    # selected_* columns null. Without this row the filter is never exercised: every
+    # other seeded game has a book beside the projection.
+    # Game 6 is the 2013-2016 shape: `consensus` hangs a spread and no total, and the
+    # only overUnder on the game belongs to a projection site. Core must keep the spread
+    # and leave `selected_total` null -- the case game 5 does not reach, because game 5
+    # has no book at all. Week 13 so no existing game's entering games_played moves.
+    con.execute(
+        """
+        INSERT INTO stg.lines VALUES (
+          6,
+          [
+            {'awayMoneyline': NULL, 'formattedSpread': 'Alpha -4', 'homeMoneyline': NULL,
+             'overUnder': NULL, 'overUnderOpen': NULL, 'provider': 'consensus',
+             'spread': -4.0, 'spreadOpen': NULL},
+            {'awayMoneyline': NULL, 'formattedSpread': NULL, 'homeMoneyline': NULL,
+             'overUnder': 58.0, 'overUnderOpen': NULL, 'provider': 'numberfire',
+             'spread': NULL, 'spreadOpen': NULL}
+          ]
+        )
+        """
+    )
+    con.execute(
+        """
+        INSERT INTO stg.lines VALUES (
+          5,
+          [
+            {'awayMoneyline': NULL, 'formattedSpread': 'Alpha -9', 'homeMoneyline': NULL,
+             'overUnder': 61.0, 'overUnderOpen': NULL, 'provider': 'teamrankings',
+             'spread': -9.0, 'spreadOpen': NULL}
+          ]
+        )
+        """
+    )
     con.execute(
         """
         INSERT INTO stg.lines VALUES (
@@ -190,7 +226,11 @@ def _seed_phase_1a_warehouse(db: Path) -> None:
           (4, 2023, 12, 'regular', '2023-11-25T17:00:00.000Z', true, 100,
            1, 2, 'Alpha', 'Beta', 'SEC', 'SEC', 31, 28),
           (3, 2023, 1, 'postseason', '2024-01-01T20:00:00.000Z', true, 100,
-           1, 2, 'Alpha', 'Beta', 'SEC', 'SEC', 21, 17)
+           1, 2, 'Alpha', 'Beta', 'SEC', 'SEC', 21, 17),
+          (5, 2023, 2, 'regular', '2023-09-09T19:00:00.000Z', true, 100,
+           1, 2, 'Alpha', 'Beta', 'SEC', 'SEC', 24, 21),
+          (6, 2023, 13, 'regular', '2023-12-02T17:00:00.000Z', true, 100,
+           1, 2, 'Alpha', 'Beta', 'SEC', 'SEC', 20, 17)
         """
     )
     con.close()
@@ -234,6 +274,30 @@ def _csv_from_same_inputs(data_dir: Path):
             "homePoints": 21,
             "awayPoints": 17,
         },
+        {
+            "id": 6,
+            "season": 2023,
+            "week": 13,
+            "seasonType": "regular",
+            "homeTeam": "Alpha",
+            "awayTeam": "Beta",
+            "homeConference": "SEC",
+            "awayConference": "SEC",
+            "homePoints": 20,
+            "awayPoints": 17,
+        },
+        {
+            "id": 5,
+            "season": 2023,
+            "week": 2,
+            "seasonType": "regular",
+            "homeTeam": "Alpha",
+            "awayTeam": "Beta",
+            "homeConference": "SEC",
+            "awayConference": "SEC",
+            "homePoints": 24,
+            "awayPoints": 21,
+        },
     ]
     lines = [
         {
@@ -269,6 +333,26 @@ def _csv_from_same_inputs(data_dir: Path):
             "id": 3,
             "lines": [{"provider": "consensus", "spread": -2.5, "overUnder": 48.0}],
         },
+        # Book spread, projection total: core keeps the spread and nulls the total.
+        {
+            "id": 6,
+            "lines": [
+                {"provider": "consensus", "spread": -4.0, "formattedSpread": "Alpha -4"},
+                {"provider": "numberfire", "overUnder": 58.0},
+            ],
+        },
+        # Projection-only: `normalize` lines this game, core does not.
+        {
+            "id": 5,
+            "lines": [
+                {
+                    "provider": "teamrankings",
+                    "spread": -9.0,
+                    "overUnder": 61.0,
+                    "formattedSpread": "Alpha -9",
+                }
+            ],
+        },
     ]
     records = normalize_games(games, lines, provider="consensus")
     save_processed_games(data_dir, records)
@@ -300,8 +384,31 @@ def test_agreement_1_has_line_coverage_matches_csv(phase_1a_env):
             "SELECT game_id FROM core.fact_game WHERE has_line"
         ).fetchall()
     }
-    assert lined == csv_ids
-    assert len(lined) == len(records)
+    # Core and games.csv deliberately DIVERGE on a projection-only game. Game 5 is
+    # quoted by teamrankings and nothing else: `normalize` takes its median over every
+    # provider so the CSV lines it, while core excludes projection sites from spread
+    # selection and so has no book to name. Assert the divergence positively rather than
+    # loosening the equality -- measured against the live warehouse this is 197 games.
+    assert csv_ids - lined == {5}
+    assert not lined - csv_ids, "core must not line a game the CSV does not"
+    assert len(lined) == len(records) - 1
+    row = con.execute(
+        "SELECT has_line, selected_spread_provider_key, selected_total_provider_key,"
+        " selected_spread, selected_total FROM core.fact_game WHERE game_id = 5"
+    ).fetchone()
+    assert row == (False, None, None, None, None)
+    # Game 6 is the 2013-2016 shape and stays lined: the book spread survives, the
+    # projection total does not. Measured against the live warehouse this is 2,901
+    # games, all of them 2013-2016, where CFBD publishes no book total at all.
+    row = con.execute(
+        "SELECT has_line, selected_spread_provider_key, selected_total_provider_key,"
+        " selected_spread, selected_total FROM core.fact_game WHERE game_id = 6"
+    ).fetchone()
+    # `_select_total` returns the spread's own row when no sibling carries a total, so
+    # the provider key still names the book -- it is the *value* that goes null. That is
+    # the honest reading: consensus was the selected book and it hung no total.
+    assert row == (True, "consensus", "consensus", -4.0, None)
+    assert 6 in csv_ids, "the CSV still totals game 6 -- that is the divergence"
 
 
 def test_agreement_2_identity_columns(phase_1a_env):
@@ -312,12 +419,16 @@ def test_agreement_2_identity_columns(phase_1a_env):
         """
         SELECT game_id, season, week, season_type, home_team, away_team,
                home_points, away_points, selected_spread_provider_key,
-               selected_spread, selected_total
+               selected_total_provider_key, selected_spread, selected_total
         FROM core.fact_game
         WHERE has_line
         """
     ).fetchall()
-    assert len(rows) == len(csv_games)
+    # One fewer than the CSV: game 5 is quoted only by a projection site, which core
+    # excludes from spread selection (see test_agreement_1). Every core row must still
+    # correspond to a CSV row -- the subset direction is the one that matters here.
+    assert len(rows) == len(csv_games) - 1
+    assert {r[0] for r in rows} < set(csv_games)
     for (
         game_id,
         season,
@@ -328,6 +439,7 @@ def test_agreement_2_identity_columns(phase_1a_env):
         home_points,
         away_points,
         provider_key,
+        total_provider_key,
         spread,
         total,
     ) in rows:
@@ -339,9 +451,20 @@ def test_agreement_2_identity_columns(phase_1a_env):
         assert away_team == g.away_team
         assert home_points == g.home_points
         assert away_points == g.away_points
-        assert provider_key == _provider_key(g.provider)
-        assert spread == g.spread
-        assert total == g.total
+        # Line columns deliberately DIVERGE since the builder moved to the median line:
+        # games.csv grades against median-across-books, while core.fact_game keeps the
+        # per-book row (CLV and anything book-specific needs a real book, not a synthetic
+        # one). Assert that divergence positively rather than dropping the guard.
+        assert g.provider == MEDIAN_PROVIDER
+        assert provider_key != MEDIAN_PROVIDER, "warehouse must still name a real book"
+        assert provider_key not in PROJECTION_PROVIDERS, (
+            f"game {game_id}: {provider_key} is a projection site, not a book"
+        )
+        assert total_provider_key not in PROJECTION_PROVIDERS, (
+            f"game {game_id}: {total_provider_key} is a projection site, not a book"
+        )
+        assert spread is None or isinstance(spread, float)
+        assert total is None or isinstance(total, float)
 
 
 def test_agreement_3_provider_clone_split_book_total():
@@ -372,10 +495,15 @@ def test_agreement_4_line_move_matches_enrich_index(phase_1a_env):
     data_dir, db, records = phase_1a_env
     index = _build_line_move_index(data_dir, [2023], records)
     assert 1 in index
+    # Game 1 books: teamrankings (spread -3.0), consensus (-7.0, open -6.5, OU 55.5,
+    # OU open 54.0), bovada (OU 54.0). Median close spread = -5.0; median total =
+    # median(55.5, 54.0) = 54.75, snapped away from zero = 55.0. Only consensus posted
+    # opens, so the opens are its numbers -- the move therefore spans different book
+    # sets on each end, which is the documented trade-off in _build_line_move_index.
     assert index[1]["spread_open"] == -6.5
     assert index[1]["total_open"] == 54.0
-    assert index[1]["spread_move"] == pytest.approx(-0.5)
-    assert index[1]["total_move"] == pytest.approx(1.5)
+    assert index[1]["spread_move"] == pytest.approx(1.5)
+    assert index[1]["total_move"] == pytest.approx(1.0)
     # Null open on game 3 → enrich still indexes the game with null opens
     assert 3 in index
     assert index[3]["spread_open"] is None
@@ -390,57 +518,59 @@ def test_agreement_4_line_move_matches_enrich_index(phase_1a_env):
         # game whose selected book CFBD spelled `Draft Kings` resolves to the
         # `draftkings` row the merge keeps. Reimplementing the rule is how the two
         # would drift apart.
-        provider_key = _provider_key(game.provider)
-        row = con.execute(
-            """
-            SELECT spread_close, spread_open
-            FROM core.fact_game_line
-            WHERE game_id = ? AND provider_key = ?
-            """,
-            [game_id, provider_key],
-        ).fetchone()
-        assert row is not None, f"missing fact_game_line for {game_id}/{provider_key}"
-        spread_close, spread_open = row
-        assert spread_close == game.spread
-        assert spread_open == moves["spread_open"]
-        if spread_open is None:
-            assert moves["spread_move"] is None
-        else:
-            assert moves["spread_move"] == pytest.approx(game.spread - spread_open)
+        # games.csv no longer names a book, so there is no single fact_game_line row to
+        # match. What must still hold is that the median the builder graded against sits
+        # inside the range of what the books actually posted -- a median outside its own
+        # inputs means the collapse-by-book step or the snap is wrong.
+        # Union with `game_projections`: the projection sites were split out of
+        # `fact_game_line`, but `normalize` still takes its median over every provider
+        # the payload carried, so the book-only range is no longer the median's own
+        # input set and a game whose projection is the extreme would fail spuriously.
+        book_spreads = [
+            r[0]
+            for r in con.execute(
+                "SELECT spread_close FROM core.fact_game_line"
+                " WHERE game_id = ? AND spread_close IS NOT NULL"
+                " UNION ALL"
+                " SELECT projected_spread FROM core.game_projections"
+                " WHERE game_id = ? AND projected_spread IS NOT NULL",
+                [game_id, game_id],
+            ).fetchall()
+        ]
+        if book_spreads and game.spread is not None:
+            # Half-point snapping can push the median one half step outside a tight range.
+            assert min(book_spreads) - 0.5 <= game.spread <= max(book_spreads) + 0.5
 
-        # Totals may be split-book — match selected_total_provider_key row
-        total_provider = con.execute(
-            """
-            SELECT selected_total_provider_key FROM core.fact_game WHERE game_id = ?
-            """,
-            [game_id],
-        ).fetchone()[0]
-        assert total_provider is not None
-        total_row = con.execute(
-            """
-            SELECT total_close, total_open
-            FROM core.fact_game_line
-            WHERE game_id = ? AND provider_key = ?
-            """,
-            [game_id, total_provider],
-        ).fetchone()
-        assert total_row is not None
-        total_close, total_open = total_row
-        assert total_close == game.total
-        assert total_open == moves["total_open"]
-        if total_open is None:
-            assert moves["total_move"] is None
-        else:
-            assert moves["total_move"] == pytest.approx(game.total - total_open)
+        book_totals = [
+            r[0]
+            for r in con.execute(
+                "SELECT total_close FROM core.fact_game_line"
+                " WHERE game_id = ? AND total_close IS NOT NULL"
+                " UNION ALL"
+                " SELECT projected_total FROM core.game_projections"
+                " WHERE game_id = ? AND projected_total IS NOT NULL",
+                [game_id, game_id],
+            ).fetchall()
+        ]
+        if book_totals and game.total is not None:
+            assert min(book_totals) - 0.5 <= game.total <= max(book_totals) + 0.5
 
-    # Full tape includes non-selected books; opens stay null (fail-closed)
+    # Full tape includes non-selected books; opens stay null (fail-closed).
+    # `teamrankings` is a projection site, so it is no longer on the line tape at all.
     providers = {
         r[0]
         for r in con.execute(
             "SELECT provider_key FROM core.fact_game_line WHERE game_id = 1"
         ).fetchall()
     }
-    assert providers == {"teamrankings", "consensus", "bovada"}
+    assert providers == {"consensus", "bovada"}
+    projections = {
+        r[0]
+        for r in con.execute(
+            "SELECT provider_key FROM core.game_projections WHERE game_id = 1"
+        ).fetchall()
+    }
+    assert projections == {"teamrankings"}
     dim = {
         r[0]
         for r in con.execute("SELECT provider_key FROM core.dim_lines_provider").fetchall()
@@ -494,7 +624,7 @@ def test_agreement_5_entering_game_matches_running_stats(phase_1a_env):
         JOIN core.dim_team t ON t.team_id = f.team_id
         """
     ).fetchall()
-    assert len(sql_rows) == len(expected) == 8  # 4 games × 2 teams
+    assert len(sql_rows) == len(expected) == 12  # 6 games × 2 teams
     for game_id, school, home_away, gp, win_pct, ats_pct, streak, ats_streak in sql_rows:
         exp = expected[(game_id, school)]
         assert gp == exp["games_played"]
@@ -556,21 +686,21 @@ def test_agreement_6_bowl_lookahead_tripwire(phase_1a_env):
     for key, measures in stats_regular.items():
         assert stats_with_bowls[key]["games_played"] == measures["games_played"], key
 
-    # Week-12 slate sees 2 prior regulars, not the bowl (week=1 would sort first)
+    # Week-12 slate sees 3 prior regulars, not the bowl (week=1 would sort first)
     sql_gp = con.execute(
         """
         SELECT games_played FROM core.fact_game_team
         WHERE game_id = 4 AND home_away = 'home'
         """
     ).fetchone()[0]
-    assert sql_gp == 2
+    assert sql_gp == 3
     bowl_gp = con.execute(
         """
         SELECT games_played FROM core.fact_game_team
         WHERE game_id = 3 AND home_away = 'home'
         """
     ).fetchone()[0]
-    assert bowl_gp == 3  # inherits all three regulars
+    assert bowl_gp == 5  # inherits all five regulars
 
 
 def test_agreement_7_postseason_week_requires_season_type(phase_1a_env):
@@ -595,10 +725,16 @@ def test_cli_core_only(tmp_path: Path):
     _seed_phase_1a_warehouse(db)
     assert main(["duckdb", "--data-dir", str(tmp_path), "--core-only"]) == 0
     con = duckdb.connect(str(db), read_only=True)
-    assert con.execute("SELECT COUNT(*) FROM core.fact_game").fetchone()[0] == 4
-    assert con.execute("SELECT COUNT(*) FROM core.fact_game WHERE has_line").fetchone()[0] == 3
+    assert con.execute("SELECT COUNT(*) FROM core.fact_game").fetchone()[0] == 6
+    assert con.execute("SELECT COUNT(*) FROM core.fact_game WHERE has_line").fetchone()[0] == 4
+    # 8 provider offers seeded, of which the three projection rows split off
     assert con.execute("SELECT COUNT(*) FROM core.fact_game_line").fetchone()[0] == 5
-    assert con.execute("SELECT COUNT(*) FROM core.fact_game_team").fetchone()[0] == 8
+    assert con.execute("SELECT COUNT(*) FROM core.game_projections").fetchone()[0] == 3
+    assert con.execute(
+        "SELECT COUNT(*) FROM core.fact_game_line"
+        " WHERE provider_key IN ('teamrankings', 'numberfire')"
+    ).fetchone()[0] == 0
+    assert con.execute("SELECT COUNT(*) FROM core.fact_game_team").fetchone()[0] == 12
     providers = {
         r[0]
         for r in con.execute("SELECT provider_key FROM core.dim_lines_provider").fetchall()

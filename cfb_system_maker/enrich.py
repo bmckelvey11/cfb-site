@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import json
+import tempfile
+import time
+
+import duckdb
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from cfb_system_maker.coach_style import COACH_STYLE_CLUSTERS
+from cfb_system_maker.prior_game_stats import build_prior_game_stats, finite_number
 from cfb_system_maker.features import FEATURE_REGISTRY, FeatureDef, get_nested, registry_version
 from cfb_system_maker.models import GameRecord
-from cfb_system_maker.normalize import _first, _select_line, _select_total
+from cfb_system_maker.normalize import median_line
 from cfb_system_maker.running_stats import compute_running_stats
 from cfb_system_maker.storage import load_processed_games
 from cfb_system_maker.v1_model import load_v1_fit, score_v1
@@ -40,12 +44,87 @@ def save_features_to(path: str | Path, features: dict[str, dict[str, Any]]) -> P
 
     The upcoming-games path needs its own file; reusing ``save_features``' fixed
     path would silently clobber the historical sidecar.
+
+    Persists to ``<stem>.duckdb`` beside the legacy ``*.json`` path. JSON sidecars
+    are no longer written; ``load_features_from`` still reads them when DuckDB is
+    absent.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"_meta": _build_meta(features), "games": features}
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    meta = _build_meta(features)
+    _save_features_duckdb(path.with_suffix(".duckdb"), features, meta)
     return path
+
+
+def _save_features_duckdb(
+    path: Path,
+    features: dict[str, dict[str, Any]],
+    meta: dict[str, Any],
+) -> None:
+    """Persist features beside the JSON sidecar without replacing the database file.
+
+    Uses CREATE OR REPLACE TABLE so a long-lived reader can keep the file open on
+    Windows (see docs/app-vs-warehouse-read-path-2026-09-16.md).
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = [{"game_id": int(game_id), **row} for game_id, row in features.items()]
+    con = _connect_features_duckdb_writer(path)
+    staging_json = None
+    try:
+        if rows:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=path.parent,
+                prefix=path.stem + ".",
+                suffix=".json",
+                delete=False,
+            ) as handle:
+                staging_json = handle.name
+                json.dump(rows, handle)
+            con.execute(
+                "CREATE OR REPLACE TABLE features AS SELECT * FROM read_json(?)",
+                [staging_json],
+            )
+        else:
+            con.execute(
+                "CREATE OR REPLACE TABLE features AS "
+                "SELECT CAST(NULL AS INTEGER) AS game_id WHERE 1 = 0"
+            )
+        con.execute(
+            """
+            CREATE OR REPLACE TABLE meta AS
+            SELECT
+                ?::VARCHAR AS registry_version,
+                ?::BIGINT AS game_count,
+                ?::VARCHAR AS generated_at
+            """,
+            [meta["registry_version"], meta["game_count"], meta["generated_at"]],
+        )
+    finally:
+        con.close()
+        if staging_json and Path(staging_json).exists():
+            Path(staging_json).unlink()
+
+
+def _connect_features_duckdb_writer(path: Path) -> duckdb.DuckDBPyConnection:
+    """Open read-write on the sidecar, retrying through brief read-only loaders.
+
+    On Windows a concurrent ``read_only=True`` connection in another process holds
+    the file until it closes. The web app opens and closes per load; enrich retries
+    rather than failing the nightly job mid-request.
+    """
+    last: Exception | None = None
+    for _ in range(120):
+        try:
+            return duckdb.connect(str(path))
+        except duckdb.IOException as exc:
+            last = exc
+            if "being used by another process" not in str(exc):
+                raise
+            time.sleep(1)
+    assert last is not None
+    raise last
 
 
 def _build_meta(features: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -56,23 +135,103 @@ def _build_meta(features: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+_MIGRATED_SIDECAR_KEYS = frozenset(
+    {
+        "pregame_win_prob",
+        "coach_style_cluster",
+        "core_overall",
+        "havoc_offense_rate",
+        "havoc_defense_rate",
+        "defense_explosiveness",
+        "defense_passingDowns_ppa",
+        "defense_ppa",
+        "defense_rushingPlays_ppa",
+        "defense_successRate",
+    }
+)
+
+
 def load_features(data_dir: str | Path) -> dict[int, dict[str, Any]]:
     return load_features_from(_features_path(data_dir))
 
 
 def load_features_from(path: str | Path) -> dict[int, dict[str, Any]]:
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    path = Path(path)
+    duckdb_path = path.with_suffix(".duckdb")
+    if duckdb_path.exists():
+        return _load_features_from_duckdb(duckdb_path)
+    raw = json.loads(path.read_text(encoding="utf-8"))
     rows = raw["games"] if "_meta" in raw and "games" in raw else raw
-    return {int(game_id): values for game_id, values in rows.items()}
+    registry_version_in_meta = raw.get("_meta", {}).get("registry_version") if isinstance(raw, dict) else None
+    return _finalize_loaded_features(rows, registry_version_in_meta)
 
 
 def load_features_meta(data_dir: str | Path) -> dict[str, Any] | None:
-    path = _features_path(data_dir)
-    if not path.exists():
+    json_path = _features_path(data_dir)
+    duckdb_path = json_path.with_suffix(".duckdb")
+    if duckdb_path.exists():
+        return _load_features_meta_from_duckdb(duckdb_path)
+    if not json_path.exists():
         return None
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw = json.loads(json_path.read_text(encoding="utf-8"))
     meta = raw.get("_meta") if isinstance(raw, dict) else None
     return meta if isinstance(meta, dict) else None
+
+
+def _finalize_loaded_features(
+    rows: dict[str, dict[str, Any]],
+    registry_version_in_meta: str | None,
+) -> dict[int, dict[str, Any]]:
+    # Reinterpreted keys must never reuse old post-game values from a stale cache.
+    stale = registry_version_in_meta != registry_version()
+    output: dict[int, dict[str, Any]] = {}
+    for game_id, values in rows.items():
+        row = dict(values)
+        row.pop("attendance", None)
+        if stale:
+            for key in _MIGRATED_SIDECAR_KEYS:
+                row.pop("home_" + key, None)
+                row.pop("away_" + key, None)
+        output[int(game_id)] = row
+    return output
+
+
+def _load_features_meta_from_duckdb(path: Path) -> dict[str, Any] | None:
+    con = duckdb.connect(str(path), read_only=True)
+    try:
+        row = con.execute(
+            "SELECT registry_version, game_count, generated_at FROM meta LIMIT 1"
+        ).fetchone()
+    finally:
+        con.close()
+    if row is None:
+        return None
+    return {
+        "registry_version": row[0],
+        "game_count": row[1],
+        "generated_at": row[2],
+    }
+
+
+def _load_features_from_duckdb(path: Path) -> dict[int, dict[str, Any]]:
+    con = duckdb.connect(str(path), read_only=True)
+    try:
+        meta_row = con.execute("SELECT registry_version FROM meta LIMIT 1").fetchone()
+        registry_version_in_meta = meta_row[0] if meta_row else None
+        relation = con.execute("SELECT * FROM features")
+        columns = [col[0] for col in relation.description]
+        game_id_idx = columns.index("game_id")
+        rows: dict[str, dict[str, Any]] = {}
+        for record in relation.fetchall():
+            values: dict[str, Any] = {}
+            for idx, name in enumerate(columns):
+                if name == "game_id":
+                    continue
+                values[name] = record[idx]
+            rows[str(record[game_id_idx])] = values
+    finally:
+        con.close()
+    return _finalize_loaded_features(rows, registry_version_in_meta)
 
 
 def _features_path(data_dir: str | Path) -> Path:
@@ -141,6 +300,8 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
     _index_graphql_game_team(indexes["graphql_game_team"], data_dir / "graphql" / "gameTeam.json", games)
 
     indexes["computed_running"] = _build_running_index(data_dir, seasons, games, indexes["raw_game"])
+    indexes["computed_prior_game"] = build_prior_game_stats(games, indexes["raw_game"], indexes["raw_havoc"], indexes["raw_adv_ngt"])
+    indexes["prior_coach_style"] = _load_prior_coach_style(data_dir)
     indexes["computed_v1"] = _build_v1_index(data_dir, games)
     indexes["computed_line_move"] = _build_line_move_index(data_dir, seasons, games)
     indexes["computed_wind"] = _build_wind_index(data_dir, games, indexes["raw_weather"])
@@ -252,12 +413,16 @@ def _build_line_move_index(
 ) -> dict[int, dict[str, float | None]]:
     """spread_open/spread_move/total_open/total_move, keyed by game_id.
 
-    The open must come from the SAME provider row that supplied the built close
-    (game.provider / game.spread / game.total) -- a cross-book open-minus-close is a
-    basis difference, not line movement. Re-selects that row via normalize's own
-    _select_line/_select_total rather than trusting _index_raw_lines, which flattens
-    to lines[0] and would silently pick a different book. Missing open -> all four
-    None (fail closed), never a zero default.
+    The open must be built the SAME way as the close that was graded -- a cross-book
+    open-minus-close is a basis difference, not line movement. Since the builder moved
+    to the median line, both sides come from ``normalize.median_line``: median-open
+    against median-close, one book one vote. Rebuilt here rather than trusting
+    _index_raw_lines, which flattens to lines[0]. Missing open -> all four None
+    (fail closed), never a zero default.
+
+    Caveat: each number is medianed over the books that posted it, so a game where only
+    some books published an open has its open and close resting on different book sets.
+    Accepted over dropping the game outright.
     """
     lines_by_season: dict[int, dict[int, list[dict[str, Any]]]] = {}
     for season in seasons:
@@ -281,7 +446,7 @@ def _build_line_move_index(
         if not lines:
             continue
 
-        selected = _select_line(lines, game.provider)
+        selected = median_line(lines)
         if selected is None:
             continue
 
@@ -290,8 +455,7 @@ def _build_line_move_index(
             game.spread - spread_open if spread_open is not None and game.spread is not None else None
         )
 
-        total_row = _select_total(lines, selected)
-        total_open = _coerce_numeric(_first(total_row, "overUnderOpen", "over_under_open"))
+        total_open = _coerce_numeric(selected.get("overUnderOpen"))
         total_move = (
             game.total - total_open if total_open is not None and game.total is not None else None
         )
@@ -321,7 +485,7 @@ def _apply_feature(row: dict[str, Any], feature: FeatureDef, game: GameRecord, i
         return
     value = _lookup(feature, game, indexes)
     if feature.team_scoped and feature.join in {"team_season", "team_name", "game_id"}:
-        if feature.source_kind in {"raw_havoc", "raw_adv_ngt", "graphql_game_team", "computed_running"}:
+        if feature.source_kind in {"raw_havoc", "raw_adv_ngt", "graphql_game_team", "computed_running", "computed_prior_game", "pregame_team_wp"}:
             home_val, away_val = value if isinstance(value, tuple) else (None, None)
             row[f"home_{feature.key}"] = home_val
             row[f"away_{feature.key}"] = away_val
@@ -342,6 +506,12 @@ def _lookup_conference(feature: FeatureDef, conference: str | None, indexes: dic
 
 
 def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> Any:
+    if feature.source_kind == "computed_prior_game":
+        prior = indexes["computed_prior_game"]
+        return tuple(prior.get((game.game_id, team), {}).get(feature.field) for team in (game.home_team, game.away_team))
+    if feature.source_kind == "pregame_team_wp":
+        value = finite_number(indexes["raw_pregame_wp"].get(game.game_id, {}).get("homeWinProbability"))
+        return (value, 1.0 - value) if value is not None and 0 <= value <= 1 else (None, None)
     if feature.source_kind == "raw_game":
         record = indexes["raw_game"].get(game.game_id)
         if feature.field == "kickoff_hour":
@@ -431,6 +601,8 @@ def _lookup(feature: FeatureDef, game: GameRecord, indexes: dict[str, Any]) -> A
 
 
 def _lookup_team_scoped(feature: FeatureDef, team: str, season: int, indexes: dict[str, Any]) -> Any:
+    if feature.source_kind == "prior_coach_style":
+        return indexes["prior_coach_style"].get((team, season))
     if feature.source_kind == "raw_team_season":
         bucket = indexes["raw_team_season"].get(feature.source_file or "")
         record = bucket.get((team, season)) if bucket else None
@@ -459,9 +631,6 @@ def _lookup_team_scoped(feature: FeatureDef, team: str, season: int, indexes: di
             return None
         if feature.field == "coach_name":
             return f"{record.get('firstName', '')} {record.get('lastName', '')}".strip()
-        if feature.field == "coach_style_cluster":
-            name = f"{record.get('firstName', '')} {record.get('lastName', '')}".strip()
-            return COACH_STYLE_CLUSTERS.get(name)
         return _field_value(record, feature.field)
 
     return None
@@ -473,6 +642,26 @@ def _field_value(record: dict[str, Any] | None, field: str) -> Any:
     if "." in field:
         return get_nested(record, field)
     return record.get(field)
+
+
+def _load_prior_coach_style(data_dir: Path) -> dict[tuple[str, int], str]:
+    path = data_dir / "processed" / "pregame_coach_styles.json"
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("method") != "expanding-prior-seasons-v1":
+        return {}
+    output = {}
+    for season, snapshot in payload.get("seasons", {}).items():
+        year = int(season)
+        trained = snapshot.get("training_seasons", [])
+        if not trained or any(int(s) >= year for s in trained):
+            continue
+        if snapshot.get("coach_assignment_season") != year - 1:
+            continue
+        for team, style in snapshot.get("teams", {}).items():
+            output[(team, year)] = style
+    return output
 
 
 def _index_raw_file(bucket: dict[int, dict[str, Any]], path: Path, key_field: str) -> None:

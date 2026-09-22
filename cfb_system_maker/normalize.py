@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from cfb_system_maker.models import GameRecord
@@ -11,6 +12,13 @@ def normalize_games(
     *,
     provider: str | None = None,
 ) -> list[GameRecord]:
+    """Build graded game records against the *median* line across books.
+
+    ``provider`` is accepted and ignored: the system builder no longer grades against
+    one book. Kept in the signature so existing callers (cli, upcoming, tests) are not
+    all rewritten for an argument that now has no effect; ``duckdb_core`` still selects
+    per book for the warehouse, which is where per-book truth (and CLV) lives.
+    """
     lines_by_id = {_game_id(row): row for row in betting_games if _game_id(row) is not None}
     normalized: list[GameRecord] = []
 
@@ -19,7 +27,7 @@ def normalize_games(
         if game_id is None:
             continue
         betting_game = lines_by_id.get(game_id, {})
-        selected_line = _select_line(betting_game.get("lines", []), provider)
+        selected_line = median_line(betting_game.get("lines", []))
         if selected_line is None:
             continue
 
@@ -34,9 +42,9 @@ def normalize_games(
                 away_conference=_first(game, "awayConference", "away_conference", fallback=_first(betting_game, "awayConference", "away_conference")),
                 home_points=_optional_int(_first(game, "homePoints", "home_points", "homeScore", "home_score", fallback=_first(betting_game, "homeScore", "home_score"))),
                 away_points=_optional_int(_first(game, "awayPoints", "away_points", "awayScore", "away_score", fallback=_first(betting_game, "awayScore", "away_score"))),
-                provider=_first(selected_line, "provider"),
+                provider=MEDIAN_PROVIDER,
                 spread=_optional_float(_first(selected_line, "spread")),
-                total=_optional_float(_first(_select_total(betting_game.get("lines", []), selected_line), "overUnder", "over_under", "total")),
+                total=_optional_float(_first(selected_line, "overUnder")),
                 season_type=str(_first(game, "seasonType", "season_type",
                                        fallback=_first(betting_game, "seasonType", "season_type",
                                                        fallback="regular"))),
@@ -71,6 +79,99 @@ def provider_key(value: Any) -> str | None:
     if not text:
         return None
     return PROVIDER_ALIASES.get(text, text)
+
+
+MEDIAN_PROVIDER = "median"
+
+
+def _book_rows(usable: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One row per *book*, not per array entry.
+
+    CFBD posts the same book twice in one array (`DraftKings` / `Draft Kings`, and the
+    Caesars family), so a median taken over raw rows double-weights whichever book
+    happens to be duplicated. Collapsing on ``provider_key`` first -- keeping that
+    book's most complete row, the same rule ``_best_of_book`` applies -- makes the
+    median one-book-one-vote.
+    """
+    best: dict[str, dict[str, Any]] = {}
+    for line in usable:
+        key = provider_key(line.get("provider"))
+        if key is None:
+            continue
+        if key not in best or _line_values(line) > _line_values(best[key]):
+            best[key] = line
+    return list(best.values())
+
+
+def _median(values: list[float]) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def _snap_to_half(value: float) -> float:
+    """Nearest half point.
+
+    An even number of books averages to quarters (-6.5 and -7 -> -6.75), which no book
+    posts and which can never push. Leaving them unsnapped would quietly delete pushes
+    from every backtest, so the median is put back on a bettable number.
+
+    Ties (a .25 exactly between two half points) go away from zero, so -6.75 -> -7.0 and
+    +6.75 -> +7.0. Deliberately not ``round``: its banker's rounding sends a tie to
+    whichever neighbour happens to be even, which is asymmetric between a home and an
+    away price for the same game.
+    """
+    sign = -1.0 if value < 0 else 1.0
+    return sign * math.floor(abs(value) * 2 + 0.5) / 2
+
+
+def _median_of(rows: list[dict[str, Any]], *keys: str) -> float | None:
+    values = []
+    for row in rows:
+        raw = _first(row, *keys)
+        if raw is None:
+            continue
+        try:
+            values.append(float(raw))
+        except (TypeError, ValueError):
+            continue
+    median = _median(values)
+    return None if median is None else _snap_to_half(median)
+
+
+def median_line(lines: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """A synthetic line: the median across books of each number, snapped to a half point.
+
+    Each number is medianed over the books that posted *that* number, so the spread and
+    the total may rest on different book sets -- and so may an open and its close. That
+    is deliberate: the alternative is dropping a game because one book withheld one
+    value. Opens are medianed the same way so ``enrich``'s move features compare
+    median-open against median-close rather than mixing constructions.
+    """
+    usable = [
+        line
+        for line in lines
+        if line.get("spread") is not None or _first(line, "overUnder", "over_under") is not None
+    ]
+    rows = _book_rows(usable)
+    if not rows:
+        return None
+
+    line = {
+        "provider": MEDIAN_PROVIDER,
+        "book_count": len(rows),
+        "spread": _median_of(rows, "spread"),
+        "overUnder": _median_of(rows, "overUnder", "over_under", "total"),
+        "spreadOpen": _median_of(rows, "spreadOpen", "spread_open"),
+        "overUnderOpen": _median_of(rows, "overUnderOpen", "over_under_open", "total_open"),
+    }
+    if line["spread"] is None and line["overUnder"] is None:
+        return None
+    return line
 
 
 def _line_values(line: dict[str, Any]) -> int:

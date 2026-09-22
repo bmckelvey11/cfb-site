@@ -101,7 +101,8 @@ def test_new_web_features_are_registered():
     assert rank.team_scoped is True
 
     overall = FEATURE_BY_KEY["core_overall"]
-    assert overall.group == "result_lookahead"
+    assert overall.group == "team_preseason"
+    assert overall.source_kind == "raw_prior_team_season"
     assert overall.source_file == "core_ratings"
     assert overall.field == "overall"
 
@@ -114,8 +115,8 @@ def test_new_web_features_are_registered():
     )
     for key in ngt_keys:
         feature = FEATURE_BY_KEY[key]
-        assert feature.group == "result_lookahead"
-        assert feature.source_kind == "raw_adv_ngt"
+        assert feature.group == "season_to_date"
+        assert feature.source_kind == "computed_prior_game"
         assert feature.source_file == "advanced_game_stats_ngt"
         assert feature.team_scoped is True
 

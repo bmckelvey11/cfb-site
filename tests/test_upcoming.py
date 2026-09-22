@@ -377,8 +377,12 @@ def test_saved_upcoming_round_trips_with_null_scores(tmp_path):
 
 
 def _upcoming_features(tmp_path):
-    path = tmp_path / "processed" / "upcoming_features.json"
-    return json.loads(path.read_text(encoding="utf-8"))["games"]
+    from cfb_system_maker.enrich import load_features_from, upcoming_features_path
+
+    return {
+        str(game_id): row
+        for game_id, row in load_features_from(upcoming_features_path(tmp_path)).items()
+    }
 
 
 def _build_accumulating(tmp_path):
@@ -435,7 +439,7 @@ def test_post_game_sourced_features_are_null_for_an_unplayed_game(tmp_path):
     features = _build_accumulating(tmp_path)
 
     row = features["3005"]
-    assert row["attendance"] is None       # post-game
+    assert "attendance" not in row
     assert row["weather_temperature"] is None  # near-game, never fetched here
 
 

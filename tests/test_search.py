@@ -119,10 +119,10 @@ def test_low_coverage_line_move_features_excluded_from_candidate_pool():
             assert filt.key not in low_coverage_keys
 
 
-def test_lookahead_features_never_appear_as_candidates():
+def test_attendance_removed_and_pregame_havoc_available_as_candidate():
     games = _games()
     feature_map = {
-        gid: {**row, "havoc_offense_rate": 0.5, "havoc_defense_rate": 0.4, "attendance": 50000}
+        gid: {**row, "home_havoc_offense_rate": gid / 10, "away_havoc_offense_rate": gid / 20, "attendance": 50000}
         for gid, row in _feature_map().items()
     }
     children = expand_candidates(SystemFilter(), games, feature_map)
@@ -130,9 +130,10 @@ def test_lookahead_features_never_appear_as_candidates():
         f.key
         for c in children
         for f in c.feature_filters
-        if f.key in {"havoc_offense_rate", "havoc_defense_rate", "attendance"}
+        if f.key == "attendance"
     }
     assert leaked_keys == set()
+    assert any(f.key == "havoc_offense_rate" for child in children for f in child.feature_filters)
 
 
 def test_team_scoped_numeric_feature_yields_candidates():

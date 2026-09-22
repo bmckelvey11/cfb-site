@@ -91,3 +91,57 @@ def test_stale_building_debris_is_cleared_under_the_lock(tmp_path):
         assert con.execute("SELECT count(*) FROM duckdb_schemas()").fetchone()[0] > 0
     finally:
         con.close()
+
+
+# ----------------------------------------------------------------- memory limit
+
+
+def test_every_loader_connection_gets_the_memory_limit():
+    """DuckDB defaults `memory_limit` to ~80% of RAM, and on 2026-09-11 that killed a rebuild
+    on a 15.4 GB machine with 2.9 GB free: `stg.an_scoreboard` died with an allocation
+    failure, its children were never built, and `core.fact_game_line` lost 8,587 rows. The
+    two settings that *were* present -- threads and preserve_insertion_order -- are DuckDB's
+    other two OOM recommendations and were not enough on their own.
+
+    Asserted against the source because the failure mode is a call site that forgets one of
+    the three, which is exactly how the limit stayed at its default at all four of them.
+    """
+    source = (REPO_ROOT / "cfb_system_maker" / "duckdb_load.py").read_text(encoding="utf-8")
+    assert "SET memory_limit" in source
+    assert source.count('con.execute("SET threads = 1")') == 1, \
+        "tuning belongs in _tune(); a second copy is a site that can drift"
+    assert source.count("_tune(con)") == 4, \
+        "every loader connection must be tuned, not just the rebuild's"
+
+
+def test_the_memory_limit_actually_applies(tmp_path):
+    """The setting has to reach the connection, not just the source file."""
+    import duckdb as _d
+
+    from cfb_system_maker.duckdb_load import _tune
+    con = _d.connect(str(tmp_path / "t.duckdb"))
+    try:
+        _tune(con)
+        limit = con.execute(
+            "SELECT value FROM duckdb_settings() WHERE name = 'memory_limit'"
+        ).fetchone()[0]
+        # DuckDB normalises '4GB' to '3.7 GiB', so assert the invariant rather than the
+        # string: the limit must be far below the ~80%-of-RAM default that caused the OOM.
+        gib = float(limit.split()[0])
+        assert "GiB" in limit and gib <= 4.0, f"limit is not conservative: {limit}"
+    finally:
+        con.close()
+
+
+def test_the_memory_limit_is_overridable(tmp_path, monkeypatch):
+    """A machine with more headroom should not be pinned to the conservative default."""
+    monkeypatch.setenv("CFB_DUCKDB_MEMORY_LIMIT", "1GB")
+    import importlib
+
+    import cfb_system_maker.duckdb_load as dl
+    importlib.reload(dl)
+    try:
+        assert dl._MEMORY_LIMIT == "1GB"
+    finally:
+        monkeypatch.delenv("CFB_DUCKDB_MEMORY_LIMIT")
+        importlib.reload(dl)

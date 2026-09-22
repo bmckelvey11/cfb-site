@@ -153,16 +153,21 @@ def test_over_under_bets_grade_against_total_points():
     assert under.pushes == 1
 
 
-def test_average_margin_is_none_for_total_bet_systems():
+def test_total_bet_margin_is_points_cleared_over_the_number():
     games = [
         GameRecord(1, 2023, 1, "A", "B", "ACC", "SEC", 31, 24, "consensus", -6.5, 52.5),
         GameRecord(2, 2023, 1, "C", "D", "ACC", "SEC", 20, 17, "consensus", -3.0, 37.0),
     ]
 
     over = run_backtest(games, SystemFilter(bet_type="total", total_side="over"))
+    under = run_backtest(games, SystemFilter(bet_type="total", total_side="under"))
 
-    assert over.average_margin is None
-    assert all(bet.margin == 0.0 for bet in over.bet_details)
+    # 55 points on a 52.5 total clears the over by 2.5 and misses the under by the same;
+    # the 37-37 push sits at zero for both sides.
+    assert [bet.margin for bet in over.bet_details] == [2.5, 0.0]
+    assert [bet.margin for bet in under.bet_details] == [-2.5, 0.0]
+    assert over.average_margin == 1.25
+    assert under.average_margin == -1.25
 
 
 def test_average_margin_averages_across_multiple_spread_bets():

@@ -65,10 +65,10 @@ def test_enrich_game_id_join_and_team_scoped_mapping(tmp_path):
     assert row["weather_temperature"] == 62.0
     assert row["home_returning_ppa"] == 0.55
     assert row["away_returning_ppa"] == 0.41
-    assert row["attendance"] == 50000
+    assert "attendance" not in row
 
     path = save_features(tmp_path, features)
-    assert path.exists()
+    assert path.with_suffix(".duckdb").exists()
 
 
 def test_enrich_computes_running_stats_from_prior_games(tmp_path):
@@ -225,13 +225,13 @@ def test_save_features_writes_meta_and_load_reads_both_shapes(tmp_path):
     from cfb_system_maker.features import registry_version
 
     path = save_features(tmp_path, {"1": {"neutralSite": True}})
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    assert payload["_meta"]["registry_version"] == registry_version()
-    assert payload["_meta"]["game_count"] == 1
+    meta = load_features_meta(tmp_path)
+    assert meta["registry_version"] == registry_version()
+    assert meta["game_count"] == 1
     assert load_features(tmp_path) == {1: {"neutralSite": True}}
-    assert load_features_meta(tmp_path)["game_count"] == 1
 
-    # Legacy flat shape still loads, meta reads as None
+    # Legacy flat JSON still loads when DuckDB is absent, meta reads as None
+    path.with_suffix(".duckdb").unlink(missing_ok=True)
     path.write_text(json.dumps({"2": {"neutralSite": False}}), encoding="utf-8")
     assert load_features(tmp_path) == {2: {"neutralSite": False}}
     assert load_features_meta(tmp_path) is None
@@ -361,13 +361,14 @@ def test_enrich_upcoming_never_overwrites_the_historical_features_sidecar(tmp_pa
     from cfb_system_maker.upcoming import enrich_upcoming
 
     _accumulation_raw(tmp_path, lines_cover_full_season=True)
-    historical = save_features(tmp_path, {"1": {"neutralSite": True}})
-    before = historical.read_bytes()
+    save_features(tmp_path, {"1": {"neutralSite": True}})
+    historical_db = tmp_path / "processed" / "features.duckdb"
+    before = historical_db.read_bytes()
 
     enrich_upcoming(tmp_path, 2026, [_target_record()])
 
-    assert historical.read_bytes() == before
-    assert (tmp_path / "processed" / "upcoming_features.json").exists()
+    assert historical_db.read_bytes() == before
+    assert (tmp_path / "processed" / "upcoming_features.duckdb").exists()
 
 
 def test_upcoming_sidecar_loads_through_the_existing_features_reader(tmp_path):
@@ -378,9 +379,19 @@ def test_upcoming_sidecar_loads_through_the_existing_features_reader(tmp_path):
     _accumulation_raw(tmp_path, lines_cover_full_season=True)
     enrich_upcoming(tmp_path, 2026, [_target_record()])
 
-    payload = json.loads(upcoming_features_path(tmp_path).read_text(encoding="utf-8"))
-    assert payload["_meta"]["registry_version"] == registry_version()
-    assert payload["_meta"]["game_count"] == 1
+    upcoming_db = upcoming_features_path(tmp_path).with_suffix(".duckdb")
+    assert upcoming_db.exists()
+    import duckdb
+
+    con = duckdb.connect(str(upcoming_db), read_only=True)
+    try:
+        row = con.execute(
+            "SELECT registry_version, game_count FROM meta LIMIT 1"
+        ).fetchone()
+    finally:
+        con.close()
+    assert row[0] == registry_version()
+    assert row[1] == 1
     assert set(load_features_from(upcoming_features_path(tmp_path))) == {3005}
 
 
@@ -424,7 +435,7 @@ def test_v1_over_prob_populated_from_cached_fit(tmp_path):
     assert features["2"]["v1_over_prob"] is None
 
 
-def test_coach_style_cluster_from_embedded_mapping(tmp_path):
+def test_coach_style_never_falls_back_to_future_embedded_mapping(tmp_path):
     season = 2023
     raw_dir = tmp_path / "raw"
     raw_dir.mkdir(parents=True)
@@ -448,7 +459,7 @@ def test_coach_style_cluster_from_embedded_mapping(tmp_path):
 
     games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
     features = enrich_games(tmp_path, games)
-    assert features["1"]["home_coach_style_cluster"] == "bend_dont_break"
+    assert features["1"]["home_coach_style_cluster"] is None
     assert features["1"]["away_coach_style_cluster"] is None
 
 
@@ -642,7 +653,7 @@ def test_enrich_preseason_rank_from_coach_seasons(tmp_path):
     assert row["away_preseasonRank"] is None
 
 
-def test_enrich_core_overall_reads_this_season_as_lookahead(tmp_path):
+def test_enrich_core_overall_reads_prior_season_only(tmp_path):
     raw_dir = tmp_path / "raw"
     raw_dir.mkdir(parents=True)
     (raw_dir / "core_ratings_2022.json").write_text(
@@ -657,12 +668,12 @@ def test_enrich_core_overall_reads_this_season_as_lookahead(tmp_path):
     games = [GameRecord(1, 2023, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
     row = enrich_games(tmp_path, games)["1"]
 
-    assert row["home_core_overall"] == 99.0
+    assert row["home_core_overall"] == 12.5
     assert row["home_prior_core_overall"] == 12.5
     assert row["away_core_overall"] is None
 
 
-def test_enrich_ngt_defense_stats_this_game(tmp_path):
+def test_enrich_ngt_defense_stats_excludes_current_game(tmp_path):
     season = 2023
     raw_dir = tmp_path / "raw"
     raw_dir.mkdir(parents=True)
@@ -699,13 +710,13 @@ def test_enrich_ngt_defense_stats_this_game(tmp_path):
     games = [GameRecord(1, season, 1, "Alpha", "Beta", None, None, 21, 14, "consensus", -3.5, None)]
     row = enrich_games(tmp_path, games)["1"]
 
-    assert row["home_defense_explosiveness"] == 1.2
-    assert row["home_defense_ppa"] == 0.15
-    assert row["home_defense_successRate"] == 0.42
-    assert row["home_defense_passingDowns_ppa"] == 0.22
-    assert row["home_defense_rushingPlays_ppa"] == 0.08
-    assert row["away_defense_explosiveness"] == 0.9
-    assert row["away_defense_ppa"] == -0.05
+    assert row["home_defense_explosiveness"] is None
+    assert row["home_defense_ppa"] is None
+    assert row["home_defense_successRate"] is None
+    assert row["home_defense_passingDowns_ppa"] is None
+    assert row["home_defense_rushingPlays_ppa"] is None
+    assert row["away_defense_explosiveness"] is None
+    assert row["away_defense_ppa"] is None
 
 
 def test_enrich_ngt_defense_stats_none_when_file_absent(tmp_path):

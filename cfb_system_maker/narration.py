@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from cfb_system_maker.describe import describe
-from cfb_system_maker.models import SearchRun
+from cfb_system_maker.models import BacktestResult, SearchRun, SystemFilter
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 _DEFAULT_TIMEOUT = 20.0
@@ -69,6 +69,18 @@ def narrate_run(
     """Exactly one API call. Any failure -- missing key, network, API error -- raises NarrationError."""
     prompt = build_prompt(run)
 
+    return _complete(prompt, client=client, api_key=api_key, model=model, timeout=timeout, max_tokens=300)
+
+
+def _complete(
+    prompt: str,
+    *,
+    client,
+    api_key: str | None,
+    model: str,
+    timeout: float,
+    max_tokens: int,
+) -> str:
     if client is None:
         try:
             import anthropic  # noqa: PLC0415
@@ -81,7 +93,7 @@ def narrate_run(
     try:
         message = client.messages.create(
             model=model,
-            max_tokens=300,
+            max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
         text = "".join(block.text for block in message.content if hasattr(block, "text"))
@@ -91,3 +103,57 @@ def narrate_run(
     if not text.strip():
         raise NarrationError("narration returned no text")
     return text
+
+
+def build_theory_prompt(system: SystemFilter, result: BacktestResult) -> str:
+    """Prompt for a short causal story behind a system's filters.
+
+    Deliberately asks for the mechanism *and* the reasons it might be noise: a theory
+    field that only ever argues for the system is worth less than one that names its own
+    weakness, and the backtest that produced these numbers is the same data the filters
+    were chosen on.
+    """
+    sentences = [row["text"] for row in describe(system)]
+    filters_text = "; ".join(sentences) if sentences else "no filters (every game in the dataset)"
+    decided = result.wins + result.losses
+    return "\n".join(
+        [
+            "You are helping a college football bettor write the rationale behind a "
+            "betting system they built by filtering historical games.",
+            "",
+            "Write 2-4 short sentences in plain English covering:",
+            "1. The plausible causal mechanism -- why these conditions might genuinely "
+            "move a game's scoring or the market's price for it.",
+            "2. One concrete reason the edge might be noise instead (small sample, "
+            "the filters being chosen on this same data, a market that has since adjusted).",
+            "",
+            "Be neutral and factual. Do not recommend betting real money, do not promise "
+            "future performance, and do not restate the numbers back -- explain them.",
+            "Write only the rationale itself, with no preamble or heading.",
+            "",
+            f"System filters: {filters_text}",
+            f"Bet type: {system.bet_type}",
+            f"Backtest: {result.bets} bets, record {result.wins}-{result.losses}-{result.pushes} "
+            f"({decided} decided), hit rate {result.hit_rate:.3f}, ROI {result.roi:.4f}",
+        ]
+    )
+
+
+def write_theory(
+    system: SystemFilter,
+    result: BacktestResult,
+    *,
+    client=None,
+    api_key: str | None = None,
+    model: str = _DEFAULT_MODEL,
+    timeout: float = _DEFAULT_TIMEOUT,
+) -> str:
+    """Exactly one API call, same failure contract as narrate_run."""
+    return _complete(
+        build_theory_prompt(system, result),
+        client=client,
+        api_key=api_key,
+        model=model,
+        timeout=timeout,
+        max_tokens=400,
+    )

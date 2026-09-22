@@ -176,7 +176,7 @@ def _build(args: argparse.Namespace) -> int:
 
 def _enrich(args: argparse.Namespace) -> int:
     path = run_enrich(args.data_dir)
-    print(f"Wrote enriched features to {path}")
+    print(f"Wrote enriched features to {path.with_suffix('.duckdb')}")
     return 0
 
 

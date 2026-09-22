@@ -33,6 +33,9 @@ SourceKind = Literal[
     "raw_prior_team_season",
     "raw_conference_change",
     "computed_running",
+    "computed_prior_game",
+    "pregame_team_wp",
+    "prior_coach_style",
     "computed_v1",
     "computed_line_move",
     "computed_wind",
@@ -100,23 +103,9 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
         description="Away team's Elo rating entering the game. Higher means stronger; pregame value.",
     ),
     FeatureDef(
-        "pregame_win_prob",
-        "Win Prob (contaminated — not pregame)",
-        "result_lookahead",
-        "graphql_game_team",
-        "winProb",
-        "game_id",
-        "numeric",
-        team_scoped=True,
-        description=(
-            "Team-scoped win probability (0–1 scale) from graphql gameTeam. Despite the key name "
-            "this is NOT an entering-game value: the source row carries endElo and final points, "
-            "and the field's tail encodes the outcome. Measured on the built data, the team with "
-            "the higher winProb wins 86.2% of games overall, but teams at winProb >= 0.977 win "
-            "7182/7244 = 99.1% — an accuracy no genuine pregame model reaches. Quarantined as "
-            "lookahead so candidate search cannot select it (see search.py _CANDIDATE_FEATURES). "
-            "Analysis-only; do not use as a betting input."
-        ),
+        "pregame_win_prob", "Team Win Probability (pregame)", "ratings",
+        "pregame_team_wp", "homeWinProbability", "game_id", "numeric", team_scoped=True,
+        description="Genuine pregame forecast: home probability from the pregame endpoint; away is its complement. Missing forecasts stay null. Never reads outcome-contaminated gameTeam.winProb.",
     ),
     FeatureDef(
         "pregame_home_win_prob", "Home Win Prob (pregame)", "ratings", "raw_pregame_wp", "homeWinProbability", "game_id", "numeric",
@@ -627,153 +616,60 @@ FEATURE_REGISTRY: tuple[FeatureDef, ...] = (
             "Break-even at standard -110 pricing is 0.5238."
         ),
     ),
-    # --- result lookahead ---
+    # --- prior-game and prior-season replacements ---
     FeatureDef(
-        "havoc_offense_rate",
-        "Offense Havoc Rate",
-        "result_lookahead",
-        "raw_havoc",
-        "offense.havocRate",
-        "game_id",
-        "numeric",
-        team_scoped=True,
-        description=(
-            "Offense havoc rate for this completed game. Team-scoped. "
-            "Analysis-only / lookahead — uses post-game result data, not available for live betting."
-        ),
+        "havoc_offense_rate", "Offense Havoc Rate (to date)", "season_to_date",
+        "computed_prior_game", "havoc_offense_rate", "game_id", "numeric", team_scoped=True,
+        source_file="game_havoc_stats",
+        description="Mean of this team's offense.havocRate from earlier completed games in the same season. Only games with known kickoff at least 24 hours before this kickoff contribute. Current game, future games, missing dates and non-finite values are excluded. Season opener is null. Uses all raw schedule games, including games without betting lines.",
     ),
     FeatureDef(
-        "havoc_defense_rate",
-        "Defense Havoc Rate",
-        "result_lookahead",
-        "raw_havoc",
-        "defense.havocRate",
-        "game_id",
-        "numeric",
-        team_scoped=True,
-        description=(
-            "Defense havoc rate for this completed game. Team-scoped. "
-            "Analysis-only / lookahead — uses post-game result data, not available for live betting."
-        ),
+        "havoc_defense_rate", "Defense Havoc Rate (to date)", "season_to_date",
+        "computed_prior_game", "havoc_defense_rate", "game_id", "numeric", team_scoped=True,
+        source_file="game_havoc_stats",
+        description="Mean of this team's defense.havocRate from earlier completed games in the same season. Only games with known kickoff at least 24 hours before this kickoff contribute. Current game, future games, missing dates and non-finite values are excluded. Season opener is null. Uses all raw schedule games, including games without betting lines.",
+    ),
+
+    FeatureDef(
+        "coach_style_cluster", "Prior-season Coach Playstyle", "team_preseason",
+        "prior_coach_style", "style", "team_season", "categorical", team_scoped=True,
+        description="Style of this team's principal coach from the previous season, not necessarily its current coach. Refit separately for each target season using only earlier completed seasons, including scaling and clustering. Requires at least three historical coach seasons; missing history stays null.",
     ),
     FeatureDef(
-        "attendance", "Attendance", "result_lookahead", "raw_game", "attendance", "game_id", "numeric",
-        description=(
-            "Reported game attendance (people). Analysis-only / lookahead — typically known after kickoff "
-            "or final, not a pure pregame betting input."
-        ),
-    ),
-    FeatureDef(
-        "coach_style_cluster",
-        "Coach Playstyle Cluster",
-        "result_lookahead",
-        "raw_coaches",
-        "coach_style_cluster",
-        "team_season",
-        "categorical",
-        team_scoped=True,
-        description=(
-            "Head coach playstyle group: one of option_ground, attack_defense, bend_dont_break, "
-            "pass_first_efficient, balanced_spread. k=5 k-means over quality-stripped (SP+-residualized) "
-            "advanced season stats 2016-2024, coaches with 3+ seasons; regenerate with "
-            "scripts/build_coach_style_clusters.py. Career-level label, so early-season games read a "
-            "label informed by the coach's later seasons — quarantined as lookahead; use for grouping "
-            "and analysis, not as a discovered betting edge."
-        ),
-    ),
-    FeatureDef(
-        "core_overall",
-        "Core Rating (this season)",
-        "result_lookahead",
-        "raw_team_season",
-        "overall",
-        "team_season",
-        "numeric",
-        team_scoped=True,
+        "core_overall", "Core Rating entering season", "team_preseason",
+        "raw_prior_team_season", "overall", "team_season", "numeric", team_scoped=True,
         source_file="core_ratings",
-        description=(
-            "CFBD core rating (overall) for THIS season. Season-final (through postseason). "
-            "Analysis-only / lookahead — not an entering-game value. For a pregame number use "
-            "Prior-Season Core Rating."
-        ),
+        description="Previous season's final overall core rating, available before this season. Same value as Prior-Season Core Rating; retained for saved-system compatibility.",
     ),
     FeatureDef(
-        "defense_explosiveness",
-        "Def Explosiveness (this game, NGT)",
-        "result_lookahead",
-        "raw_adv_ngt",
-        "defense.explosiveness",
-        "game_id",
-        "numeric",
-        team_scoped=True,
+        "defense_explosiveness", "Def Explosiveness (to date, NGT)", "season_to_date",
+        "computed_prior_game", "defense_explosiveness", "game_id", "numeric", team_scoped=True,
         source_file="advanced_game_stats_ngt",
-        description=(
-            "Defensive explosiveness allowed in this completed game, garbage time excluded. "
-            "Team-scoped. Analysis-only / lookahead — post-game, not available for live betting. "
-            "For an entering-game value use Def Explosiveness (to date)."
-        ),
+        description="Mean of this team's defense.explosiveness from earlier completed games in the same season, excluding garbage time. Only games with known kickoff at least 24 hours before this kickoff contribute. Current game, future games, missing dates and non-finite values are excluded. Season opener is null. Uses all raw schedule games, including games without betting lines.",
     ),
     FeatureDef(
-        "defense_passingDowns_ppa",
-        "Def Passing-Downs PPA (this game, NGT)",
-        "result_lookahead",
-        "raw_adv_ngt",
-        "defense.passingDowns.ppa",
-        "game_id",
-        "numeric",
-        team_scoped=True,
+        "defense_passingDowns_ppa", "Def Passing-Downs PPA (to date, NGT)", "season_to_date",
+        "computed_prior_game", "defense_passingDowns_ppa", "game_id", "numeric", team_scoped=True,
         source_file="advanced_game_stats_ngt",
-        description=(
-            "Defensive PPA allowed on passing downs in this completed game, garbage time excluded. "
-            "Team-scoped. Analysis-only / lookahead — post-game, not available for live betting."
-        ),
+        description="Mean of this team's defense.passingDowns.ppa from earlier completed games in the same season, excluding garbage time. Only games with known kickoff at least 24 hours before this kickoff contribute. Current game, future games, missing dates and non-finite values are excluded. Season opener is null. Uses all raw schedule games, including games without betting lines.",
     ),
     FeatureDef(
-        "defense_ppa",
-        "Def PPA (this game, NGT)",
-        "result_lookahead",
-        "raw_adv_ngt",
-        "defense.ppa",
-        "game_id",
-        "numeric",
-        team_scoped=True,
+        "defense_ppa", "Def PPA (to date, NGT)", "season_to_date",
+        "computed_prior_game", "defense_ppa", "game_id", "numeric", team_scoped=True,
         source_file="advanced_game_stats_ngt",
-        description=(
-            "Defensive PPA allowed in this completed game, garbage time excluded. Team-scoped. "
-            "Analysis-only / lookahead — post-game, not available for live betting. "
-            "For an entering-game value use Def PPA (to date)."
-        ),
+        description="Mean of this team's defense.ppa from earlier completed games in the same season, excluding garbage time. Only games with known kickoff at least 24 hours before this kickoff contribute. Current game, future games, missing dates and non-finite values are excluded. Season opener is null. Uses all raw schedule games, including games without betting lines.",
     ),
     FeatureDef(
-        "defense_rushingPlays_ppa",
-        "Def Rushing PPA (this game, NGT)",
-        "result_lookahead",
-        "raw_adv_ngt",
-        "defense.rushingPlays.ppa",
-        "game_id",
-        "numeric",
-        team_scoped=True,
+        "defense_rushingPlays_ppa", "Def Rushing PPA (to date, NGT)", "season_to_date",
+        "computed_prior_game", "defense_rushingPlays_ppa", "game_id", "numeric", team_scoped=True,
         source_file="advanced_game_stats_ngt",
-        description=(
-            "Defensive PPA allowed on rushing plays in this completed game, garbage time excluded. "
-            "Team-scoped. Analysis-only / lookahead — post-game, not available for live betting."
-        ),
+        description="Mean of this team's defense.rushingPlays.ppa from earlier completed games in the same season, excluding garbage time. Only games with known kickoff at least 24 hours before this kickoff contribute. Current game, future games, missing dates and non-finite values are excluded. Season opener is null. Uses all raw schedule games, including games without betting lines.",
     ),
     FeatureDef(
-        "defense_successRate",
-        "Def Success Rate (this game, NGT)",
-        "result_lookahead",
-        "raw_adv_ngt",
-        "defense.successRate",
-        "game_id",
-        "numeric",
-        team_scoped=True,
+        "defense_successRate", "Def Success Rate (to date, NGT)", "season_to_date",
+        "computed_prior_game", "defense_successRate", "game_id", "numeric", team_scoped=True,
         source_file="advanced_game_stats_ngt",
-        description=(
-            "Defensive success rate allowed in this completed game (0–1), garbage time excluded. "
-            "Team-scoped. Analysis-only / lookahead — post-game, not available for live betting. "
-            "For an entering-game value use Def Success Rate (to date)."
-        ),
+        description="Mean of this team's defense.successRate from earlier completed games in the same season, excluding garbage time. Only games with known kickoff at least 24 hours before this kickoff contribute. Current game, future games, missing dates and non-finite values are excluded. Season opener is null. Uses all raw schedule games, including games without betting lines.",
     ),
 )
 
@@ -797,7 +693,7 @@ def registry_keys_unique() -> bool:
 
 
 def registry_version() -> str:
-    digest = hashlib.sha256(",".join(sorted(FEATURE_BY_KEY)).encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(repr(FEATURE_REGISTRY).encode("utf-8")).hexdigest()
     return digest[:12]
 
 

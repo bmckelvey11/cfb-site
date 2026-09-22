@@ -1,7 +1,7 @@
-from cfb_system_maker.normalize import normalize_games
+from cfb_system_maker.normalize import MEDIAN_PROVIDER, normalize_games
 
 
-def test_normalize_joins_games_to_consensus_lines():
+def test_normalize_joins_games_to_the_median_line():
     games = [
         {
             "id": 401520161,
@@ -25,6 +25,7 @@ def test_normalize_joins_games_to_consensus_lines():
         }
     ]
 
+    # provider= is inert now; the builder always grades against the median book line.
     [record] = normalize_games(games, lines, provider="consensus")
 
     assert record.game_id == 401520161
@@ -36,9 +37,11 @@ def test_normalize_joins_games_to_consensus_lines():
     assert record.away_conference == "American"
     assert record.home_points == 30
     assert record.away_points == 14
-    assert record.provider == "consensus"
-    assert record.spread == -14.5
-    assert record.total == 52.5
+    assert record.provider == MEDIAN_PROVIDER
+    # median of DraftKings -35.5 and consensus -14.5, snapped to a half point
+    assert record.spread == -25.0
+    # totals 51.5 and 52.5 -> 52.0
+    assert record.total == 52.0
 
 
 def test_line_less_game_contributes_zero_records():
@@ -102,7 +105,7 @@ def test_usable_line_contributes_one_record():
     assert records[0].season == 2013
 
 
-def test_normalize_uses_first_usable_line_when_provider_missing():
+def test_normalize_single_book_median_is_that_book():
     games = [
         {
             "id": 1,
@@ -118,12 +121,12 @@ def test_normalize_uses_first_usable_line_when_provider_missing():
 
     [record] = normalize_games(games, lines, provider="consensus")
 
-    assert record.provider == "Book"
+    assert record.provider == MEDIAN_PROVIDER
     assert record.spread == -2.5
     assert record.total is None
 
 
-def test_total_falls_back_to_sibling_provider_when_preferred_line_lacks_it():
+def test_total_medians_over_the_books_that_posted_one():
     # 2013-2016 pattern: consensus has spread but no overUnder; a sibling
     # provider on the same game does. Total should fall back to the first
     # sibling (list order) that has one, without changing the spread source.
@@ -151,6 +154,8 @@ def test_total_falls_back_to_sibling_provider_when_preferred_line_lacks_it():
 
     [record] = normalize_games(games, lines, provider="consensus")
 
-    assert record.provider == "consensus"
-    assert record.spread == -11.5
-    assert record.total == 56
+    # Spread medians over all three books (-11.5, -11, -11); the total only over the two
+    # that posted one (56, 58) -- each number uses its own book set by design.
+    assert record.provider == MEDIAN_PROVIDER
+    assert record.spread == -11.0
+    assert record.total == 57.0

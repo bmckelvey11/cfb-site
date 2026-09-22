@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import os
 import json
 import re
 from dataclasses import dataclass
@@ -443,6 +444,36 @@ def parse_dump_stem(stem: str) -> tuple[str, int | None, int | None, str | None]
     return stem, None, None, None
 
 
+# DuckDB defaults `memory_limit` to ~80% of physical RAM. On 2026-09-11 that killed a
+# rebuild on a 15.4 GB machine with 2.9 GB actually free: `stg.an_scoreboard` died with
+# `OutOfMemoryException: Allocation failure`, its children `an_market`/`an_team`/
+# `an_linescore` were never built, the ActionNetwork backfill found no tape, `stg.game_lines`
+# stayed 9 columns without `period`, and `build_core` skipped the line merge -- one
+# allocation failure cost 8,587 line rows and five tables.
+#
+# DuckDB's own OOM guide says to go *below* the default, "counter-intuitively", because some
+# operations bypass the buffer manager and reserve past the limit; it recommends 50-60% of
+# total RAM. 4 GB is under that on any machine this runs on, deliberately: the loader is not
+# throughput-critical and spilling to disk is strictly better than losing tables. The other
+# two recommendations -- `threads = 1` and `preserve_insertion_order = false` -- were already
+# here and were not enough on their own.
+#
+# `temp_directory` is left at its default (`<database>.tmp` beside the database file), which
+# is already where we want spill to land.
+_MEMORY_LIMIT = os.environ.get("CFB_DUCKDB_MEMORY_LIMIT", "4GB")
+
+
+def _tune(con: duckdb.DuckDBPyConnection) -> None:
+    """The three settings every loader connection needs, in one place.
+
+    The first two were duplicated at four call sites and the third was missing from all of
+    them, which is how the limit stayed at its 80% default everywhere.
+    """
+    con.execute("SET preserve_insertion_order = false")
+    con.execute("SET threads = 1")
+    con.execute(f"SET memory_limit = '{_MEMORY_LIMIT}'")
+
+
 class RebuildInProgress(RuntimeError):
     """Another process is already rebuilding this warehouse."""
 
@@ -532,8 +563,7 @@ def _build_duckdb_locked(
     reports: list[TableLoad] = []
     con = duckdb.connect(str(tmp_path))
     try:
-        con.execute("SET preserve_insertion_order = false")
-        con.execute("SET threads = 1")
+        _tune(con)
         con.execute("CREATE SCHEMA IF NOT EXISTS raw")
         con.execute("CREATE SCHEMA IF NOT EXISTS stg")
         con.execute("CREATE SCHEMA IF NOT EXISTS meta")
@@ -605,8 +635,7 @@ def explode_payloads(
     con = duckdb.connect(str(db)) if owns_connection else db
     reports: list[TableLoad] = []
     try:
-        con.execute("SET preserve_insertion_order = false")
-        con.execute("SET threads = 1")
+        _tune(con)
         con.execute("CREATE SCHEMA IF NOT EXISTS stg")
         sources = con.execute(
             """
@@ -1157,8 +1186,7 @@ def flatten_stg_nested(
     con = duckdb.connect(str(db)) if owns_connection else db
     reports: list[TableLoad] = []
     try:
-        con.execute("SET preserve_insertion_order = false")
-        con.execute("SET threads = 1")
+        _tune(con)
         tables = con.execute(
             """
             SELECT table_schema, table_name
@@ -1208,8 +1236,7 @@ def explode_stg_lists(
     con = duckdb.connect(str(db)) if owns_connection else db
     reports: list[TableLoad] = []
     try:
-        con.execute("SET preserve_insertion_order = false")
-        con.execute("SET threads = 1")
+        _tune(con)
         for schema in _STG_SCHEMAS:
             for (stale,) in con.execute(
                 f"""

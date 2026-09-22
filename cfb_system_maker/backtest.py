@@ -82,7 +82,7 @@ def run_backtest(
         bet_details=details,
         stats=compute_system_stats(details, hit_rate=hit_rate, roi=roi, american_odds=american_odds, stake=stake),
         season_breakdown=tuple(compute_season_breakdown(details, stake=stake)),
-        average_margin=(round(sum(bet.margin for bet in details) / bets, 4) if bets and system.bet_type == "spread" else None),
+        average_margin=(round(sum(bet.margin for bet in details) / bets, 4) if bets else None),
     )
     result = replace(result, grade=compute_grade(result, system))
     if result.stats is not None:
@@ -587,6 +587,10 @@ def _grade_total_bet(
         result = "loss"
         profit = -stake
 
+    # Signed the way the spread branch signs cover_margin: positive means the
+    # bet cleared its number, so a mixed slate still averages meaningfully.
+    cover_margin = points - game.total if effective_total_side == "over" else game.total - points
+
     return BetDetail(
         game_id=game.game_id,
         season=game.season,
@@ -600,6 +604,7 @@ def _grade_total_bet(
         line=game.total,
         result=result,
         profit=round(profit, 4),
+        margin=round(cover_margin, 4),
         team_points=points,
         opponent_points=None,
     )
