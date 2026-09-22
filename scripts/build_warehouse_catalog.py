@@ -574,9 +574,9 @@ def compute_grain(
     keys = [c for c, ctype, *_ in cols if is_key(c)]
     if not keys or n_rows == 0:
         return ""
-    tuple_expr = " || '\x01' || ".join(
-        f"coalesce(\"{c}\"::varchar, '\x00')" for c in keys
-    )
+    # A struct, not a sentinel-joined string: DISTINCT treats NULL fields as equal, and
+    # DuckDB 1.5's parser rejects the NUL byte the old sentinel put in the SQL text.
+    tuple_expr = "row(" + ", ".join(f'"{c}"' for c in keys) + ")"
     distinct = con.execute(
         f'select count(distinct {tuple_expr}) from "{schema}"."{name}"'
     ).fetchone()[0]
