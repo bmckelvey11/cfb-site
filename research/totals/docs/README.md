@@ -17,6 +17,7 @@ PFF showed, and accumulate until the sample can answer.
 
 | Doc | What it reports |
 | --- | --- |
+| **[greenline-findings.md](greenline-findings.md)** | **Start here.** Living summary — the twelve settled findings with a pointer to the record that establishes each, the four open questions and which one is worth the next hour, the standing cautions, and what it all implies for staking. Undated because it must stay current; if it disagrees with a dated record, the record wins |
 | [greenline-season-review-2026-09-16.md](greenline-season-review-2026-09-16.md) | Season to date, all three markets — record, Wilson intervals, units, ROI, CLV, calibration, and the minimum detectable win rate for each sample |
 | [greenline-totals-season-2026-09-16.md](greenline-totals-season-2026-09-16.md) | The same review narrowed to totals, with the CLV section against the PFF board close |
 | [greenline-band-significance-2026-09-17.md](greenline-band-significance-2026-09-17.md) | Is the market-total band split real? Chi-square, Fisher, best-of-six correction, trend, and out-of-sample ordering test. Not significant; band ordering withdrawn |
@@ -36,8 +37,11 @@ PFF showed, and accumulate until the sample can answer.
 > rate its own sample could reliably detect. Every split so far sits below that floor, so
 > the numbers are not evidence in either direction — not for an edge, and not against one.
 >
-> **The 2023-25 personal unders are not an independent sample.** They were mostly the same
-> Greenline flags, taken as bets. Pool them as prior evidence; never as a baseline.
+> **The 2023-25 personal unders are not an independent sample, and not a pool member.**
+> Measured on the only days where a Greenline board and a book bet both exist: 7 of 12 are
+> the same pick, **3 take the side Greenline flagged against**, 2 are games it never flagged.
+> Report them as a comparison stratum with their own interval — never as a baseline, never as
+> out-of-sample confirmation, never as a row inside a pooled Greenline record.
 
 ### Pipeline
 
