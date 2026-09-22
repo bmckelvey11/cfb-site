@@ -105,6 +105,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | --- | --- |
 | [bet-history-analysis-2023-2025.md](bet-history-analysis-2023-2025.md) | The 2023–2025 personal bet history |
 | [model-evaluation-standard.md](model-evaluation-standard.md) | How is a model, system, or filter scored, and what invalidates the result? |
+| [feature-evaluation-framework.md](feature-evaluation-framework.md) | How to tell whether a CFB statistic adds predictive value beyond a baseline and the market, and the warehouse/experiment machinery to test it (plan; nothing here is built yet) |
 | [ledger-system.md](ledger-system.md) | What records a bet or a pick: the five ledgers, which script writes which file, the CLV sign per market, and which ones are actually running |
 | [clv-analysis.md](clv-analysis.md) | Do you beat the closing line? |
 | [value-sources-beyond-the-close.md](value-sources-beyond-the-close.md) | Value other than beating the close |
