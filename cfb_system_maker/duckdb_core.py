@@ -298,9 +298,9 @@ def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
     """All REST games + has_line; selected books clone normalize._select_line/_select_total.
 
     One documented departure from the clone: projection sites are filtered out before
-    spread selection (see ``PROJECTION_PROVIDERS``), so core and ``games.csv`` disagree
-    on 197 projection-only games. ``tests/test_core_agreement.py`` asserts that
-    divergence positively.
+    selection (see ``PROJECTION_PROVIDERS``), so core and ``games.csv`` disagree on 197
+    projection-only games and on the 2,901 2013-2016 totals the CSV still carries.
+    ``tests/test_core_agreement.py`` asserts that divergence positively.
     """
     con.execute("DROP TABLE IF EXISTS core.fact_game")
     con.execute(
@@ -401,16 +401,18 @@ def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
             continue
 
         lines = lines_by_id.get(int(game_id), [])
-        # Spread selection sees books only. `_select_line` falls back to array order when
-        # no preferred provider matches, and the projection sites quote every game, so
-        # they won that fallback on 203 games -- a model number sitting in
-        # `selected_spread` as if a book had hung it. 197 of those 203 have no book
-        # spread at all, so they lose `has_line` rather than reroute; that is the honest
-        # answer for a game nobody took a price on.
+        # Selection sees books only, for both markets. `_select_line` falls back to array
+        # order and `_select_total` to the first sibling carrying a number, and the
+        # projection sites quote every game, so they won those fallbacks on 203 spreads
+        # and 2,901 totals -- a model number sitting in `selected_spread` /
+        # `selected_total` as if a book had hung it.
         #
-        # `_select_total` still gets the unfiltered list: totals are a separate column
-        # with a separate fallback, and narrowing them here would null ~2,901 more games
-        # in a change that was scoped to spreads.
+        # Nothing is rerouted, because there is nothing to reroute to. CFBD's own
+        # payloads carry `overUnder: null` on every `consensus` row until 2017 (verified
+        # in `raw.lines`, where the same rows are 100% populated on `spread`), and the
+        # ActionNetwork tape starts in 2024 -- so the 2,901 are exactly 2013-2016, and
+        # the 197 games that lose `has_line` have no book spread in any source either.
+        # Nulling them is the honest answer for a game nobody took a price on.
         books = [
             line
             for line in lines
@@ -423,7 +425,7 @@ def _build_fact_game(con: duckdb.DuckDBPyConnection, *, provider: str) -> None:
         if selected is not None:
             spread_provider = _provider_key(_first(selected, "provider"))
             spread = _optional_float(_first(selected, "spread"))
-            total_row = _select_total(lines, selected)
+            total_row = _select_total(books, selected)
             total_provider = _provider_key(_first(total_row, "provider"))
             total = _optional_float(_first(total_row, "overUnder", "over_under", "total"))
             if spread is None and total is None:
@@ -763,10 +765,10 @@ def _build_game_projections(con: duckdb.DuckDBPyConnection) -> None:
     a projection has. ``fact_game_line_conflicts`` needs no cleanup -- it holds zero rows
     for either provider, the two sources never disagreed.
 
-    ``_build_fact_game`` no longer lets a projection win ``selected_spread_provider_key``.
-    ``selected_total_provider_key`` still resolves to one on 3,104 games, and since
-    3,098 of those have no book total at all, narrowing totals nulls them rather than
-    rerouting -- a separate decision, deliberately not taken here.
+    ``_build_fact_game`` no longer lets a projection win either selected provider key.
+    That leaves ``selected_total`` null for 2013-2016, which is correct: CFBD publishes
+    no book total before 2017 and ActionNetwork none before 2024, so the warehouse's
+    usable totals history starts in 2017.
     """
     con.execute("DROP TABLE IF EXISTS core.game_projections")
     con.execute(
