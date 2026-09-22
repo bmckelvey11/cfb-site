@@ -148,6 +148,8 @@ def check_fresh(cookie: str, now: float | None = None) -> str:
     requests at analytics and CDN hosts too, and those carry their own cookie header
     with no Clerk keys in it."""
     now = int(now if now is not None else time.time())
+    if cookie[:7].lower() == "cookie:":
+        cookie = cookie[7:].strip()  # DevTools' row copy keeps the header name
     keys = [part.strip().split("=", 1)[0] for part in cookie.split(";") if "=" in part]
     if "__session" not in keys:
         raise SystemExit(
@@ -406,6 +408,7 @@ def self_check() -> None:
     assert session_expiry("CookieConsent=1; AWSALB=x") is None
     assert session_expiry("__session=not.a.jwt") is None
     assert check_fresh(jwt(1790056378), now=1790056340).startswith("CookieConsent")
+    assert check_fresh("cookie: " + jwt(1790056378), now=1790056340).startswith("CookieConsent")
     try:
         check_fresh("AWSALB=x; ph_phc_x=y")
     except SystemExit as exc:
