@@ -182,25 +182,25 @@ def warehouse_finals(season: int) -> list[dict]:
             for d, a, h, ap, hp in rows]
 
 
-def capture_lines(season: int, wk: str) -> dict:
-    p = IN_DIR / f"greenline_unders_{season}_w{wk}.csv"
+def capture_lines(season: int, wk: str, in_dir: Path = IN_DIR) -> dict:
+    p = in_dir / f"greenline_unders_{season}_w{wk}.csv"
     if not p.exists():
         return {}
     return {r["game_id"]: num(r["line"]) for r in csv.DictReader(p.open(encoding="utf-8"))}
 
 
-def load(season: int, weeks: list[str]) -> list[dict]:
-    sched_path = IN_DIR / f"pff_schedule_{season}.csv"
+def load(season: int, weeks: list[str], in_dir: Path = IN_DIR) -> list[dict]:
+    sched_path = in_dir / f"pff_schedule_{season}.csv"
     if not sched_path.exists():
         raise SystemExit(f"{sched_path} not found -- run scripts/pull_pff_scoreboard.py")
     sched = {x["pff_game_id"]: x for x in csv.DictReader(sched_path.open(encoding="utf-8"))}
     finals = warehouse_finals(season)
     out = []
     for wk in weeks:
-        p = IN_DIR / f"pff_greenline_{season}_w{wk}.csv"
+        p = in_dir / f"pff_greenline_{season}_w{wk}.csv"
         if not p.exists():
             continue
-        lines = capture_lines(season, wk)
+        lines = capture_lines(season, wk, in_dir)
         for flag in csv.DictReader(p.open(encoding="utf-8")):
             g = sched.get(flag["pff_game_id"])
             if not g:
@@ -263,6 +263,12 @@ def main() -> None:
     ap.add_argument("--week", action="append", help="repeatable; omit with --all")
     ap.add_argument("--all", action="store_true", help="every captured week")
     ap.add_argument("--self-check", action="store_true")
+    # Replaying a non-PFF capture (see format_exports_for_grading.py) must not read from
+    # or write over the real 2026 capture set, so both ends are overridable.
+    ap.add_argument("--in-dir", type=Path, default=IN_DIR,
+                    help=f"directory holding the captures (default: {IN_DIR})")
+    ap.add_argument("--out", type=Path, default=OUT,
+                    help=f"graded output (default: {OUT})")
     args = ap.parse_args()
 
     if args.self_check:
@@ -271,13 +277,13 @@ def main() -> None:
 
     if args.all:
         weeks = sorted(p.stem.rsplit("_w", 1)[1]
-                       for p in IN_DIR.glob(f"pff_greenline_{args.season}_w*.csv"))
+                       for p in args.in_dir.glob(f"pff_greenline_{args.season}_w*.csv"))
     elif args.week:
         weeks = args.week
     else:
         raise SystemExit("pass --week N (repeatable) or --all")
 
-    rows = load(args.season, weeks)
+    rows = load(args.season, weeks, args.in_dir)
     print(f"=== Greenline totals, {args.season} week(s) {', '.join(weeks)} ===\n")
     report(rows)
 
@@ -289,8 +295,8 @@ def main() -> None:
                   f"line={r['line_source']} -> {r['result']}")
 
     if rows:
-        OUT.parent.mkdir(parents=True, exist_ok=True)
-        with OUT.open("w", newline="", encoding="utf-8") as fh:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        with args.out.open("w", newline="", encoding="utf-8") as fh:
             wr = csv.DictWriter(fh, fieldnames=GRADED_COLUMNS)
             wr.writeheader()
             wr.writerows(rows)

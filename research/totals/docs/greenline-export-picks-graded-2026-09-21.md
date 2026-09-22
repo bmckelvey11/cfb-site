@@ -111,8 +111,66 @@ apply here.
   question, and per the unit's standing rule the personal 2023-25 unders are not an
   independent sample to pool them with either.
 
+## Replaying through the standard grader
+
+[`format_exports_for_grading.py`](../scripts/format_exports_for_grading.py) reshapes the
+total picks into the weekly capture format (`pff_greenline_<season>_w<week>.csv` plus a
+`pff_schedule_<season>.csv`) so [`grade_greenline.py`](../scripts/grade_greenline.py) can
+read them. That grader is totals-only, so **only the 91 total picks replay** — the 67
+spread and 62 moneyline picks have no home in that format and stay with
+`grade_export_picks.py`.
+
+Three things kept separate on purpose:
+
+- **Files go to `<ingest>/pff_scoreboard/export_replay/`, not beside the real captures.**
+  These are synthesized from a vendor export, not pulled from PFF; a file named
+  `pff_greenline_2022_w5.csv` sitting next to the genuine 2026 captures would eventually
+  be read as one. `grade_greenline.py` gained `--in-dir` and `--out` for this; both
+  default to the old behaviour, so the 2026 pipeline is untouched.
+- **Graded output stays out of `greenline_graded.csv`**, which is the 2026 pooled record.
+- **No final scores are written into the synthesized schedule.** `is_over` is left empty so
+  `pff_final()` declines and the grader falls through to its documented warehouse lookup.
+  CFBD stays the single source of truth rather than this adapter copying results in.
+
+### The two paths agree exactly
+
+| | overlap | side agrees | line agrees | **result disagreements** |
+| --- | --- | --- | --- | --- |
+| `grade_export_picks.py` vs `grade_greenline.py` | 77 picks | yes | yes | **0** |
+
+Two independently written graders returning identical W/L/P on all 77 shared picks is the
+main reason to have built the adapter at all.
+
+### But the capture path grades 13 fewer
+
+| path | graded | record |
+| --- | --- | --- |
+| `grade_export_picks.py` (joins on the archive's `game_id`) | 90 | 46-42, 2 push |
+| `grade_greenline.py` replay | 77 | 40-35, 2 push |
+
+The 13 missing picks (6 W, 7 L — so their absence is not directional) are ones
+`grade_greenline.py`'s warehouse fallback cannot resolve: it matches on calendar day plus
+a strong shared token in both names and requires one clear best hit, whereas the archive
+already carries a `game_id` resolved by the parser. **The replay is strictly weaker at
+finding the game**, which is why the headline record in this document is the one from
+`grade_export_picks.py`.
+
+### Ignore the replay's ROI column
+
+`grade_greenline.py` prints units and ROI at a flat −110 (`PAYOUT = 100/110`), which is
+sound for the 2026 captures and **not** sound here: these picks have no price, which is the
+integrity-gate failure described above. Its `+7.9%` for 2022 and `−0.9%` for 2023 are
+arithmetic on an assumed price and must not be quoted as returns. Read the replay for its
+record and its agreement with the other grader, nothing else.
+
 ## Reproduce
 
 ```bash
 python research/totals/scripts/grade_export_picks.py
+```
+
+The replay, whose inputs land in `$CFB_DATA_ROOT` and are regenerable, not committed:
+
+```bash
+python research/totals/scripts/format_exports_for_grading.py
 ```
