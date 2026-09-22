@@ -17,10 +17,11 @@ since established:
 | Conversation notes on regression, priors, and the market-residual workflow | New in this guide (was untracked) | Totals-specific shrinkage table, turnover decomposition, first feature set |
 
 The two tracked reports stay as the full reference material, with their citation lists.
-Preseason priors, prior decay, opponent adjustment, and empirical-Bayes shrinkage are
-covered in depth, with where-tables and worked examples, by
-[opponent-adjustment-priors-model-comparison.md](opponent-adjustment-priors-model-comparison.md).
-This guide links there and does not repeat that material.
+§7 writes opponent adjustment and previous-season priors in their totals form: points per
+possession, pace, and one fit that does both. The general methods, their evidence, and the
+head-to-head comparison stay in
+[opponent-adjustment-priors-model-comparison.md](opponent-adjustment-priors-model-comparison.md),
+which §7 links to instead of repeating.
 
 Scoring is governed by [`docs/model-evaluation-standard.md`](../../../docs/model-evaluation-standard.md).
 When this guide's evaluation advice and that standard differ, the standard wins.
@@ -70,7 +71,7 @@ and the record that measured it.
 | Key numbers in the total | "Respect key numbers" | Measured: one-point bins with neighbour lift, 2014–25 FBS | [total-points-distribution-2026-09-17.md](../../../docs/total-points-distribution-2026-09-17.md) |
 | Wind | Anecdotal 13–15 mph thresholds | Pre-registered plan for crosswind vs along-field wind | [wind-orientation-totals.md](../../../docs/wind-orientation-totals.md) |
 | Which stats are usable pre-game? | "Strictly trailing" | 565 of 1,043 PFF/CFBD columns usable; the dividing line is table grain | [pregame-feature-eligibility-2026-09-16.md](../../../docs/pregame-feature-eligibility-2026-09-16.md) |
-| Opponent-adjusted efficiency | "Build it" | Built: crossed-random-effects PPA ratings, v1.0; five better EPA constructions specified | [ppa-opponent-adjusted-ratings-2026-09-16.md](../../../docs/ppa-opponent-adjusted-ratings-2026-09-16.md), [epa-metric-constructions-2026-09-18.md](../../../docs/epa-metric-constructions-2026-09-18.md) |
+| Opponent-adjusted efficiency | "Build it" | Built: crossed-random-effects PPA ratings, v1.0; five better EPA constructions specified. Points-per-possession and pace ratings (§7) are not built | [ppa-opponent-adjusted-ratings-2026-09-16.md](../../../docs/ppa-opponent-adjusted-ratings-2026-09-16.md), [epa-metric-constructions-2026-09-18.md](../../../docs/epa-metric-constructions-2026-09-18.md) |
 
 ---
 
@@ -234,17 +235,311 @@ produce. Both argue for simulation (§9) once the linear version is understood.
 
 ---
 
-## 7. Shrinkage and priors
+## 7. Opponent adjustment, previous-season priors, and shrinkage
 
-The general machinery lives in
+A team's raw scoring and pace depend on who it played. Opponent adjustment turns them into
+ratings that do not. Before any games are played there is nothing to adjust, so the
+ratings start from a prior built on last season. This section writes both for totals:
+efficiency and pace in the units §6 multiplies, priors that carry across seasons, and
+one fit that does adjustment and prior decay together.
+
+The general methods are in
 [opponent-adjustment-priors-model-comparison.md](opponent-adjustment-priors-model-comparison.md):
-empirical-Bayes reliability $B_{ik}$ (§7 there), the effective-sample prior blend with
-$w_{i,t}=n_0/(n_0+n^{\text{eff}}_{i,t})$ (§6), the preseason prior specification (§5),
-and transfer-era roster features (§8). What follows is what is specific to totals.
+iterative, ridge, crossed random effects, Bayesian and Elo adjustment (§1 and §9 there),
+SP+ and FPI prior components (§5), effective-sample decay (§6), empirical-Bayes reliability
+(§7), and transfer-era roster features (§8). This section uses that doc's **additive sign
+convention**: an offense effect $O$ is positive for a good offense, and a defense effect
+$D$ is **negative** for a good defense, because it lowers what opponents score.
 
-**How hard each input regresses, and toward what.** Ordinal guidance from the conversation
-notes. The strengths are hypotheses; fit the actual $n_0$ or $B$ per metric in walk-forward
-folds.
+**Status.** None of this is built. The repo's adjusted ratings are play-level PPA
+([ppa-opponent-adjusted-ratings-2026-09-16.md](../../../docs/ppa-opponent-adjusted-ratings-2026-09-16.md)).
+No points-per-possession or pace rating appears in any docs index. **Every coefficient and
+league average in the worked examples below is illustrative, not estimated.**
+
+### 7.1 Opponent-adjusted efficiency
+
+Rate each team's points per possession, the $\text{PPP}$ in §6, against the defenses it
+faced.
+
+$$
+\begin{gathered}
+y_{ig}=\mu_s+O_i+D_{j(g)}+hH_{ig}+\epsilon_{ig} \\[1em]
+\begin{array}{rl}
+\text{where}\quad y_{ig}: & \text{team } i\text{'s offensive points per possession in game } g \text{ (regulation, competitive possessions)} \\
+\mu_s: & \text{league-average points per possession in season } s \\
+O_i: & \text{team } i\text{'s offense effect (points per possession; } +\text{ = better offense)} \\
+j(g): & \text{team } i\text{'s opponent in game } g \\
+D_{j(g)}: & \text{that opponent's defense effect (points per possession allowed; } -\text{ = better defense)} \\
+h: & \text{home-field effect (points per possession)} \\
+H_{ig}: & +1 \text{ if } i \text{ is home, } -1 \text{ away, } 0 \text{ neutral} \\
+\epsilon_{ig}: & \text{game noise; its variance falls as the game's possession count rises}
+\end{array}
+\end{gathered}
+$$
+
+An average offense facing defense $j$ at that venue is expected to score
+$\mu_s+D_j+hH$ per possession. Whatever team $i$ did above that is credited to its
+offense. Each game is weighted by its possession count, so a 14-possession game counts more
+than a 9-possession one. The defensive side of every game supplies the mirror observation:
+opponent $i$'s scoring is data on $D_j$.
+
+**Worked example (illustrative: $\mu_s=2.10$, $h=0.05$).** Team A scores 3.0 per
+possession at home against a defense rated $D=-0.40$. The game credits A's offense with
+$3.0-2.10-(-0.40)-0.05=+1.25$. Raw, 3.0 looks like $+0.90$ above average. Against a strong
+defense it is worth $+1.25$.
+
+Points per possession is used rather than EPA/play because §6 multiplies in those units.
+EPA/play and success rate remain useful inputs to the priors in §7.4, and as features.
+Drop FBS–FCS games or rate FCS teams separately (priors doc §2).
+
+### 7.2 Opponent-adjusted pace
+
+Efficiency is offense against defense. Pace is not: both teams feed one shared possession
+count, so their effects add.
+
+$$
+\begin{gathered}
+N_g=\nu_s+P_{\text{h}(g)}+P_{\text{a}(g)}+\epsilon_g \\[1em]
+\begin{array}{rl}
+\text{where}\quad N_g: & \text{possessions per team in game } g \text{ (regulation offensive possessions of both teams} \div 2\text{)} \\
+\nu_s: & \text{league-average possessions per team per game in season } s \\
+\text{h}(g),\ \text{a}(g): & \text{the home and away team in game } g \\
+P_i: & \text{team } i\text{'s pace effect (possessions per team per game; } +\text{ = more possessions in its games)} \\
+\epsilon_g: & \text{game noise, including game script}
+\end{array}
+\end{gathered}
+$$
+
+A fast team adds possessions to every game it plays, and a slow opponent takes them away
+from the same game. That is why a pace rating has to be opponent-adjusted too: a team that
+played three slow opponents has a raw possession count below its real tendency.
+
+**Worked example (illustrative: $\nu_s=12.0$).** A $+0.8$ team meets a $-0.5$ team. The
+expected count is $12.0+0.8-0.5=12.3$ possessions each.
+
+Three cautions.
+
+- **Possessions are partly an efficiency outcome.** Long drives, turnovers, and quick
+  scores change the count, so $P_i$ absorbs some efficiency. A cleaner split rates neutral
+  seconds per play for the offense only and derives possessions from it. Test both.
+- **Overtime is excluded** from $N_g$. It is a separate tail, handled by the distribution
+  (§8), not by pace.
+- **Model the game's count, not two team counts.** Possessions alternate, so the two teams'
+  counts are nearly equal. Priors doc §3 makes the same point.
+
+### 7.3 From ratings to a total
+
+$$
+\begin{gathered}
+\widehat{T}_g=\widehat{N}_g\left(\widehat{\text{PPP}}^{\text{home}}_g+\widehat{\text{PPP}}^{\text{away}}_g\right) \\[0.5em]
+\widehat{N}_g=\nu_s+P_{\text{h}}+P_{\text{a}},
+\qquad
+\widehat{\text{PPP}}^{\text{home}}_g=\mu_s+O_{\text{h}}+D_{\text{a}}+h,
+\qquad
+\widehat{\text{PPP}}^{\text{away}}_g=\mu_s+O_{\text{a}}+D_{\text{h}}-h \\[1em]
+\begin{array}{rl}
+\text{where}\quad \widehat{T}_g: & \text{predicted regulation total (points)} \\
+\text{h},\ \text{a}: & \text{the home and away team; } O,\ D,\ P \text{ are their current ratings} \\
+\widehat{N}_g: & \text{predicted possessions per team (§7.2)} \\
+\widehat{\text{PPP}}^{\text{home}}_g,\ \widehat{\text{PPP}}^{\text{away}}_g: & \text{each offense's predicted points per possession against this defense (§7.1)}
+\end{array}
+\end{gathered}
+$$
+
+This is §6's decomposition with the ratings filled in. Each offense's rate uses the
+**other** team's defense, and home field moves the two rates in opposite directions.
+Defensive and special-teams scores can be added as a small separate term, as in priors
+doc §3.
+
+**Worked example (illustrative: $\mu_s=2.10$, $h=0.05$, $\nu_s=12.0$).**
+
+| | $O$ | $D$ | $P$ |
+| --- | ---: | ---: | ---: |
+| Home | +0.40 | −0.30 | +0.8 |
+| Away | −0.10 | +0.20 | −0.3 |
+
+- Home offense: $2.10+0.40+0.20+0.05=2.75$. The away defense is poor ($D=+0.20$).
+- Away offense: $2.10-0.10-0.30-0.05=1.65$.
+- Possessions: $12.0+0.8-0.3=12.5$.
+- Total: $12.5\times(2.75+1.65)=55.0$.
+
+If the market is 58.5, the decomposition says what would have to be true for the market to
+be right: about 0.8 more possessions per team ($58.5/4.40=13.3$), or 0.28 more points per
+possession between the two offenses ($58.5/12.5=4.68$). That turns an edge into a claim
+about pace or about efficiency, which can each be checked.
+
+### 7.4 Previous-season priors
+
+A prior sets each rating before the season's first game. It starts from last season's
+final opponent-adjusted rating, regresses it toward average, and adjusts for who left and
+who arrived.
+
+**Efficiency prior**
+
+$$
+\begin{gathered}
+O_{i,0}=\left(b+c\,\text{RP}^{\text{off}}_i\right)O_{i,-1}+q\,Z^{\text{off}}_i \\[1em]
+\begin{array}{rl}
+\text{where}\quad O_{i,0}: & \text{prior for team } i\text{'s offense effect this season (points per possession vs this season's average)} \\
+O_{i,-1}: & \text{team } i\text{'s final opponent-adjusted offense effect last season (vs last season's average)} \\
+\text{RP}^{\text{off}}_i: & \text{offensive returning production, 0 to 1, as available before the season} \\
+b: & \text{share of last season's effect a team keeps with nothing returning} \\
+c: & \text{extra share kept per unit of returning production; } b+c<1 \\
+Z^{\text{off}}_i: & \text{talent change on offense (recruiting plus transfers in, minus departures), standardized} \\
+q: & \text{points per possession per standard deviation of talent change}
+\end{array}
+\end{gathered}
+$$
+
+The bracket is how much of last season carries over. It stays below 1 even when every
+starter returns, because part of last season's rating was noise and luck. That shortfall
+is the regression to the mean, applied before the season instead of discovered during it.
+A team that lost most of its production regresses most of the way to average, and talent
+change then moves it. Defense uses the same form with $D$, $\text{RP}^{\text{def}}$,
+$Z^{\text{def}}$, and its own coefficients.
+
+**Worked example (illustrative: $b=0.30$, $c=0.40$, $q=0.10$).** An offense finished last
+season at $+0.80$.
+
+- With 75% returning production the multiplier is $0.30+0.40(0.75)=0.60$, giving $+0.48$.
+  A talent change of $+0.5$ SD adds $0.05$, for a prior of $+0.53$.
+- With 30% returning, the multiplier is $0.42$, giving $+0.34$. With the same talent change
+  the prior is $+0.39$.
+
+The product $c\,\text{RP}\times O_{i,-1}$ is the interaction the priors doc (§5) calls the
+simplest way to make a strong team with little returning regress harder. A second lag,
+$e\,O_{i,-2}$, stays only if it earns its place in walk-forward testing. This replaces the
+fixed 70/20/10 season weights (§7.9).
+
+**Pace prior**
+
+Pace belongs to the play-caller more than to the roster, so the prior switches on whether
+the play-caller changed.
+
+$$
+\begin{gathered}
+P_{i,0}=S_i\,a_{\text{same}}\,P_{i,-1}+\left(1-S_i\right)\left(a_{\text{new}}\,P_{i,-1}+\kappa\,P^{\text{call}}_{i,-1}\right) \\[1em]
+\begin{array}{rl}
+\text{where}\quad P_{i,0}: & \text{prior for team } i\text{'s pace effect this season (possessions per team per game vs this season's average)} \\
+P_{i,-1}: & \text{team } i\text{'s final opponent-adjusted pace effect last season} \\
+S_i: & 1 \text{ if the offensive play-caller is unchanged, } 0 \text{ if new} \\
+P^{\text{call}}_{i,-1}: & \text{the new play-caller's team pace effect last season at a previous FBS job; } 0 \text{ if none} \\
+a_{\text{same}},\ a_{\text{new}}: & \text{share of the team's own pace kept with the same or a new play-caller} \\
+\kappa: & \text{share of the new play-caller's old pace carried over}
+\end{array}
+\end{gathered}
+$$
+
+With the same play-caller, the team keeps most of its own pace. With a new one, it keeps
+less of its own and takes on part of the newcomer's.
+
+**Worked example (illustrative: $a_{\text{same}}=0.7$, $a_{\text{new}}=0.3$,
+$\kappa=0.5$).** A team was $+1.0$ possession last season.
+
+- Same play-caller: $0.7(1.0)=+0.70$.
+- New play-caller from a team at $-0.6$: $0.3(1.0)+0.5(-0.6)=0.00$. The team is projected
+  at league pace.
+
+**Data gap.** The warehouse has head coaches only.
+[coach-playstyle-analysis.md](../../../docs/coach-playstyle-analysis.md) records that
+"attribution is team-level", and a coordinator change under a stable head coach is
+invisible. Until a play-caller table exists, $S_i$ can only mean "same head coach", which
+misses coordinator-only changes. See open item 8 (§14).
+
+**Why the priors are effects, not levels.** Every prior above is a deviation from its own
+season's average. The season averages $\mu_s$ and $\nu_s$ are set separately. That is how
+league-wide shifts stay out of team priors: the 2023 clock rule, and the scoring decline
+since 2016 in
+[total-points-distribution-2026-09-17.md](../../../docs/total-points-distribution-2026-09-17.md).
+A team that was $+1.0$ possession in 2022 enters 2023 as a $+1.0$ team in a
+lower-possession league. It does not keep 2022's absolute snap count.
+
+This moves the era problem into the season average. It does not solve it. Before Week 1,
+$\mu_s$ and $\nu_s$ are themselves forecasts: last season's value plus any known rule
+effect. In 2023 the size of that rule effect is anecdotal (open item 3). The league
+averages do firm up quickly once games are played, because every game informs them.
+
+**Inputs and their timing.**
+[pregame-feature-eligibility-2026-09-16.md](../../../docs/pregame-feature-eligibility-2026-09-16.md)
+classes CFBD's `returning_production`, `recruiting_teams`, and `talent` as
+`pregame_direct`: fixed before the season starts. The research report still flags revision
+risk for any value that can change after publication, such as a figure that takes in
+offseason transfers. Record the date each value was pulled, and use the value as of the
+prior's snapshot date.
+
+**Prior uncertainty.** Each prior has a variance. It is wider when returning production is
+low, the play-caller is new, or the talent change is large. That variance sets how hard
+the fit in §7.5 holds the rating to its prior. It also belongs in the predictive
+distribution's $\sigma(x)$ (§8).
+
+### 7.5 One fit: shrink toward the prior
+
+Opponent adjustment and prior decay can be one ridge fit. The only change from the priors
+doc's ridge (§1 there) is the shrinkage target: each rating is pulled toward **its own
+prior**, not toward zero.
+
+$$
+\begin{gathered}
+\min_{\mu_s,\,h,\,O,\,D}\;\sum_{g<t}w_g\left(y_{ig}-\mu_s-O_i-D_{j(g)}-hH_{ig}\right)^2
++\sum_i\lambda_i^{O}\left(O_i-O_{i,0}\right)^2
++\sum_j\lambda_j^{D}\left(D_j-D_{j,0}\right)^2 \\[1em]
+\begin{array}{rl}
+\text{where}\quad g<t: & \text{games completed before the cutoff } t \\
+w_g: & \text{the game's possession count (weight on its points-per-possession observation)} \\
+O_{i,0},\ D_{j,0}: & \text{the previous-season priors from §7.4} \\
+\lambda_i^{O},\ \lambda_j^{D}: & \text{each team's penalty, in possessions: how much evidence its prior is worth; } \ge 0
+\end{array}
+\end{gathered}
+$$
+
+The first sum rewards ratings that reproduce what happened against the schedule played.
+The penalty sums charge for moving away from the prior. In Week 0 there are no games, so
+every rating equals its prior. As possessions accumulate, the data term grows and the
+ratings move toward what the team has shown against its opponents. No separate fade
+schedule is needed; the decay falls out of the fit.
+
+$\lambda$ plays the role of the priors doc's $n_0$. In the normal case,
+$\lambda_i=\sigma^2/\tau_i^2$: per-possession noise variance over prior variance, in
+possessions. A confident prior has a small $\tau_i$, a large $\lambda_i$, and moves slowly.
+A team with a new play-caller or little returning production gets a smaller $\lambda_i$
+and follows its games sooner. Pace uses the same fit with $N_g$, $P_i$, $P_{i,0}$, and
+$\lambda_i^{P}$. Tune the overall scale of each $\lambda$ on earlier seasons by
+one-step-ahead loss.
+
+**Worked example (illustrative: $\lambda=30$ possessions).** An offense has a prior of
+$+0.50$. After three games and 36 possessions, its opponent-adjusted average is $+1.10$.
+Treating this one team in isolation,
+$\widehat{O}\approx(30\times0.50+36\times1.10)/(30+36)=+0.83$. After eight games and 96
+possessions at the same average, $(15+105.6)/126=+0.96$. The formula is an approximation:
+the real fit couples every team through its opponents, so a rating also moves when an
+opponent's does.
+
+**Identification.** Center each season's priors so the offense priors sum to zero, and so
+do the defense priors. Leave $\mu_s$ and $h$ out of the penalty. Otherwise the penalty
+pulls the average rating toward the average prior and fights the intercept. That is the
+same add-$c$-to-every-$O$, subtract-$c$-from-every-$D$ ambiguity the priors doc §1 warns
+about.
+
+**Implementation.** Write $O_i=O_{i,0}+\delta_i$ and fit an ordinary ridge on $\delta$,
+with the prior-implied prediction subtracted from $y$. A per-team $\lambda_i$ is a
+per-column rescaling. Refit at every cutoff and append the ratings to a snapshot table
+keyed by `as_of`, as priors doc §4 describes.
+
+### 7.6 Leakage rules for priors and adjustment
+
+- **Last season's final ratings are legal inputs.** That season ended before this one
+  began. This season's final ratings joined back onto its own early games are not legal.
+- **Fit every coefficient on earlier seasons only**: $b$, $c$, $q$, $a$, $\kappa$, and the
+  scale of $\lambda$. Never tune them on the season being scored.
+- **Refit at each cutoff.** A rating used for a Week 5 game comes from games completed
+  before that game's decision time, not from a mid-season or full-season fit.
+- **Play-caller changes count from their announcement date**, not from the season start.
+
+### 7.7 How hard other inputs regress
+
+Ordinal guidance for the inputs used as features or as prior ingredients, taken from the
+conversation notes. The strengths are hypotheses: fit the actual $\lambda$, $n_0$, or reliability $B$
+per metric in walk-forward folds.
 
 | Metric family | Regress toward | Strength | Why |
 | --- | --- | --- | --- |
@@ -252,24 +547,19 @@ folds.
 | Offensive EPA/play | Team preseason offense | Moderate | Real signal, distorted early by schedule |
 | Defensive EPA/play | Team preseason defense | Moderate–high | Noisier and more opponent-dependent than offense |
 | Explosive-play rate | Team prior and conference mean | High | Rare events dominate short samples |
-| Turnover margin | Expected turnover margin (§7.1) | Very high | Realization is largely luck |
+| Turnover margin | Expected turnover margin (§7.8) | Very high | Realization is largely luck |
 | Fumble recovery rate | 50% | Very high | Driven by the bounce |
 | Sack rate | Pressure rate times a conversion prior | Moderate | Pressure repeats, conversion is noisy |
 | Special teams | Specialist prior plus tier mean | High early | Low attempt volume; the kicker record found PAAR persists at r 0.16 |
 
-**Pace priors need a larger staff effect than talent priors.** A new offensive coordinator
-can change pace and pass rate at once. Use a bigger pull toward the coordinator's or
-scheme's historical pace than toward the old team's pace. This is the totals-specific form
-of the `Coach` term in the priors doc.
-
-### 7.1 Turnovers: separate opportunity from realization
+### 7.8 Turnovers: separate opportunity from realization
 
 Turnovers matter to totals through possessions and short fields. Model the expected count,
 not the realized one: expected fumbles lost is half of total fumbles, and expected
 interceptions come from pass volume, pressure, and the quarterback's prior rate. ESPN's
 turnover-luck framing does the same split. The mechanism evidence is NFL. `[transfer]`
 
-### 7.2 Conflicts between the sources, resolved
+### 7.9 Conflicts between the sources, resolved
 
 - **Fixed 70/20/10 season weights.** The conversation notes proposed
   $P = 0.70A_{t-1}+0.20A_{t-2}+0.10A_{t-3}$ as a default. The priors doc learns $f$ over
@@ -284,7 +574,7 @@ turnover-luck framing does the same split. The mechanism evidence is NFL. `[tran
 - **The four-game shrinkage threshold** is a starting point from the research report, not
   a rule. The effective-sample blend replaces it.
 
-### 7.3 PFF player-level priors
+### 7.10 PFF player-level priors
 
 If PFF data is point-in-time valid, rebuild each unit from shrunk player grades weighted by
 projected snaps, rather than carrying last season's team grade. That avoids counting
@@ -368,7 +658,7 @@ folds.
 ### 9.1 First feature block
 
 - Decision-time total; absolute spread, as a strength-asymmetry control.
-- Home and away offensive, defensive, and pace priors (blended per §7).
+- Home and away offense, defense, and pace ratings, fit per §7.4–7.5.
 - Matchup terms: home offense minus away defense, away offense minus home defense, and the
   mean of the two pace priors.
 - Clock-rule era flag; neutral-site flag.
@@ -478,8 +768,8 @@ The source documents each gave a build order from zero. The repo is not at zero.
 | --- | --- | --- |
 | 1. Audit lines | Partly done: floor, provider mix, fields (§2, §5) | Open item (§14): open-vs-close timing agreement against the-odds-api from 2020 |
 | 2. Core game, drive, play tables | Done (warehouse) | — |
-| 3. Point-in-time pace and efficiency | Opponent-adjusted PPA built; EPA constructions specified | Neutral-pace snapshots; garbage-time filter |
-| 4. Preseason priors and blend | Specified in the priors doc | Build per that doc; fit $n_0$ per metric |
+| 3. Point-in-time pace and efficiency | Opponent-adjusted PPA built; EPA constructions specified. Points-per-possession and pace ratings specified in §7.1–7.2, not built | Build them as-of each week; neutral-pace snapshots; garbage-time filter |
+| 4. Previous-season priors and blend | Specified in §7.4–7.5 | Fit $b$, $c$, $q$, $a$, $\kappa$ and the $\lambda$ scale on earlier seasons; prior-centered ridge refit at each cutoff |
 | 5. Rung 0 and 1 baselines | Not recorded for $r^{\text{final}}$ by era | Record the market's own loss per season and era |
 | 6. Rung 2 on the residual | The 2022–25 harness (predicts the total, not the residual) is a null | Refit on $r^{\text{final}}$ and $r^{\text{move}}$ with the §9.1 block |
 | 7. Distribution and pricing | Not built | Rung 3, priced with §8 |
@@ -508,6 +798,12 @@ None is answered here.
    $r^{\text{final}}$.
 6. **Does the PFF passing-grade movement signal reach $r^{\text{final}}$?** Or is it CLV
    only?
+7. **Offseason carryover.** Fitted values of $b$, $c$, and $q$ (§7.4) for offense, defense,
+   and pace: how much of last season's adjusted rating survives, and how much returning
+   production changes that.
+8. **Play-caller table.** Offensive play-caller by team-season, with the date of each
+   change, so the pace prior can separate coordinator changes from head-coach changes. No
+   such table exists (§7.4).
 
 ---
 
