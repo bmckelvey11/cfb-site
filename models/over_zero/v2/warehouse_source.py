@@ -69,7 +69,7 @@ order by season, start_date, game_id
 """
 
 
-# SENSITIVITY PROBE -- NOT A SHIPPING PATH. Its ROI is not usable.
+# The shipping path as of 2026-09-22: book-quoted lines only.
 #
 # `selected_spread` / `selected_total` are chosen independently, so a game can
 # carry a consensus spread beside a teamrankings total. models_v2.pick_line
@@ -80,11 +80,11 @@ order by season, start_date, game_id
 # implied_team_points does dog = (total - spread)/2, so in principle the pair
 # should come from one market. In practice that argument does not survive
 # measurement: this query's fallback `order by provider_key` is arbitrary, and
-# requiring one provider to carry both fields drops 3,073 of 13,397 games --
-# it scores a richer-coverage subsample, not the same games. Its ROI also moved
-# 2.6 points when core.fact_game_line was rebuilt mid-analysis, while the
-# shipped path reproduced exactly. Keep it to measure that sensitivity; do not
-# report it. See docs/warehouse-as-model-source-2026-09-22.md.
+# requiring one provider to carry both fields drops games rather than filling
+# them from a second book, so its sample is smaller and later than the raw
+# path's -- 2017 onward, because core excludes projection sites and CFBD
+# published no consensus total before 2017. That is a narrower but honestly
+# priceable population, not a like-for-like comparison with the raw record. See docs/warehouse-as-model-source-2026-09-22.md.
 _QUERY_PAIR = """
 with pick as (
     select game_id, spread_close as spread, total_close as total, provider_key,
@@ -162,7 +162,7 @@ order by g.season, g.start_date, g.game_id
 """
 
 
-def load_warehouse_frame(seasons, db=WAREHOUSE, lines="fact_game"):
+def load_warehouse_frame(seasons, db=WAREHOUSE, lines="fact_game_line"):
     """Every gradeable game for `seasons`, one row each, deterministically
     ordered. Carries identity columns the 4-tuple contract drops, which is what
     a reconciliation against the raw JSON needs.
@@ -238,7 +238,7 @@ def _assert_no_silent_gap(seasons, df, db):
             "-- a partial stg->core build can null it out.")
 
 
-def load_warehouse_seasons(seasons, db=WAREHOUSE, lines="fact_game"):
+def load_warehouse_seasons(seasons, db=WAREHOUSE, lines="fact_game_line"):
     """dict season -> (spread_est, totals_est, fav_pts, dog_pts).
 
     Same contract, ordering rule and favourite convention as

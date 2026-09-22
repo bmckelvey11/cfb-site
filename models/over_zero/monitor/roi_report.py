@@ -387,8 +387,9 @@ def reconcile_csv(path, expect, price=-110):
 
 
 _SOURCE_NOTE = {
-    "warehouse": ("data/cfb.duckdb core.fact_game, selected_spread/selected_total "
-                  "(consensus-first, per-field)"),
+    "warehouse": ("data/cfb.duckdb core.fact_game_line, one provider supplying "
+                  "both spread and total, consensus first; projection sites are "
+                  "excluded by the core build, so lines are book-quoted only"),
     "raw": "data/raw/lines_*.json via pick_line (one provider supplies both)",
 }
 

@@ -25,7 +25,7 @@ Documentation for the Floor Bias / over-zero model. Unit rules live in
 
 | Doc | Question it answered |
 | --- | --- |
-| [warehouse-as-model-source-2026-09-22.md](warehouse-as-model-source-2026-09-22.md) | Switching the model from `data/raw/lines_*.json` to `data/cfb.duckdb`: the headline barely moves (+23.57% → +23.32%) but tradeable-line coverage improves sharply — and line selection alone is worth 7.5 ROI points. |
+| [warehouse-as-model-source-2026-09-22.md](warehouse-as-model-source-2026-09-22.md) | Moving the model onto `core.fact_game_line`: the record becomes 210 bets over 2020–2026 at +28.18%, because the core build excludes projection sites and no book quoted a total before 2017. Not comparable to the old 275-bet figure. |
 | [roi-refresh-backfill-2026-09-22.md](roi-refresh-backfill-2026-09-22.md) | Refreshing `ROI_HITRATE.md` with the 2026 season, and why every historical season's row moved: the raw CFBD lines files were backfilled (+793 graded games), not a code change. |
 | [week3-grade-2026-09-21.md](week3-grade-2026-09-21.md) | The 2026-09-19 board graded at each pick's first published total: 4-1 on the week, 21-9 on the season, and why neither number is model performance. |
 | [site-refresh-cap50-2026-09-16.md](site-refresh-cap50-2026-09-16.md) | Rerun with an absolute 50-point spread cap and publish. Carries its own reproduction command. |

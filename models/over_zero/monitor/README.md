@@ -11,7 +11,7 @@ python monitor/run_monitor.py --width 3       # trailing-window width
 python monitor/run_walkforward.py             # train ≤ t−1, bet season t
 python monitor/run_walkforward.py --threshold 1.75 --min-train 5
 python monitor/roi_report.py --season $(seq 2013 2026)   # ROI of the deployed filter + figure
-python monitor/roi_report.py --source warehouse          # DuckDB warehouse instead
+python monitor/roi_report.py --source raw                # raw JSON, 2013-2026 instead
 ```
 
 Files: `monitor.py` (per-season/trailing stats, Wilson CIs, slope trend test),
@@ -98,20 +98,22 @@ Three ROI definitions, ranked as MODEL_GUIDE ranks them:
   map, so its interval is bootstrapped (10k resamples).
 - **compounded bankroll** — equity curve only, labelled order-dependent.
 
-Result (2013–2026 data, bet seasons 2016–2026, run 2026-09-22, **source: raw**
-(the default; `--source warehouse` is implemented and reproduces this within
-its interval); 2026 is a partial season — see
+Result (2017–2026 data, bet seasons 2020–2026, run 2026-09-22, **source:
+warehouse `core.fact_game_line`** — book-quoted lines only, which is why the
+record starts in 2020; see
+[warehouse-as-model-source-2026-09-22.md](../docs/warehouse-as-model-source-2026-09-22.md).
+2026 is a partial season — see
 [ROI_HITRATE.md](../docs/ROI_HITRATE.md), and
 [warehouse-as-model-source-2026-09-22.md](../docs/warehouse-as-model-source-2026-09-22.md)
 for what the source switch changed):
 
 | metric | value | 95% interval |
 |--------|-------|--------------|
-| record | 178–97 (64.73%) over N=275 | win [58.91%, 70.14%] |
-| flat-stake ROI @ −110 | **+23.57%** per unit risked | [+12.47%, +33.90%] |
-| flat profit | **+64.82u** on 275u risked | — |
+| record | 141–69 (67.14%) over N=210 | win [60.53%, 73.14%] |
+| flat-stake ROI @ −110 | **+28.18%** per unit risked | [+15.56%, +39.63%] |
+| flat profit | **+59.18u** on 210u risked | — |
 | ¼-Kelly ROI | +25.12% per unit staked | [+13.71%, +36.13%] (boot) |
-| ¼-Kelly profit | +385.30u on 1,534u staked | — |
+| ¼-Kelly profit | +423.98u on 1,509u staked | — |
 | ROI @ −120 | +18.67% | planning bound +8.01% |
 | max drawdown | 6.18u flat / 35.0u Kelly | — |
 
@@ -132,7 +134,7 @@ win probability with no allowance for estimation error — at p ≈ 0.65 and
 b = 0.909, full Kelly is ~26% of bankroll and the quarter is ~6.6%. Add that
 a college slate settles simultaneously (several 5u bets live at once, which
 sequential Kelly does not model) and the realised drawdown is 35u against
-flat's 6u for the same 178–97.
+flat's 6u for the same 141–69.
 
 Flat 1u per qualifying bet is the deployable rule. The Kelly column is there
 to show the edge is big enough that a stake rule *could* exploit it harder,
@@ -141,7 +143,7 @@ not as a recommendation.
 ### Raw backtest CSV
 
 `docs/backtest_bets.csv` — one row per graded walk-forward game, **all
-11,048 of them**, not just the 275 clearing the filter, so the bias-bin table
+7,838 of them**, not just the 210 clearing the filter, so the bias-bin table
 in [ROI_HITRATE.md](../docs/ROI_HITRATE.md) is reproducible from the file
 alone. Columns: game identity (`game_id`, `season`, `week`, `date`, teams),
 the inputs (`spread`, `total`, `fav_pts`, `dog_pts`, `actual_total`), the
