@@ -18,36 +18,36 @@ above break-even.
 
 | season | N | record | hit rate | hit-rate 95% | ROI | ROI 95% | clears break-even |
 |---|---:|---:|---:|---|---:|---|:---:|
-| 2016 | 2 | 0–2 | 0.00% | [0.00%, 65.76%] | -100.00% | [-100.00%, +25.55%] | no |
+| 2016 | 3 | 1–2 | 33.33% | [6.15%, 79.23%] | -36.36% | [-88.26%, +51.27%] | no |
 | 2017 | 8 | 5–3 | 62.50% | [30.57%, 86.32%] | +19.32% | [-41.63%, +64.78%] | no |
 | 2018 | 16 | 12–4 | 75.00% | [50.50%, 89.82%] | +43.18% | [-3.59%, +71.47%] | no |
 | 2019 | 16 | 13–3 | 81.25% | [56.99%, 93.41%] | +55.11% | [+8.80%, +78.33%] | **yes** |
 | 2020 | 6 | 4–2 | 66.67% | [30.00%, 90.32%] | +27.27% | [-42.73%, +72.43%] | no |
 | 2021 | 28 | 21–7 | 75.00% | [56.64%, 87.32%] | +43.18% | [+8.14%, +66.71%] | **yes** |
 | 2022 | 37 | 22–15 | 59.46% | [43.49%, 73.65%] | +13.51% | [-16.98%, +40.61%] | no |
-| 2023 | 42 | 29–13 | 69.05% | [53.97%, 80.93%] | +31.82% | [+3.04%, +54.50%] | **yes** |
+| 2023 | 41 | 28–13 | 68.29% | [53.02%, 80.44%] | +30.38% | [+1.21%, +53.56%] | **yes** |
 | 2024 | 30 | 19–11 | 63.33% | [45.51%, 78.13%] | +20.91% | [-13.11%, +49.15%] | no |
-| 2025 | 51 | 27–24 | 52.94% | [39.52%, 65.95%] | +1.07% | [-24.55%, +25.90%] | no |
+| 2025 | 50 | 26–24 | 52.00% | [38.51%, 65.20%] | -0.73% | [-26.48%, +24.48%] | no |
 | 2026 | 39 | 26–13 | 66.67% | [50.98%, 79.37%] | +27.27% | [-2.68%, +51.52%] | no |
 
-Pooled: **275 bets, 178–97, 64.73%** hit rate ([58.91%, 70.14%]), **+23.57%** ROI ([+12.47%, +33.90%]).
+Pooled: **274 bets, 177–97, 64.60%** hit rate ([58.77%, 70.02%]), **+23.32%** ROI ([+12.20%, +33.68%]).
 
-10/11 seasons profitable on the point estimate, but only 3 clear break-even on their own interval — which is what 2–51 bets a season buys you. Single seasons are not the unit of evidence here; the pooled row is.
+9/11 seasons profitable on the point estimate, but only 3 clear break-even on their own interval — which is what 3–50 bets a season buys you. Single seasons are not the unit of evidence here; the pooled row is.
 
 Two things worth naming rather than leaving for the reader to find:
 
-- **2026 is the most recent season**: 26–13, +27.27% ROI on n=39, against a pooled +23.57%. Its interval [-2.7%, +51.5%] contains both the pooled estimate and break-even, so it is not evidence of decay on its own. `run_monitor.py` is the test that measures decay directly, and as of its last run it finds none.
-- **The sample is back-loaded**: 2–51 bets per season, with 59% of all bets coming from 2023 onward. The pooled figure is mostly recent data.
+- **2026 is the most recent season**: 26–13, +27.27% ROI on n=39, against a pooled +23.32%. Its interval [-2.7%, +51.5%] contains both the pooled estimate and break-even, so it is not evidence of decay on its own. `run_monitor.py` is the test that measures decay directly, and as of its last run it finds none.
+- **The sample is back-loaded**: 3–50 bets per season, with 58% of all bets coming from 2023 onward. The pooled figure is mostly recent data.
 
 ## By bias bin — every graded game, disjoint bands
 
 | bias bin | N | record | hit rate | hit-rate 95% | ROI | ROI 95% | clears break-even |
 |---|---:|---:|---:|---|---:|---|:---:|
-| 0.00–0.50 | 9118 | 4403–4715 | 48.29% | [47.26%, 49.32%] | -7.81% | [-9.77%, -5.85%] | no |
-| 0.50–1.00 | 1157 | 608–549 | 52.55% | [49.67%, 55.41%] | +0.32% | [-5.18%, +5.79%] | no |
-| 1.00–1.75 | 498 | 262–236 | 52.61% | [48.22%, 56.96%] | +0.44% | [-7.94%, +8.74%] | no |
-| 1.75–2.50 | 185 | 118–67 | 63.78% | [56.64%, 70.36%] | +21.77% | [+8.14%, +34.33%] | **yes** |
-| >2.50 | 90 | 60–30 | 66.67% | [56.42%, 75.55%] | +27.27% | [+7.71%, +44.23%] | **yes** |
+| 0.00–0.50 | 9017 | 4350–4667 | 48.24% | [47.21%, 49.27%] | -7.90% | [-9.87%, -5.93%] | no |
+| 0.50–1.00 | 1158 | 607–551 | 52.42% | [49.54%, 55.28%] | +0.07% | [-5.43%, +5.54%] | no |
+| 1.00–1.75 | 491 | 260–231 | 52.95% | [48.53%, 57.33%] | +1.09% | [-7.35%, +9.44%] | no |
+| 1.75–2.50 | 186 | 119–67 | 63.98% | [56.86%, 70.53%] | +22.14% | [+8.55%, +34.65%] | **yes** |
+| >2.50 | 88 | 58–30 | 65.91% | [55.53%, 74.96%] | +25.83% | [+6.00%, +43.11%] | **yes** |
 
 This is the mechanism check, not a menu of bets. Censoring theory predicts that more expected bias means more mispricing, so the metrics should **rise across the bins**; a single bin popping while its neighbours sit flat is noise, not a strategy. 2 of 5 bins clear break-even on their own interval.
 
@@ -55,8 +55,8 @@ Note the bins are disjoint, so the 1.00–1.75 row is the band *excluded* by the
 
 ## Caveats that apply to every number above
 
-- The 1.75 threshold was chosen partly on this data, so the pooled point estimate is inflated by selection. **Plan on the lower bound** (+12.47% ROI), not the point estimate.
-- **2026 is a partial season**: 409 graded games so far against a ~851-game full season, so its row is a few weeks of results and will move as the season fills in. It is pooled in with the rest.
+- The 1.75 threshold was chosen partly on this data, so the pooled point estimate is inflated by selection. **Plan on the lower bound** (+12.20% ROI), not the point estimate.
+- **2026 is a partial season**: 409 graded games so far against a ~786-game full season, so its row is a few weeks of results and will move as the season fills in. It is pooled in with the rest.
 - Every ROI here is priced at −110 flat. The operational rule says −120 or
   better; see the price-sensitivity panel in `figs/roi_report.png` for what
   the vig costs.
@@ -80,4 +80,4 @@ money wagered, so don't sum them across the excluded bins.
 
 ---
 
-Walk-forward: train on seasons < t, bet season t  |  data 2013–2026, bet seasons 2016–2026 (min-train=3)  |  filter: expected censoring bias > 1.75 → bet the full-game OVER  |  N=275 graded bets (pushes dropped)  |  CFBD lines, consensus provider  |  commit b731c65  |  generated 2026-09-22
+Walk-forward: train on seasons < t, bet season t  |  data 2013–2026, bet seasons 2016–2026 (min-train=3)  |  filter: expected censoring bias > 1.75 → bet the full-game OVER  |  N=274 graded bets (pushes dropped)  |  source: data/cfb.duckdb core.fact_game, selected_spread/selected_total (consensus-first, per-field)  |  commit df0fa93  |  generated 2026-09-22
