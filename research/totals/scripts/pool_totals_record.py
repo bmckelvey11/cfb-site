@@ -12,10 +12,19 @@ consistent enough to pool.
 
 WHAT IS AND IS NOT POOLED
 
-  Every row is one Greenline totals pick, graded at the number in its own capture.
+  Every pooled row is one Greenline totals pick, graded at the number in its own capture.
   Populations are flag boards, not published lists: the 2026 under lists (36 in week 2,
   22 in week 3) are a NESTED subset of the 2026 flags and are reported separately, never
   added in, or those picks would count twice.
+
+  THE 2023-25 PERSONAL UNDERS ARE A COMPARISON STRATUM, NOT A POOL MEMBER. They have long
+  been described as mostly the same Greenline flags taken as bets. `overlap()` measures
+  that for the first time, on the only days where both a Greenline board and a book bet
+  exist, and it comes back 7 of 12 -- with 3 of the 12 betting the side Greenline flagged
+  AGAINST. A bet opposing the vendor is not that vendor's pick at a different price, so
+  adding the set to the pool would average vendor skill with a different selector's and
+  would make the homogeneity test test the wrong hypothesis. It gets its own record, its
+  own interval, and a head-to-head against the pool.
 
   ROI IS NOT POOLED OVER EVERYTHING. The 2022-23 exports carry no price at all
   (`breakeven_prob` NULL on every row), which is an integrity-gate failure under
@@ -42,8 +51,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from cfb_paths import INGEST  # noqa: E402
-from greenline_season_review import BREAK_EVEN, mde, wilson  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bankroll" / "scripts"))
+from cfb_paths import DB_PATH, INGEST  # noqa: E402
+from greenline_bet_log import book_totals  # noqa: E402  -- the ledger owns the team resolver
+from greenline_season_review import BREAK_EVEN, decimal, mde, personal_totals, wilson  # noqa: E402
 from greenline_bet_stats import beta_post, binom_p, bootstrap, clustered_se, heterogeneity  # noqa: E402
 
 IN_DIR = INGEST / "pff_scoreboard"
@@ -80,6 +91,7 @@ def archive_rows(snapshot: str, era: str) -> list[dict]:
             continue  # ungraded: no CFBD match, so no final
         be = num(r["breakeven_prob"])
         out.append({"era": era, "season": int(float(r["season"])) if r["season"] else None,
+                    "game_id": (r["game_id"] or "").split(".")[0],
                     "date": (r["kickoff_utc"] or "")[:10], "side": r["side"], "line": line,
                     "value": num(r["difference"]), "result": grade(hp + ap, line, r["side"]),
                     "payout": (1 / be - 1) if be else None, "price_source":
@@ -103,6 +115,69 @@ def load() -> list[dict]:
     return (archive_rows("open_greenline", "2020 PFF_hist")
             + archive_rows("export", "2022-23 exports")
             + rows_2026())
+
+
+def personal_unders() -> list[dict]:
+    """The 2023-25 book unders, in the same row shape. NOT a pool member -- see `overlap()`.
+
+    These carry the price actually paid, so unlike the exports they can carry a return.
+    The 30 personal overs in the same seasons are excluded: the question asked of this set
+    has always been about the unders.
+    """
+    out = []
+    for season in (2023, 2024, 2025):
+        for r in personal_totals(season):
+            if r["side"] != "under" or r["price"] is None:
+                continue
+            out.append({"era": "2023-25 personal unders", "season": season, "date": r["date"],
+                        "game": r["game"], "side": "under", "line": r["line"], "value": None,
+                        "result": r["result"], "win": r["result"] == "win",
+                        "payout": decimal(r["price"]) - 1, "price_source": "book odds paid"})
+    return out
+
+
+def overlap(personal: list[dict], greenline: list[dict]) -> dict:
+    """How much of the personal set is actually a Greenline pick, on the days both cover.
+
+    The only slates where this is checkable are the three 2022-23 export days, because no
+    Greenline flag archive exists for 2024 or 2025. Both sides resolve to a CFBD team-id
+    pair -- `book_totals()` from the ledger for the book export, `core.fact_game` for the
+    archive -- because the two sources disagree on dozens of abbreviations.
+    """
+    import duckdb
+
+    board_days = {r["date"] for r in greenline}
+    ids = [r["game_id"] for r in greenline if r["game_id"]]
+    con = duckdb.connect(str(DB_PATH), read_only=True)
+    teams = {str(g): frozenset((str(h), str(a))) for g, h, a in con.execute(
+        "select game_id, home_team_id, away_team_id from core.fact_game where game_id in "
+        f"({','.join(ids) or 'null'})").fetchall()}
+    con.close()
+    board = {}
+    for r in greenline:
+        t = teams.get(r["game_id"])
+        if t:
+            board[(r["date"], t)] = r
+
+    book = {(b["date"], b["game"]): b["teams"] for b in book_totals()}
+    same = opposite = absent = unresolved = 0
+    for r in personal:
+        if r["date"] not in board_days:
+            continue
+        t = book.get((r["date"], r["game"]))
+        if t is None:
+            unresolved += 1     # abbreviation the ledger's alias map cannot resolve
+            continue
+        g = board.get((r["date"], t))
+        if g is None:
+            absent += 1         # bet a game Greenline never flagged
+        elif g["side"] == r["side"]:
+            same += 1
+        else:
+            opposite += 1       # bet the side Greenline flagged against
+    checkable = same + opposite + absent + unresolved
+    return {"checkable": checkable, "same": same, "opposite": opposite, "absent": absent,
+            "unresolved": unresolved, "days": len(board_days)}
 
 
 def under_list_2026(pool: list[dict]) -> list[dict]:
@@ -203,6 +278,42 @@ def report(pool: list[dict]) -> str:
     sstat, sp, sdf = heterogeneity({s: [r for r in live if r["side"] == s] for s in ("under", "over")})
     L += [f"Under vs over, chi-square {sstat:.2f} on {sdf} df, p {sp:.3f}.", ""]
 
+    # The 2023-25 book unders, as a fourth stratum -- compared, never pooled in.
+    per = personal_unders()
+    ov = overlap(per, by_era["2022-23 exports"])
+    pt, pp, pdf = heterogeneity({"greenline pool": live,
+                                 "personal unders": [r for r in per if r["result"] != "push"]})
+    four = heterogeneity(dict({e: [r for r in by_era[e] if r["result"] != "push"] for e in eras},
+                              **{"2023-25 personal unders": [r for r in per if r["result"] != "push"]}))
+    L += ["## Fourth stratum — the 2023-25 personal unders", "",
+          "Kept out of the pooled row on purpose, and the overlap check below is why. This is a "
+          "comparison stratum: its own record, its own interval, and a head-to-head against the "
+          "Greenline pool, not a fourth era added to it. The 30 personal *overs* in the same "
+          "seasons are excluded; the standing question about this set is an unders question.", "",
+          "| population | n | W-L | hit% | Wilson 95% | mde% | verdict |",
+          "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
+          rec_row("2023-25 personal unders", per),
+          rec_row("Greenline pool (for comparison)", pool),
+          rec_row("Greenline pool, unders only", [r for r in pool if r["side"] == "under"]), "",
+          f"Personal unders vs the Greenline pool: chi-square {pt:.2f} on {pdf} df, p {pp:.3f}. "
+          f"All four strata together: chi-square {four[0]:.2f} on {four[2]} df, p {four[1]:.3f}.", "",
+          "### How much of this set is even a Greenline pick?", "",
+          f"Measured, not assumed, and measurable on {ov['days']} slate days only -- the three "
+          "2022-23 export slates are the only pre-2026 days where a Greenline board and a book "
+          "bet both exist. 2024 and 2025 have no flag archive at all, so nothing there is "
+          "checkable in either direction. Both sides resolve to a CFBD team-id pair before "
+          "comparing, because the book and PFF disagree on dozens of abbreviations.", "",
+          f"| of the {ov['checkable']} personal unders on those days | n |", "| --- | ---: |",
+          f"| Greenline flagged the same side | {ov['same']} |",
+          f"| Greenline flagged the **opposite** side | {ov['opposite']} |",
+          f"| Greenline never flagged the game | {ov['absent']} |",
+          f"| team abbreviation unresolvable | {ov['unresolved']} |", "",
+          f"So on the only slates where it can be checked, {ov['same']} of {ov['checkable']} "
+          f"personal unders are a Greenline pick taken at a book price, {ov['opposite']} are a bet "
+          f"*against* what Greenline flagged, and {ov['absent']} are games Greenline left alone. "
+          "That is a sample of a dozen on one season and it settles nothing about 2024-25, but it "
+          "is the first direct measurement of an overlap that has been asserted without one.", ""]
+
     nested = under_list_2026(pool)
     L += ["## The published 2026 under lists (nested, not added)", "",
           "These picks are already counted in the 2026 flag row above. They are the subset PFF's "
@@ -216,8 +327,10 @@ def report(pool: list[dict]) -> str:
 
     priced = [r for r in pool if r["payout"] is not None]
     L += ["## Money, on the price-bearing rows only", "",
-          f"{len(priced)} of {len(pool)} picks carry a price: 2020 at PFF's published break-even "
-          "per bet, 2026 at an assumed -110. The 2022-23 exports carry none and are excluded from "
+          f"{len(priced)} of {len(pool)} pooled picks carry a price: 2020 at PFF's published "
+          "break-even per bet, 2026 at an assumed -110. The personal unders carry the price "
+          "actually paid and are shown for contrast, outside the pool. "
+          "The 2022-23 exports carry none and are excluded from "
           "every number in this table -- reporting a return on them would be an integrity-gate "
           "failure, not a rounding choice. Bootstrap resamples bets, 4,000 reps.", "",
           "| population | n | units (95%) | ROI | ROI 95% |",
@@ -225,7 +338,8 @@ def report(pool: list[dict]) -> str:
           money_row("priced pool", priced),
           money_row("2020 PFF_hist", by_era["2020 PFF_hist"]),
           money_row("2026 flags (assumed -110)", by_era["2026 flags"]),
-          money_row("2026 under lists (nested)", nested), "",
+          money_row("2026 under lists (nested)", nested),
+          money_row("2023-25 personal unders (not pooled)", per), "",
           f"PFF's published 2020 break-evens run better than -110 on "
           f"{sum(1 for r in by_era['2020 PFF_hist'] if r['payout'] and r['payout'] > DASH)} of "
           f"{len(by_era['2020 PFF_hist'])} picks (median implied price about -107), so that leg's "
@@ -279,6 +393,18 @@ def self_check() -> None:
 
     assert all(r["payout"] is None for r in pool if r["era"] == "2022-23 exports")
     assert mde(325) < mde(106)  # a bigger pool has a lower floor
+
+    per = personal_unders()
+    tp = tally(per)
+    assert (tp["w"], tp["l"]) == (114, 87), tp
+    assert all(r["side"] == "under" for r in per)          # overs excluded by scope
+    assert all(r["payout"] is not None for r in per)       # real book odds, so ROI is legitimate
+    assert not any(r["era"] == "2023-25 personal unders" for r in pool), "never a pool member"
+    ov = overlap(per, archive_rows("export", "2022-23 exports"))
+    assert ov["same"] + ov["opposite"] + ov["absent"] + ov["unresolved"] == ov["checkable"]
+    # The standing caveat says these were "mostly the same Greenline flags". Where it is
+    # checkable it is 7 of 12, with 3 taking the side Greenline flagged against.
+    assert (ov["same"], ov["opposite"], ov["absent"], ov["checkable"]) == (7, 3, 2, 12), ov
     print("self-check ok")
 
 

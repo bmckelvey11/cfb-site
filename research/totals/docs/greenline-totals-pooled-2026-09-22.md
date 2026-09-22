@@ -16,6 +16,11 @@ totals number whose 95% interval has a floor worth quoting (48.6%). It still doe
 the detection threshold this n requires (59.3%), and the money interval still contains zero.
 Nothing here licenses a bet-sizing change.
 
+**A fourth stratum was added on request** — the 201 personal book unders of 2023-25, 114-87,
+56.7%. It is reported beside the pool and not inside it, because checking the overlap for
+the first time found 3 of the 12 checkable bets took the side Greenline flagged *against*.
+Details in [Fourth stratum](#fourth-stratum--the-2023-25-personal-unders).
+
 ## Data
 
 324 graded picks, 3 pushes excluded, 327 rows in all. Every pick graded **at the line in
@@ -26,6 +31,7 @@ its own capture**, per the unit's standing rule.
 | 2020 PFF_hist | `greenline_history_archive.csv`, `snapshot='open_greenline'` | 131 | 2020-09 → 2020-12 |
 | 2022-23 exports | `greenline_history_archive.csv`, `snapshot='export'` | 91 (88 graded) | 2022-09-30→10-02, 2023-10-17→22, 2023-11-02→05 |
 | 2026 flags | `greenline_graded.csv`, weeks 2-3 | 106 | 2026-09-11 → 2026-09-19 |
+| *(compared, not pooled)* 2023-25 personal unders | `bet_history/history.csv` via `personal_totals()` | 201 | 2023-08-26 → 2026-01-02 |
 
 Finals for the two archive eras are the CFBD scores carried on the archive rows, after the
 join repair in [`greenline-archive-join-audit-2026-09-21.md`](greenline-archive-join-audit-2026-09-21.md).
@@ -116,10 +122,57 @@ board are both inside the pooled interval; the week moved the pooled hit rate by
 a point and the pooled MDE by about two points. That is what one week is worth at this n,
 and it is the argument for continuing to capture rather than for acting.
 
+## Fourth stratum — the 2023-25 personal unders
+
+Added on request as a fourth stratum, and reported **beside** the pool rather than inside
+it. The 201 book unders of 2023-25 carry the price actually paid, so unlike the exports they
+can carry a return.
+
+| population | n | W-L | hit% | Wilson 95% | mde% |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2023-25 personal unders | 201 | 114-87 | 56.7% | 49.8 – 63.4 | 61.1% |
+| Greenline pool | 324 | 175-149 | 54.0% | 48.6 – 59.4 | 59.3% |
+| Greenline pool, unders only | 270 | 146-124 | 54.1% | 48.1 – 59.9 | 59.9% |
+
+Head to head, chi-square 0.37 on 1 df, **p 0.545** — the personal record is 2.6 points
+better and that gap is well inside noise. All four strata together: chi-square 0.51 on 3 df,
+p 0.916. The 30 personal *overs* of those seasons are excluded; the standing question about
+this set has always been an unders question.
+
+### Why beside and not inside — the overlap, measured
+
+This tree's standing caveat says the 2023-25 unders "were mostly the same Greenline flags,
+taken as bets." That has never been measured. It can be, on exactly the days where a
+Greenline board and a book bet both exist: the three 2022-23 export slates, ten slate days.
+2024 and 2025 have no flag archive at all, so nothing there is checkable in either
+direction. Both sides resolve to a CFBD team-id pair first, because the book and PFF
+disagree on dozens of abbreviations.
+
+| of the 12 personal unders on those days | n |
+| --- | ---: |
+| Greenline flagged the same side | 7 |
+| Greenline flagged the **opposite** side | 3 |
+| Greenline never flagged the game | 2 |
+| team abbreviation unresolvable | 0 |
+
+**Three of twelve took the side Greenline flagged against** — MINN@IOWA under 30.5 against a
+flagged over 32.5, AFA@NAVY under 37.5 against a flagged over 37.5, ARMY@AFA under 34.0
+against a flagged over 31.5. A bet opposing the vendor is not that vendor's pick at a
+different price; it is a different selector. Folding the set into the pooled row would
+average Greenline's skill with that selector's, and would leave the homogeneity test in
+*Is the pool one thing?* testing the wrong hypothesis. So the pooled 324 is unchanged and
+this stratum sits next to it.
+
+The measurement cuts both ways and both should be said: 7 of 12 **is** a real overlap, so
+the set is not independent evidence either, and the half-pooled (κ=0.5) treatment the
+bankroll unit already applies to it remains the right handling. What is now measured rather
+than assumed is that the overlap is partial, on one season, on a sample of twelve.
+
 ## Money — price-bearing rows only
 
-237 of 327 picks carry a price (236 after the one priced push drops out, which is the `n` in
-the table below). The **2022-23 exports carry none** (`breakeven_prob` NULL
+237 of the 327 pooled picks carry a price (236 after the one priced push drops out, which is
+the `n` in the table below). The personal unders carry the price actually paid and are shown
+for contrast, outside the pool. The **2022-23 exports carry none** (`breakeven_prob` NULL
 on every row), which is an integrity-gate failure under
 [`model-evaluation-standard.md`](../../../docs/model-evaluation-standard.md), so they are
 excluded from every number below rather than defaulted to -110. Bootstrap resamples bets,
@@ -131,8 +184,12 @@ excluded from every number below rather than defaulted to -110. Bootstrap resamp
 | 2020 PFF_hist | 130 | +7.52u (-14.0 to +28.9) | +5.8% | -10.8 to +22.2 |
 | 2026 flags (assumed -110) | 106 | +4.73u (-14.4 to +23.8) | +4.5% | -13.6 to +22.5 |
 | 2026 under lists (nested) | 58 | +3.09u (-10.3 to +16.5) | +5.3% | -17.7 to +28.4 |
+| **2023-25 personal unders (not pooled)** | 201 | +16.41u (-10.1 to +43.0) | **+8.2%** | -5.0 to +21.4 |
 | priced pool at flat -110 | 236 | +10.27u (-18.4 to +38.9) | +4.4% | -7.8 to +16.5 |
 | 2020 at flat -110 | 130 | +5.55u (-15.5 to +26.5) | +4.3% | -11.9 to +20.4 |
+
+The personal unders are the only line here priced at money that actually changed hands, and
+they are also the best return in the table. Their interval still reaches -5.0%.
 
 **The 2020 leg is priced at PFF's own claim.** Its published break-evens run better than
 -110 on 75 of 131 picks, median implied price about -107, which no observed book number
@@ -154,9 +211,12 @@ both intervals still straddle zero.
 - **No CLV and no proper score.** The three eras do not share a closing-line convention, and
   the exports have no break-even, so neither a de-vigged Brier nor a cross-era CLV is
   computable here. Both remain 2026-only questions.
-- **Not independent of the personal 2023-25 unders.** Those were mostly the same Greenline
-  flags taken as bets and are deliberately absent from this pool; they are prior evidence,
-  not a fourth era.
+- **The personal 2023-25 unders are neither independent evidence nor a fourth era.** Where
+  the overlap is checkable they are 7 of 12 the same Greenline pick, 3 of 12 the opposite
+  side. Too entangled to be a second opinion, too different to be pooled in. They stay a
+  comparison stratum and the bankroll unit's κ=0.5 half-pooling stays the right discount.
+  56.7% on 201 picks is the best single record in this doc and it is still 4.4 points under
+  its own floor.
 - **Multiplicity, and it is worse than the eleven splits printed here.**
   `greenline_bet_stats.py` already carries `SPLITS_EXAMINED = 24` for the looks taken across
   this tree — bands, value buckets, edge bins, sides and sources. These eleven are additional
@@ -176,6 +236,10 @@ export record against
 (46-42-2), the 2026 flag record (58-48), both published under-list records (21-15 and 11-11)
 against their own grade docs, that the under lists are a strict subset of the flags rather
 than additive rows, that no export row carries a price, and that MDE falls as n grows.
+For the fourth stratum it pins the personal record (114-87), that the set is unders-only and
+fully priced, that no personal row ever enters the pool, and the overlap counts themselves
+(7 same side, 3 opposite, 2 unflagged, 0 unresolved) — so a later reparse that quietly
+changes the overlap fails loudly instead of rewriting the caveat.
 
 Wilson, MDE, exact binomial, Beta posterior, bootstrap, chi-square heterogeneity, and
 day-clustered SE are imported from `greenline_season_review.py` and `greenline_bet_stats.py`
