@@ -38,6 +38,14 @@ hand; the warehouse has since backfilled them and the script now agrees).
 published its own `bet_result`, the same rule reproduces it on all 131 picks. That is what
 licenses applying it to the exports, where PFF published no result column at all.
 
+The rule grades at `market_line`, and the check is only worth something where that choice
+bites. `market_line` and `greenline_line` differ on 126 of the 131 2020 picks, and on
+**three** of them the final lands so that the two numbers grade differently. `market_line`
+matches PFF's published result on all three. So the agreement is not an artifact of the two
+lines rarely mattering — it is the discriminating cases going the right way. This matters
+because the exports carry no `greenline_line` at all, so `market_line` is the only number
+available there.
+
 Reproduce with:
 
 ```bash
@@ -67,11 +75,11 @@ capture formats, and the win rates are as alike as random draws from one rate. P
 defensible on this evidence — which is the *only* reason the pooled row above is quoted at
 all.
 
-The pooled win-rate SE is 2.77pp iid and **1.98pp clustered by game day** (51 distinct
-days). Clustering *tightening* the estimate means same-day results are not positively
-correlated in this sample, contrary to the usual worry about slate-wide weather shocks. The
-Wilson interval quoted above is the iid one, so the headline interval is the conservative
-one either way.
+The pooled win-rate SE is 2.77pp iid and 1.98pp clustered by game day (51 distinct days).
+Clustering does not widen the interval here, so the iid Wilson above stands as the headline
+and is the conservative choice. Read nothing further into it: these "days" span 2020, 2022,
+2023 and 2026, which are not exchangeable clusters, so the tightening is a property of the
+cluster definition rather than a fact about same-day football.
 
 ## Side splits
 
@@ -110,7 +118,8 @@ and it is the argument for continuing to capture rather than for acting.
 
 ## Money — price-bearing rows only
 
-237 of 327 picks carry a price. The **2022-23 exports carry none** (`breakeven_prob` NULL
+237 of 327 picks carry a price (236 after the one priced push drops out, which is the `n` in
+the table below). The **2022-23 exports carry none** (`breakeven_prob` NULL
 on every row), which is an integrity-gate failure under
 [`model-evaluation-standard.md`](../../../docs/model-evaluation-standard.md), so they are
 excluded from every number below rather than defaulted to -110. Bootstrap resamples bets,
@@ -148,13 +157,20 @@ both intervals still straddle zero.
 - **Not independent of the personal 2023-25 unders.** Those were mostly the same Greenline
   flags taken as bets and are deliberately absent from this pool; they are prior evidence,
   not a fourth era.
-- **Multiplicity.** Eleven splits are printed above. The best of them (2026 overs, 66.7%)
-  is the one to discount hardest.
+- **Multiplicity, and it is worse than the eleven splits printed here.**
+  `greenline_bet_stats.py` already carries `SPLITS_EXAMINED = 24` for the looks taken across
+  this tree — bands, value buckets, edge bins, sides and sources. These eleven are additional
+  to those and fall on largely the same picks, so the pooled 54.0% is being read after
+  roughly 35 looks. That does not move any number, and it cuts against the pool rather than
+  for it. The best single split here (2026 overs, 66.7% on 18 picks) is the one to discount
+  hardest.
 
 ## Method
 
 `research/totals/scripts/pool_totals_record.py`, `--self-check` pins: the grading rule on
-four hand-checked boundaries, the 2020 record against PFF's own `bet_result` (71-59-1), the
+four hand-checked boundaries, the three 2020 picks where `market_line` and `greenline_line`
+grade differently (all three must match PFF's published result, or the line choice carried
+to the exports is unvalidated), the 2020 record against PFF's own `bet_result` (71-59-1), the
 export record against
 [`greenline-export-picks-graded-2026-09-21.md`](greenline-export-picks-graded-2026-09-21.md)
 (46-42-2), the 2026 flag record (58-48), both published under-list records (21-15 and 11-11)

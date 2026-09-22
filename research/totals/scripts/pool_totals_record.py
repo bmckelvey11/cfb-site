@@ -140,12 +140,13 @@ def rec_row(label: str, rows: list[dict]) -> str:
 
 def money_row(label: str, rows: list[dict], flat: bool = False) -> str:
     """`flat` reprices every row at -110 instead of the price its source claims."""
-    priced = [r for r in rows if r["payout"] is not None and r["result"] != "push"]
-    if len(priced) < 5:
-        return f"| {label} | {len(priced)} | -- | -- | -- |"
-    for r in priced:
-        r["net"] = (DASH if flat else r["payout"]) if r["result"] == "win" else -1.0
-        r["win"] = r["result"] == "win"
+    src = [r for r in rows if r["payout"] is not None and r["result"] != "push"]
+    if len(src) < 5:
+        return f"| {label} | {len(src)} | -- | -- | -- |"
+    # net onto fresh dicts, never onto the pooled rows: the flat and as-priced calls share them
+    priced = [dict(r, win=r["result"] == "win",
+                   net=(DASH if flat else r["payout"]) if r["result"] == "win" else -1.0)
+              for r in src]
     units = sum(r["net"] for r in priced)
     ulo, uhi, rlo, rhi = bootstrap(priced)
     return (f"| {label} | {len(priced)} | {units:+.2f}u ({ulo:+.1f} to {uhi:+.1f}) | "
@@ -246,6 +247,23 @@ def self_check() -> None:
     hist = archive_rows("open_greenline", "2020 PFF_hist")
     t = tally(hist)
     assert (t["w"], t["l"], t["push"]) == (71, 59, 1), t   # matches PFF's own bet_result column
+
+    # The line choice is the thing being validated, so pin where it actually bites: the 2020
+    # rows whose market_line and greenline_line grade differently. market_line must win all of
+    # them against PFF's published result, or the same rule cannot be carried to the exports.
+    disc = 0
+    for r in csv.DictReader(ARCHIVE.open(encoding="utf-8")):
+        if r["market"] != "total" or r["snapshot"] != "open_greenline" or r["is_greenline_pick"] != "True":
+            continue
+        m, g = num(r["market_line"]), num(r["greenline_line"])
+        hp, ap = num(r["home_points"]), num(r["away_points"])
+        if None in (m, g, hp, ap) or m == g:
+            continue
+        if grade(hp + ap, m, r["side"]) != grade(hp + ap, g, r["side"]):
+            disc += 1
+            assert grade(hp + ap, m, r["side"])[0].upper() == r["bet_result"], r
+    assert disc == 3, disc
+
     exp = tally(archive_rows("export", "2022-23 exports"))
     assert (exp["w"], exp["l"], exp["push"]) == (46, 42, 2), exp  # greenline-export-picks-graded-2026-09-21
     t26 = tally(rows_2026())
