@@ -18,8 +18,6 @@ PFF showed, and accumulate until the sample can answer.
 | Doc | What it reports |
 | --- | --- |
 | **[greenline-findings.md](greenline-findings.md)** | **Start here.** Living summary — the twelve settled findings with a pointer to the record that establishes each, the four open questions and which one is worth the next hour, the standing cautions, and what it all implies for staking. Undated because it must stay current; if it disagrees with a dated record, the record wins |
-| [greenline-season-review-2026-09-16.md](greenline-season-review-2026-09-16.md) | Season to date, all three markets — record, Wilson intervals, units, ROI, CLV, calibration, and the minimum detectable win rate for each sample |
-| [greenline-totals-season-2026-09-16.md](greenline-totals-season-2026-09-16.md) | The same review narrowed to totals, with the CLV section against the PFF board close |
 | [greenline-under-filters-2026-09-17.md](greenline-under-filters-2026-09-17.md) | Six pre-registered situational filters (line move, wind, pace, big favorite, night, short rest) on the pooled unders, history and 2026 kept as strata. Nothing survives Holm; big favorites is the only split under p 0.05 raw |
 | [greenline-pinnacle-shade-2026-09-17.md](greenline-pinnacle-shade-2026-09-17.md) | Does Pinnacle's position at capture (juice lean, line vs PFF's, distance from PFF's projection, limit) predict which unders win? n=38, nothing survives Holm; "Pinnacle already below PFF's line" is 9-2 raw |
 | [greenline-w2-grade-2026-09-15.md](greenline-w2-grade-2026-09-15.md) | Week 2's 36 positive-edge unders graded, including the six flags that needed a score or line fallback |

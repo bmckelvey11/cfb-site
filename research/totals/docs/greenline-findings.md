@@ -46,6 +46,42 @@ unit from 1% to 0.6%.
 | D | **Does a flag predict line movement?** A bet-free test of whether PFF knows anything, accruing every week regardless of what gets bet. | Not started. |
 | E | **Closed — do not reopen.** Bands, edge thresholds, overs, Pinnacle shade, situational filters. Each tested at least twice, each null. Further looks on the same 324 picks cost multiplicity and buy nothing. | Closed. |
 
+## The 2026 season on its own, all three markets
+
+Carried here from the two 2026-09-16 season reviews when they were archived, because it is
+the only place these numbers live. **Through week 2 only** — week 3 is graded in its own doc
+and is not folded in below; regenerate with `greenline_season_review.py` for a current
+version, which writes a new dated review.
+
+| market | record | win% | 95% CI | units | ROI | MDE |
+| --- | --- | ---: | --- | ---: | ---: | ---: |
+| total | 27-22 | 55.1% | 41–68% | +2.55u | +5.2% | 70% |
+| spread | 21-28 | **42.9%** | 30–57% | **−8.91u** | **−18.2%** | 70% |
+| moneyline | 21-25 | 45.7% | 32–60% | +1.58u | +3.4% | 71% |
+| all | 69-75 | 47.9% | 40–56% | −4.79u | −3.3% | 63% |
+
+**Totals are the only market with a case.** The spread leg lost 18.2% over 49 picks and the
+moneyline leg is unjudgeable without its prices. Everything else in this file is about
+totals for that reason.
+
+**CLV against PFF's own board close** — totals +0.36 ± 0.32 pts (n=44), spreads +0.34 ± 0.29
+(n=44). Positive means the number moved toward PFF's side after capture. This measures
+whether PFF's flags lead *PFF's own displayed market*, not a real one, which is why open
+question A exists.
+
+**Calibration of PFF's stated probabilities** (Brier, against a market baseline of 0.25 for
+spreads and totals and the de-vigged price for moneylines):
+
+| market | n | mean stated p | actual | Brier (PFF) | Brier (market) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| total | 49 | 55.0% | 55.1% | 0.2478 | 0.2500 |
+| spread | 49 | 56.3% | **42.9%** | 0.2685 | 0.2500 |
+| moneyline | 46 | 45.0% | 45.7% | 0.1341 | 0.1384 |
+
+PFF's totals and moneyline probabilities beat the market baseline by a hair; **its spread
+probabilities are worse than a coin** and overconfident by 13 points. That is the sharpest
+single argument for treating Greenline as a totals product and nothing else.
+
 ## Retired, with their records
 
 Two questions were answered twice — once small, once on the pooled corpus — and the small

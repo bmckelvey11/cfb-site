@@ -1,3 +1,5 @@
+**Consolidated into** [greenline-findings.md](../../research/totals/docs/greenline-findings.md) — its numbers are carried there under "The 2026 season on its own, all three markets". This file stays as the dated record of what week 2 showed; `greenline_season_review.py` writes a new dated review rather than updating this one.
+
 # PFF Greenline totals, 2026 season to date
 
 Generated 2026-09-16 by `research/totals/scripts/greenline_season_review.py`. Graded at the line in the capture, -110 on spreads and totals, market price on moneylines. Intervals are 95% Wilson. Pushes excluded from win% and calibration.

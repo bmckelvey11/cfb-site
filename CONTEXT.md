@@ -53,7 +53,7 @@ Glossary of canonical terms for CFB System Maker. Add terms as they are resolved
 - **Band** — the market-total ranges (<45, 45–49.5, 50–54.5, 55–59.5, 60–64.5, 65+) the under list is annotated by. Band ordering was withdrawn 2026-09-17: not significant, out-of-sample AUC 0.47. Context on the list, never a rule. (`archive/docs/greenline-band-significance-2026-09-17.md`, superseded by `research/totals/docs/greenline-totals-rule-search-2026-09-22.md`)
 - **Selection-on-selection** — a split scored on the same sample that chose it (the 55–59.5 band was picked from the 2023–25 history, then reported pooled with it). Such a record is not evidence; the honest tests are the best-of-k correction and the out-of-sample ordering test. (method: `docs/methods.md`)
 - **Ledger** — `greenline_bet_log.csv`: which flags were actually placed, seeded from every capture. `bet` is three-valued: `y`, `n`, or blank, and **blank means not yet marked**, not "no". Coverage refuses to compute on a week with blanks. A plan is not a mark; only a placed bet is `y`. (`research/bankroll/scripts/greenline_bet_log.py`)
-- **Control** — the flags not bet in a week. Every flag is graded Monday whether or not it was placed, so the cut flags test whatever rule cut them. A selection rule with no control is untestable. (`research/totals/docs/greenline-totals-season-2026-09-16.md`)
+- **Control** — the flags not bet in a week. Every flag is graded Monday whether or not it was placed, so the cut flags test whatever rule cut them. A selection rule with no control is untestable. (`archive/docs/greenline-totals-season-2026-09-16.md`; current status in `research/totals/docs/greenline-findings.md`)
 
 ## Bankroll
 

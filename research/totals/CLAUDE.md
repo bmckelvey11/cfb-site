@@ -28,9 +28,9 @@ idea that has no code yet, belongs here.
 - **The pooled record is underpowered and the reviews say so in their own words.** Every
   split so far sits below the minimum detectable win rate for its own sample size, which
   means it is not evidence either way — in either direction. Cite
-  `docs/greenline-season-review-2026-09-16.md` for the record and its MDE; do not restate
-  the numbers here, and do not describe any split as an edge until a review says it clears
-  its own floor.
+  `docs/greenline-findings.md` for where every question stands and which record
+  establishes it; do not restate the numbers here, and do not describe any split as an
+  edge until a record says it clears its own floor.
 
 - **The personal 2023-25 unders are not an independent sample, and not a fourth era
   either.** The overlap is measured, not assumed: on the only days where a Greenline board

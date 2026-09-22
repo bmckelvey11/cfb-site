@@ -13,8 +13,15 @@ Tests, in order of how much they respect the selection:
    The history chose the bands, so this is the only test that is not
    selection-on-selection.
 
+CLOSED QUESTION. The answer was recorded 2026-09-17 (not significant, band ordering
+withdrawn) and confirmed 2026-09-22 on 270 Greenline-only unders with pre-registered bands
+-- greenline-totals-rule-search-2026-09-22.md. Both records live in `archive/docs/`, which
+is why `--out` defaults there: a re-run of this script is a CONFIRMATION, and under the
+repo's write-up rule a confirmation updates research/totals/docs/greenline-findings.md
+rather than landing as a new dated doc.
+
 Run from repo root:
-    python research/totals/scripts/band_significance.py [--sims 200000] [--out research/totals/docs]
+    python research/totals/scripts/band_significance.py [--sims 200000] [--out archive/docs]
     python research/totals/scripts/band_significance.py --self-check
 """
 from __future__ import annotations
@@ -32,6 +39,10 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "research" / "totals" / "scripts"))
 from greenline_season_review import load, personal_totals, wilson  # noqa: E402
 from greenline_unders import BANDS, band  # noqa: E402
+
+# The question is closed, so output belongs with the records rather than beside the
+# live docs -- where an unindexed file would also fail tests/test_docs_index.py.
+ARCHIVE = Path(__file__).resolve().parents[3] / "archive" / "docs"
 
 LABELS = [b[0] for b in BANDS]
 ORDER = ["55-59.5", "<45", "45-49.5", "60-64.5", "65+", "50-54.5"]  # the proposed queue
@@ -111,7 +122,7 @@ def run(sims: int) -> tuple[str, dict]:
     th, tf, tp = table(H), table(F), table(P)
 
     L = [f"# Is the band split significant? Greenline unders, {date.today().isoformat()}", "",
-         "Reproduce: `python research/totals/scripts/band_significance.py --out research/totals/docs`.",
+         "Reproduce: `python research/totals/scripts/band_significance.py` (writes to `archive/docs/`).",
          "Data: personal unders 2023-25 (`data/ingest/bet_history/history.csv`) and graded 2026 Greenline",
          f"under flags (`data/ingest/pff_scoreboard/pff_greenline_2026_w*.csv`). n = {len(H)} history, {len(F)} 2026,",
          f"{len(P)} pooled. Pushes dropped. Bands from `greenline_unders.py`.", "",
@@ -211,7 +222,7 @@ def self_check() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sims", type=int, default=200_000)
-    ap.add_argument("--out", type=Path)
+    ap.add_argument("--out", type=Path, default=ARCHIVE)
     ap.add_argument("--self-check", action="store_true")
     a = ap.parse_args()
     if a.self_check:
@@ -222,6 +233,10 @@ def main() -> None:
         p = a.out / f"greenline-band-significance-{date.today().isoformat()}.md"
         p.write_text(md, encoding="utf-8")
         print("wrote", p)
+        if a.out.resolve() != ARCHIVE.resolve():
+            print(f"note: the band question is closed -- {ARCHIVE} is where this output belongs.\n"
+                  "      A re-run is a confirmation, not a new finding: record it in\n"
+                  "      research/totals/docs/greenline-findings.md rather than as a new doc.")
     else:
         print(md)
 
