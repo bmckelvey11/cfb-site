@@ -56,12 +56,20 @@ Any failure at the integrity layer should invalidate the financial score rather 
 For a binary event with model probability $p_i$ and outcome $y_i \in \{0,1\}$, use:
 
 $$
-\text{Brier}=\frac{1}{n}\sum_{i=1}^{n}(p_i-y_i)^2
+\begin{gathered}
+\text{Brier}=\frac{1}{n}\sum_{i=1}^{n}(p_i-y_i)^2 \\[0.5em]
+\text{LogLoss}=-\frac{1}{n}\sum_{i=1}^{n}\left[y_i\log(p_i)+(1-y_i)\log(1-p_i)\right] \\[1em]
+\begin{array}{rl}
+\text{where}\quad i: & \text{one forecast (one bet, game, or event)} \\
+n: & \text{number of forecasts scored} \\
+p_i \in (0,1): & \text{model probability that event } i \text{ happens} \\
+y_i \in \{0,1\}: & \text{outcome; 1 if it happened, 0 if not} \\
+\log: & \text{natural logarithm}
+\end{array}
+\end{gathered}
 $$
 
-$$
-\text{LogLoss}=-\frac{1}{n}\sum_{i=1}^{n}\left[y_i\log(p_i)+(1-y_i)\log(1-p_i)\right]
-$$
+Both are averages of a per-forecast penalty, and lower is better. Brier is the squared distance between the probability and the outcome: a 0.60 forecast on an event that happens costs $(0.60-1)^2 = 0.16$. Always saying 0.50 scores 0.25, so a binary model above 0.25 is worse than a coin. Log loss charges $-\log$ of the probability given to what actually happened: the same 0.60 forecast costs $-\log 0.60 \approx 0.51$, but a 0.99 forecast on an event that fails costs $-\log 0.01 \approx 4.6$. That unbounded penalty is why log loss punishes overconfidence harder than Brier.
 
 Brier and logarithmic loss are strictly proper scoring rules, meaning that their expected value is optimized by reporting the true probability; log loss penalizes confidently wrong forecasts more heavily. Use both: Brier is interpretable and stable, while log loss is a stronger warning against dangerous overconfidence.[^6][^7][^8][^9]
 
@@ -72,10 +80,17 @@ For three-way ordered outcomes such as home/draw/away, report **Ranked Probabili
 An absolute Brier score is hard to interpret across sports, seasons, and markets with different base rates. Convert it to a skill score against a stated benchmark:
 
 $$
-\text{Brier Skill}=1-\frac{\text{Brier}_{model}}{\text{Brier}_{reference}}
+\begin{gathered}
+\text{Brier Skill}=1-\frac{\text{Brier}_{model}}{\text{Brier}_{reference}} \\[1em]
+\begin{array}{rl}
+\text{where}\quad \text{Brier}_{model}: & \text{model's Brier score on the scored events} \\
+\text{Brier}_{reference}: & \text{benchmark's Brier score on the same events} \\
+\text{Brier Skill}: & \text{fraction of the benchmark's error the model removes}
+\end{array}
+\end{gathered}
 $$
 
-A value above zero means improvement over the reference; one is perfect; a negative value means the model is worse. For betting work, calculate skill against at least three references: a base-rate model, the de-vigged market probability available at decision time, and the incumbent production model.[^10][^11][^12]
+A value above zero means improvement over the reference; one is perfect; a negative value means the model is worse. Example: a model scoring 0.240 against a de-vigged market scoring 0.250 has skill $1 - 0.240/0.250 = 0.04$, meaning it removes 4% of the market's squared error. Both scores must come from exactly the same events, or the ratio compares different samples, not different forecasters. For betting work, calculate skill against at least three references: a base-rate model, the de-vigged market probability available at decision time, and the incumbent production model.[^10][^11][^12]
 
 The most important comparison is generally **incremental skill over the market at the same information timestamp**. Comparing a morning model with the closing market mixes forecasting skill with information that arrived later, while comparing it only with a naive base rate sets the bar too low.
 
@@ -84,8 +99,17 @@ The most important comparison is generally **incremental skill over the market a
 Brier score can be decomposed into reliability, resolution, and uncertainty:
 
 $$
-\text{Brier}=\text{Reliability}-\text{Resolution}+\text{Uncertainty}
+\begin{gathered}
+\text{Brier}=\text{Reliability}-\text{Resolution}+\text{Uncertainty} \\[1em]
+\begin{array}{rl}
+\text{where}\quad \text{Reliability}: & \text{average squared gap between forecast and observed frequency, per forecast bin (lower is better)} \\
+\text{Resolution}: & \text{how far each bin's observed frequency sits from the overall base rate (higher is better)} \\
+\text{Uncertainty}: & \bar{y}(1-\bar{y}) \text{, set by the base rate } \bar{y} \text{ alone; no model can change it}
+\end{array}
+\end{gathered}
 $$
+
+The signs are the point: reliability adds error, resolution subtracts it, and uncertainty is fixed by the data. For a roughly 50/50 market such as spreads, $\bar{y} \approx 0.5$ and uncertainty is $0.25$, the coin-flip score above. The exact decomposition holds when forecasts take a limited set of values; with continuous probabilities it is computed on bins and is approximate.
 
 Reliability measures probability calibration, resolution measures the ability to separate events into meaningfully different risk groups, and uncertainty reflects the outcome's base-rate difficulty. This decomposition matters because two systems can have similar Brier scores for different reasons: one may be calibrated but timid, while another may be sharp but systematically overconfident.[^13][^14][^6]
 
@@ -137,10 +161,21 @@ Positive CLV does not by itself prove that:
 CLV is therefore best viewed as a **price-acquisition and market-direction diagnostic**. The deeper question is whether the system has information incremental to the market. Test this by fitting an out-of-sample market-conditioned model such as
 
 $$
-\operatorname{logit}P(Y=1)=\alpha+\beta\operatorname{logit}(p_{market})+\gamma z_{model},
+\begin{gathered}
+\operatorname{logit}P(Y=1)=\alpha+\beta\operatorname{logit}(p_{market})+\gamma z_{model} \\[1em]
+\begin{array}{rl}
+\text{where}\quad Y \in \{0,1\}: & \text{outcome of the bet's side (1 = it won)} \\
+\operatorname{logit}(p) = \log\frac{p}{1-p}: & \text{log-odds transform} \\
+p_{market}: & \text{de-vigged market probability at the decision time} \\
+z_{model}: & \text{model's residual signal, or its log-odds difference from the market} \\
+\alpha: & \text{intercept; nonzero means the market leans one way on average} \\
+\beta: & \text{market slope; 1 means market probabilities are correctly scaled} \\
+\gamma: & \text{information the model adds beyond the market}
+\end{array}
+\end{gathered}
 $$
 
-where $z_{model}$ is the model's residual signal or log-odds difference from the market. A stable, correctly signed $\gamma$, improved out-of-sample proper score, and better calibration show that the model contributes information beyond simply echoing market odds. Forecast-encompassing tests are designed to ask whether one forecast explains variation that the other cannot.[^26][^27]
+If the model only echoes the market, the fit returns $\alpha = 0$, $\beta = 1$, $\gamma = 0$. A stable, correctly signed $\gamma$, improved out-of-sample proper score, and better calibration show that the model contributes information beyond simply echoing market odds. Forecast-encompassing tests are designed to ask whether one forecast explains variation that the other cannot.[^26][^27]
 
 Also test whether returns and win rates rise monotonically across **predeclared model-edge deciles**. If the model's 8% edges do not perform better than its 2% edges, its probability scale or selection logic is suspect even when aggregate ROI is positive.
 
@@ -151,8 +186,17 @@ Also test whether returns and win rates rise monotonically across **predeclared 
 Use turnover ROI, commonly called yield in some markets, as the primary realized-efficiency statistic:
 
 $$
-\text{ROI}_{turnover}=\frac{\sum_i \text{net profit}_i}{\sum_i \text{stake}_i}.
+\begin{gathered}
+\text{ROI}_{turnover}=\frac{\sum_i \text{net profit}_i}{\sum_i \text{stake}_i} \\[1em]
+\begin{array}{rl}
+\text{where}\quad i: & \text{one settled bet} \\
+\text{net profit}_i: & \text{amount won minus stake; } -\text{stake}_i \text{ on a loss, 0 on a push} \\
+\text{stake}_i: & \text{amount risked on bet } i
+\end{array}
+\end{gathered}
 $$
+
+Example: 100 one-unit bets at −110 (decimal 1.909) going 55–45 return $55 \times 0.909 - 45 = 5.0$ units on 100 staked, a turnover ROI of 5.0%. Break-even at −110 is 52.4%.
 
 Published betting studies commonly define ROI as net profit divided by total amount wagered. Report it with total turnover, net profit, number of independent events, and a confidence interval; a naked ROI percentage conceals both scale and uncertainty.[^28][^29][^30]
 
