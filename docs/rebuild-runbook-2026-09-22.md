@@ -116,7 +116,76 @@ grep -oE '^[A-Za-z_][A-Za-z0-9_-]*[ ]*=' env.env | sed 's/[ ]*=$//' | sort -u
 
 Keep only that list, to know what to refill.
 
-### 1.7 What needs no backup
+### 1.7 Other repos in `~/dev` — nine have NO remote at all
+
+Added later on 2026-09-22, after the first draft scoped this to `cfb` only. **Nine
+repos exist nowhere but this disk.** There is one physical drive (C:, 952 GB); nothing
+survives the wipe by living on another partition.
+
+| Repo | Unpushed | Dirty | Remote |
+| --- | --- | --- | --- |
+| `dl-master` | 41 | 79 | **none** |
+| `video-wall` | 24 | 27 | origin |
+| `fantasty-football` | 14 | 5 | **none** |
+| `golf-master` | 10 | 8 | origin |
+| `face-sorter` | 9 | 38 | **none** |
+| `finances` | 5 | 0 | **none** |
+| `vid_programs` | 4 | 69 | origin |
+| `DFS` | 3 | 4 | **none** |
+| `cross-ai-review` | 3 | 0 | **none** |
+| `ai-edit` | 1 | 0 | **none** |
+| `clipsmith` | 1 | 5 | **none** |
+| `wedding` | 1 | 1 | **none** |
+| `pcloud-viewer` | 0 | 40 | origin |
+| `perplexport` | 0 | 5 | origin |
+| `design-mode` | 0 | 1 | origin |
+
+`dl-master` matters beyond its own contents: its `dl_state.db` (28,342 rows) is what the
+2026-09-17 forensics used to cover the window Chrome had lost. It is evidence, and it has
+no remote.
+
+For each repo with a remote: commit the dirty work, then push.
+For each repo without one: create a private GitHub repo and push, **or** copy the whole
+directory (including `.git`) to external media. Do not rely on copying the working files
+alone — that discards history.
+
+Regenerate this table before the wipe:
+
+```bash
+cd ~/dev
+for d in */; do
+  [ -d "$d/.git" ] || continue
+  n=$(git -C "$d" rev-list --count --all --not --remotes 2>/dev/null)
+  dirty=$(git -C "$d" status --porcelain 2>/dev/null | wc -l)
+  rem=$(git -C "$d" remote 2>/dev/null | head -1)
+  printf "%-28s unpushed=%-5s dirty=%-5s remote=%s\n" "${d%/}" "${n:-?}" "$dirty" "${rem:-NONE}"
+done
+```
+
+Proceed only when every row reads `unpushed=0 dirty=0`, or the directory has been copied
+off whole.
+
+### 1.8 Personal files — roughly 110 GB total
+
+One drive, no second partition. Sizes as of 2026-09-22:
+
+| Folder | Size |
+| --- | --- |
+| `~/dev` | 78.6 GB (includes `data/` at 17 GB, rebuildable) |
+| `~/Downloads` | 19.0 GB |
+| `~/Documents` | 6.2 GB (includes the 2.9 GB Obsidian vault) |
+| `~/Videos` | 3.1 GB |
+| `~/Pictures` | 2.2 GB |
+| `~/sort` | 1.5 GB |
+| `~/Desktop` | 0.3 GB |
+
+Budget an external drive of 128 GB or more, or subtract `data/` and triage `Downloads`.
+
+Also not in any repo and easily forgotten: browser bookmarks (export to HTML — do **not**
+copy the profile), saved passwords (export from `chrome://password-manager` *after* the
+sweep, not before), and any licence keys or installers you cannot re-download.
+
+### 1.9 What needs no backup
 
 - Anything pushed to `origin/master`
 - `data/` (17 GB) — rebuilds from source via `refresh_cfbd.py`. Slow, not lost.
