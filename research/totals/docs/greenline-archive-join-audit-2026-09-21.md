@@ -44,10 +44,10 @@ That is also the snapshot the parser derives the flag from, per its no-lookahead
 
 Related shape notes, for the same reason:
 
-- `is_greenline_pick` is **NULL on all 1,020 export rows** (the 2022–23
-  `ncaa-best-bets*.csv` slates). Those rows do carry `difference`, and 220 of them are
-  positive, so picks are derivable there — they were simply never derived. Treat the
-  export slates as unflagged, not as zero picks.
+- `is_greenline_pick` was **NULL on all 1,020 export rows** (the 2022–23
+  `ncaa-best-bets*.csv` slates) although they carry `difference`. Picks were derivable
+  there and simply never derived. **Now derived — 220 picks** (see the fix section);
+  18 rows keep a NULL flag because their `difference` is NULL.
 - 144 `PFF_hist` rows (16 slots × 3 markets × 3 snapshots) have NULL `cover_prob`, so no
   `difference` and no flag. Source holes, not parser holes.
 - 6 rows (SMU @ UCF, 2022-10-02) have NULL `season` **and** NULL `week`. Any
@@ -120,6 +120,9 @@ names and scores agree, and PFF's weeks 17–18 are the postseason CFBD restarts
 ## What this does not support
 
 - **This is not a re-grade.** The 2026-09-17 record is unchanged and is not re-scored here.
+- **The 220 export picks are flags, not a record.** The source carries no result, so all
+  220 are ungraded and none of them can be added to any win rate, ROI or CLV figure. They
+  say what Greenline flagged on three 2022–23 slates, nothing about whether it won.
 - **The defect is latent, not live.** [`greenline_archive_review.py`](../scripts/greenline_archive_review.py)
   never reads `game_id` — it grades off PFF's own `bet_result` — and no other script in the
   repo reads this file. So nothing published today is wrong because of Finding 2. It is a
@@ -158,6 +161,7 @@ the academy's name, and the new qualifier rule would otherwise have unmatched Ar
 
 3. **`transposed_name_slots()`** repairs the one game whose team-name columns contradict
    its own scores (below).
+4. **`is_greenline_pick` is now derived on the export rows too** (below).
 
 Effect on the file — 8,772 rows and 368 picks unchanged, and the only columns that move
 are `game_id`, its derived `kickoff_utc` (162 rows, the re-matched slots) and the two
@@ -194,6 +198,38 @@ The score check in the audit cannot see this — the points agree with CFBD posi
 so `transposed()` was added to the audit as a second detector, name-aware and using the
 parser's aliases. Compared with raw tokens it would drown in false positives: Ole Miss /
 Mississippi, UL Monroe / Louisiana-Monroe and Hawai'i / Hawaii all fail a naive match.
+
+### Deriving the export picks
+
+The 2022–23 slates carry PFF's per-side `Value` but were never turned into a pick flag.
+The same `difference > 0` rule PFF_hist uses applies, and it was verified on these files
+rather than assumed — the two properties that make the rule unambiguous both hold:
+
+| property | PFF_hist 2020 | exports 2022–23 |
+| --- | --- | --- |
+| complete pairs sum to −overround (−0.0476 at −110/−110) | mean −0.0459, median −0.0480 | mean −0.0460, median −0.0465 |
+| pairs inside [−0.09, −0.01] | 98.1% | **501 of 501** |
+| pairs with two positive sides | 0 of 1,292 | **0 of 510** |
+
+So `> 0` selects at most one side. That gives **220 export picks**:
+
+| source | moneyline | spread | total |
+| --- | --- | --- | --- |
+| `ncaa-best-bets-pff.csv` (2022) | 23 | 26 | 30 |
+| `ncaa-best-bets (1) - Copy…` (2023) | 21 | 21 | 28 |
+| `ncaa-best-bets - Copy…` (2023) | 18 | 20 | 33 |
+
+The remaining 18 export rows keep a NULL flag: their `difference` is NULL, so nothing is
+derivable. 2020 is untouched at 368 picks.
+
+Two things the rule does **not** decide:
+
+- **`> 0`, not `>= 0`.** 20 export pairs have a best side of exactly 0.00, and
+  `ncaa-best-bets-pff.csv` writes about half its values as whole-percent strings, so a
+  0.00 there can hide either sign. Those pairs are treated as no-pick. PFF_hist has 19
+  pairs in the same position and is treated identically, so the two eras stay comparable.
+- **No lookahead question arises.** An export is a single pre-kickoff capture with no
+  later snapshot to select on.
 
 Not fixed, deliberately: the `is_greenline_pick` replication of Finding 1.
 

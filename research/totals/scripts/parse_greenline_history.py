@@ -26,10 +26,17 @@ Conventions verified against core.fact_game_line rather than assumed:
   game/market ever has two positive sides (0 of 1292). So `Difference > 0` picks at
   most one side and is unambiguous.
 
+  The exports' per-side Value behaves the same way: complete pairs sum to -0.0460 mean
+  / -0.0465 median, 501 of 501 inside [-0.09, -0.01], and no pair ever shows two
+  positive sides (220 with one, 290 with none). So the same `> 0` rule derives 220
+  picks there. Those rows carry no result in the source and stay ungraded -- an export
+  pick is a flag, never a record.
+
 LOOKAHEAD: the pick flag comes from the OPENING GREENLINE snapshot, which is when the
 number was actually available. Selecting on the closing Difference would be
 result-informed: it yields a different, smaller set (323 vs 368 picks in 2020). The
-closing block is retained for grading and CLV only, never for selection.
+closing block is retained for grading and CLV only, never for selection. The exports
+raise no such question: each is a single pre-kickoff capture with no later snapshot.
 
 Usage:
     python research/totals/scripts/parse_greenline_history.py
@@ -281,6 +288,17 @@ def build_exports(src: Path, con: duckdb.DuckDBPyConnection):
         game = hit.get((rec["team"], rec["opponent"], rec["_kick"]))
         line = parse_num(rec.get("line"))
         for side, tag in ((one, "sideOne"), (two, "sideTwo")):
+            # Same rule as PFF_hist: the side whose stated value is positive is the pick.
+            # Verified on these files rather than assumed -- the two sides' values sum to
+            # minus the book's overround (mean -0.0460, median -0.0465, 501 of 501
+            # complete pairs inside [-0.09, -0.01], against 1 - 2*110/210 = -0.0476), and
+            # no game/market ever shows two positive sides (220 pairs with one, 290 with
+            # none). So `> 0` selects at most one side, unambiguously.
+            #
+            # There is no snapshot here, so there is no lookahead question: an export is a
+            # single pre-kickoff capture. These rows stay ungraded -- the source carries no
+            # result -- so a pick here is a flag, never a record.
+            diff = parse_value(rec.get(f"{tag}Value"))
             out.append({
                 "season": None if game is None else int(game.season),
                 "week": None if game is None else int(game.week),
@@ -294,7 +312,11 @@ def build_exports(src: Path, con: duckdb.DuckDBPyConnection):
                 "greenline_line": None,
                 "cover_prob": None,
                 "breakeven_prob": None,
-                "difference": parse_value(rec.get(f"{tag}Value")),
+                "difference": diff,
+                # `diff > 0` and not `>= 0`: a value of exactly 0.00 is no edge, and in
+                # ncaa-best-bets-pff.csv it may be a rounded percent hiding either sign.
+                # PFF_hist is treated the same way, so the two eras stay comparable.
+                "is_greenline_pick": None if diff is None else bool(diff > 0),
                 "bet_result": None,
                 "clv": None,
                 "cash_pct": parse_int(rec.get(f"{tag}Cash")),
