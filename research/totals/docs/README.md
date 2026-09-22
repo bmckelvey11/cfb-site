@@ -120,6 +120,7 @@ Anything that gets built and backtested belongs in `models/totals/`.
 | --- | --- |
 | [fbs-totals-frontier-models.md](fbs-totals-frontier-models.md) | Survey of frontier modeling approaches for FBS totals (+ [`.pdf`](fbs-totals-frontier-models.pdf)) |
 | [fbs-totals-system-research-report.md](fbs-totals-system-research-report.md) | Long-form research report on a pregame totals betting system |
+| [opponent-adjustment-priors-model-comparison.md](opponent-adjustment-priors-model-comparison.md) | Opponent adjustment (iterative, ridge, crossed random effects, Bayesian hierarchy, Elo), preseason priors and their decay, transfer-era roster features, and a head-to-head comparison of the methods for totals and line movement. Every equation has a where-table and a worked example |
 | [research-prompts/fbs-totals/](research-prompts/fbs-totals/) | 15 numbered research prompts plus a README — odds-data audit, market-implied score distributions, price discovery, error anatomy, cold starts, joint spread/total modeling, uncertainty decomposition, abstention, staking, drift monitoring, governance, synthesis |
 
 ---
