@@ -75,6 +75,20 @@ FBS_GROUP_ID = "11"
 # the other two answer 500 for every NCAA pull. See docs/pff-warehouse-schema.md.
 SKIP_FACETS = {"facet-passing-detail", "facet-receiving-coverage", "facet-defense-coverage-matchup"}
 
+
+def export_on_disk(out_dir: Path, stem: str) -> bool:
+    """True if this export already landed, non-empty, as either extension it can take.
+
+    An export writes `<stem>.csv`, or `<stem>.json` when PFF hands back a blank CSV. Size
+    is part of the test, not just existence: a zero-byte export is a failed one, and
+    treating it as done means it is never repaired. That is how
+    `facet_defense_coverage_ncaa_2026_fbs_wk1.csv` sat empty from 2026-09-08 through a
+    later full run of this script. The read tier has always checked size -- see `wanted` --
+    and this is the export tier catching up.
+    """
+    return any((p := out_dir / f"{stem}{ext}").exists() and p.stat().st_size
+               for ext in (".csv", ".json"))
+
 TEAM_STATS_CATEGORIES = ("offense-overall-success", "offense-passing", "offense-rushing",
                          "defense-overall-success", "defense-passing", "defense-rushing",
                          "defense-opponent-tendencies")
@@ -281,6 +295,7 @@ def main() -> None:
     def wanted(dest: Path, season: int | None) -> bool:
         return args.force or not dest.exists() or not dest.stat().st_size or season == live
 
+
     def read_now(op_id: str, values: dict, dest: Path, season: int | None = None) -> None:
         """Reference reads run before planning, because the plan depends on them."""
         if not wanted(dest, season) or args.dry_run:
@@ -369,7 +384,7 @@ def main() -> None:
                 values = {"league": "ncaa", "season": str(season), "week": str(week), "division": "fbs"}
                 for entry in sorted(facets.values(), key=lambda e: e["id"]):
                     stem = out_name(entry["id"], values, entry["optional"]).removesuffix(".csv")
-                    if args.force or not any((args.out_dir / f"{stem}{ext}").exists() for ext in (".csv", ".json")):
+                    if args.force or season == live or not export_on_disk(args.out_dir, stem):
                         exports.append((entry, values))
 
     est = len(reads) * READ_PACING_SECONDS + len(exports) * EXPORT_PACING_SECONDS

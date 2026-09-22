@@ -4,7 +4,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from pull_pff_modeling import (  # noqa: E402
-    all_ops, command, fbs_franchises, flatten_team_games, ncaa_weeks, parse_ids, parse_seasons,
+    all_ops, command, export_on_disk, fbs_franchises, flatten_team_games, ncaa_weeks, parse_ids,
+    parse_seasons,
 )
 
 
@@ -56,3 +57,24 @@ def test_flatten_pairs_opponent_grades(tmp_path):
     assert rows[103]["opp_grades_overall"] == 80.1 and rows[103]["home"] == 0 and rows[103]["points_scored"] == 17
     assert rows[167]["opp_grades_overall"] == 66.7 and rows[167]["home"] == 1 and rows[167]["points_allowed"] == 17
     assert rows[103]["fbs"] == 1 and rows[103]["opp_fbs"] == 0 and rows[103]["graded"] == 1
+
+
+def test_export_on_disk_treats_a_zero_byte_export_as_not_pulled(tmp_path):
+    """A blank export must be re-pulled, not counted as done.
+
+    The read tier has always tested size; the export tier tested existence alone, which
+    left `facet_defense_coverage_ncaa_2026_fbs_wk1.csv` empty across a full re-run.
+    """
+    stem = "facet_defense_coverage_ncaa_2026_fbs_wk1"
+    assert not export_on_disk(tmp_path, stem)          # nothing there at all
+
+    csv = tmp_path / f"{stem}.csv"
+    csv.touch()                                         # zero bytes: a failed export
+    assert not export_on_disk(tmp_path, stem)
+
+    csv.write_text("player,yards\nSmith,10\n")
+    assert export_on_disk(tmp_path, stem)
+
+    csv.unlink()                                        # the JSON fallback counts too
+    (tmp_path / f"{stem}.json").write_text("[{}]")
+    assert export_on_disk(tmp_path, stem)
