@@ -134,6 +134,21 @@ Overtime points count, because the book grades totals on the final score includi
 - **Which timestamp.** It must be a price you could actually have bet then, rebuilt from line history at that time. Using the closing line when the decision was made earlier is leakage. It also fails the hard gate in the [model evaluation standard](model-evaluation-standard.md) that prices be reconstructible at decision time.
 - **What it means.** $T_g^{decision}$ is roughly the market's median forecast of $y_g$ at that moment. It is the line the over/under is priced so that each side wins about half the time, before the vig. It already contains everything the market knew then: team strength, pace, injuries, weather forecasts, and public money.
 
+**Which total this repo uses.** The choice is set by what line data carries timestamps:
+
+| Seasons | $T_g^{decision}$ | Source | Why |
+| --- | --- | --- | --- |
+| 2013–2025 | Median **opening** total across books, snapped to the half point | `ou_open` in the totals model; median total-open in `cfb_system_maker/normalize.py` (`median_line`) | CFBD lines have no timestamps, only open and current/close ([odds sources](odds-sources-an-vs-apis-2026-09-11.md)). The open is the only pre-close price whose place in time is known. The median across books survives the book turnover ([median line](median-line-2026-09-17.md)); a single named book loses whole seasons. |
+| 2026 onward | Consensus total (Action Network book 15) at one fixed weekly time, e.g. Wednesday 18:00 ET | `stg.an_history_tick` | Every tick is timestamped back to the April opener, so the decision line can be the price actually available at the decision time. Switch once a full season is captured. |
+
+The close is **not** the decision line unless the strategy bets at kickoff. Otherwise it contains information that arrived after the decision, which is leakage. It stays in the design as a second target (below).
+
+Three caveats come with the historical choice:
+
+1. **The open is soft.** Limits are low and opens move a lot. A feature can look predictive against the open only because it anticipates the move. Always report the close residual alongside.
+2. **"Open" is not one moment.** Each book's open is its first posted number, and books post on different days. The median open is the typical opener, not a snapshot at a fixed time.
+3. **Results from the two eras are not directly comparable.** An open-based residual (2013–2025) and a fixed-time residual (2026+) measure against different information sets. Report them separately.
+
 **Market-residual target.**
 
 $$
@@ -150,6 +165,21 @@ $$
 This is how far the actual score landed above or below the line you could bet. A game with a decision-time total of 55.5 that finished 48 has $r_g^{total} = -7.5$, so the under won.
 
 **Why model the residual instead of $y_g$.** The market total already explains most of the variation in the actual total. A model trained on $y_g$ spends its capacity relearning what the line already knows. A model trained on $r_g$ only earns credit for information the market missed, and that is the only kind of information that wins bets. If $r_g$ cannot be predicted from pre-game features, the model has no edge, however well it predicts raw points.
+
+**Close residual (secondary target).** Score every totals feature against the close as well:
+
+$$
+\begin{gathered}
+r_g^{total,close} = y_g - T_g^{close} \\[1em]
+\begin{array}{rl}
+\text{where}\quad y_g: & \text{realized combined score (points)} \\
+T_g^{close}: & \text{median closing total across books, same construction as the open} \\
+r_g^{total,close}: & \text{points above } (+) \text{ or below } (-) \text{ the closing total}
+\end{array}
+\end{gathered}
+$$
+
+The two residuals differ by exactly the line move: $r_g^{total} - r_g^{total,close} = T_g^{close} - T_g^{decision}$. So a feature can predict the decision residual in two ways. It can know something the market learns before kickoff, in which case it also predicts the move but not $r_g^{total,close}$; that is a bet-timing signal. Or it can know something the market never prices, in which case it predicts $r_g^{total,close}$ too; that is a fundamental edge. Example: open 55.5, close 52.5, final 48. The decision residual is $-7.5$ and the close residual $-4.5$; 3 of the 7.5 points were the market moving toward the under before kickoff.
 
 **What totals features need to capture.** Totals features usually need to describe some of these:
 
