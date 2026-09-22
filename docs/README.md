@@ -129,6 +129,24 @@ Each answers one question against the live warehouse; keep for provenance.
 > mostly Greenline flags, not independent picks. Pool them as prior evidence, never as a
 > standalone baseline.
 
+## Imported reference reading (cross-unit, not findings)
+
+Research-assistant exports, moved in from `research/bankroll/docs/` on 2026-09-22. Nothing
+here was checked against the warehouse; every claim is a hypothesis. Math delimiters were
+converted to `$`; equations have not been brought to the where-table standard.
+
+| Doc | What it is |
+| --- | --- |
+| [modeling-validation-guide.md](modeling-validation-guide.md) | Choosing regression and ML models for betting targets, walk-forward validation against look-ahead, and auditing data, odds, calibration, and CLV |
+| [modeling-validation-glossary.md](modeling-validation-glossary.md) | A–Z glossary of the modeling, validation, and data-audit terms used in the guide above |
+| [data-audit-checklist.md](data-audit-checklist.md) | Checklist to run before trusting any backtest, model comparison, calibration, or CLV result; its core rule is that every feature is available before the prediction timestamp |
+| [cross-domain-model-designs.md](cross-domain-model-designs.md) | 21 model designs borrowed from other fields (state-space, competing-risk survival, mixture-of-experts, analog ensembles, conformal), ranked by expected lift per unit of effort |
+| [cross-domain-derived-metrics.md](cross-domain-derived-metrics.md) | 22 candidate derived metrics not in the current inventory, ranked by expected predictive lift per unit of effort |
+| [quantile-regression-methods.md](quantile-regression-methods.md) | Quantile regression for betting: pinball loss, and applications to NCAA basketball, Australian rules football, and golf |
+| [research-prompts/perplexity-prompting-guide.md](research-prompts/perplexity-prompting-guide.md) | How to write a Perplexity research prompt: retrieval-first, specific, and bound to an output format |
+| [alabama-georgia-2026-09-17.md](alabama-georgia-2026-09-17.md) | Alabama vs Georgia through week 2 of 2026, from a warehouse snapshot export |
+| [injury-news-2026-09-18.md](injury-news-2026-09-18.md) | Selective week 3 injury roundup, dated by publication; not an availability ledger |
+
 ## App, product, and process
 
 | Doc | What it is |
