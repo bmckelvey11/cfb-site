@@ -19,6 +19,13 @@ human-facing product intent. None should duplicate another file's rules.
 
   The judgement call is "does anything downstream change?" If a reader would act differently, write it up. If they would not, the finding is a line, not a document. When it is genuinely unclear, prefer the line — an over-full `docs/` costs more than a missing paragraph, because the next reader has to read all of it to find out what is current.
 
+- **Math in Markdown.** Any `.md` with equations follows three rules. Applies to new docs and to any equation you touch; dated records are not rewritten to comply.
+  - **Delimiters.** Inline math is `$...$`; display math is `$$` on its own line above and below. Never `\( \)` or `\[ \]` — GitHub and Obsidian do not render them. Watch for `\b`, `\t`, `\n` being eaten as escapes (`\beta` turning into `eta`).
+  - **Declare variables inside the fence.** Under each display equation, in the same `$$` block, a `where` table defines every symbol with its units and sign convention: `\begin{gathered} <equation> \\[1em] \begin{array}{rl} \text{where}\quad x: & \text{...} \end{array} \end{gathered}`.
+  - **Explain in prose after the fence.** What the equation computes, how to read its sign or edge cases, and a worked number where it helps. A symbol used before it is defined, or an equation with no prose after it, is not done.
+
+  Pattern: [`docs/feature-evaluation-framework.md`](docs/feature-evaluation-framework.md).
+
 - Docs lifecycle (`tests/test_docs_index.py` enforces the first point):
   - **Check first.** Before writing a doc, grep its `docs/README.md` for the topic. If a doc already answers the question, update it or supersede it — don't write a sibling.
   - **Index.** Every `.md` in a `docs/` dir gets a row in that dir's `README.md`: one line, what question it answers. Unindexed doc = task not done.
