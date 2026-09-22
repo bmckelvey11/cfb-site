@@ -59,6 +59,18 @@
         "data/exports"
       ],
       "port": 8778
+    },
+    {
+      "name": "Marimo",
+      "runtimeExecutable": "marimo",
+      "runtimeArgs": [
+        "edit",
+        "marimo.py",
+        "--headless",
+        "--no-token"
+      ],
+      "port": 2718,
+      "autoPort": true
     }
   ]
 }
