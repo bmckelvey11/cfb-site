@@ -1,3 +1,5 @@
+**Superseded by** [greenline-totals-rule-search-2026-09-22.md](../../research/totals/docs/greenline-totals-rule-search-2026-09-22.md)
+
 # Revisiting the PFF edge cap, 2026-09-17
 
 Reproduce: `python research/totals/scripts/greenline_edge_window.py`.

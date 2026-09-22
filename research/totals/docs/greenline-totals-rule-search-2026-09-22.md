@@ -213,9 +213,9 @@ on one era is being asked to bet a slate the other era barely contains.
   hit rate.
 - **No overs rule of any kind.** n=54 with a 13-pick largest cell.
 - **Not a contradiction of the earlier nulls — a confirmation of them.**
-  [`greenline-band-significance-2026-09-17.md`](greenline-band-significance-2026-09-17.md)
+  [`greenline-band-significance-2026-09-17.md`](../../../archive/docs/greenline-band-significance-2026-09-17.md)
   withdrew the band ordering and
-  [`greenline-edge-cap-revisit-2026-09-17.md`](greenline-edge-cap-revisit-2026-09-17.md)
+  [`greenline-edge-cap-revisit-2026-09-17.md`](../../../archive/docs/greenline-edge-cap-revisit-2026-09-17.md)
   dropped the 2–4% window on a ninth of this sample. Tripling the data moved neither verdict.
   Both remain the records for the 2026-only version of the question; this is the pooled one.
 - **Not "keep looking and it will appear."** The permutation p of 0.547 is a statement about

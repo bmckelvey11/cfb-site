@@ -1,3 +1,5 @@
+**Superseded by** [greenline-totals-rule-search-2026-09-22.md](../../research/totals/docs/greenline-totals-rule-search-2026-09-22.md)
+
 # Is the band split significant? Greenline unders, 2026-09-17
 
 Reproduce: `python research/totals/scripts/band_significance.py --out research/totals/docs`.

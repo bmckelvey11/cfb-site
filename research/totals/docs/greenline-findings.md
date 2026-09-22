@@ -46,6 +46,17 @@ unit from 1% to 0.6%.
 | D | **Does a flag predict line movement?** A bet-free test of whether PFF knows anything, accruing every week regardless of what gets bet. | Not started. |
 | E | **Closed — do not reopen.** Bands, edge thresholds, overs, Pinnacle shade, situational filters. Each tested at least twice, each null. Further looks on the same 324 picks cost multiplicity and buy nothing. | Closed. |
 
+## Retired, with their records
+
+Two questions were answered twice — once small, once on the pooled corpus — and the small
+answers are superseded. Both records live in [`archive/docs/`](../../../archive/docs/) with a
+banner pointing forward. Their conclusions are kept here so nothing is lost with the file.
+
+| question | first answer | now |
+| --- | --- | --- |
+| **Is the market-total band split real?** | 2026-09-17, n=240 (201 of them personal bets), bands taken from `greenline_unders.BANDS`. Not significant; band ordering withdrawn from the weekly list. | Confirmed on 270 Greenline-only unders with pre-registered bands: 55+ vs below 55 is CMH p 0.295, Holm 0.384. The original also *used* the contaminated `BANDS` cutpoints it was testing — the re-test does not. |
+| **Does a cap or floor on PFF's `value` help?** | 2026-09-17, n=36, week 2 only. Slope p 0.40, the 4%+ bucket nine games. Window dropped from the week-3 list; spread filter only. | Confirmed on 270 unders: 4%+ vs below is CMH p 0.058, Holm 0.232. Its own closing line asked for exactly this re-run. The cut survives as a *registered hypothesis* (row C), not as a filter. |
+
 ## Standing cautions
 
 - **Read the MDE before quoting any record.** Every split so far sits below the smallest win
