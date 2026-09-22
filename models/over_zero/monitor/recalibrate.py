@@ -37,7 +37,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "v2"))
 from bias_bins import BIN_EDGES, KELLY_FRACTION, kelly_fraction  # noqa: E402
-from monitor import load_from_raw  # noqa: E402
+from monitor import load_games, add_source_arg  # noqa: E402
 from run_walkforward import HURDLE, fit_train  # noqa: E402
 from models_v2 import censoring_bias, implied_team_points  # noqa: E402
 
@@ -167,6 +167,7 @@ def _self_check(data, years, min_train):
 
 def main():
     ap = argparse.ArgumentParser()
+    add_source_arg(ap)
     ap.add_argument("--season", type=int, nargs="+",
                     default=list(range(2013, 2026)))
     ap.add_argument("--min-train", type=int, default=3)
@@ -175,7 +176,7 @@ def main():
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
 
-    data = load_from_raw(args.season)
+    data = load_games(args.season, args.source)
     years = sorted(data)
     if args.self_check:
         _self_check(data, years, args.min_train)

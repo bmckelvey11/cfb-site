@@ -31,14 +31,16 @@ set "LOGDIR=%CFB_DATA_ROOT%\logs"
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
 set "LOG=%LOGDIR%\over_zero_slate.log"
 
+for /f %%i in ('powershell -NoProfile -NonInteractive -Command "(Get-Date).ToString('s')"') do set "START=%%i"
 echo.>> "%LOG%"
 echo ==== %DATE% %TIME% :: %* ====>> "%LOG%"
 REM -u so a killed run keeps the partial trail (see refresh_cfbd.cmd).
-"%PYTHON%" -u "%REPO%\models\over_zero\scripts\best_line_slate.py" --json "%SITE%\lib\board.json" %*>> "%LOG%" 2>&1
+"%PYTHON%" -u "%REPO%\models\over_zero\scripts\best_line_slate.py" --max-spread 50 --json "%SITE%\lib\board.json" %*>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" (
     echo ---- slate exited %RC%, skipping build ---->> "%LOG%"
-    exit /b %RC%
+    call "%REPO%\scripts\task_ledger.cmd" "over_zero_slate" "%START%" %RC%
+exit /b %RC%
 )
 
 REM npm is npm.cmd -- without call, control never comes back here.
@@ -46,4 +48,5 @@ cd /d "%SITE%"
 call npm run build>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- build exited %RC% ---->> "%LOG%"
+call "%REPO%\scripts\task_ledger.cmd" "over_zero_slate" "%START%" %RC%
 exit /b %RC%

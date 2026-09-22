@@ -38,7 +38,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "v2"))
-from monitor import _wilson, load_from_raw  # noqa: E402
+from monitor import _wilson, load_games, add_source_arg  # noqa: E402
 from run_walkforward import HURDLE, fit_train  # noqa: E402
 from bias_bins import KELLY_FRACTION, kelly_fraction  # noqa: E402
 from models_v2 import (  # noqa: E402
@@ -116,7 +116,32 @@ def game_meta(season, raw_dir=RAW_DIR, provider=None):
     return rows
 
 
-def walk_forward_bets(data, years, min_train, with_meta=False):
+def warehouse_game_meta(seasons):
+    """{season: [identity dict]} in load_warehouse_frame's row order.
+
+    The warehouse analogue of game_meta. Both loaders group the same frame with
+    the same `groupby("season", sort=True)`, so row i here is row i of
+    data[season] by construction -- but the caller still asserts the lengths,
+    because that guard is what caught the source mismatch in the first place.
+    """
+    from warehouse_source import load_warehouse_frame
+
+    out = {}
+    for season, g in load_warehouse_frame(seasons).groupby("season", sort=True):
+        rows = []
+        for r in g.itertuples():
+            fav, dog = ((r.home_team, r.away_team) if r.spread < 0
+                        else (r.away_team, r.home_team))
+            rows.append({"game_id": int(r.game_id), "week": int(r.week),
+                         "date": str(r.start_date)[:10],
+                         "home_team": r.home_team, "away_team": r.away_team,
+                         "fav_team": fav, "dog_team": dog})
+        out[int(season)] = rows
+    return out
+
+
+def walk_forward_bets(data, years, min_train, with_meta=False,
+                      meta_by_season=None):
     """Every out-of-sample game with its season label, chronological.
 
     Mirrors bias_bins.walk_forward but keeps the season so the bets can be
@@ -147,7 +172,7 @@ def walk_forward_bets(data, years, min_train, with_meta=False):
         season.append(np.full(int(keep.sum()), t))
 
         if with_meta:
-            ids = game_meta(t)
+            ids = game_meta(t) if meta_by_season is None else meta_by_season[t]
             if len(ids) != se_t.size:
                 raise AssertionError(
                     f"{t}: identity replay has {len(ids)} rows, loader has "
@@ -361,7 +386,14 @@ def reconcile_csv(path, expect, price=-110):
     return n, flat_pnl, kelly_staked, kelly_pnl
 
 
-def _provenance(years, min_train, threshold, n):
+_SOURCE_NOTE = {
+    "warehouse": ("data/cfb.duckdb core.fact_game, selected_spread/selected_total "
+                  "(consensus-first, per-field)"),
+    "raw": "data/raw/lines_*.json via pick_line (one provider supplies both)",
+}
+
+
+def _provenance(years, min_train, threshold, n, source="warehouse"):
     try:
         sha = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -374,7 +406,7 @@ def _provenance(years, min_train, threshold, n):
             f"{years[min_train]}–{years[-1]} (min-train={min_train})  |  "
             f"filter: expected censoring bias > {threshold} → bet the "
             f"full-game OVER  |  N={n} graded bets (pushes dropped)  |  "
-            f"CFBD lines, consensus provider  |  commit {sha}  |  "
+            f"source: {_SOURCE_NOTE.get(source, source)}  |  commit {sha}  |  "
             f"generated {date.today().isoformat()}")
 
 
@@ -711,6 +743,7 @@ def _self_check():
 
 def main():
     ap = argparse.ArgumentParser()
+    add_source_arg(ap)
     ap.add_argument("--season", type=int, nargs="+",
                     default=list(range(2013, 2026)))
     ap.add_argument("--min-train", type=int, default=3)
@@ -729,13 +762,16 @@ def main():
         return
 
     rng = np.random.default_rng(SEED)
-    data = load_from_raw(args.season)
+    data = load_games(args.season, args.source)
     years = sorted(data)
     if len(years) <= args.min_train:
         sys.exit(f"Need > {args.min_train} seasons; have {len(years)}.")
 
+    meta_by_season = (warehouse_game_meta(args.season)
+                      if args.source == "warehouse" else None)
     season, bias, over, prob, meta = walk_forward_bets(
-        data, years, args.min_train, with_meta=True)
+        data, years, args.min_train, with_meta=True,
+        meta_by_season=meta_by_season)
     sel = bias > args.threshold
     s_b, o_b, p_b = season[sel], over[sel], prob[sel]
     n, wins = int(sel.sum()), int(o_b.sum())
@@ -791,7 +827,7 @@ def main():
         "mdd": max_drawdown(equity), "season_marks": marks,
         "seasons": rows, "pos_seasons": sum(1 for r in rows if r["roi"] > 0),
         "sweep": sweep, "pval": pval,
-        "provenance": _provenance(years, args.min_train, args.threshold, n),
+        "provenance": _provenance(years, args.min_train, args.threshold, n, args.source),
     }
 
     print(f"\nFLOOR BIAS ROI REPORT — filter: bias > {args.threshold}")

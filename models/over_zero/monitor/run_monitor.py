@@ -7,7 +7,8 @@ import argparse
 
 from monitor import (
     HURDLE,
-    load_from_raw,
+    load_games,
+    add_source_arg,
     per_season,
     slope_trend,
     trailing_windows,
@@ -37,11 +38,12 @@ def _print_table(title, stats_list):
 
 def main():
     ap = argparse.ArgumentParser()
+    add_source_arg(ap)
     ap.add_argument("--season", type=int, nargs="+", default=list(range(2013, 2026)))
     ap.add_argument("--width", type=int, default=3, help="trailing-window width (seasons)")
     args = ap.parse_args()
 
-    data = load_from_raw(args.season)
+    data = load_games(args.season, args.source)
     print(f"Loaded {len(data)} seasons: {', '.join(map(str, sorted(data)))}")
     print(f"Breakeven hurdle = {HURDLE:.4f}.  Flags: SLOPE~0 = slope 95% CI "
           f"includes 0 (signal weak/dead); UNPROF = bias>1.0 win% CI lower "

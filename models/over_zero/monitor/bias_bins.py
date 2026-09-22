@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "v2"))
-from monitor import _wilson, load_from_raw  # noqa: E402
+from monitor import _wilson, load_games, add_source_arg  # noqa: E402
 from run_walkforward import HURDLE, _unit, fit_train  # noqa: E402
 from models_v2 import (  # noqa: E402
     censoring_bias,
@@ -270,6 +270,7 @@ def _self_check():
 
 def main():
     ap = argparse.ArgumentParser()
+    add_source_arg(ap)
     ap.add_argument("--season", type=int, nargs="+",
                     default=list(range(2013, 2026)))
     ap.add_argument("--min-train", type=int, default=3)
@@ -283,7 +284,7 @@ def main():
         _self_check()
         return
 
-    data = load_from_raw(args.season)
+    data = load_games(args.season, args.source)
     years = sorted(data)
     if len(years) <= args.min_train:
         sys.exit(f"Need > {args.min_train} seasons; have {len(years)}.")

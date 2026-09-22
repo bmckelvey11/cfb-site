@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "v2"))
-from monitor import load_from_raw  # noqa: E402
+from monitor import load_games, add_source_arg  # noqa: E402
 from run_walkforward import fit_train  # noqa: E402
 from models_v2 import censoring_bias, implied_team_points  # noqa: E402
 
@@ -40,6 +40,7 @@ def _argv():
 
 def main():
     ap = argparse.ArgumentParser()
+    add_source_arg(ap)
     ap.add_argument("lines", type=float, nargs="+", metavar="SPREAD_TOTAL",
                     help="pairs: SPREAD TOTAL [SPREAD TOTAL ...]")
     ap.add_argument("--season", type=int, nargs="+",
@@ -49,7 +50,7 @@ def main():
     if len(args.lines) % 2:
         ap.error("supply pairs: SPREAD TOTAL [SPREAD TOTAL ...]")
 
-    data = load_from_raw(args.season)
+    data = load_games(args.season, args.source)
     if not data:
         sys.exit("No training data found (need data/raw).")
     years = sorted(data)

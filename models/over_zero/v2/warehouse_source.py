@@ -69,16 +69,125 @@ order by season, start_date, game_id
 """
 
 
-def load_warehouse_frame(seasons, db=WAREHOUSE):
+# SENSITIVITY PROBE -- NOT A SHIPPING PATH. Its ROI is not usable.
+#
+# `selected_spread` / `selected_total` are chosen independently, so a game can
+# carry a consensus spread beside a teamrankings total. models_v2.pick_line
+# instead requires ONE provider to supply both, which is why the two sources
+# disagree on ~20% of spreads -- a selection rule difference, not bad data
+# (both sources are internally consistent with their own formatted_spread).
+#
+# implied_team_points does dog = (total - spread)/2, so in principle the pair
+# should come from one market. In practice that argument does not survive
+# measurement: this query's fallback `order by provider_key` is arbitrary, and
+# requiring one provider to carry both fields drops 3,073 of 13,397 games --
+# it scores a richer-coverage subsample, not the same games. Its ROI also moved
+# 2.6 points when core.fact_game_line was rebuilt mid-analysis, while the
+# shipped path reproduced exactly. Keep it to measure that sensitivity; do not
+# report it. See docs/warehouse-as-model-source-2026-09-22.md.
+_QUERY_PAIR = """
+with pick as (
+    select game_id, spread_close as spread, total_close as total, provider_key,
+           row_number() over (
+               partition by game_id
+               order by case when lower(provider_key) = 'consensus' then 0 else 1 end,
+                        provider_key
+           ) as rn
+    from core.fact_game_line
+    where spread_close is not null and total_close is not null
+      and spread_close <> 0 and total_close > 0
+)
+select g.game_id, g.season, g.week, g.start_date, g.home_team, g.away_team,
+       p.spread, p.total,
+       p.provider_key as spread_provider,
+       p.provider_key as total_provider,
+       g.home_points, g.away_points
+from core.fact_game g
+join pick p on p.game_id = g.game_id and p.rn = 1
+where g.season = any(?)
+  and g.home_points is not null
+  and g.away_points is not null
+order by g.season, g.start_date, g.game_id
+"""
+
+
+# Lines straight from stg.game_lines, which is what core.fact_game's
+# selected_* columns are derived from. Used because that derivation regressed:
+# on 2026-09-22 selected_total was NULL for every 2013-2016 game while the
+# staging rows were intact, which silently removed four seasons.
+#
+# Selection rule, fixed on principle BEFORE it was scored, because the rule is
+# worth several ROI points and must not be picked on the outcome:
+#   tier 0  consensus          -- the market aggregate pick_line was reaching for
+#   tier 1  a real sportsbook  -- a price that could actually have been taken
+#   tier 2  a projection site  -- numberfire / teamrankings, never tradeable
+# ...then by provider name, purely to make ties deterministic. Spread and total
+# are chosen per field, as core.fact_game does, so a consensus spread is kept
+# even when that provider published no total.
+#
+# period = 'game' is required: the table also carries firsthalf and
+# firstquarter rows, which are a different market.
+_QUERY_STG = """
+with lines as (
+    select l.gameId as game_id, p.name as provider, lower(p.name) as pkey,
+           l.spread, l.overUnder as total,
+           case when lower(p.name) = 'consensus' then 0
+                when lower(p.name) in ('teamrankings', 'numberfire') then 2
+                else 1 end as tier
+    from stg.game_lines l
+    join stg.lines_provider p on p.linesProviderId = l.linesProviderId
+    where l.period = 'game'
+),
+sp as (
+    select game_id, spread, provider,
+           row_number() over (partition by game_id order by tier, pkey) rn
+    from lines where spread is not null and spread <> 0
+),
+tt as (
+    select game_id, total, provider,
+           row_number() over (partition by game_id order by tier, pkey) rn
+    from lines where total is not null and total > 0
+)
+select g.game_id, g.season, g.week, g.start_date, g.home_team, g.away_team,
+       sp.spread, tt.total,
+       sp.provider as spread_provider, tt.provider as total_provider,
+       g.home_points, g.away_points
+from core.fact_game g
+join sp on sp.game_id = g.game_id and sp.rn = 1
+join tt on tt.game_id = g.game_id and tt.rn = 1
+where g.season = any(?)
+  and g.home_points is not null
+  and g.away_points is not null
+order by g.season, g.start_date, g.game_id
+"""
+
+
+def load_warehouse_frame(seasons, db=WAREHOUSE, lines="fact_game"):
     """Every gradeable game for `seasons`, one row each, deterministically
     ordered. Carries identity columns the 4-tuple contract drops, which is what
-    a reconciliation against the raw JSON needs."""
+    a reconciliation against the raw JSON needs.
+
+    coherent_pair=False (default, and the shipping path) takes
+    core.fact_game's selected_spread and selected_total.
+
+    coherent_pair=True requires one provider to supply both, consensus first.
+    It exists to measure how much the line-selection rule moves the result,
+    which is a lot -- its own ROI is inflated by an arbitrary tiebreak and is
+    not a reportable number.
+
+    The fallback when no provider carries both is ordered by provider_key,
+    where pick_line takes whichever book the CFBD JSON array happened to list
+    first. Those two orders are not the same, so a game with no consensus pair
+    can still differ between the sources.
+    """
     import duckdb
 
     # Read-only: the warehouse is ~5GB and a scheduled slate run may hold it.
     con = duckdb.connect(str(db), read_only=True)
     try:
-        return con.execute(_QUERY, [[int(s) for s in seasons]]).df()
+        query = {"game_lines": _QUERY_STG, "fact_game": _QUERY,
+                 "fact_game_line": _QUERY_PAIR}[lines]
+        return con.execute(query, [[int(s) for s in seasons]]).df()
     finally:
         con.close()
 
@@ -91,13 +200,52 @@ def _split_fav_dog(spread, home_pts, away_pts):
     return np.abs(spread).astype(float), fav, dog
 
 
-def load_warehouse_seasons(seasons, db=WAREHOUSE):
+def _assert_no_silent_gap(seasons, df, db):
+    """Fail loudly when a season has played games but no usable lines.
+
+    A season that returns zero rows does not raise on its own -- it simply
+    disappears from the returned dict, and the walk-forward then starts
+    `min_train` seasons later than intended and reports a smaller record that
+    looks entirely plausible. That happened on 2026-09-22: a core rebuild left
+    core.fact_game.selected_total NULL for 2013-2016 while the spreads and the
+    upstream stg.game_lines totals were intact, which would have moved the
+    first bet season from 2016 to 2020 without any error.
+    """
+    import duckdb
+
+    present = set(df["season"].unique().tolist()) if len(df) else set()
+    wanted = {int(s) for s in seasons}
+    missing = sorted(wanted - present)
+    if not missing:
+        return
+
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        played = dict(con.execute(
+            "select season, count(*) from core.fact_game"
+            " where season = any(?) and home_points is not null"
+            " group by 1", [missing]).fetchall())
+    finally:
+        con.close()
+
+    broken = {s: n for s, n in played.items() if n}
+    if broken:
+        detail = ", ".join(f"{s} ({n:,} played games)" for s, n in sorted(broken.items()))
+        raise RuntimeError(
+            "warehouse has played games but no usable spread+total for: "
+            f"{detail}. The season would vanish from the walk-forward silently. "
+            "Check core.fact_game.selected_total against stg.game_lines.overUnder "
+            "-- a partial stg->core build can null it out.")
+
+
+def load_warehouse_seasons(seasons, db=WAREHOUSE, lines="fact_game"):
     """dict season -> (spread_est, totals_est, fav_pts, dog_pts).
 
     Same contract, ordering rule and favourite convention as
     `models_v2.load_raw_seasons`, so the two are drop-in interchangeable.
     """
-    df = load_warehouse_frame(seasons, db)
+    df = load_warehouse_frame(seasons, db, lines)
+    _assert_no_silent_gap(seasons, df, db)
     out = {}
     for season, g in df.groupby("season", sort=True):
         se, fp, dp = _split_fav_dog(

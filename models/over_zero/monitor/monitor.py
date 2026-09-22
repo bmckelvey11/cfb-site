@@ -32,6 +32,45 @@ from models_v2 import (  # noqa: E402
 
 HURDLE = 0.5238
 
+SOURCES = ("warehouse", "raw")
+
+
+def load_games(seasons, source="warehouse"):
+    """Season dict from either source, same contract both ways.
+
+    "warehouse" reads core.fact_game in data/cfb.duckdb and is the default:
+    data/raw/lines_*.json is a replay log that gets backfilled in place, and
+    its line selection drops the consensus spread whenever CFBD published no
+    consensus total, falling back to a projection site's spread. The warehouse
+    picks each field separately and keeps the consensus spread on 60% of games
+    against raw's 38%.
+
+    This is not a tradeability improvement: both sources rest on projection
+    numbers for the same 23% of games (raw in both fields, the warehouse in
+    the total), and on 99.7% of those no book published both numbers at all.
+
+    Both sources are internally consistent; they differ because they select
+    lines differently, not because either is wrong. See
+    docs/warehouse-as-model-source-2026-09-22.md -- including the measured
+    sensitivity of ROI to that choice, which is large.
+    """
+    if source == "warehouse":
+        from warehouse_source import load_warehouse_seasons
+        return load_warehouse_seasons(seasons)
+    if source == "raw":
+        return load_from_raw(seasons)
+    raise ValueError(f"unknown source {source!r}; expected one of {SOURCES}")
+
+
+def add_source_arg(ap, default="warehouse"):
+    """The --source flag, identical across every monitor entry point.
+
+    Default is "warehouse": core.fact_game in data/cfb.duckdb. Pass
+    --source raw for the data/raw/lines_*.json path.
+    """
+    ap.add_argument("--source", choices=SOURCES, default=default,
+                    help="where game lines come from (default: %(default)s)")
+
 
 def _wilson(wins, n, z=1.96):
     """Wilson 95% CI for a binomial proportion."""

@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "v2"))
-from monitor import load_from_raw  # noqa: E402
+from monitor import SOURCES, load_games  # noqa: E402
 from run_walkforward import fit_train  # noqa: E402
 from models_v2 import censoring_bias, implied_team_points  # noqa: E402
 
@@ -123,6 +123,15 @@ def _self_check(s1, s2, probit):
 
 def main():
     args = [a.lstrip("-") for a in sys.argv[1:]]
+    # Hand-rolled argv here, not argparse, so the source token is pulled out
+    # by hand rather than through add_source_arg.
+    source = "warehouse"
+    for a in list(args):
+        if a.startswith("source="):
+            source = a.split("=", 1)[1]
+            args.remove(a)
+    if source not in SOURCES:
+        sys.exit(f"unknown source {source!r}; expected one of {SOURCES}")
     if args and args[0] == "self-check":
         vals = []
     else:
@@ -133,7 +142,7 @@ def main():
         if not vals or len(vals) % 2:
             sys.exit(__doc__)
 
-    data = load_from_raw(list(range(2013, 2026)))
+    data = load_games(list(range(2013, 2027)), source)
     years = sorted(data)
     se, te, fp, dp = (np.concatenate([data[y][k] for y in years])
                       for k in range(4))

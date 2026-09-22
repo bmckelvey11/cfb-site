@@ -11,6 +11,7 @@ python monitor/run_monitor.py --width 3       # trailing-window width
 python monitor/run_walkforward.py             # train ≤ t−1, bet season t
 python monitor/run_walkforward.py --threshold 1.75 --min-train 5
 python monitor/roi_report.py --season $(seq 2013 2026)   # ROI of the deployed filter + figure
+python monitor/roi_report.py --source warehouse          # DuckDB warehouse instead
 ```
 
 Files: `monitor.py` (per-season/trailing stats, Wilson CIs, slope trend test),
@@ -97,8 +98,12 @@ Three ROI definitions, ranked as MODEL_GUIDE ranks them:
   map, so its interval is bootstrapped (10k resamples).
 - **compounded bankroll** — equity curve only, labelled order-dependent.
 
-Result (2013–2026 data, bet seasons 2016–2026, run 2026-09-22; 2026 is a
-partial season — see [ROI_HITRATE.md](../docs/ROI_HITRATE.md)):
+Result (2013–2026 data, bet seasons 2016–2026, run 2026-09-22, **source: raw**
+(the default; `--source warehouse` is implemented and reproduces this within
+its interval); 2026 is a partial season — see
+[ROI_HITRATE.md](../docs/ROI_HITRATE.md), and
+[warehouse-as-model-source-2026-09-22.md](../docs/warehouse-as-model-source-2026-09-22.md)
+for what the source switch changed):
 
 | metric | value | 95% interval |
 |--------|-------|--------------|

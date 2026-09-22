@@ -34,7 +34,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "v2"))
-from monitor import _wilson, load_from_raw  # noqa: E402
+from monitor import _wilson, load_games, add_source_arg  # noqa: E402
 from run_walkforward import HURDLE  # noqa: E402
 from bias_bins import BIN_EDGES  # noqa: E402
 from roi_report import (  # noqa: E402
@@ -382,6 +382,7 @@ def _partial_note(data, years):
 
 def main():
     ap = argparse.ArgumentParser()
+    add_source_arg(ap)
     ap.add_argument("--season", type=int, nargs="+",
                     default=list(range(2013, 2026)))
     ap.add_argument("--min-train", type=int, default=3)
@@ -396,7 +397,7 @@ def main():
         _self_check()
         return
 
-    data = load_from_raw(args.season)
+    data = load_games(args.season, args.source)
     years = sorted(data)
     if len(years) <= args.min_train:
         sys.exit(f"Need > {args.min_train} seasons; have {len(years)}.")
@@ -431,7 +432,7 @@ def main():
         "recent_from": recent_from,
         "recent_share": sum(r["n"] for r in live
                             if int(r["label"]) >= recent_from) / n,
-        "provenance": _provenance(years, args.min_train, args.threshold, n),
+        "provenance": _provenance(years, args.min_train, args.threshold, n, args.source),
         "season_arg": " ".join(str(y) for y in years),
         # A season still being played grades far fewer games than a finished
         # one, and its row moves every week. Flag it rather than let the
