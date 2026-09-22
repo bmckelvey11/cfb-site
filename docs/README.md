@@ -52,6 +52,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [stg-gql-collapse-2026-09-10.md](stg-gql-collapse-2026-09-10.md) | Collapsing `stg_gql` into `stg` |
 | [warehouse-containment-remeasure-2026-09-10.md](warehouse-containment-remeasure-2026-09-10.md) | Containment after the relation-key repair |
 | [warehouse-drop-superseded-2026-09-10.md](warehouse-drop-superseded-2026-09-10.md) | Dropping Bucket A REST sides and 7 dead columns |
+| [warehouse-combine-candidates-2026-09-22.md](warehouse-combine-candidates-2026-09-22.md) | Which `stg` tables hold one concept under different names, and which should be combined |
 | [team-name-mapping-2026-09-10.md](team-name-mapping-2026-09-10.md) | Do the four vendor name maps need consolidating? |
 | [graphql-dump-staleness-2026-09-11.md](graphql-dump-staleness-2026-09-11.md) | How stale are the GraphQL dumps? |
 | [cfb-warehouse-dive-2026-09-16.md](cfb-warehouse-dive-2026-09-16.md) | Can `md:cfb` be browsed from a saved MotherDuck Dive, and what does the mirror hold? |
