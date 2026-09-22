@@ -1086,8 +1086,17 @@ def test_an_children_are_flat_and_the_generic_recursion_leaves_them_alone(tmp_pa
                             "linescore": [
                                 {"id": 1, "abbr": "1", "home_points": 7,
                                  "away_points": 3}
-                            ]
+                            ],
+                            "latest_odds": {
+                                "game": {"spread_home": -3.5, "total": 48.5,
+                                         "ml_home": -160},
+                                "firsthalf": {"spread_home": -1.5},
+                            },
                         },
+                        "ranks": [{"poll": "AP25", "rank": 13, "team_id": 1}],
+                        "last_play": {"clock": "0:00", "possession": 1,
+                                      "text": "End of Game", "type": "game_over",
+                                      "home_win_pct": 1.0},
                         "teams": [
                             {"id": 1, "abbr": "AAA", "location": "Alpha",
                              "standings": {"win": 3, "loss": 1}},
@@ -1122,7 +1131,10 @@ def test_an_children_are_flat_and_the_generic_recursion_leaves_them_alone(tmp_pa
             "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'stg'"
         ).fetchall()
     }
-    assert {"an_scoreboard", "an_market", "an_team", "an_linescore"} <= tables
+    assert {
+        "an_scoreboard", "an_market", "an_team", "an_linescore",
+        "an_rank", "an_last_play", "an_latest_odds",
+    } <= tables
     assert not [t for t in tables if t.startswith("an_scoreboard__")]
 
     cols = [row[0] for row in con.execute("DESCRIBE stg.an_market").fetchall()]
@@ -1144,6 +1156,16 @@ def test_an_children_are_flat_and_the_generic_recursion_leaves_them_alone(tmp_pa
     assert con.execute(
         "SELECT period_id, home_points, away_points FROM stg.an_linescore"
     ).fetchone() == (1, 7, 3)
+    assert con.execute(
+        "SELECT event_id, poll, rank, team_id FROM stg.an_rank"
+    ).fetchall() == [(100, "AP25", 13, 1)]
+    assert con.execute(
+        "SELECT play_type, text, possession, home_win_pct FROM stg.an_last_play"
+    ).fetchall() == [("game_over", "End of Game", 1, 1.0)]
+    assert con.execute(
+        "SELECT period, spread_home, total, ml_home FROM stg.an_latest_odds"
+        " ORDER BY period"
+    ).fetchall() == [("firsthalf", -1.5, None, None), ("game", -3.5, 48.5, -160)]
 
 
 def test_massey_csvs_load_into_stg_with_a_real_date(tmp_path):

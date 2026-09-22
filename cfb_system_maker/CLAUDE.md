@@ -123,8 +123,9 @@ in `stg` under its bare name — optional `stg` explode / `--flatten-nested`). S
 - **Action Network staging:** all `an_*`. `stg.an_history` (1H/1Q) and `stg.an_market`
   (full game, from the scoreboard's `markets`) are the same 19-column grain — one offering per
   event, book, period, market and side. `stg.an_scoreboard` is one row per game and carries
-  the score, status and matchup those two join back to on `event_id`. `stg.an_team` and
-  `stg.an_linescore` are its other children. Generic explode is wrong for all of them: it
+  the score, status and matchup those two join back to on `event_id`. `stg.an_team`,
+  `stg.an_linescore`, `stg.an_rank`, `stg.an_last_play` and `stg.an_latest_odds` (event ×
+  period) are its other children — one per nested column, so none is left as JSON. Generic explode is wrong for all of them: it
   repeats the walked path on every column and carries down 36 parent scalars, so each is
   hand-written. Nothing under `an_scoreboard` goes through `explode_stg_lists`.
 - **Action Network movement:** every table above is a **snapshot** — one closing price per

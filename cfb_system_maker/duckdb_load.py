@@ -1808,7 +1808,9 @@ def _explode_an_scoreboard(
 # and repeats that path on every column, so one spread price arrived as a
 # 62-character column inside a 62-column table. See
 # ``docs/warehouse-schema-recommendation.md`` §8.
-_AN_CHILDREN = ("an_market", "an_team", "an_linescore")
+_AN_CHILDREN = (
+    "an_market", "an_team", "an_linescore", "an_rank", "an_last_play", "an_latest_odds",
+)
 
 
 def explode_an_children(
@@ -1816,11 +1818,12 @@ def explode_an_children(
     *,
     progress: Callable[[TableLoad], None] | None = None,
 ) -> list[TableLoad]:
-    """Build ``stg.an_market`` / ``an_team`` / ``an_linescore``.
+    """Build every ``stg.an_scoreboard`` child: one per nested JSON column.
 
-    ``latest_odds``, ``ranks`` and ``last_play`` stay unexploded JSON on
-    ``stg.an_scoreboard``: the first duplicates ``an_market``, the second
-    duplicates CFBD rankings, and the third is live in-game state.
+    ``an_latest_odds`` largely duplicates ``an_market`` (AN's own summary line per
+    period), ``an_rank`` duplicates CFBD rankings, and ``an_last_play`` is the
+    scrape-time in-game state -- for a finished game, the final play. They are
+    exploded anyway so no scoreboard column is left as JSON.
     """
     have = {
         row[0]
@@ -1835,6 +1838,9 @@ def explode_an_children(
         ("an_market", _AN_MARKET_SQL),
         ("an_team", _AN_TEAM_SQL),
         ("an_linescore", _AN_LINESCORE_SQL),
+        ("an_rank", _AN_RANK_SQL),
+        ("an_last_play", _AN_LAST_PLAY_SQL),
+        ("an_latest_odds", _AN_LATEST_ODDS_SQL),
     ):
         target = _qualify("stg", dest)
         try:
@@ -1913,6 +1919,65 @@ _AN_LINESCORE_SQL = """
             FROM stg.an_scoreboard AS t,
               UNNEST(json_transform(t.linescore, '["JSON"]')) AS u(x)
             WHERE t.linescore IS NOT NULL
+"""
+
+_AN_RANK_SQL = """
+            SELECT
+              t.event_id,
+              t.season,
+              t.week,
+              json_extract_string(x, '$.poll') AS poll,
+              TRY_CAST(json_extract(x, '$.rank') AS INTEGER) AS rank,
+              TRY_CAST(json_extract(x, '$.team_id') AS BIGINT) AS team_id,
+              t._source_file
+            FROM stg.an_scoreboard AS t,
+              UNNEST(json_transform(t.ranks, '["JSON"]')) AS u(x)
+            WHERE json_type(t.ranks) = 'ARRAY'
+"""
+
+# One row per event. `type` is renamed: it is a play type, not a column type.
+_AN_LAST_PLAY_SQL = """
+            SELECT
+              t.event_id,
+              t.season,
+              t.week,
+              json_extract_string(t.last_play, '$.type') AS play_type,
+              json_extract_string(t.last_play, '$.text') AS text,
+              json_extract_string(t.last_play, '$.clock') AS clock,
+              TRY_CAST(json_extract(t.last_play, '$.possession') AS BIGINT) AS possession,
+              TRY_CAST(json_extract(t.last_play, '$.home_win_pct') AS DOUBLE) AS home_win_pct,
+              TRY_CAST(
+                json_extract(t.last_play, '$.home_spread_win_pct') AS DOUBLE
+              ) AS home_spread_win_pct,
+              TRY_CAST(json_extract(t.last_play, '$.over_win_pct') AS DOUBLE) AS over_win_pct,
+              t._source_file
+            FROM stg.an_scoreboard AS t
+            WHERE json_type(t.last_play) = 'OBJECT'
+"""
+
+# Keyed by period (`game`, `firsthalf`, ... `live`), so the key becomes a column.
+_AN_LATEST_ODDS_SQL = """
+            SELECT
+              t.event_id,
+              t.season,
+              t.week,
+              p.key AS period,
+              json_extract_string(p.value, '$.type') AS odds_type,
+              TRY_CAST(json_extract(p.value, '$.spread_home') AS DOUBLE) AS spread_home,
+              TRY_CAST(json_extract(p.value, '$.spread_home_line') AS INTEGER)
+                AS spread_home_line,
+              TRY_CAST(json_extract(p.value, '$.spread_away') AS DOUBLE) AS spread_away,
+              TRY_CAST(json_extract(p.value, '$.spread_away_line') AS INTEGER)
+                AS spread_away_line,
+              TRY_CAST(json_extract(p.value, '$.total') AS DOUBLE) AS total,
+              TRY_CAST(json_extract(p.value, '$.over') AS INTEGER) AS "over",
+              TRY_CAST(json_extract(p.value, '$.under') AS INTEGER) AS "under",
+              TRY_CAST(json_extract(p.value, '$.ml_home') AS INTEGER) AS ml_home,
+              TRY_CAST(json_extract(p.value, '$.ml_away') AS INTEGER) AS ml_away,
+              t._source_file
+            FROM stg.an_scoreboard AS t, json_each(t.latest_odds) AS p
+            WHERE json_type(t.latest_odds) = 'OBJECT'
+              AND json_type(p.value) = 'OBJECT'
 """
 
 

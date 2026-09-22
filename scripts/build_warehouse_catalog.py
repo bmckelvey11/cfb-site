@@ -91,6 +91,7 @@ CORE_NOTES = {
     "fact_poll_rank": "Poll ballot: season × week × poll × team, rank and points",
     "fact_drive_postgame": "One drive: result, yards, plays, start/end field position",
     "coach_name_conflicts": "Audit: one name, several coach ids",
+    "coach_name_conflicts__coach_ids": "Audit: one name, several coach ids, one row per id",
     "coach_season_unmatched": "Audit: coach seasons that would not join",
     "fact_game_line_conflicts": "Audit: REST and GraphQL disagree on a line",
     "game_projections": "Per-site projected spread and total (teamrankings, numberfire)",

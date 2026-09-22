@@ -69,7 +69,7 @@ def build_core(
         # Bucket C/B merges (rationalization plan step 3). Each is guarded and skipped when
         # its sources are absent, so a partial warehouse still rebuilds.
         if _build_dim_coach(con):
-            built += ["dim_coach", "coach_name_conflicts"]
+            built += ["dim_coach", "coach_name_conflicts", "coach_name_conflicts__coach_ids"]
         if _build_dim_draft_pick(con):
             built.append("dim_draft_pick")
         if _build_dim_recruit(con):
@@ -1047,6 +1047,14 @@ def _build_dim_coach(con: duckdb.DuckDBPyConnection) -> bool:
         SELECT first_name, last_name, count(*) AS coach_count,
                list(coach_id ORDER BY coach_id) AS coach_ids
         FROM core.dim_coach GROUP BY 1, 2 HAVING count(*) > 1
+    """)
+    # The same audit at one row per id, so no core column is left as a list.
+    con.execute("DROP TABLE IF EXISTS core.coach_name_conflicts__coach_ids")
+    con.execute("""
+        CREATE TABLE core.coach_name_conflicts__coach_ids AS
+        SELECT first_name, last_name, unnest(coach_ids) AS coach_id,
+               unnest(generate_series(1, len(coach_ids))) AS coach_ids_idx
+        FROM core.coach_name_conflicts
     """)
     return True
 

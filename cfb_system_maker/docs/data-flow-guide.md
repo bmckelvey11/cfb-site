@@ -166,7 +166,8 @@ the old file intact.
 
 1. Generic: each `raw` payload is typed with `json_group_structure` and unnested into `stg`.
 2. Action Network children, hand-written not generic: `an_scoreboard` → `an_market`,
-   `an_team`, `an_linescore`; `an_history` and `an_history_tick` from the flattened CSV.
+   `an_team`, `an_linescore`, `an_rank`, `an_last_play`, `an_latest_odds` (one per nested
+   JSON column); `an_history` and `an_history_tick` from the flattened CSV.
    `an_scoreboard` is exploded one weekly file per statement to stay under the memory limit.
 3. `null_nan_values`: any `stg` JSON column whose values are all numbers or `"NaN"` becomes
    `DOUBLE` with NaN nulled; existing `DOUBLE` columns get NaN nulled. Runs before the
