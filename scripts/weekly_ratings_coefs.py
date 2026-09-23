@@ -13,8 +13,6 @@ import json
 
 import pandas as pd
 
-from cfb_paths import PROCESSED
-
 TEAM_SEASON = 2025
 MIN_GAMES = 3
 LEAGUE = ["mu", "nu", "h", "c"]
@@ -29,6 +27,8 @@ def md(df: pd.DataFrame) -> str:
 
 
 def main() -> int:
+    from cfb_paths import PROCESSED
+
     out = PROCESSED / "ratings"
     ev = json.loads((out / "weekly_ratings_eval.json").read_text(encoding="utf-8"))
     snap = pd.read_csv(out / "weekly_ratings_snapshots.csv")

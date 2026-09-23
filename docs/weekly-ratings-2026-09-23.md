@@ -25,13 +25,14 @@ information about where the total lands.
 - **Beats both baselines.** Ridge is 1.14 points closer than raw and 0.84 closer than the
   train mean, in all five seasons, and still at half or double the penalty.
 - **Trails the open.** Ridge is 0.33 points further from the total in all five seasons,
-  and when it disagrees with the open the total does not follow it (slope $b$ = 0.03).
+  and its disagreement with the open carries no detectable information (slope $b$ = 0.03,
+  −0.13 to 0.20; a weak null, see the last section).
 - **Weak early.** When a team has fewer than three games, ridge cannot be told apart from
   the mean, trails the open by 0.65 and runs 1.36 points low. Priors (step 4) are the fix
   to test.
-- **Fitted values.** League average is about 2.2 points per possession and 11.5–12.1
-  possessions per team. The home edge is worth 2.5–4.2 points of margin and cancels in the
-  total. One standard deviation of a team's offense or defense rating is about 0.45 points
+- **Fitted values, at season end.** League average is about 2.2 points per possession and
+  11.5–12.1 possessions per team. The home edge is worth 2.5–4.2 points of margin (larger
+  in early-season fits) and cancels in the total. One standard deviation of a team's offense or defense rating is about 0.45 points
   per possession, roughly 5 points a game ([Fitted coefficients](#fitted-coefficients)).
 - **Not a betting result.** This measures forecast error only. There is no price and no
   capture time, and no wager is graded.
@@ -208,7 +209,7 @@ JSON keys below sit under `results.primary` or `results.early` unless they start
 | $\lambda_{\text{PPP}}$ | offense/defense penalty | possessions | `lam_ppp`, grid `LAMBDA_PPP_GRID` | CSV `lambda_ppp`; JSON `tuning.ppp` |
 | $\lambda_{\text{pace}}$ | pace penalty | games | `lam_pace`, grid `LAMBDA_PACE_GRID` | CSV `lambda_pace`; JSON `tuning.pace` |
 | — | games behind a rating | games | `_evidence()` | CSV `n_games` |
-| — | fewer of the two teams' prior games; primary if ≥ 3 | games | `min_prior_games`, `MIN_PRIOR_GAMES` | JSON `populations` |
+| — | fewer of the two teams' prior games; primary if ≥ 3 | games | `min_prior_games`, `MIN_PRIOR_GAMES` | JSON `results.populations` |
 | $T_g$ | actual total | points | `total` | — |
 | $L_g$ | Bovada open label | points | `load_opens()`: `overUnderOpen` → `open` | JSON `market` |
 | $\widehat{T}^{F}_g$ | forecast $F$'s total | points | `forecast_total()`; columns `open`, `mean`, `raw`, `ridge`, `ridge_x0.5`, `ridge_x2` | JSON `accuracy_pooled.<F>` |
