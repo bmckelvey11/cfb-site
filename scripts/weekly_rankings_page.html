@@ -122,7 +122,7 @@ footer b { color: var(--text); font-weight: 600; }
           <th class="num" scope="col" title="FBS-vs-FBS games behind the rating">G</th>
           <th class="num" scope="col" data-key="O"><button type="button">Offense</button></th>
           <th class="num" scope="col" data-key="D"><button type="button">Defense</button></th>
-          <th class="num" scope="col" data-key="P"><button type="button">Pace</button></th>
+          <th class="num" scope="col" data-key="P"><button type="button">Volume</button></th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -132,11 +132,12 @@ footer b { color: var(--text); font-weight: 600; }
   <footer>
     <p><b>Offense</b> is points per possession above the league average; + is better.
       <b>Defense</b> is points per possession allowed against the average; − is better.
-      <b>Pace</b> is possessions per team per game against the average; + is faster.
+      <b>Volume</b> is possessions per team per game against the average; + is more. Long scoring
+      drives use up possessions, so an efficient offense can rank low here.
       Each cell shows the rank, the rating, and the move since the previous week.</p>
     <p>Ratings adjust for opponents and are pulled toward league average until a team has several
       games: a team's own results get half the weight after about three games for offense and
-      defense and eight for pace. Grey rows have fewer than three games. Method: ridge_v1,
+      defense and eight for volume. Grey rows have fewer than three games. Method: ridge_v1,
       λ 40 possessions and 8 games, fit on completed FBS-vs-FBS regular-season games.</p>
     <p id="stamp"></p>
   </footer>
@@ -208,7 +209,7 @@ function render() {
 
   const best = (k) => wk.rows.find((r) => r[IDX[k] + 1] === 1);
   $("chips").replaceChildren(chip("Best offense", best("O"), "O", wk), chip("Best defense", best("D"), "D", wk),
-    chip("Fastest pace", best("P"), "P", wk));
+    chip("Most volume", best("P"), "P", wk));
 
   document.querySelectorAll("th[data-key]").forEach((th) =>
     th.setAttribute("aria-sort", th.dataset.key === sortKey ? "ascending" : "none"));

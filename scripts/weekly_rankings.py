@@ -1,4 +1,4 @@
-"""Weekly offense, defense and pace rankings from the `ridge_v1` ratings.
+"""Weekly offense, defense and volume rankings from the `ridge_v1` ratings.
 
     python -m scripts.weekly_rankings                 # latest season with a games file
     python -m scripts.weekly_rankings --season 2025
@@ -9,7 +9,8 @@ FBS-vs-FBS regular-season games through that week, and ranks every team:
 
     offense  O descending   1 = most points per possession above average
     defense  D ascending    1 = fewest allowed (the most negative D)
-    pace     P descending   1 = most possessions per game
+    volume   P descending   1 = most possessions per game (labelled "Volume": a sustained-
+                            drive offense has few of them, so this is not tempo)
 
 Ratings only: no forecast is scored against a result, so this never touches the 2026
 prior_v3 confirmation. Writes data/processed/ratings/rankings/<season>.csv (every week),
@@ -69,17 +70,18 @@ def week_markdown(season: int, week: int, r: Ratings, t: pd.DataFrame,
     rows = [f"| {i + 1} | " + " | ".join(f"{cols[c].index[i]} | {cols[c][c].iloc[i]:+.2f}"
                                          for c in RANK_ORDER) + " |" for i in range(len(t))]
     return "\n".join([
-        f"# {season} offense, defense and pace rankings through week {week}", "",
+        f"# {season} offense, defense and volume rankings through week {week}", "",
         f"`ridge_v1` (λ 40 possessions, 8 games) fit on {fit} of the {scheduled} FBS-vs-FBS "
         f"regular-season games scheduled through week {week}; the rest are not completed or "
         f"failed the drive-count gate. League average: {r.mu:.2f} points per possession, "
         f"{r.nu:.1f} possessions per team.", "",
         "- **Offense** $O$: points per possession above average. + is better.",
         "- **Defense** $D$: points per possession allowed vs average. − is better.",
-        "- **Pace** $P$: possessions per team per game vs average. + is faster.", "",
+        "- **Volume** $P$: possessions per team per game vs average. + is more. Long scoring "
+        "drives use up possessions, so an efficient offense can rank low here.", "",
         "Ratings are pulled toward 0 until a team has several games, so early weeks rank "
         "thin evidence. Method: `docs/weekly-ratings-2026-09-23.md`.", "",
-        "| Rank | Offense | $O$ | Defense | $D$ | Pace | $P$ |",
+        "| Rank | Offense | $O$ | Defense | $D$ | Volume | $P$ |",
         "| ---: | --- | ---: | --- | ---: | --- | ---: |",
         *rows, ""])
 
