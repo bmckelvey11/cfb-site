@@ -1,6 +1,9 @@
 # Release F, experiment F1: dynamic ratings vs weekly ridge — design
 
-**Status:** declared 2026-09-23, before any tuning, screening, or confirmation code ran.
+**Status:** declared 2026-09-23 (`096a3e24`), before any tuning, screening, or confirmation
+code ran. Tuned and frozen (`89eef2f8`). **Stopped at stop rule 2**: on the screen,
+`kalman_v1` − `ridge_v1` is *worse* (+0.08 MAE). No 2026 look. Result:
+[`../../dynamic-ratings-2026-09-23.md`](../../dynamic-ratings-2026-09-23.md).
 **Plan of record:** [`../../model-tuning-lab-plan.md`](../../model-tuning-lab-plan.md) §40
 Release F and §39 ("Dynamic Bayesian ratings"). One frontier family at a time.
 **Builds on:** Release B's `ridge_v1` ([`../../weekly-ratings-2026-09-23.md`](../../weekly-ratings-2026-09-23.md)):

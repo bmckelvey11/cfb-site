@@ -2505,6 +2505,13 @@ fit_fold(train, test, run_spec) -> FoldResult
 
 Run only one frontier hypothesis family at a time, with a preregistered baseline, budget, outer test, and failure rule. Negative results remain first-class artifacts.
 
+**F1, dynamic Kalman ratings (2026-09-23): null, stopped at the screen gate.**
+
+- Declared: [`superpowers/specs/2026-09-23-tuning-lab-release-f-dynamic-ratings-design.md`](superpowers/specs/2026-09-23-tuning-lab-release-f-dynamic-ratings-design.md).
+- Result: [`dynamic-ratings-2026-09-23.md`](dynamic-ratings-2026-09-23.md).
+- A week-to-week random walk on `ridge_v1`'s ratings is 0.08 MAE worse on 2021–25, in every season. Recency decay picks no decay.
+- The 2026 weeks 9+ confirmation does not run. The next family needs its own declaration.
+
 ---
 
 ## 41. Definition of done

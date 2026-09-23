@@ -1,0 +1,35 @@
+{
+  "candidate": "kalman_v1",
+  "generated_at": "2026-09-23T13:35:20+00:00",
+  "frozen_sha256": "5e63827fcbb60fb5da7b4dee8a7bffa0f17c25b7e0c56f394749accbf68e5750",
+  "populations": {
+    "primary": 2618,
+    "early": 862
+  },
+  "confirmation_power": {
+    "games_2025_w9plus": 351,
+    "clusters_2025_w9plus": 8,
+    "mde80_projected": 0.1631
+  },
+  "gate": {
+    "kalman_vs_ridge_v1": "worse",
+    "kalman_vs_ridge_x0.5_diff": -0.1679,
+    "pass": false
+  },
+  "kalman_vs_ridge_v1": {
+    "diff": 0.08,
+    "ci95": [
+      0.0398,
+      0.1225
+    ],
+    "mde80": 0.059,
+    "by_season": {
+      "2021": 0.1098,
+      "2022": 0.0844,
+      "2023": 0.0317,
+      "2024": 0.0934,
+      "2025": 0.0816
+    },
+    "verdict": "worse"
+  }
+}
