@@ -54,13 +54,19 @@ pushd "%REPO%"
 if errorlevel 1 echo ---- weekly_rankings exited %ERRORLEVEL% ---->> "%LOG%"
 
 REM Release E shadow ledger (models/tuning/shadow.py): snapshot the next week between weeks,
-REM score finished games, write status.md. Needs the main .venv (pydantic 2, optuna,
-REM sklearn), not the fetch venv. Reads raw files only and never changes RC.
+REM score finished games, write status.md. Reads raw files only and never changes RC.
+REM The code is the detached worktree ..\cfb-shadow-pin (pinned for the 2026 weeks 5-8
+REM period), not this working tree, so edits here cannot change live predictions
+REM mid-period. Python is the main .venv (pydantic 2, optuna, sklearn), not the fetch venv.
 REM No ( ) block: %ERRORLEVEL% inside one would expand before the tick runs.
 set "SHADOW_PY=%REPO%\.venv\Scripts\python.exe"
-set "SHADOW_SPEC=%REPO%\models\tuning\specs\shadow_2026_w05_08.json"
-if not exist "%SHADOW_PY%" echo ---- shadow tick skipped: no .venv ---->> "%LOG%"
-if exist "%SHADOW_PY%" "%SHADOW_PY%" -u -m models.tuning shadow tick --spec "%SHADOW_SPEC%">> "%LOG%" 2>&1
-if exist "%SHADOW_PY%" if errorlevel 1 echo ---- shadow tick exited %ERRORLEVEL% ---->> "%LOG%"
+set "SHADOW_TREE=%REPO%\..\cfb-shadow-pin"
+set "SHADOW_OK=0"
+if exist "%SHADOW_PY%" if exist "%SHADOW_TREE%\models\tuning\shadow.py" set "SHADOW_OK=1"
+if "%SHADOW_OK%"=="0" echo ---- shadow tick skipped: no .venv or no pinned tree ---->> "%LOG%"
+if "%SHADOW_OK%"=="1" pushd "%SHADOW_TREE%"
+if "%SHADOW_OK%"=="1" "%SHADOW_PY%" -u -m models.tuning shadow tick --spec "models\tuning\specs\shadow_2026_w05_08.json">> "%LOG%" 2>&1
+if "%SHADOW_OK%"=="1" if errorlevel 1 echo ---- shadow tick exited %ERRORLEVEL% ---->> "%LOG%"
+if "%SHADOW_OK%"=="1" popd
 popd
 exit /b %RC%
