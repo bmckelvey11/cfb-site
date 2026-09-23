@@ -2325,7 +2325,8 @@ Allow pinning runs and comparing only compatible experiments. Block or clearly w
 - It compares two tuning runs game by game on their shared outer folds.
 - It blocks the comparison unless source, snapshot, target, population, decision time and folds all match.
 - It reports the paired MAE difference with the season-week bootstrap and verdict, the per-season differences, and each game's delta.
-- There is no pinning yet, and no line-timestamp or provider check, because no run uses a timestamped line.
+- Runs are pinned on the Runs page. With two or more pinned, Compare offers only those. Pins last for the browser session and are not saved.
+- There is no line-timestamp or provider check, because no run uses a timestamped line.
 
 ### 37.4 Scenario explorer
 

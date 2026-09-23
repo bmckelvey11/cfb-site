@@ -207,8 +207,12 @@ elif page == "Distributions":
 elif page == "Compare":
     st.title("Compare runs")
     st.caption("Plan §37.3. Two tuning runs, game by game on their shared outer folds. Blocked "
-               "unless source, snapshot, target, population, decision time, and folds match.")
+               "unless source, snapshot, target, population, decision time, and folds match. "
+               "Pin runs on the Runs page to narrow the choice.")
     tuned = [p for p in md.run_dirs(LAB) if (p / "predictions.csv").exists() and (p / "run_spec.json").exists()]
+    pinned = [p for p in tuned if p.name in st.session_state.get("pins", set())]
+    if len(pinned) >= 2 and st.toggle(f"Only the {len(pinned)} pinned runs", value=True):
+        tuned = pinned
     if len(tuned) < 2:
         st.info(f"{len(tuned)} tuning run(s) published; a comparison needs two.")
         st.stop()
@@ -499,6 +503,12 @@ elif page == "Runs":
         st.caption("No published runs.")
         st.stop()
     run = st.selectbox("Run", runs, format_func=lambda p: p.name)
+    pins = st.session_state.setdefault("pins", set())  # ponytail: per session, not saved to disk
+    if (run / "predictions.csv").exists() and (run / "run_spec.json").exists():
+        if st.checkbox("Pinned for Compare", value=run.name in pins, key=f"pin:{run.name}"):
+            pins.add(run.name)
+        else:
+            pins.discard(run.name)
     tabs = st.tabs(["Card", "Trials", "Comparisons", "Spec"])
     card = run / "card.md"
     tabs[0].markdown(card.read_text(encoding="utf-8") if card.exists() else "_No card._")
