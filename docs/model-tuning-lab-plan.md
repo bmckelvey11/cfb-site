@@ -2481,7 +2481,13 @@ fit_fold(train, test, run_spec) -> FoldResult
 
 - Design: [`superpowers/specs/2026-09-23-tuning-lab-release-e-design.md`](superpowers/specs/2026-09-23-tuning-lab-release-e-design.md).
 - Shadow `shadow-3be5383c3469` covers 2026 weeks 5–8, with week 4 as a rehearsal. Its champion is `ridge_v1_total`; its challenger is `run-de1927346ab0` plus `dist-0b0cc0382eca`, frozen in `dd9724b5`.
-- An append-only, hash-chained ledger records every snapshot, prediction, and score. The daily refresh (`scripts/refresh_cfbd.cmd`) runs `shadow tick`.
+- An append-only, hash-chained ledger records every snapshot, prediction, and score. The daily refresh (`scripts/refresh_cfbd.cmd`, 05:00 ET, while logged on) runs `shadow tick` from the code pinned in the detached worktree `../cfb-shadow-pin` at `7f155f45`.
+- **Snapshot windows (ET):**
+  - Week 5: Sun 9/27 – Thu 10/1.
+  - Week 6: Mon 10/5 – Tue 10/6.
+  - Week 7: Sun 10/11 – Tue 10/13.
+  - Week 8: Sun 10/18 – Tue 10/20.
+  - A window with no run is a missed week, which means NO-GO.
 - Status: `$CFB_DATA_ROOT/processed/tuning/shadow/shadow-3be5383c3469/status.md`.
 - **The verdict is written to the ledger** once every week 5–8 game is scored or no-action.
 - **Parity check:** live features equal the historical path's on three past weeks, to within 1e-9.

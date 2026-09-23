@@ -13,6 +13,7 @@ Design (period, frozen artifacts, counting rules):
 | 3. Shadow spec, freeze, tick, alias, status (`shadow_spec.py`, `shadow.py`) | Done 2026-09-23 (`624a6f09`): 7 synthetic lifecycle tests |
 | 4. Arm: commit spec and freeze JSON; week 4 rehearsal snapshot | Done 2026-09-23: freeze `dd9724b5`; armed 11:18Z, week 4 snapshot of 58 games fit on 156; chain ok |
 | 5. Daily step in `refresh_cfbd.cmd`; docs | Done 2026-09-23 (`ebfb4f81`); plan-of-record status |
+| 5b. Counting fixes before the period (`7f155f45`); tick pinned to worktree `../cfb-shadow-pin` (`6ecb0aa3`) | Done 2026-09-23: stuck games block 36 h, not 10 days; the timing check reads the week's decision time; postponed games are no-action; unscheduled games are logged |
 | 6. Period verdict after week 8 (~2026-10-26), written by `tick` | waiting on the calendar |
 
 ## Global constraints
