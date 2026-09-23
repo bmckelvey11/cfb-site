@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "spec_id": "total_ratings_v1",
+  "created_at": "2026-09-23T00:00:00Z",
+  "created_by": "claude+mckel",
+  "notes": "Holdout status: outer seasons 2021-2025 were already used as a holdout by Release B and the priors work, so the outer numbers are descriptive, not new evidence; 2026 is the untouched season. Tuning uses inner folds 2015-2019 only.",
+  "dataset": {
+    "source": "cfb_release_b",
+    "snapshot": "release_b_ridge_v1_2026-09-23",
+    "seasons": [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+  },
+  "feature_set": {
+    "feature_set_id": "total_ratings_v1",
+    "version": 1,
+    "features": [
+      {"id": "rv1_off_home", "version": 1, "availability_class": "historical_replayable"},
+      {"id": "rv1_def_home", "version": 1, "availability_class": "historical_replayable"},
+      {"id": "rv1_pace_home", "version": 1, "availability_class": "historical_replayable"},
+      {"id": "rv1_off_away", "version": 1, "availability_class": "historical_replayable"},
+      {"id": "rv1_def_away", "version": 1, "availability_class": "historical_replayable"},
+      {"id": "rv1_pace_away", "version": 1, "availability_class": "historical_replayable"},
+      {"id": "rv1_total", "version": 1, "availability_class": "historical_replayable"},
+      {"id": "min_prior_games", "version": 1, "availability_class": "historical_replayable"},
+      {"id": "neutral", "version": 1, "availability_class": "historical_replayable"}
+    ]
+  },
+  "folds": {
+    "inner_test_seasons": [2015, 2016, 2017, 2018, 2019],
+    "outer_test_seasons": [2021, 2022, 2023, 2024, 2025],
+    "exclude_seasons": [2020]
+  },
+  "search": {
+    "profile_id": "cfb_regularized_regression_v1",
+    "n_trials": 60,
+    "objective": "mae",
+    "sampler": {"n_startup_trials": 20},
+    "pruner": {"n_startup_trials": 20, "n_warmup_steps": 2},
+    "max_retry": 2
+  },
+  "acceptance": {
+    "baselines": ["market_open", "past_mean", "ridge_v1_total"],
+    "bias_tolerance": 1.0,
+    "max_features": 20
+  },
+  "seeds": {"split": 0, "model": 0, "sampler": 42}
+}
