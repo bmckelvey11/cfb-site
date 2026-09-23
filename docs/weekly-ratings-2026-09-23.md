@@ -127,6 +127,11 @@ cannot tell. Ridge − open +0.65 (+0.21 to +1.13). Ridge's early bias is −1.3
 - **No betting value.** This is forecast error of a point total against a labeled vendor
   number with no capture time and no price ([Release A](pregame-replay-2026-09-22.md)). It
   grades no wager and supports no return, cover-rate or closing-line claim.
+- **Not "−0.84 against the mean is all team-rating skill".** The pooled mean carries a
+  +2.23 bias from scoring drift since 2014, and ridge uses current-season league levels, so
+  part of that gap is a level correction. Ridge − raw (same league levels, −1.14) is the
+  comparison that isolates adjustment and shrinkage. A current-season-mean baseline was not
+  declared before scoring and is not added here.
 - **Not "ratings add nothing beyond the open".** The encompassing slope uses an estimated
   regressor: rating noise biases $b$ toward zero, so $b\approx0$ is a weak null, not
   evidence of absence.

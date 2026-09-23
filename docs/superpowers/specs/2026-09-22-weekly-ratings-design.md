@@ -1,6 +1,7 @@
 # Weekly PPP and pace ratings vs the mean and the vendor open (Release B) — design
 
-**Status:** approved design, 2026-09-22. Implementation plan follows from this file.
+**Status:** implemented 2026-09-23 (`d9367c1` fits, `e2c0ffd` evaluation). Result:
+[`docs/weekly-ratings-2026-09-23.md`](../../weekly-ratings-2026-09-23.md).
 **Builds on:** Release A, [`docs/pregame-replay-2026-09-22.md`](../../pregame-replay-2026-09-22.md)
 and `scripts/pregame_replay_audit.py` (`snapshot()`).
 **Spec it implements:** [`research/totals/docs/totals-modeling-guide.md`](../../../research/totals/docs/totals-modeling-guide.md)

@@ -4,6 +4,21 @@ _Locked via claudex-loop — by Claude + mckel, 2026-09-22_
 Detailed design (equations, metrics, tests): [`../specs/2026-09-22-weekly-ratings-design.md`](../specs/2026-09-22-weekly-ratings-design.md).
 This file is the reviewable plan; where the two differ, fix both.
 
+## Status — done 2026-09-23
+
+| Approach step | Status |
+| --- | --- |
+| 1–6 Load, gate, cutoffs, fits, snapshots, forecast | Done 2026-09-23, `d9367c1` |
+| 7–10 Tune, score, verdict, manifest | Done 2026-09-23, `e2c0ffd` |
+| 11 Tests | Done 2026-09-23: 15 in `tests/test_weekly_ratings.py`, green |
+| 12 Docs | Done 2026-09-23: `docs/weekly-ratings-2026-09-23.md`, guide §2/§7/§13/§14 updated |
+| 13 Commits | Done 2026-09-23, both pushed |
+
+Deviations: the evaluation lives in `scripts/weekly_ratings_eval.py`, split from the fits
+past ~400 lines (the spec allowed it); the command is
+`python -m scripts.weekly_ratings_eval`. The pre-build Codex review never ran (see the
+review log); the post-build inspection outcome is in the same log.
+
 ## Goal
 
 Build weekly, as-of **team points-per-possession** (offense $O$, defense $D$) and **pace**
