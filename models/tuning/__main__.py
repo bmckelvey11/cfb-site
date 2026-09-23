@@ -3,6 +3,7 @@
     python -m models.tuning run --spec models/tuning/specs/total_ratings_v1.json [--root DIR] [--replicate K]
     python -m models.tuning status [--root DIR]
     python -m models.tuning cancel --run-id RUN_ID [--root DIR]
+    python -m models.tuning dist --spec models/tuning/specs/dist_total_v1.json [--root DIR]
 
 `run` submits the spec and works that job until it is completed, failed, or cancelled.
 Resubmitting a completed spec returns the existing run when the code fingerprint and
@@ -67,6 +68,24 @@ def _run(args) -> int:
     return 0 if job.state == "completed" else 1
 
 
+def _dist(args) -> int:
+    from models.tuning.dist_run import DistRefused, run_dist
+    from models.tuning.dist_spec import DistRunSpec
+
+    spec = DistRunSpec.model_validate_json(Path(args.spec).read_text(encoding="utf-8"))
+    root = Path(args.root) if args.root else _default_root()
+    try:
+        run_dir = run_dist(spec, root)
+    except DistRefused as e:
+        print(f"refused: {e}", file=sys.stderr)
+        return 2
+    scores = json.loads((run_dir / "scores.json").read_text(encoding="utf-8"))
+    print(json.dumps({"run_id": spec.run_id(), "selected": scores["selected"],
+                      "gate_pass": scores["gate"]["pass"], "card": str(run_dir / "card.md")},
+                     indent=1))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m models.tuning", description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -84,10 +103,15 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("cancel")
     c.add_argument("--run-id", required=True)
     c.add_argument("--root")
+    d = sub.add_parser("dist", help="predictive distributions on a completed run (Release D)")
+    d.add_argument("--spec", required=True)
+    d.add_argument("--root")
     args = ap.parse_args(argv)
 
     if args.cmd == "run":
         return _run(args)
+    if args.cmd == "dist":
+        return _dist(args)
     store = LabStore(Path(args.root) if args.root else _default_root())
     if args.cmd == "cancel":
         job = store.request_cancel(args.run_id)

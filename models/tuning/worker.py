@@ -386,7 +386,7 @@ def trials_csv(study: optuna.Study) -> str:
     return pd.DataFrame(rows).to_csv(index=False, lineterminator="\n")
 
 
-def publish_run(root: Path, run_id: str, files: dict[str, str]) -> Path:
+def publish_run(root: Path, run_id: str, files: dict[str, str | bytes]) -> Path:
     """Write to a temporary directory, verify every checksum, then rename it into place."""
     runs = Path(root) / "runs"
     final = runs / run_id
@@ -402,7 +402,7 @@ def publish_run(root: Path, run_id: str, files: dict[str, str]) -> Path:
     for rel, text in sorted(files.items()):
         path = tmp / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        data = text.encode("utf-8")
+        data = text if isinstance(text, bytes) else text.encode("utf-8")
         with open(path, "wb") as fh:
             fh.write(data)
             fh.flush()

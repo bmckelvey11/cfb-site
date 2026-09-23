@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "spec_id": "dist_total_v1",
+  "created_at": "2026-09-23T00:00:00Z",
+  "created_by": "claude+mckel",
+  "notes": "Holdout status: outer seasons 2021-2025 were already used as a holdout by Release B and the priors work, so the gate result is a software go/no-go on a spent range, not new evidence; 2026 is the untouched season. Priced evaluation is deferred to Release E (timestamped totals prices exist for 2026 only).",
+  "base_run_id": "run-de1927346ab0",
+  "selection_seasons": [2018, 2019],
+  "distribution": {
+    "candidates": ["empirical_total", "joint_bootstrap", "normal_const"],
+    "baseline": "normal_const",
+    "window_seasons": 3,
+    "early_min_prior_games": 3,
+    "support_max": 150,
+    "quantiles": [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95],
+    "interval_levels": [0.5, 0.8, 0.9]
+  },
+  "gate": {
+    "pooled_coverage_tol": 0.03,
+    "season_coverage_level": 0.8,
+    "season_coverage_tol": 0.06,
+    "pit_decile_tol": 0.02
+  },
+  "open_label_pushes": "exclude"
+}

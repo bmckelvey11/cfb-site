@@ -35,8 +35,9 @@ def test_empirical_table_rounds_each_shifted_residual():
 
 
 def test_joint_table_adds_overtime_only_to_regulation_ties():
-    pmf, home_win = joint_pmf(np.array([10.0]), np.array([10.0]),
-                              [np.array([[0.0, 0.0], [1.0, -1.0]])], [np.array([3.0, 7.0])], S)
+    pmf, home_win, tie = joint_pmf(np.array([10.0]), np.array([10.0]),
+                                   [np.array([[0.0, 0.0], [1.0, -1.0]])], [np.array([3.0, 7.0])], S)
+    assert tie[0] == pytest.approx(0.5)
     assert pmf[0, 20] == pytest.approx(0.5)            # 11-9: no overtime
     assert pmf[0, 23] == pytest.approx(0.25) and pmf[0, 27] == pytest.approx(0.25)
     assert pmf[0].sum() == pytest.approx(1.0)

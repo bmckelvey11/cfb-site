@@ -181,3 +181,156 @@ def render_card(run_spec: RunSpec, manifest: dict, study_summary: dict,
     add(manifest["reproduce"])
     add("```")
     return "\n".join(lines) + "\n"
+
+
+def render_dist_card(spec, manifest: dict, scores: dict, selective: dict) -> str:
+    """Card for a Release D distribution run. Pure, like `render_card`."""
+    d, g = spec.distribution, spec.gate
+    sel, gate = scores["selected"], scores["gate"]
+    lines: list[str] = []
+    add = lines.append
+
+    add(f"# Distribution card: {spec.spec_id} (`{manifest['run_id']}`)")
+    add("")
+    add("**Status:** research. Predictive distributions of the full-game total; no priced "
+        "result. Timestamped, priced totals quotes exist for 2026 only, so priced evaluation "
+        "belongs to Release E's shadow period.")
+    add(f"**Config hash:** `{manifest['config_hash']}`  ")
+    add(f"**Point forecasts from:** `{manifest['base_run_id']}` (model "
+        f"`{manifest['model']['family']}`, alpha {manifest['model']['alpha']:.4g}"
+        + (f", l1_ratio {manifest['model']['l1_ratio']:.4g}" if manifest['model'].get('l1_ratio') is not None else "")
+        + ").  ")
+    add(f"**Code:** `{manifest['git_sha']}`, fingerprint `{manifest['code_sha256'][:16]}`; "
+        + ", ".join(f"{k} {v}" for k, v in sorted(manifest["packages"].items())))
+    if spec.notes:
+        add("")
+        add(f"**Notes:** {spec.notes}")
+
+    add("")
+    add("## Method")
+    add("")
+    add(f"- Candidates: {', '.join(f'`{c}`' for c in d.candidates)}; baseline `{d.baseline}`. "
+        f"One table per game over integer totals 0–{d.support_max}, overtime included.")
+    add(f"- Residual window: the {d.window_seasons} most recent usable seasons before the test "
+        f"season, split early (a team with fewer than {d.early_min_prior_games} prior games) and "
+        "primary. Point forecasts are season-ahead and reproduce the base run's outer "
+        "predictions exactly.")
+    add(f"- Selection: lowest mean CRPS on inner seasons "
+        f"{', '.join(map(str, spec.selection_seasons))}. Outer seasons are scored once.")
+    add(f"- Gate (declared before scoring): mid-PIT coverage within ±{g.pooled_coverage_tol} "
+        f"pooled at {', '.join(f'{lv:.0%}' for lv in d.interval_levels)}; "
+        f"{g.season_coverage_level:.0%} coverage within ±{g.season_coverage_tol} every season; "
+        f"PIT deciles within ±{g.pit_decile_tol}.")
+
+    add("")
+    add("## Selection (inner seasons)")
+    add("")
+    add("| candidate | mean CRPS |")
+    add("| --- | ---: |")
+    for c, v in sorted(scores["selection_crps"].items()):
+        add(f"| {c}{' (selected)' if c == sel else ''} | {_f(v)} |")
+
+    add("")
+    add(f"## Calibration gate: `{sel}` on the outer seasons — {'PASS (go)' if gate['pass'] else 'FAIL (no-go)'}")
+    add("")
+    add("| check | value | target | result |")
+    add("| --- | ---: | --- | --- |")
+    for lv, v in gate["pooled_coverage"].items():
+        add(f"| coverage {float(lv):.0%}, pooled | {v['value']:.3f} | {v['nominal']:.2f} ± "
+            f"{g.pooled_coverage_tol} | {'pass' if v['pass'] else 'FAIL'} |")
+    sc = gate["season_coverage"]
+    for s, v in sc["by_season"].items():
+        add(f"| coverage {sc['level']:.0%}, {s} (n {v['n']}) | {v['value']:.3f} | "
+            f"{sc['level']:.2f} ± {g.season_coverage_tol} | {'pass' if v['pass'] else 'FAIL'} |")
+    pd_ = gate["pit_deciles"]
+    add(f"| PIT deciles, largest deviation | {pd_['max_abs_dev']:.3f} | ≤ {pd_['tolerance']} | "
+        f"{'pass' if pd_['pass'] else 'FAIL'} |")
+    add("")
+    add("PIT decile shares: " + ", ".join(f"{s:.3f}" for s in pd_["shares"]) + ".")
+
+    add("")
+    add(f"## Outer seasons, all candidates ({gate['n']} games)")
+    add("")
+    add("CRPS is in points; lower is better. Differences are candidate minus baseline on the "
+        "same games, week-cluster bootstrap, 10,000 draws, seed 20260922.")
+    add("")
+    add("| candidate | CRPS | vs baseline | 95% interval | 80% width | 80% coverage | PIT max dev | would pass gate |")
+    add("| --- | ---: | ---: | --- | ---: | ---: | ---: | --- |")
+    for c, v in scores["outer"].items():
+        diff = scores["paired_crps_vs_baseline"].get(c)
+        cal = v["calibration"]
+        delta = _f(diff["diff"], True) if diff else "—"
+        interval = f"{_f(diff['ci95'][0], True)} to {_f(diff['ci95'][1], True)}" if diff else ""
+        add(f"| {c} | {_f(v['crps'])} | {delta} | {interval} | "
+            f"{_f(v['width_80']) if v['width_80'] is not None else ''} | "
+            f"{cal['pooled_coverage']['0.8']['value']:.3f} | {cal['pit_deciles']['max_abs_dev']:.3f} | "
+            f"{'pass' if cal['pass'] else 'fail'} |")
+    add("")
+    seasons = sorted({s for v in scores["outer"].values() for s in v["crps_by_season"]})
+    add("| candidate | " + " | ".join(str(s) for s in seasons) + " |")
+    add("| --- | " + " | ".join("---:" for _ in seasons) + " |")
+    for c, v in scores["outer"].items():
+        add(f"| {c} | " + " | ".join(_f(v["crps_by_season"][s]) for s in seasons) + " |")
+
+    add("")
+    add("## Over the CFBD open label (a forecast of the event, not a price)")
+    add("")
+    add("The label has no capture time and no price. P(over) is conditional on no push; games "
+        "whose total equals an integer label are excluded.")
+    add("")
+    add("| candidate | games | pushes excluded | Brier | log loss | over rate |")
+    add("| --- | ---: | ---: | ---: | ---: | ---: |")
+    for c, v in scores["outer"].items():
+        o = v["open_label"]
+        if o and o["n"]:
+            add(f"| {c} | {o['n']} | {o['pushes_excluded']} | {o['brier']:.4f} | {o['log_loss']:.4f} | "
+                f"{o['over_rate']:.3f} |")
+
+    if scores.get("coherence"):
+        co = scores["coherence"]
+        add("")
+        add("## Joint model coherence")
+        add("")
+        add(f"- Overtime: simulated {co['simulated_ot_rate']:.3f} vs observed {co['observed_ot_rate']:.3f}.")
+        add(f"- Mean total: table {co['pooled_mean']:.2f} vs observed {co['observed_mean']:.2f}.")
+        add(f"- Home-win Brier on the {co['regulation_decided_games']} games decided in regulation: "
+            f"{co['home_win_brier_regulation']:.4f} (secondary; the frame does not record the "
+            "overtime winner).")
+
+    add("")
+    add(f"## Selective prediction (`{sel}`)")
+    add("")
+    add(f"A fixed Ridge meta-model predicts |residual| from the features and week, trained on the "
+        f"window seasons only. Keeping the lowest-score games, mean CRPS by share kept:")
+    add("")
+    add("| share kept | games | mean CRPS |")
+    add("| ---: | ---: | ---: |")
+    for p in selective["curve"]:
+        add(f"| {p['coverage']:.0%} | {p['n_kept']} | {_f(p['mean_loss'])} |")
+    lo, hi = selective["ci95"]
+    add("")
+    add(f"Area under the curve minus full-coverage risk: {_f(selective['diff'], True)} "
+        f"({_f(lo, True)} to {_f(hi, True)}, {selective['n_clusters']} season-week clusters). "
+        "Negative means abstaining on high scores lowers the loss on the games kept.")
+    if "min_prior_games_rule" in selective:
+        r = selective["min_prior_games_rule"]
+        add(f"Rule baseline, skip early games: keeps {r['coverage']:.0%}, mean CRPS "
+            f"{_f(r['mean_crps'])} vs {_f(selective['full_mean_crps'])} for all games.")
+
+    add("")
+    add("## Limitations")
+    add("")
+    add("- Outer seasons were already used as a holdout by earlier work: descriptive, not new "
+        "evidence. 2026 is the untouched season.")
+    add("- The base model's hyperparameters were tuned on 2015–2019, so windows that draw on "
+        "those seasons may run narrow; per-season coverage shows whether they do.")
+    add("- No betting value: nothing here is priced. The betting engine is verified on "
+        "hand-computed fixtures only.")
+
+    add("")
+    add("## Reproduce")
+    add("")
+    add("```text")
+    add(manifest["reproduce"])
+    add("```")
+    return "\n".join(lines) + "\n"

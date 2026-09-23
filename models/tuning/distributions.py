@@ -61,10 +61,12 @@ def empirical_pmf(mu: np.ndarray, pools: list[np.ndarray], support_max: int) -> 
 
 
 def joint_pmf(mu_home: np.ndarray, mu_away: np.ndarray, pair_pools: list[np.ndarray],
-              ot_pools: list[np.ndarray], support_max: int) -> tuple[np.ndarray, np.ndarray]:
-    """Table of totals and P(home win), a regulation tie counting as half a win."""
+              ot_pools: list[np.ndarray], support_max: int
+              ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Table of totals, P(home win) with a regulation tie as half a win, and P(tie)."""
     out = np.zeros((len(mu_home), support_max + 1))
     home_win = np.zeros(len(mu_home))
+    p_tie = np.zeros(len(mu_home))
     for i, (mh, ma, pairs, ot) in enumerate(zip(mu_home, mu_away, pair_pools, ot_pools)):
         h = np.maximum(np.round(mh + pairs[:, 0]), 0)
         a = np.maximum(np.round(ma + pairs[:, 1]), 0)
@@ -81,7 +83,8 @@ def joint_pmf(mu_home: np.ndarray, mu_away: np.ndarray, pair_pools: list[np.ndar
                 tied = np.clip(total[tie], 0, support_max).astype(int)
                 out[i] += np.bincount(tied, minlength=support_max + 1) / m
         home_win[i] = ((h > a).sum() + 0.5 * tie.sum()) / m
-    return out, home_win
+        p_tie[i] = tie.sum() / m
+    return out, home_win, p_tie
 
 
 def score_pmf(pmf: np.ndarray, y: np.ndarray, quantiles: tuple[float, ...],
