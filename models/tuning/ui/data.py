@@ -1,13 +1,16 @@
-"""Read-only data for the lab monitor (`models/tuning/monitor.py`). Nothing here writes.
+"""Read-only data for the lab GUI (`models/tuning/ui/app.py`). Nothing here writes;
+`actions.py` holds the few things that do.
 
-Standard library and pandas only, so the monitor's own venv (`.venv-lab-ui`) needs no
-optuna or sklearn, and the shadow tick's `.venv` never gets the monitor's packages.
-The ledger is opened read-only, so the monitor cannot block or alter the daily tick.
+Standard library and pandas only, so the GUI's own venv (`.venv-lab-ui`) needs no
+optuna or sklearn, and the shadow tick's `.venv` never gets the GUI's packages.
+Every database is opened read-only, so the GUI cannot block the tick or a worker.
 """
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -17,7 +20,65 @@ from models.tuning.ledger import read_only
 ET = "America/New_York"
 STALE_TICK_HOURS = 26      # the refresh runs daily at 05:00 ET
 WARN_BEFORE_CUTOFF_DAYS = 7
-HYPOTHESES = Path(__file__).with_name("hypotheses.json")
+HYPOTHESES = Path(__file__).resolve().parents[1] / "hypotheses.json"
+
+
+def lab_root() -> Path:
+    """`CFB_LAB_ROOT` overrides the lab root (a scratch lab for trying the GUI)."""
+    if os.environ.get("CFB_LAB_ROOT"):
+        return Path(os.environ["CFB_LAB_ROOT"])
+    from cfb_paths import PROCESSED
+    return PROCESSED / "tuning"
+
+
+def _ro_query(path: Path, sql: str, params: tuple = ()) -> pd.DataFrame:
+    """A read-only query that retries while a writer holds the lock."""
+    for attempt in range(5):
+        con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True, timeout=5)
+        try:
+            return pd.read_sql_query(sql, con, params=params)
+        except (sqlite3.OperationalError, pd.errors.DatabaseError) as e:
+            if "locked" not in str(e) or attempt == 4:
+                raise
+            time.sleep(0.5)
+        finally:
+            con.close()
+    raise AssertionError("unreachable")
+
+
+def _param(value: float, distribution_json: str):
+    dist = json.loads(distribution_json)
+    if dist.get("name") == "CategoricalDistribution":
+        return dist["attributes"]["choices"][int(value)]
+    return round(value, 6)
+
+
+def trials(root: Path, run_id: str) -> pd.DataFrame:
+    """One row per Optuna trial of a run: number, state, objective, parameters."""
+    path = root / "optuna.sqlite3"
+    if not path.exists():
+        return pd.DataFrame()
+    t = _ro_query(path, "SELECT t.trial_id, t.number, t.state, v.value, t.datetime_start, "
+                        "t.datetime_complete FROM trials t JOIN studies s USING (study_id) "
+                        "LEFT JOIN trial_values v ON v.trial_id = t.trial_id AND v.objective = 0 "
+                        "WHERE s.study_name = ? ORDER BY t.number", (run_id,))
+    if t.empty:
+        return t
+    p = _ro_query(path, "SELECT p.trial_id, p.param_name, p.param_value, p.distribution_json "
+                        "FROM trial_params p JOIN trials t USING (trial_id) JOIN studies s "
+                        "USING (study_id) WHERE s.study_name = ?", (run_id,))
+    if not p.empty:
+        p["v"] = [_param(v, d) for v, d in zip(p["param_value"], p["distribution_json"])]
+        wide = p.pivot(index="trial_id", columns="param_name", values="v")
+        t = t.join(wide, on="trial_id")
+    return t.drop(columns="trial_id").rename(columns={"value": "objective"})
+
+
+def log_tail(root: Path, run_id: str, lines: int = 40) -> str:
+    path = root / "logs" / f"{run_id}.log"
+    if not path.exists():
+        return ""
+    return "\n".join(path.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:])
 
 
 def _et(ts) -> str:

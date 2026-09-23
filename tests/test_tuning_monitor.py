@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from models.tuning.ledger import Ledger, read_only
-from models.tuning.monitor_data import hypotheses, shadow_view
+from models.tuning.ui.data import hypotheses, shadow_view
 
 REPO = Path(__file__).resolve().parents[1]
 CUT4, CUT5 = pd.Timestamp("2026-09-24T23:30Z"), pd.Timestamp("2026-10-02T00:00Z")

@@ -173,6 +173,27 @@ opponent_possessions
 
 ## 5. GUI information architecture
 
+**Status (2026-09-23): built** (`models/tuning/ui/`).
+
+- **Start it:** `.venv-lab-ui\Scripts\python -m streamlit run models/tuning/ui/app.py`, or "Tuning Lab" in `.claude/launch.json`. It listens on 127.0.0.1 only (`.streamlit/config.toml`).
+- **Pages:**
+  - **New run** covers pages 01–06: template, dataset, features, validation, search, acceptance, then review and launch.
+  - **Jobs** is page 07: state, Optuna trials, best-so-far chart, worker log, and a confirmed cancel.
+  - **Runs** is pages 08–09: card, trials, comparisons, spec.
+  - **Hypotheses** is page 10.
+- **Only what `RunSpec` implements is editable.** Page 03 is read-only because the ratings come fixed from the Release B snapshot. The draft object below is one form rather than session-wide state.
+- **Every check runs in `validate`** (`models/tuning/ui/api.py`, main `.venv`), so the GUI cannot skip one. Blocking errors:
+  - RunSpec rules, such as the confirmation lock.
+  - The sealed season, 2026.
+  - A feature the catalog refuses.
+  - A job still in flight.
+- **Amber warning:** the outer seasons were already evaluated. Prior lab trials are counted from `jobs.sqlite3`.
+- **Replicates:** the next free replicate is chosen explicitly.
+- **Launch** re-validates the exact draft file, then starts a detached worker that outlives the GUI. It writes only `drafts/` and `logs/` under the lab root; nothing in the repo.
+- **Separate venv:** the GUI runs in its own venv, `.venv-lab-ui` (`requirements-lab-ui.txt`), so the shadow tick's `.venv` never gains pyarrow.
+- **Outside the run fingerprint:** `models/tuning/ui/` is not fingerprinted, so editing the GUI never makes a completed run look like it ran on different code.
+- **Scratch lab:** `--lab-root DIR` or `CFB_LAB_ROOT` points the GUI at a scratch lab.
+
 Use a Streamlit multipage app for the first implementation. Streamlit session state supports retaining variables across reruns within a user session, which is appropriate for an in-progress feature and tuning configuration. [web:32][web:33]
 
 ```text
@@ -2269,15 +2290,11 @@ Add persistent top-level context: environment, database snapshot, experiment dra
 18 System Health & Drift
 ```
 
-**Status (2026-09-23): read-only lab monitor built** (`models/tuning/monitor.py`).
+**Status (2026-09-23): pages 15, 17 and 18 are built, read-only**, in the lab GUI (§5 status).
 
-- It has three Streamlit pages:
-  - **Shadow:** covers pages 15 and 18. It shows alerts for a stale tick, a snapshot deadline, a missed week, or the verdict; the weeks; and the replay.
-  - **Runs:** jobs and model cards.
-  - **Hypotheses:** page 17, from `models/tuning/hypotheses.json`.
-- It launches nothing. The CLI still does that.
-- It runs in its own venv, `.venv-lab-ui` (`requirements-lab-ui.txt`), so the shadow tick's `.venv` never gains pyarrow. Start it with `.venv-lab-ui\Scripts\python -m streamlit run models/tuning/monitor.py`.
-- The editable pages in §5 are not built.
+- **Shadow** covers pages 15 and 18. It shows alerts for a stale tick, a snapshot deadline, a missed week, or the verdict; then the weeks and the replay.
+- **Hypotheses** is page 17, read from `models/tuning/hypotheses.json`.
+- Pages 11–14 and 16 are not built.
 
 ### 37.3 Comparison workspace
 

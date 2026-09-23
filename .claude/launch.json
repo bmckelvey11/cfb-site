@@ -61,13 +61,13 @@
       "port": 8778
     },
     {
-      "name": "Tuning Lab Monitor",
+      "name": "Tuning Lab",
       "runtimeExecutable": ".venv-lab-ui/Scripts/python.exe",
       "runtimeArgs": [
         "-m",
         "streamlit",
         "run",
-        "models/tuning/monitor.py",
+        "models/tuning/ui/app.py",
         "--server.headless",
         "true",
         "--server.port",

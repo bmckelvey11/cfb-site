@@ -1,4 +1,4 @@
-# Lab monitor only (models/tuning/monitor.py), installed into its own venv:
+# Lab GUI only (models/tuning/ui/app.py), installed into its own venv:
 #   python -m venv .venv-lab-ui && .venv-lab-ui\Scripts\pip install -r requirements-lab-ui.txt
 # Kept out of requirements.txt so the shadow tick's .venv never gains pyarrow, which
 # changes pandas 3's default string storage.
