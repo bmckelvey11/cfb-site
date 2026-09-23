@@ -235,11 +235,13 @@ betting-threshold terms, grepped as in Release A.
 
 ## Files and outputs
 
-- `scripts/weekly_ratings.py`: `load_team_games`, `fit_ridge`, `fit_raw`,
-  `forecast_total`, `tune`, `evaluate`, `classify_verdict`, CLI. One module; split only past
-  ~400 lines.
+- `scripts/weekly_ratings.py`: `build_games`, `fit_set`, `fit_ppp`, `fit_pace`,
+  `fit_ridge`, `fit_raw`, `forecast_total` — the reusable ratings.
+- `scripts/weekly_ratings_eval.py`: `load`, `tune`, `run_season`, `paired_mae_diff`,
+  `encompassing_slope`, `classify_verdict`, CLI. Split from the fits past ~400 lines, so
+  Release C can import ratings without the evaluation.
 - Command:
-  `python -m scripts.weekly_ratings --tune-seasons 2014-2019 --score-seasons 2021-2025`
+  `python -m scripts.weekly_ratings_eval --tune-seasons 2014-2019 --score-seasons 2021-2025`
 - Outputs (gitignored), under `data/processed/ratings/`:
   - `weekly_ratings_snapshots.csv`: every (season, as_of_week, team, method) row.
   - `weekly_ratings_eval.json`: command, code and source sha256s, λ grid losses and picks,

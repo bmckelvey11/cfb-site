@@ -71,7 +71,7 @@ and the record that measured it.
 | Key numbers in the total | "Respect key numbers" | Measured: one-point bins with neighbour lift, 2014–25 FBS | [total-points-distribution-2026-09-17.md](../../../docs/total-points-distribution-2026-09-17.md) |
 | Wind | Anecdotal 13–15 mph thresholds | Pre-registered plan for crosswind vs along-field wind | [wind-orientation-totals.md](../../../docs/wind-orientation-totals.md) |
 | Which stats are usable pre-game? | "Strictly trailing" | 565 of 1,043 PFF/CFBD columns usable; the dividing line is table grain | [pregame-feature-eligibility-2026-09-16.md](../../../docs/pregame-feature-eligibility-2026-09-16.md) |
-| Opponent-adjusted efficiency | "Build it" | Built: crossed-random-effects PPA ratings, v1.0; five better EPA constructions specified. Points-per-possession and pace ratings (§7) are not built | [ppa-opponent-adjusted-ratings-2026-09-16.md](../../../docs/ppa-opponent-adjusted-ratings-2026-09-16.md), [epa-metric-constructions-2026-09-18.md](../../../docs/epa-metric-constructions-2026-09-18.md) |
+| Opponent-adjusted efficiency | "Build it" | Built: crossed-random-effects PPA ratings, v1.0; five better EPA constructions specified. Weekly as-of ridge points-per-possession and pace ratings (§7.1–7.3, no priors) built; they beat raw ratings and a train mean on 2021–25 totals and trail the Bovada open by 0.33 MAE | [ppa-opponent-adjusted-ratings-2026-09-16.md](../../../docs/ppa-opponent-adjusted-ratings-2026-09-16.md), [epa-metric-constructions-2026-09-18.md](../../../docs/epa-metric-constructions-2026-09-18.md), [weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md) |
 
 ---
 
@@ -251,10 +251,12 @@ SP+ and FPI prior components (§5), effective-sample decay (§6), empirical-Baye
 convention**: an offense effect $O$ is positive for a good offense, and a defense effect
 $D$ is **negative** for a good defense, because it lowers what opponents score.
 
-**Status.** None of this is built. The repo's adjusted ratings are play-level PPA
-([ppa-opponent-adjusted-ratings-2026-09-16.md](../../../docs/ppa-opponent-adjusted-ratings-2026-09-16.md)).
-No points-per-possession or pace rating appears in any docs index. **Every coefficient and
-league average in the worked examples below is illustrative, not estimated.**
+**Status.** §7.1–7.3 are built without priors: weekly as-of ridge ratings shrunk toward
+league average, points from line scores, in `scripts/weekly_ratings.py`, scored in
+[weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md). Tuned on
+2014–2019, $\lambda_{\text{PPP}}=40$ possessions and $\lambda_{\text{pace}}=8$ games. §7.4–7.5
+(priors, prior-centered ridge) are not built. **Every coefficient and league average in the
+worked examples below is illustrative, not estimated.**
 
 ### 7.1 Opponent-adjusted efficiency
 
@@ -768,7 +770,7 @@ The source documents each gave a build order from zero. The repo is not at zero.
 | --- | --- | --- |
 | 1. Audit lines | Partly done: floor, provider mix, fields (§2, §5) | Open item (§14): open-vs-close timing agreement against the-odds-api from 2020 |
 | 2. Core game, drive, play tables | Done (warehouse) | — |
-| 3. Point-in-time pace and efficiency | Opponent-adjusted PPA built; EPA constructions specified. Points-per-possession and pace ratings specified in §7.1–7.2, not built | Build them as-of each week; neutral-pace snapshots; garbage-time filter |
+| 3. Point-in-time pace and efficiency | Built: weekly as-of ridge PPP and pace ratings, no priors ([weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md)). Beat raw and train mean on 2021–25; 0.33 MAE behind the open; early weeks indistinguishable from the mean | Neutral-pace snapshots; garbage-time ablation (§14 item 5) |
 | 4. Previous-season priors and blend | Specified in §7.4–7.5 | Fit $b$, $c$, $q$, $a$, $\kappa$ and the $\lambda$ scale on earlier seasons; prior-centered ridge refit at each cutoff |
 | 5. Rung 0 and 1 baselines | Not recorded for $r^{\text{final}}$ by era | Record the market's own loss per season and era |
 | 6. Rung 2 on the residual | The 2022–25 harness (predicts the total, not the residual) is a null | Refit on $r^{\text{final}}$ and $r^{\text{move}}$ with the §9.1 block |
@@ -788,7 +790,9 @@ None is answered here.
    `overUnder` match the-odds-api's first and last snapshots for the same book?
 2. **Market loss by era.** Rung 0 and rung 1 residual loss per season, and whether the
    calibration slope differs from 1 by total band. This is the combined-total version of
-   Arscott's question.
+   Arscott's question. Lead, not an answer: on 2021–25 Bovada opens, totals landed about
+   15% of the way from the open toward a pooled mean (slope 0.15, 0.06–0.23;
+   [weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md)).
 3. **Size of the 2023 clock effect** on plays, possessions, and totals in the warehouse,
    replacing the anecdotal 7.8%. Also whether the market's totals had caught up by a given
    week of 2023.

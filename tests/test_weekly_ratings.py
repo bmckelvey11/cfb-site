@@ -172,3 +172,50 @@ def test_total_reproduces_the_guide_worked_example():
     assert forecast_total(r, "Home", "Away", neutral=False) == pytest.approx(55.0)
     # Neutral site: home field drops out of both rates, and it cancels in the sum.
     assert forecast_total(r, "Home", "Away", neutral=True) == pytest.approx(55.0)
+
+
+# 6. Evaluation pieces -------------------------------------------------------------
+
+def _scored(n_weeks=30, per_week=10, seed=0) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    n = n_weeks * per_week
+    truth = rng.normal(55, 14, n)
+    return pd.DataFrame({
+        "season": np.repeat(2021 + np.arange(n_weeks) // 6, per_week),
+        "week": np.repeat(np.arange(n_weeks) % 6 + 2, per_week),
+        "total": truth,
+        "good": truth + rng.normal(0, 3, n),
+        "bad": truth + rng.normal(0, 12, n),
+    })
+
+
+def test_paired_difference_is_zero_for_identical_forecasts_and_negative_for_better():
+    from scripts.weekly_ratings_eval import paired_mae_diff
+    df = _scored()
+    same = paired_mae_diff(df, "good", "good")
+    assert same["diff"] == 0 and same["ci95"] == [0.0, 0.0]
+    better = paired_mae_diff(df, "good", "bad")
+    assert better["ci95"][1] < 0
+    assert set(better["by_season"]) == set(df["season"].unique())
+    assert better["n_clusters"] == df.groupby(["season", "week"]).ngroups
+
+
+def test_encompassing_slope_recovers_known_slope():
+    from scripts.weekly_ratings_eval import encompassing_slope
+    df = _scored()
+    df["open"] = df["good"]  # truth + noise, so total - open varies
+    df["fc"] = df["open"] + 2.0 * (df["total"] - df["open"])  # disagreement is half right
+    out = encompassing_slope(df, "fc")
+    assert out["slope"] == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("lo, hi, by_season, expected", [
+    (0.2, 0.9, [0.5, 0.4, 0.6, 0.3, 0.7], "worse"),           # whole interval above 0
+    (-0.9, -0.2, [-0.5, -0.4, -0.6, -0.3, -0.7], "improves"),  # below 0, every season
+    (-0.9, -0.2, [-0.5, -0.4, 0.1, -0.3, -0.7], "improves"),   # one season may disagree
+    (-0.9, -0.2, [-0.5, 0.2, 0.1, -0.3, -0.7], "matches"),     # two may not
+    (-0.3, 0.2, [-0.5, -0.4, -0.6, -0.3, -0.7], "matches"),    # interval covers 0
+])
+def test_classify_verdict(lo, hi, by_season, expected):
+    from scripts.weekly_ratings_eval import classify_verdict
+    assert classify_verdict(lo, hi, by_season) == expected
