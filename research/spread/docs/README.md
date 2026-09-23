@@ -49,6 +49,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `prediction-tracker.md` | dataset | Column dictionary for the joined panel. |
 | `review-2026-09-08-tree-audit.md` | review | Full-tree audit; each finding carries its resolution date. |
 | `methods-review-2026-09-21.md` | review | Audit of the live serving and version B grading paths on 147 graded games. Leakage and selection clean; the graded "Monday line" is a Tuesday line for 62% of games, B4's regressor spends 71% of its variance on the revert-to-opener component, and `beat_close` counts a line that never moved as a loss. No verdict. |
+| `objective-review-2026-09-23.md` | review | Is the pred-tracker-model what the user asked for (fair spread, bet where it disagrees with the books, judged ATS at the number bet)? Reframed: the 2026-09-02 pivot to movement/CLV was user-endorsed, the served `edge` is the market's move sign-flipped, and no grader measures ATS at the printed number. No version B verdict. |
 | **`plan-2026-09-08-master.md`** | **plan of record** | **Start here for the plan.** What is true, what is decided, what must change, and the execution waves. Absorbs the hardened plan, the review log and the audit's open items. |
 | `plan-2026-09-08-hardened.md` | absorbed | Contract the master absorbed; audit history of the claudex-loop. |
 | `plan-review-log-2026-09-08.md` | absorbed | The three-round adversarial argument (claudex-loop) that produced the hardened plan. |
