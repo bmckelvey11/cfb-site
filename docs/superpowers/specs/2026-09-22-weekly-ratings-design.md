@@ -139,12 +139,12 @@ the fit-set means. A team is rated once it has one game.
 
 $$
 \begin{gathered}
-\widehat{T}_g=\widehat{N}_g\left(\widehat{\text{PPP}}^{\text{h}}_g+\widehat{\text{PPP}}^{\text{a}}_g\right)+c_t \\[0.5em]
+\widehat{\text{Total}}_g=\widehat{N}_g\left(\widehat{\text{PPP}}^{\text{h}}_g+\widehat{\text{PPP}}^{\text{a}}_g\right)+c_t \\[0.5em]
 \widehat{N}_g=\nu+P_{\text{h}}+P_{\text{a}},\qquad
 \widehat{\text{PPP}}^{\text{h}}_g=\mu+O_{\text{h}}+D_{\text{a}}+hH_g,\qquad
 \widehat{\text{PPP}}^{\text{a}}_g=\mu+O_{\text{a}}+D_{\text{h}}-hH_g \\[1em]
 \begin{array}{rl}
-\text{where}\quad \widehat{T}_g: & \text{forecast full-game points total} \\
+\text{where}\quad \widehat{\text{Total}}_g: & \text{forecast full-game points total} \\
 H_g: & +1 \text{, or } 0 \text{ at a neutral site} \\
 c_t: & \text{fit-set mean of overtime points (actual total} - \text{both teams' Q1–Q4 line scores)}
 \end{array}
@@ -197,11 +197,11 @@ worked example (55.0 before $c_t$) and an illustrative $c_t=0.8$, the forecast i
 
 $$
 \begin{gathered}
-T_g-L_g=a+b\left(\widehat{T}^{F}_g-L_g\right)+e_g \\[1em]
+\text{Total}_g-L_g=a+b\left(\widehat{\text{Total}}^{F}_g-L_g\right)+e_g \\[1em]
 \begin{array}{rl}
-\text{where}\quad T_g: & \text{actual full-game points total} \\
+\text{where}\quad \text{Total}_g: & \text{actual full-game points total} \\
 L_g: & \text{Bovada open label (points)} \\
-\widehat{T}^{F}_g: & \text{forecast } F\text{'s total (points)} \\
+\widehat{\text{Total}}^{F}_g: & \text{forecast } F\text{'s total (points)} \\
 a,\ b: & \text{intercept and slope, fit by OLS} \\
 e_g: & \text{residual (points)}
 \end{array}
