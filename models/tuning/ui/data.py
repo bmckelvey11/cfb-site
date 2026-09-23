@@ -161,6 +161,7 @@ def shadow_view(sd: Path, raw_dir: Path, now: pd.Timestamp) -> dict:
             "last_tick": _et(last_tick), "alerts": alerts, "weeks": pd.DataFrame(rows),
             "last_tick_hours": None if last_tick is None else (now - last_tick).total_seconds() / 3600,
             "counts": {k: len(v) for k, v in by.items()}, "verdict": verdict,
+            "latest_snapshot": (by.get("snapshot") or [None])[-1],
             "aliases": [(a["alias"], a["model"], a["reason"]) for a in by.get("alias", [])],
             "status_md": status.read_text(encoding="utf-8") if status.exists() else "",
             "replays": sorted((sd / "replay").glob("replay-*.json"))}
@@ -371,7 +372,8 @@ def compare_runs(a: Path, b: Path) -> dict:
 # --- global context (plan §37.1) -------------------------------------------------------
 
 def context(root: Path, raw_dir: Path, now: pd.Timestamp) -> dict:
-    """What the sidebar always shows: jobs in flight, the aliases, data age, blockers."""
+    """What the sidebar always shows: jobs in flight, the aliases, data age, the latest shadow
+    snapshot, saved drafts, blockers."""
     j = jobs(root)
     active = int(j["state"].isin(("queued", "claimed", "running", "retry_wait",
                                    "cancellation_requested")).sum()) if len(j) else 0
@@ -379,11 +381,15 @@ def context(root: Path, raw_dir: Path, now: pd.Timestamp) -> dict:
     aliases = moves.groupby("alias").tail(1).set_index("alias")["model"].to_dict() if len(moves) else {}
     games = raw_dir / f"games_{now.year}.json"
     age = (now.timestamp() - games.stat().st_mtime) / 3600 if games.exists() else None
-    blocking = []
+    blocking, snapshot = [], None
     for sd in sorted((root / "shadow").glob("shadow-*")):
         if (sd / "ledger.sqlite3").exists():
-            blocking += [t for lvl, t in shadow_view(sd, raw_dir, now)["alerts"] if lvl == "error"]
-    return {"active_jobs": active, "aliases": aliases, "games_age_hours": age, "blocking": blocking}
+            v = shadow_view(sd, raw_dir, now)
+            blocking += [t for lvl, t in v["alerts"] if lvl == "error"]
+            snapshot = v["latest_snapshot"] or snapshot
+    drafts = len(list((root / "drafts").glob("draft-*.json")))
+    return {"active_jobs": active, "aliases": aliases, "games_age_hours": age, "blocking": blocking,
+            "snapshot": snapshot, "drafts": drafts}
 
 
 # --- registry (plan §37.2 page 16) ------------------------------------------------------

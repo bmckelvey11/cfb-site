@@ -48,11 +48,18 @@ now = pd.Timestamp.now(tz="UTC")
 
 # Plan §37.1: always visible, whatever the page.
 ctx = md.context(LAB, RAW, now)
+snap, val = ctx["snapshot"], st.session_state.get("validated")
 st.sidebar.markdown(
     f"**Jobs in flight:** {ctx['active_jobs']}  \n"
     + "".join(f"**{a.title()}:** `{m}`  \n" for a, m in sorted(ctx["aliases"].items()))
     + ("**CFBD games file:** " + (f"{ctx['games_age_hours']:.0f} h old" if ctx["games_age_hours"]
-                                   is not None else "missing")))
+                                   is not None else "missing"))
+    + "  \n**Latest shadow snapshot:** "
+    + (f"week {snap['week']}{' (rehearsal)' if snap.get('rehearsal') else ''}, "
+       f"{md._et(snap['generated_at'])}" if snap else "none")
+    + f"  \n**Drafts saved:** {ctx['drafts']}"
+    + (f"; this session's is {'valid' if val['res']['ok'] else 'blocked'} "
+       f"(`{Path(val['draft']).stem}`)" if val else ""))
 for text in ctx["blocking"]:
     st.sidebar.error(text)
 

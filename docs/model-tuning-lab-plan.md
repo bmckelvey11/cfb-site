@@ -2282,9 +2282,11 @@ Add persistent top-level context: environment, database snapshot, experiment dra
 - jobs in flight;
 - the current champion and challenger;
 - the age of the CFBD games file;
+- the latest shadow snapshot: its week, whether it is a rehearsal, and when it was generated;
+- the number of saved drafts, and whether this session's draft is valid or blocked;
 - every blocking shadow alert.
 
-The snapshot and draft status are not shown.
+The mode is not a separate line. The lab-root banner marks a scratch lab, and each page names what it reads.
 
 ### 37.2 New pages
 

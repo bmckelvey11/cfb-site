@@ -160,6 +160,19 @@ def test_compare_runs_blocks_incompatible_runs_and_pairs_compatible_ones(tmp_pat
     assert not blocked["comparable"] and "folds.outer_test_seasons" in blocked["differences"][0]
     ctx = context(tmp_path, tmp_path / "raw", pd.Timestamp("2026-09-23T12:00Z"))
     assert ctx["active_jobs"] == 0 and ctx["blocking"] == [] and ctx["games_age_hours"] is None
+    assert ctx["snapshot"] is None and ctx["drafts"] == 0
+
+
+def test_context_names_the_latest_snapshot_and_counts_drafts(tmp_path):
+    from models.tuning.ui.data import context
+
+    lab = tmp_path / "lab"
+    (lab / "shadow").mkdir(parents=True)
+    _shadow(lab / "shadow")
+    (lab / "drafts").mkdir()
+    (lab / "drafts" / "draft-abc.json").write_text("{}", encoding="utf-8")
+    ctx = context(lab, lab / "shadow" / "raw", CUT4 - pd.Timedelta(hours=2))
+    assert ctx["snapshot"]["week"] == 4 and ctx["drafts"] == 1
 
 
 def test_every_hypothesis_points_at_a_record_that_exists():
