@@ -31,6 +31,12 @@ def _cli(*args: str) -> subprocess.CompletedProcess:
                           capture_output=True, text=True, timeout=300)
 
 
+def test_committed_spec_keeps_its_published_run_id():
+    # Docs cite this run id; any change to RunSpec's canonical JSON (even a new null
+    # field) would silently fork it. New spec types get their own hash instead.
+    assert load_run_spec(COMMITTED).run_id() == "run-de1927346ab0"
+
+
 def test_committed_spec_is_valid_and_embeds_the_committed_feature_set():
     spec = load_run_spec(COMMITTED)
     assert spec.feature_set == load_feature_set(FEATURE_SETS / "total_ratings_v1.json")
