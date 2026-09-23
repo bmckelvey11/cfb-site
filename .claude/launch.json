@@ -61,6 +61,21 @@
       "port": 8778
     },
     {
+      "name": "Tuning Lab Monitor",
+      "runtimeExecutable": ".venv-lab-ui/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "streamlit",
+        "run",
+        "models/tuning/monitor.py",
+        "--server.headless",
+        "true",
+        "--server.port",
+        "8501"
+      ],
+      "port": 8501
+    },
+    {
       "name": "Marimo",
       "runtimeExecutable": "marimo",
       "runtimeArgs": [

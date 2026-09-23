@@ -2269,6 +2269,16 @@ Add persistent top-level context: environment, database snapshot, experiment dra
 18 System Health & Drift
 ```
 
+**Status (2026-09-23): read-only lab monitor built** (`models/tuning/monitor.py`).
+
+- It has three Streamlit pages:
+  - **Shadow:** covers pages 15 and 18. It shows alerts for a stale tick, a snapshot deadline, a missed week, or the verdict; the weeks; and the replay.
+  - **Runs:** jobs and model cards.
+  - **Hypotheses:** page 17, from `models/tuning/hypotheses.json`.
+- It launches nothing. The CLI still does that.
+- It runs in its own venv, `.venv-lab-ui` (`requirements-lab-ui.txt`), so the shadow tick's `.venv` never gains pyarrow. Start it with `.venv-lab-ui\Scripts\python -m streamlit run models/tuning/monitor.py`.
+- The editable pages in §5 are not built.
+
 ### 37.3 Comparison workspace
 
 Allow pinning runs and comparing only compatible experiments. Block or clearly warn when target, game universe, folds, line timestamp, provider, or target policy differs. Show paired game-level deltas rather than side-by-side aggregate metrics alone.

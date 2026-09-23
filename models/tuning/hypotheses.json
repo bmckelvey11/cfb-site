@@ -1,0 +1,86 @@
+{
+  "note": "Plan of record §32.1: every hypothesis, including nulls. Each answer points at the record that establishes it; if they disagree, the record wins. Trials are as the record states them; null means the record does not give a count.",
+  "hypotheses": [
+    {
+      "id": "B-ridge_v1",
+      "question": "Do weekly as-of ridge PPP and pace ratings beat raw ratings and a train mean on totals?",
+      "answer": "Yes: -1.14 and -0.84 MAE vs raw and mean; 0.33 MAE behind the Bovada open",
+      "status": "closed",
+      "holdout": "2021-2025 (first use)",
+      "trials": "12 lambda grid points, 2 methods",
+      "record": "docs/weekly-ratings-2026-09-23.md"
+    },
+    {
+      "id": "B-priors",
+      "question": "Do previous-season priors improve the weekly ratings early in the season?",
+      "answer": "No-go: early gain -0.24 MAE, lost when the carryover is inflated by half",
+      "status": "closed",
+      "holdout": "2021-2025 (reused)",
+      "trials": "14 lambda grid points, 4 coefficients, 4 stress variants",
+      "record": "docs/weekly-priors-2026-09-23.md"
+    },
+    {
+      "id": "B-lambda-total",
+      "question": "Does tuning the rating penalties on total-forecast loss change them?",
+      "answer": "Ridge no (40/4 ~ 40/8); priors at 80/8 improve but still fail the stress rule",
+      "status": "closed",
+      "holdout": "2021-2025 (reused)",
+      "trials": "98 grid points, 2 methods",
+      "record": "docs/weekly-lambda-total-2026-09-23.md"
+    },
+    {
+      "id": "prior_v3",
+      "question": "Tuned pre-2021, does a carryover prior forecast 2026 better than ridge_v1?",
+      "answer": "Frozen k = 1.0, lambda 80/8; one confirmatory look after the 2026 regular season",
+      "status": "pending",
+      "holdout": "2026 (sealed; final look only)",
+      "trials": "294 grid points",
+      "record": "docs/prior-scale-2026-09-23.md"
+    },
+    {
+      "id": "C-run-de1927346ab0",
+      "question": "Does a tuned Ridge/Elastic Net recombination of the nine ridge_v1 features beat ridge_v1's own total?",
+      "answer": "Matches: -0.035 MAE (-0.10 to +0.03); descriptive, spent holdout",
+      "status": "closed",
+      "holdout": "2021-2025 (reused)",
+      "trials": "60 Optuna trials",
+      "record": "research/totals/docs/totals-modeling-guide.md"
+    },
+    {
+      "id": "D-distributions",
+      "question": "Are predictive distributions of the total calibrated, and does P(over) beat a coin flip against the open?",
+      "answer": "Calibrated (80% intervals cover 80.8%); P(over) Brier 0.257, worse than 0.25",
+      "status": "closed",
+      "holdout": "2021-2025 (reused)",
+      "trials": "3 candidates, selected on 2018-2019",
+      "record": "docs/total-distributions-2026-09-23.md"
+    },
+    {
+      "id": "E-shadow",
+      "question": "Can the lab run one shadow period with no untracked revisions, timing violations, or missing artifacts?",
+      "answer": "Armed; the verdict is written after week 8 is scored (~2026-10-26)",
+      "status": "pending",
+      "holdout": "2026 weeks 5-8 (prospective)",
+      "trials": null,
+      "record": "docs/superpowers/specs/2026-09-23-tuning-lab-release-e-design.md"
+    },
+    {
+      "id": "E-replay",
+      "question": "How does the frozen min-EV policy price against real 2026 quotes over the shadow period?",
+      "answer": "Rules declared before week 5; runs after the period verdict. Descriptive, trial count 1",
+      "status": "pending",
+      "holdout": "2026 weeks 5-8 (prospective)",
+      "trials": "1",
+      "record": "models/tuning/replay.py"
+    },
+    {
+      "id": "F1-dynamic-ratings",
+      "question": "Do ratings that drift week to week (Kalman) beat weekly ridge on totals?",
+      "answer": "No: +0.08 MAE on 2021-2025, worse every season; stopped at the screen gate, no 2026 look",
+      "status": "closed",
+      "holdout": "2021-2025 (reused, screen only)",
+      "trials": "24 grid points",
+      "record": "docs/dynamic-ratings-2026-09-23.md"
+    }
+  ]
+}

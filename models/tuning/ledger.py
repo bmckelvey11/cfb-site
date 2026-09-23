@@ -150,20 +150,38 @@ class Ledger:
         return [_record(r) for r in rows]
 
     def verify(self) -> tuple[bool, str]:
-        """Recompute every hash in seq order; names the first bad seq.
-
-        A gap in `seq` (AUTOINCREMENT can leave one after a rolled-back insert) is not
-        a failure -- only a bad hash or a prev_sha256 that doesn't match the actual
-        previous record's sha256 is.
-        """
         with self._tx() as con:
-            rows = con.execute("SELECT * FROM records ORDER BY seq").fetchall()
-        prev = ""
-        for row in rows:
-            if row["prev_sha256"] != prev:
-                return False, f"seq {row['seq']}: prev_sha256 does not chain from the prior record"
-            expected = _digest(row["prev_sha256"], row["kind"], row["created_at"], row["payload"])
-            if expected != row["sha256"]:
-                return False, f"seq {row['seq']}: sha256 does not match its stored fields"
-            prev = row["sha256"]
-        return True, f"ok: {len(rows)} records"
+            return verify_rows(con.execute("SELECT * FROM records ORDER BY seq").fetchall())
+
+
+def verify_rows(rows: list[sqlite3.Row]) -> tuple[bool, str]:
+    """Recompute every hash in seq order; names the first bad seq.
+
+    A gap in `seq` (AUTOINCREMENT can leave one after a rolled-back insert) is not
+    a failure -- only a bad hash or a prev_sha256 that doesn't match the actual
+    previous record's sha256 is.
+    """
+    prev = ""
+    for row in rows:
+        if row["prev_sha256"] != prev:
+            return False, f"seq {row['seq']}: prev_sha256 does not chain from the prior record"
+        expected = _digest(row["prev_sha256"], row["kind"], row["created_at"], row["payload"])
+        if expected != row["sha256"]:
+            return False, f"seq {row['seq']}: sha256 does not match its stored fields"
+        prev = row["sha256"]
+    return True, f"ok: {len(rows)} records"
+
+
+def read_only(path: str | Path) -> tuple[list[Record], tuple[bool, str]]:
+    """Every record and the chain check, from a read-only connection.
+
+    For monitors: never creates the file, never takes a write lock, so it cannot
+    block the daily tick.
+    """
+    con = sqlite3.connect(f"file:{Path(path).as_posix()}?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+    try:
+        rows = con.execute("SELECT * FROM records ORDER BY seq").fetchall()
+    finally:
+        con.close()
+    return [_record(r) for r in rows], verify_rows(rows)
