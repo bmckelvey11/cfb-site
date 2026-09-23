@@ -2477,6 +2477,16 @@ fit_fold(train, test, run_spec) -> FoldResult
 
 ### Release E: live shadow system
 
+**Status (2026-09-23):** built and armed. The go/no-go is pending until the shadow period ends, around 2026-10-26.
+
+- Design: [`superpowers/specs/2026-09-23-tuning-lab-release-e-design.md`](superpowers/specs/2026-09-23-tuning-lab-release-e-design.md).
+- Shadow `shadow-3be5383c3469` covers 2026 weeks 5–8, with week 4 as a rehearsal. Its champion is `ridge_v1_total`; its challenger is `run-de1927346ab0` plus `dist-0b0cc0382eca`, frozen in `dd9724b5`.
+- An append-only, hash-chained ledger records every snapshot, prediction, and score. The daily refresh (`scripts/refresh_cfbd.cmd`) runs `shadow tick`.
+- Status: `$CFB_DATA_ROOT/processed/tuning/shadow/shadow-3be5383c3469/status.md`.
+- **The verdict is written to the ledger** once every week 5–8 game is scored or no-action.
+- **Parity check:** live features equal the historical path's on three past weeks, to within 1e-9.
+- **Prospective-only feeds:** the only one wired in is Action Network history, which is hashed after each cutoff. Injuries are not.
+
 - Scheduled snapshots and prediction ledger.
 - Champion/challenger aliases, shadow comparisons, rollback.
 - Data/prediction/performance/calibration drift monitoring.

@@ -8,11 +8,11 @@ Design (period, frozen artifacts, counting rules):
 
 | Task | Status |
 | --- | --- |
-| 1. Ledger (`ledger.py`): append-only SQLite, hash chain | pending |
-| 2. Shared row builder and live week frame; parity on 2025 week 6 | pending |
-| 3. Shadow spec, freeze, tick, alias, status (`shadow_spec.py`, `shadow.py`) | pending |
-| 4. Arm: commit spec and freeze JSON; week 4 rehearsal snapshot | pending |
-| 5. Daily step in `refresh_cfbd.cmd`; docs | pending |
+| 1. Ledger (`ledger.py`): append-only SQLite, hash chain | Done 2026-09-23 (`785a3a1b`): 13 tests, including two-process appends; built by a Sonnet subagent |
+| 2. Shared row builder and live week frame; parity on 2025 week 6 | Done 2026-09-23 (`624a6f09`): parity to 1e-9 on 2025 w6, 2024 w2, 2022 w11 (slow test); C reproduces byte for byte |
+| 3. Shadow spec, freeze, tick, alias, status (`shadow_spec.py`, `shadow.py`) | Done 2026-09-23 (`624a6f09`): 7 synthetic lifecycle tests |
+| 4. Arm: commit spec and freeze JSON; week 4 rehearsal snapshot | Done 2026-09-23: freeze `dd9724b5`; armed 11:18Z, week 4 snapshot of 58 games fit on 156; chain ok |
+| 5. Daily step in `refresh_cfbd.cmd`; docs | Done 2026-09-23 (`ebfb4f81`); plan-of-record status |
 | 6. Period verdict after week 8 (~2026-10-26), written by `tick` | waiting on the calendar |
 
 ## Global constraints
