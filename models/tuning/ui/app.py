@@ -2,8 +2,9 @@
 
     .venv-lab-ui\\Scripts\\python -m streamlit run models/tuning/ui/app.py
 
-Pages: Shadow (read-only), New run (plan §5 pages 01-06), Jobs (07), Runs (08-09),
-Hypotheses (10). Every check a spec must pass lives in `models.tuning.ui.api`, run in the
+Pages: Shadow (read-only; §37.2 pages 15, 18), Distributions (§37.2 page 13 and the §37.4
+scenario line), New run (plan §5 pages 01-06), Jobs (07), Runs (08-09), Registry (§37.2
+page 16), Hypotheses (10 / §37.2 page 17). Every check a spec must pass lives in `models.tuning.ui.api`, run in the
 main `.venv`, so the GUI cannot skip one; a launch re-validates the exact file it starts.
 Set CFB_LAB_ROOT to point the whole GUI at a scratch lab. Runs in its own venv so the
 shadow tick's `.venv` keeps its packages:
@@ -35,7 +36,8 @@ ALERT = {"error": st.error, "warning": st.warning, "success": st.success, "info"
 IN_FLIGHT = ("queued", "claimed", "running", "retry_wait", "cancellation_requested")
 
 st.set_page_config(page_title="CFB Tuning Lab", layout="wide")
-page = st.sidebar.radio("Page", ["Shadow", "New run", "Jobs", "Runs", "Hypotheses"])
+page = st.sidebar.radio("Page", ["Shadow", "Distributions", "New run", "Jobs", "Runs",
+                                 "Registry", "Hypotheses"])
 st.sidebar.caption(f"Lab root: `{LAB}`" + ("  \n**scratch lab**" if "--lab-root" in sys.argv
                                             or os.environ.get("CFB_LAB_ROOT") else ""))
 st.sidebar.caption("Shadow and Hypotheses are read-only. Freeze, tick, alias, and replay "
@@ -64,6 +66,28 @@ def templates() -> dict[str, Path]:
 
 def pretty(doc: dict) -> list[str]:
     return json.dumps(doc, indent=1, sort_keys=True).splitlines()
+
+
+def pmf_view(pmf_row, default_line: float, actual: float | None = None) -> None:
+    """One game's table: a chart, and P(over/under/push) at a line the user picks."""
+    import altair as alt
+
+    cdf = pmf_row.cumsum()
+    lo, hi = int((cdf >= 0.002).argmax()), int((cdf >= 0.998).argmax())
+    line = st.number_input("Line (a what-if you enter)", value=float(default_line), step=0.5)
+    p = md.over_under(pmf_row, line)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("P(over)", f"{p['over']:.1%}")
+    c2.metric("P(under)", f"{p['under']:.1%}")
+    c3.metric("P(push)", f"{p['push']:.1%}")
+    bars = alt.Chart(pd.DataFrame({"total": range(lo, hi + 1), "p": pmf_row[lo:hi + 1]})).mark_bar(
+        opacity=0.8).encode(x=alt.X("total:Q", title="Game total"), y=alt.Y("p:Q", title="Probability"))
+    marks = [{"x": line, "what": "line"}] + ([{"x": actual, "what": "actual"}] if actual is not None else [])
+    rules = alt.Chart(pd.DataFrame(marks)).mark_rule(strokeWidth=2).encode(
+        x="x:Q", color=alt.Color("what:N", scale=alt.Scale(range=["#d62728", "#111111"])))
+    st.altair_chart(bars + rules, width="stretch")
+    st.caption("Sensitivity analysis on a line you enter: not a stored prediction, a price, or an "
+               "edge. Release D found no skill against the open (P(over) Brier 0.257 vs 0.25).")
 
 
 if page == "Shadow":
@@ -103,6 +127,66 @@ if page == "Shadow":
             st.dataframe(pd.DataFrame(out["sensitivity"]), hide_index=True)
     with st.expander("status.md (written by the tick)"):
         st.markdown(v["status_md"])
+
+elif page == "Distributions":
+    st.title("Distributions")
+    source = st.radio("Source", ["2026 shadow predictions", "2021–25 outer folds (Release D)"],
+                      horizontal=True)
+    if source.startswith("2026"):
+        shadows = sorted(p for p in (LAB / "shadow").glob("shadow-*") if (p / "ledger.sqlite3").exists())
+        if not shadows:
+            st.info("No shadow period is armed.")
+            st.stop()
+        sd = shadows[-1]
+        weeks = sorted(md.shadow_view(sd, RAW, now)["weeks"].query("snapshots > 0")["week"])
+        if not weeks:
+            st.info("No snapshot yet.")
+            st.stop()
+        week = st.selectbox("Week", weeks, index=len(weeks) - 1)
+        df, pmf, snap = md.shadow_predictions(sd, RAW, week)
+        st.caption(f"Snapshot {snap['snapshot_id']}, generated {md._et(snap['generated_at'])}"
+                   + (" — REHEARSAL week, never counted" if snap.get("rehearsal") else "")
+                   + ". Champion: ridge_v1 total. Challenger: the lab model's point and joint table.")
+        st.dataframe(df.drop(columns=["pmf_row"]), hide_index=True, width="stretch")
+        pick = st.selectbox("Game", df["game_id"], format_func=lambda g: df.set_index("game_id").at[g, "game"])
+        row = df.set_index("game_id").loc[pick]
+        pmf_view(pmf[int(row["pmf_row"])], round(row["challenger"] * 2) / 2)
+    else:
+        dists = [p for p in md.run_dirs(LAB) if p.name.startswith("dist-") and (p / "pmf_outer.npy").exists()]
+        if not dists:
+            st.info("No distribution run.")
+            st.stop()
+        run = st.selectbox("Distribution run", dists, format_func=lambda p: p.name)
+        df, pmf = md.dist_outer(run, RAW)
+        c1, c2 = st.columns(2)
+        season = c1.selectbox("Season", sorted(df["season"].unique()))
+        week = c2.selectbox("Week", sorted(df.loc[df["season"] == season, "week"].unique()))
+        wk = df[(df["season"] == season) & (df["week"] == week)]
+        cols = ["game_id", "game", "target", "market_open", "joint_bootstrap__mean",
+                "joint_bootstrap__q_0.1", "joint_bootstrap__q_0.9", "joint_bootstrap__pit"]
+        st.dataframe(wk[[c for c in cols if c in wk]], hide_index=True, width="stretch")
+        pick = st.selectbox("Game", wk["game_id"], format_func=lambda g: wk.set_index("game_id").at[g, "game"])
+        row = wk.set_index("game_id").loc[pick]
+        opened = row.get("market_open")
+        pmf_view(pmf[int(row["pmf_row"])], opened if pd.notna(opened) else round(row["joint_bootstrap__mean"]),
+                 actual=float(row["target"]))
+        st.caption("A spent holdout: descriptive. The line defaults to the untimed Bovada open.")
+
+elif page == "Registry":
+    st.title("Model registry")
+    st.caption("Plan §37.2 page 16. Read-only: aliases move with "
+               "`python -m models.tuning shadow alias`, which records the reason.")
+    runs, moves = md.registry(LAB)
+    st.subheader("Champion and challenger")
+    if len(moves):
+        current = moves.groupby(["shadow", "alias"]).tail(1)
+        st.dataframe(current[["shadow", "alias", "model", "reason", "at"]], hide_index=True, width="stretch")
+        with st.expander("Every alias move"):
+            st.dataframe(moves, hide_index=True, width="stretch")
+    else:
+        st.caption("No shadow period has set an alias.")
+    st.subheader("Published runs")
+    st.dataframe(runs, hide_index=True, width="stretch")
 
 elif page == "New run":
     st.title("New run")

@@ -7,12 +7,14 @@ Every database is opened read-only, so the GUI cannot block the tick or a worker
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from models.tuning.ledger import read_only
@@ -180,3 +182,84 @@ def run_dirs(lab_root: Path) -> list[Path]:
 
 def hypotheses(path: Path = HYPOTHESES) -> pd.DataFrame:
     return pd.DataFrame(json.loads(path.read_text(encoding="utf-8"))["hypotheses"])
+
+
+# --- distributions (plan §37.2 page 13) ------------------------------------------------
+
+def over_under(pmf: np.ndarray, line: float) -> dict[str, float]:
+    """P(over), P(push), P(under) of an integer total table at `line` (same rule as
+    `market.outcome_probs`; a test pins them together)."""
+    k = int(np.floor(line))
+    at_or_below = float(pmf[: min(max(k, -1), len(pmf) - 1) + 1].sum())
+    push = float(pmf[k]) if line == k and 0 <= k < len(pmf) else 0.0
+    return {"over": 1.0 - at_or_below, "push": push, "under": at_or_below - push}
+
+
+def _teams(raw_dir: Path, seasons) -> dict[int, dict]:
+    out = {}
+    for s in sorted(set(int(x) for x in seasons)):
+        path = raw_dir / f"games_{s}.json"
+        if path.exists():
+            for g in json.loads(path.read_text(encoding="utf-8")):
+                if g.get("id") is None:
+                    continue
+                out[g["id"]] = {"home": g.get("homeTeam"), "away": g.get("awayTeam"),
+                                "kickoff": pd.to_datetime(g.get("startDate"), utc=True, errors="coerce")}
+    return out
+
+
+def shadow_predictions(sd: Path, raw_dir: Path, week: int) -> tuple[pd.DataFrame, np.ndarray, dict]:
+    """The week's latest snapshot: one row per game (both aliases) and its checked table."""
+    records, _ = read_only(sd / "ledger.sqlite3")
+    snaps = [r.payload for r in records if r.kind == "snapshot" and r.payload["week"] == week]
+    if not snaps:
+        return pd.DataFrame(), np.zeros((0, 0)), {}
+    snap = snaps[-1]
+    blob = (sd / snap["pmf_file"]).read_bytes()
+    if hashlib.sha256(blob).hexdigest() != snap["pmf_sha256"]:
+        raise ValueError(f"{snap['pmf_file']} does not match its ledger checksum")
+    pmf = np.load(sd / snap["pmf_file"])
+    preds = pd.DataFrame([r.payload for r in records if r.kind == "prediction"
+                          and r.payload["snapshot_id"] == snap["snapshot_id"]])
+    champ = preds[preds["alias"] == "champion"].set_index("game_id")["point"].rename("champion")
+    ch = preds[preds["alias"] == "challenger"].set_index("game_id")
+    df = ch[["point", "pmf_row", "q10", "q50", "q90", "p_home_win"]].rename(
+        columns={"point": "challenger"}).join(champ)
+    teams = _teams(raw_dir, [pd.Timestamp(snap["cutoff"]).year])
+    df["game"] = [f"{teams.get(g, {}).get('away', '?')} @ {teams.get(g, {}).get('home', '?')}" for g in df.index]
+    df["kickoff"] = [_et(teams.get(g, {}).get("kickoff")) for g in df.index]
+    df = df.reset_index().sort_values(["kickoff", "game"])
+    return df[["game_id", "kickoff", "game", "champion", "challenger", "q10", "q50", "q90",
+               "p_home_win", "pmf_row"]], pmf, snap
+
+
+def dist_outer(run_dir: Path, raw_dir: Path) -> tuple[pd.DataFrame, np.ndarray]:
+    """A distribution run's outer-fold games (selected candidate's table) with team names."""
+    pmf = np.load(run_dir / "pmf_outer.npy")
+    order = pd.read_csv(run_dir / "pmf_games.csv")["game_id"]
+    pred = pd.read_csv(run_dir / "predictions.csv").set_index("game_id").loc[order].reset_index()
+    teams = _teams(raw_dir, pred["season"].unique())
+    pred["game"] = [f"{teams.get(g, {}).get('away', '?')} @ {teams.get(g, {}).get('home', '?')}"
+                    for g in pred["game_id"]]
+    pred["pmf_row"] = range(len(pred))
+    return pred, pmf
+
+
+# --- registry (plan §37.2 page 16) ------------------------------------------------------
+
+def registry(root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Published runs, and every alias move in every shadow ledger (newest last)."""
+    runs = []
+    for d in run_dirs(root):
+        m = json.loads((d / "manifest.json").read_text(encoding="utf-8")) if (d / "manifest.json").exists() else {}
+        runs.append({"run_id": d.name, "kind": "distribution" if d.name.startswith("dist-") else "tuning",
+                     "spec": m.get("spec_id") or m.get("base_run_id"), "generated": m.get("generated_at"),
+                     "git": m.get("git_sha"), "code": (m.get("code_sha256") or "")[:12],
+                     "card": (d / "card.md").exists()})
+    moves = []
+    for sd in sorted((root / "shadow").glob("shadow-*")):
+        if (sd / "ledger.sqlite3").exists():
+            recs, _ = read_only(sd / "ledger.sqlite3")
+            moves += [{"shadow": sd.name, "at": _et(pd.Timestamp(r.created_at)), **r.payload}
+                      for r in recs if r.kind == "alias"]
+    return pd.DataFrame(runs), pd.DataFrame(moves)

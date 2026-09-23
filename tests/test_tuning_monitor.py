@@ -57,6 +57,51 @@ def test_alerts_warn_before_a_period_cutoff_and_fail_after_it(tmp_path):
     assert "No tick for 40 h" in v["alerts"][0][1] and "Week 5 MISSED" in v["alerts"][1][1]
 
 
+def test_over_under_matches_the_pricing_engine():
+    import numpy as np
+
+    from models.tuning.market import outcome_probs
+    from models.tuning.ui.data import over_under
+
+    pmf = np.random.default_rng(3).dirichlet(np.ones(151))
+    for line in (-1, 0, 44, 44.5, 150, 151.5):
+        p = over_under(pmf, line)
+        assert (p["over"], p["push"], p["under"]) == pytest.approx(outcome_probs(pmf, "over", line))
+
+
+def test_shadow_predictions_join_both_aliases_and_refuse_a_changed_table(tmp_path):
+    import hashlib
+
+    import numpy as np
+
+    from models.tuning.ui.data import shadow_predictions
+
+    sd = _shadow(tmp_path)
+    games = json.loads((tmp_path / "raw" / "games_2026.json").read_text(encoding="utf-8"))
+    games += [{"id": 7, "homeTeam": "Ohio", "awayTeam": "Akron", "startDate": CUT5.isoformat()}]
+    (tmp_path / "raw" / "games_2026.json").write_text(json.dumps(games), encoding="utf-8")
+    (sd / "snapshots").mkdir()
+    pmf = np.zeros((1, 151))
+    pmf[0, 50] = 1.0
+    np.save(sd / "snapshots" / "w5.npy", pmf)
+    blob = (sd / "snapshots" / "w5.npy").read_bytes()
+    led = Ledger(sd / "ledger.sqlite3")
+    led.append("snapshot", {"week": 5, "snapshot_id": "5:x", "cutoff": CUT5.isoformat(), "games": [7],
+                            "generated_at": CUT5.isoformat(), "pmf_file": "snapshots/w5.npy",
+                            "pmf_sha256": hashlib.sha256(blob).hexdigest()})
+    common = {"snapshot_id": "5:x", "week": 5, "game_id": 7}
+    led.append_many([("prediction", {**common, "alias": "champion", "point": 52.0}),
+                     ("prediction", {**common, "alias": "challenger", "point": 50.5, "pmf_row": 0,
+                                     "q10": 50, "q50": 50, "q90": 50, "p_home_win": 0.6})])
+    df, table, snap = shadow_predictions(sd, tmp_path / "raw", 5)
+    row = df.iloc[0]
+    assert (row["game"], row["champion"], row["challenger"]) == ("Akron @ Ohio", 52.0, 50.5)
+    assert table[int(row["pmf_row"])][50] == 1.0
+    np.save(sd / "snapshots" / "w5.npy", pmf * 0.5)
+    with pytest.raises(ValueError, match="checksum"):
+        shadow_predictions(sd, tmp_path / "raw", 5)
+
+
 def test_every_hypothesis_points_at_a_record_that_exists():
     h = hypotheses()
     assert h["id"].is_unique and set(h["status"]) <= {"closed", "pending"}

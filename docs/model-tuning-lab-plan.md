@@ -2290,11 +2290,16 @@ Add persistent top-level context: environment, database snapshot, experiment dra
 18 System Health & Drift
 ```
 
-**Status (2026-09-23): pages 15, 17 and 18 are built, read-only**, in the lab GUI (§5 status).
+**Status (2026-09-23): pages 13 and 15–18 are built, read-only**, in the lab GUI (§5 status).
 
+- **Distributions** is page 13, with §37.4's scenario limited to one input: the total line.
+  - It shows each game's predicted table, from this week's shadow snapshot (checked against its ledger checksum) or from Release D's 2021–25 outer folds.
+  - It gives P(over/under/push) at a line you enter, labelled as sensitivity analysis, not a price or an edge.
 - **Shadow** covers pages 15 and 18. It shows alerts for a stale tick, a snapshot deadline, a missed week, or the verdict; then the weeks and the replay.
+- **Registry** is page 16: published runs, the current champion and challenger, and every alias move. Aliases still move only through the CLI.
 - **Hypotheses** is page 17, read from `models/tuning/hypotheses.json`.
-- Pages 11–14 and 16 are not built.
+- **Page 14, the betting decision lab, waits** until the shadow replay has run. Pricing live 2026 quotes in the GUI now would show priced results before the frozen replay.
+- Pages 11 and 12 are not built.
 
 ### 37.3 Comparison workspace
 
