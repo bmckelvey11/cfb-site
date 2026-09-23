@@ -1,5 +1,9 @@
 """Closing-line value for the 2026 Greenline totals flags, against a real market close.
 
+SUPERSEDED AS A MEASUREMENT 2026-09-23 by `greenline_clv_all_eras.py`: the "corrupt" rows
+this gates are in-game totals, they sit at every GraphQL-only book (not just Pinnacle), and
+on some games they outnumber the pregame closes, so the book-median gate keeps them.
+
     python research/totals/scripts/greenline_clv.py
     python research/totals/scripts/greenline_clv.py --close consensus
     python research/totals/scripts/greenline_clv.py --tolerance 2.0 --out doc.md

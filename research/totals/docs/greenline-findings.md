@@ -15,10 +15,11 @@ a 52.38% break-even. The eras are statistically one thing (p 0.91), the money in
 contains zero, and **no filter on it survives testing** — not bands, not edge thresholds, not
 situational splits, not Pinnacle agreement. The honest position is a small, mechanical,
 unfiltered allocation sized for uncertainty, and a recommendation on the table to cut the
-unit from 1% to 0.6%. Against a real market close the flags show **no CLV clearing its own
-detection floor** — +0.06 ± 0.48 points against an mde of 0.61 — so whatever the board is,
-it is not demonstrably early, though a true CLV under 0.6 points would look the same either
-way.
+unit from 1% to 0.6%. Against the closing line, the pooled unders beat the close by
+**+0.29 ± 0.21 points** (p 0.004, n=265), but the eras disagree: 2020 has none (+0.05) and the
+2026 flags have about half a point (+0.50), which holds at a single book (DraftKings at
+capture vs its own close, +0.51 ± 0.21). That is two early-season weeks, and even the
+pooled upper bound sits below the ~0.6 points that would pay for −110 on CLV alone.
 
 ---
 
@@ -38,8 +39,8 @@ way.
 | 10 | **Pinnacle's position does not rank the unders.** Juice lean, line vs PFF's, distance from projection, limit — n=38, nothing survives Holm. | [pinnacle shade](greenline-pinnacle-shade-2026-09-17.md) |
 | 11 | **The 2022-23 exports carry no price**, so they contribute a record and never a return. Integrity gate, not a rounding choice. | [export picks](greenline-export-picks-graded-2026-09-21.md) |
 | 12 | **The archive's CFBD joins are clean** after one repaired transposition and a matcher fix. `is_greenline_pick` is copied onto all three snapshots — a known trap. | [join audit](greenline-archive-join-audit-2026-09-21.md) |
-| 13 | **No closing-line value clears its own detection floor overall** — +0.06 ± 0.48 pts against a gated market close, n=79, mde 0.61 pts, so this is a bound under 0.6 pts, not a measured zero. All three gated policies land between −0.20 and +0.06, none clearing its own mde. Beating the close does not predict winning the bet either. **Week 3 alone is the exception**: +0.35 ± 0.25 exceeds its mde of 0.31 (one-sided p≈0.003, n=55, unadjusted); week 2 is negative and uninformative. Registered to watch, not yet a finding. | [clv](greenline-clv-market-close-2026-09-22.md) |
-| 14 | **The Pinnacle feed must be gated before use.** Ungated CLV reads +0.24; the 18 corrupt rows that inflate it carry +1.06 on their own and span −15 to +27 points. Stable from 0.5 to 5 points of tolerance. | [clv](greenline-clv-market-close-2026-09-22.md) |
+| 13 | **Pooled unders beat the close; the eras disagree.** +0.29 ± 0.21 pts against REST-backed book closes, n=265, one-sided p 0.004. 2020 +0.05 ± 0.38 (also ~0 against PFF_hist's own close), 2022-23 +0.46 ± 0.35, 2026 +0.50 ± 0.22; 2026 minus 2020 p 0.047. The 2026 move holds at one book, DraftKings at capture vs its own close, +0.51 ± 0.21 on 97 flags, +0.46 on the 84 where PFF's number equalled DraftKings', and both sides move toward PFF, so it is not drift and not a noisy displayed number. Two weeks, five kickoff dates; the pooled upper bound +0.50 is below the ~0.60 break-even CLV. | [clv all eras](greenline-clv-all-eras-2026-09-23.md) |
+| 14 | **GraphQL-only closes are not closes.** Rows in `core.fact_game_line` that exist only in the CFBD GraphQL feed (Pinnacle, Caesars, FanDuel, BetMGM, bet365, Circa) carry in-game or partial-game totals on some 2026 games — WKU @ UGA closes 52.5–56.0 at REST-backed books and 78.0–82.5 at four GraphQL-only ones. The "corrupt Pinnacle rows" of 2026-09-22 were these, and a median of the other books cannot catch them when live rows are the majority, so that doc's +0.06 is withdrawn and the flag-CLV contrast (row D) reused the same close. Use REST-backed rows (`_source` ≠ `gql`); every 2020-23 row is one. | [clv all eras](greenline-clv-all-eras-2026-09-23.md) |
 
 ## Open
 
@@ -47,7 +48,7 @@ way.
 | --- | --- | --- |
 | B | **Were the 2020 prices real?** That era is priced at PFF's published break-evens, median implied −107. Strip 2020 and the unders pool goes +4.0% → **−0.2%**. | Not started. Cheap, and it either confirms or deflates every ROI here. |
 | C | **Do unders at `value` ≥ 0.04 underperform?** Registered 2026-09-22 at a frozen raw cut. Currently 8-16 against 138-108. | **Registered. No look until 56 prospective picks have graded** (from week 4 forward, ~6 weeks). |
-| D | **Does a flag predict line movement?** A bet-free test of whether PFF knows anything, accruing every week regardless of what gets bet. | **Half answered — the flag half is not identifiable as posed.** PFF's team grades do track movement: dropback-weighted passing grade is worth +0.26 pts per SD of the close-minus-open move over 956 games, Holm p 0.003, same sign both seasons ([line movement](pff-line-movement-2026-09-22.md)). But whether a *flag* adds anything cannot be tested that way — every FBS game with PFF features in 2026 weeks 2-3 was on the board, so there are no unflagged controls. Needs a contrast with variation: the published under list, or a cut on `value`. **Both now tried and both bounded, not answered** — under list −0.36 pts against a 1.46-pt MDE, edge slope −0.03 pts/SD against 0.69 ([flag CLV contrast](greenline-flag-clv-contrast-2026-09-22.md)). Re-look at ~595 scored flags, i.e. end of the 2026 season. |
+| D | **Does a flag predict line movement?** A bet-free test of whether PFF knows anything, accruing every week regardless of what gets bet. | **Half answered — the flag half is not identifiable as posed.** PFF's team grades do track movement: dropback-weighted passing grade is worth +0.26 pts per SD of the close-minus-open move over 956 games, Holm p 0.003, same sign both seasons ([line movement](pff-line-movement-2026-09-22.md)). But whether a *flag* adds anything cannot be tested that way — every FBS game with PFF features in 2026 weeks 2-3 was on the board, so there are no unflagged controls. Needs a contrast with variation: the published under list, or a cut on `value`. **Both now tried and both bounded, not answered** — under list −0.36 pts against a 1.46-pt MDE, edge slope −0.03 pts/SD against 0.69 ([flag CLV contrast](greenline-flag-clv-contrast-2026-09-22.md)). **That contrast reused the GraphQL-contaminated close (row 14) and needs a rerun on REST-backed closes before it counts.** The line-movement half is unaffected: it requires `total_open`, which no GraphQL-only row has. Re-look at ~595 scored flags, i.e. end of the 2026 season. |
 | E | **Closed — do not reopen.** Bands, edge thresholds, overs, Pinnacle shade, situational filters. Each tested at least twice, each null. Further looks on the same 324 picks cost multiplicity and buy nothing. | Closed. |
 | F | **Do team-level PFF stats filter the unders?** Five features registered 2026-09-22 in `pff_under_filters.py` (pass rush, run-heavy, no-deep, weak QB, coverage), each requiring both teams on the under side of the FBS median. | **Blocked on power, not started.** `stg.pff_*` begins at 2025, so only the 88 2026-flag unders can carry a feature — the 2020 and 2022-23 eras cannot. MDE 65.6% at n=88, above the 65% gate the script enforces, so the search does not run. Rerun when the flag board grades enough unders to bring it under. |
 
@@ -100,9 +101,16 @@ banner pointing forward. Their conclusions are kept here so nothing is lost with
 
 ### The Pinnacle close: reachable, and what the gate has to do
 
+**Revised 2026-09-23: the gate below is not enough.** The "corrupt" rows are in-game or
+partial-game totals, they appear at every GraphQL-only book and not just Pinnacle, and on
+some games they outnumber the pregame closes, so a median gate keeps them. Score against
+REST-backed rows instead — row 14 and
+[clv all eras](greenline-clv-all-eras-2026-09-23.md). The original reading follows as it
+was written; its record is
+[archive/docs/greenline-clv-market-close-2026-09-22.md](../../../archive/docs/greenline-clv-market-close-2026-09-22.md).
+
 **Yes for 2026, and only 2026, and not before a validation gate.** The gate was then tested
-rather than assumed, and it is load-bearing — see
-[clv](greenline-clv-market-close-2026-09-22.md).
+rather than assumed, and it is load-bearing.
 
 - `core.fact_game_line` carries `provider_key = 'pinnacle'` with a `total_close`, sourced
   entirely from the CFBD GraphQL feed (`_source = 'gql'`). 204 rows: 2025 weeks 8-13

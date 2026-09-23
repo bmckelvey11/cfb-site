@@ -1,3 +1,5 @@
+**Superseded by** [greenline-clv-all-eras-2026-09-23.md](../../research/totals/docs/greenline-clv-all-eras-2026-09-23.md) — the "corrupt" GraphQL closes this doc gates are in-game totals at every GraphQL-only book, and the book median it gates against is contaminated the same way.
+
 # Greenline totals vs a real market close — and whether the feed needs filtering
 
 2026-09-22

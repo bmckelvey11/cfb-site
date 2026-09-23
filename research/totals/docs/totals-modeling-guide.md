@@ -66,7 +66,7 @@ and the record that measured it.
 | Seasonal under effect | Not raised | **Null.** Late-season unders 50.80% vs early 51.00%, p=0.83 | [seasonal-totals-backtest.md](../../../docs/seasonal-totals-backtest.md) |
 | Kicker quality/volatility past the close | Special teams "shrink heavily" | **Bound, not a zero.** CI upper bound buys a 51.5% over vs 52.38% break-even; underpowered | [kicker-quality-volatility-totals-2026-09-18.md](kicker-quality-volatility-totals-2026-09-18.md) |
 | Can a team stat predict line movement? | Market-as-sensor listed as frontier | **Yes, one.** PFF passing grade, +0.26 pts/SD, Holm p 0.003, n=956 | [pff-line-movement-2026-09-22.md](pff-line-movement-2026-09-22.md) |
-| Vendor picks vs a real close | Not raised | Greenline CLV **+0.06 ± 0.48** against gated Pinnacle; the personal 2023–25 bets show +0.29 against CFBD's close. The benchmarks differ, and the personal bets are mostly Greenline flags | [greenline-clv-market-close-2026-09-22.md](greenline-clv-market-close-2026-09-22.md), [clv-analysis.md](../../../docs/clv-analysis.md) |
+| Vendor picks vs a real close | Not raised | Greenline unders **+0.29 ± 0.21** against REST-backed CFBD closes across all eras, but 2020 ~0 and 2026 +0.50 (same-book +0.51); the personal 2023–25 bets show +0.29 against CFBD's close. The personal bets overlap Greenline only partly | [greenline-clv-all-eras-2026-09-23.md](greenline-clv-all-eras-2026-09-23.md), [clv-analysis.md](../../../docs/clv-analysis.md) |
 | Arscott's zero-censoring bias | "Untested; replicate first" | The repo runs a strategy on the same mechanism: the floor-bias over-zero model prices the zero floor on team scores | [`models/over_zero/docs/MODEL_GUIDE.md`](../../../models/over_zero/docs/MODEL_GUIDE.md) |
 | Key numbers in the total | "Respect key numbers" | Measured: one-point bins with neighbour lift, 2014–25 FBS | [total-points-distribution-2026-09-17.md](../../../docs/total-points-distribution-2026-09-17.md) |
 | Wind | Anecdotal 13–15 mph thresholds | Pre-registered plan for crosswind vs along-field wind | [wind-orientation-totals.md](../../../docs/wind-orientation-totals.md) |
@@ -739,8 +739,9 @@ Report the evaluation standard's **Tier 1** list. Mapped to totals:
   line itself as the market median.
 - **Calibration slope and intercept**, plus a reliability plot of $p_{\text{o}}$, and PIT
   coverage for distributional models.
-- **CLV**: mean, median, and positive rate against a fixed benchmark close (gated Pinnacle
-  from 2025 week 8 only, per [greenline-clv-market-close-2026-09-22.md](greenline-clv-market-close-2026-09-22.md)).
+- **CLV**: mean, median, and positive rate against a fixed benchmark close (the median
+  REST-backed book close; GraphQL-only rows, Pinnacle included, carry in-game totals, per
+  [greenline-clv-all-eras-2026-09-23.md](greenline-clv-all-eras-2026-09-23.md)).
   Signed so positive favors the side bet: close minus bet total for an over, and bet total
   minus close for an under.
 - **ROI with an interval, bet count, independent events, drawdown**: economic folds only.

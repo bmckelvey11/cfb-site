@@ -108,11 +108,12 @@ def break_even(odds: int) -> float:
     return (-odds) / (-odds + 100) if odds < 0 else 100 / (odds + 100)
 
 
-def latest_snapshot() -> tuple[list[dict], str, Path]:
+def latest_snapshot(path: Path | None = None) -> tuple[list[dict], str, Path]:
+    """The newest odds-api snapshot, or the one at `path`."""
     snaps = sorted(OA_DIR.glob("odds_americanfootball_ncaaf_*.json"))
     if not snaps:
         raise SystemExit(f"no snapshot in {OA_DIR} -- run scripts/pull_odds.py")
-    path = snaps[-1]
+    path = path or snaps[-1]
     payload = json.loads(path.read_text(encoding="utf-8"))
     rows = []
     for e in payload["events"]:
