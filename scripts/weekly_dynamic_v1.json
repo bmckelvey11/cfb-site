@@ -1,0 +1,138 @@
+{
+  "candidate": "kalman_v1",
+  "design": "docs/superpowers/specs/2026-09-23-tuning-lab-release-f-dynamic-ratings-design.md",
+  "frozen_at": "2026-09-23T13:33:04+00:00",
+  "tune_seasons": [
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019
+  ],
+  "ridge_v1_lambda": [
+    40,
+    8
+  ],
+  "q_ppp": 0.001,
+  "q_pace": 0.005,
+  "decay_ppp": 1.0,
+  "decay_pace": 1.0,
+  "trial_count": {
+    "grid_points": 24
+  },
+  "tuning": {
+    "seasons": [
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019
+    ],
+    "n_cutoffs": 85,
+    "kalman_ppp": {
+      "value": 0.001,
+      "loss_by_value": {
+        "0": 97157.2102,
+        "0.0001": 97101.9859,
+        "0.0003": 97024.3906,
+        "0.001": 97002.654,
+        "0.003": 97931.9893,
+        "0.01": 102842.8829
+      },
+      "pick_on_grid_boundary": false
+    },
+    "kalman_pace": {
+      "value": 0.005,
+      "loss_by_value": {
+        "0": 13187.943,
+        "0.0005": 13184.4567,
+        "0.0015": 13178.9965,
+        "0.005": 13173.0421,
+        "0.015": 13225.7988,
+        "0.05": 13644.8012
+      },
+      "pick_on_grid_boundary": false
+    },
+    "decay_ppp": {
+      "value": 1.0,
+      "loss_by_value": {
+        "1": 97157.2102,
+        "0.98": 97204.9527,
+        "0.95": 97380.6814,
+        "0.9": 97930.6081,
+        "0.85": 98753.5217,
+        "0.8": 99781.5846
+      },
+      "pick_on_grid_boundary": true
+    },
+    "decay_pace": {
+      "value": 1.0,
+      "loss_by_value": {
+        "1": 13187.943,
+        "0.98": 13202.2472,
+        "0.95": 13232.5676,
+        "0.9": 13301.3855,
+        "0.85": 13384.4923,
+        "0.8": 13473.5089
+      },
+      "pick_on_grid_boundary": true
+    }
+  },
+  "code_sha256": {
+    "weekly_dynamic.py": "1d065cf69c1a95434f18d50266720e18ce039a0ed59996986a6f75895d5620e0",
+    "weekly_ratings.py": "fca7078614f1a35b92d0e9f4b4505a2367b47c4fe15ba23ae190de36db5f5dc0",
+    "weekly_ratings_eval.py": "a96c5c177f2dfa031715f8ef4e8db87a6297a93aa15c9dd6ddbcb3017644d174"
+  },
+  "source_files": [
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2014.json",
+      "sha256": "c33a8fd2687d248c0bbf3b9320e1b793abde55dca9cbf9bc1f25a7b4bf04113b"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2014.json",
+      "sha256": "64adb34375cfb7a1347c1e0ee53384755f20da177f96b0fd348c54338df66179"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2015.json",
+      "sha256": "63921d315df440bde538241ecd2e5684b78305c1f1102ef8d4e2abd915936868"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2015.json",
+      "sha256": "bdcc401346167e25cdb05e068216c1b276521ebea99b5bf31e671a1b776443de"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2016.json",
+      "sha256": "b6b734fb2f0b538413bd0c6510014af915dda7e75158bc70e5dd9bf06d74222f"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2016.json",
+      "sha256": "ffd95b15099efe96f45254af72066d3de9e3940c7bee88e7f1cf5bc609bf032a"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2017.json",
+      "sha256": "6cd9c7592e0fb13089136b4e0ccd611b87a4b843474ce6514cfd130b983a9d4d"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2017.json",
+      "sha256": "589c70ff78af757d9f67273c0e4faf0d36b66f5cce5447246075b1268c51175f"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2018.json",
+      "sha256": "ae879f0bc7a21c82ca7639ab1f2ce231ced4973aecc0797886c73e2b2a79f12c"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2018.json",
+      "sha256": "0bb5776518dc22832ae3dcc8b694aa5fa16defc884187a300c269f71dccf1e99"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2019.json",
+      "sha256": "367b30e0f29fdaa8b0cbed987c67656835dae82680cdbbfaca8aa156eb66c79a"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2019.json",
+      "sha256": "7830b66afe533d1373d64f56a913024bffc3ab2b1995c265f400fdd6b0ad846d"
+    }
+  ]
+}
