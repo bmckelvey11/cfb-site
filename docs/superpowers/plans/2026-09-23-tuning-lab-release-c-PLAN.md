@@ -10,7 +10,7 @@ This file is the build order; where the two differ, fix both.
 | Task | Status |
 | --- | --- |
 | 1. C0 contract | Done 2026-09-23: 29 tests in `tests/test_tuning_spec.py` |
-| 2. C2 features | pending |
+| 2. C2 features | Done 2026-09-23: 10 tests; real loader reproduces Release B (2021–25: 3,488 games, 3,480 opens; primary ridge − open +0.33) |
 | 3. C3 folds and estimators | pending |
 | 4. C1 cards | pending |
 | 5. C4 worker | pending |

@@ -1,0 +1,15 @@
+{
+  "feature_set_id": "total_ratings_v1",
+  "version": 1,
+  "features": [
+    {"id": "rv1_off_home", "version": 1, "availability_class": "historical_replayable"},
+    {"id": "rv1_def_home", "version": 1, "availability_class": "historical_replayable"},
+    {"id": "rv1_pace_home", "version": 1, "availability_class": "historical_replayable"},
+    {"id": "rv1_off_away", "version": 1, "availability_class": "historical_replayable"},
+    {"id": "rv1_def_away", "version": 1, "availability_class": "historical_replayable"},
+    {"id": "rv1_pace_away", "version": 1, "availability_class": "historical_replayable"},
+    {"id": "rv1_total", "version": 1, "availability_class": "historical_replayable"},
+    {"id": "min_prior_games", "version": 1, "availability_class": "historical_replayable"},
+    {"id": "neutral", "version": 1, "availability_class": "historical_replayable"}
+  ]
+}
