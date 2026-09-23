@@ -1,6 +1,6 @@
 # Previous-season priors for the weekly ratings — design
 
-**Status:** implemented 2026-09-23 (`1f67c8f` priors, evaluation in the next commit).
+**Status:** implemented 2026-09-23 (`1f67c8f` priors, `fb9f1df` evaluation).
 Result: [`docs/weekly-priors-2026-09-23.md`](../../weekly-priors-2026-09-23.md), no-go.
 **Deviation:** the evaluation lives in a new `scripts/weekly_priors_eval.py` with its own
 outputs (`weekly_priors_eval.json`, `weekly_priors_snapshots.csv`) instead of extending

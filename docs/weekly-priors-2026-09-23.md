@@ -8,11 +8,15 @@ week 1 be forecast at all?
 **Answer.** Not by the rule declared before scoring. At the tuned settings the priors help
 in weeks 2+ while a team has fewer than three games (0.24 points closer than Release B's
 ridge, interval clear of zero, four of five seasons) and are indistinguishable from it once
-both teams have three games. But the early gain disappears when the ridge penalty is halved
-or the prior coefficients are scaled up by half, so the declared go condition — improve
-early, not worse later, both unchanged under all four stress variants — is not met. Week 1
-can now be forecast; the priors beat the pooled mean there in three of five seasons and
-trail the Bovada open in three of five.
+both teams have three games. The declared go condition — improve early, not worse later,
+both unchanged under all four stress variants — is not met, and the variant that breaks it
+is the prior's own: with the carryover coefficients scaled up by half, the early gain is no
+longer distinguishable from zero. The declared λ variants also flip, but they move
+`prior_v1`'s penalty against a `ridge_v1` held at its tuned penalty, which mixes in ridge's
+own sensitivity to λ; compared at the same λ (post-hoc, descriptive), the priors help early
+at both half and double the penalty and are neutral later. Week 1 can now be forecast; the
+priors beat the pooled mean there in three of five seasons and trail the Bovada open in
+three of five.
 
 Reproduce:
 
@@ -76,7 +80,7 @@ grids.
 | Early weeks 2+ | 862 | −0.24 | −0.44 to −0.07 | 0.27 | −0.28 / −0.80 / −0.01 / +0.06 / −0.23 | improves, **unstable** |
 | Primary | 2,618 | −0.01 | −0.09 to +0.06 | 0.10 | +0.04 / −0.03 / −0.04 / −0.01 / −0.03 | matches, **unstable** |
 
-**Stress** (same comparison, each variant against the unchanged `ridge_v1`):
+**Declared stress** (each variant of `prior_v1` against `ridge_v1` at its tuned λ = 40 / 8):
 
 | Variant | Early 2+ | Primary |
 | --- | --- | --- |
@@ -84,6 +88,21 @@ grids.
 | λ ×2 | −0.36 (−0.61 to −0.12), improves | −0.12 (−0.23 to −0.01), improves |
 | coefficients ×0.5 | −0.20 (−0.31 to −0.10), improves | −0.03 (−0.07 to +0.00), matches |
 | coefficients ×1.5 | −0.14 (−0.43 to +0.12), matches | +0.05 (−0.06 to +0.15), matches |
+
+The coefficient rows change only the prior, so they are clean robustness tests; ×1.5 is
+the one that breaks the early verdict. The λ rows change `prior_v1`'s penalty but not
+`ridge_v1`'s, and Release B's stress shows `ridge_v1` alone gets about 0.25 worse at λ ×0.5
+and 0.085 better at λ ×2 on the primary games — most of what those rows show.
+
+**Matched λ** (post-hoc, descriptive, not a verdict: both at the same stressed λ):
+
+| λ | Early 2+ | Primary |
+| --- | --- | --- |
+| ×0.5 | −0.20 (−0.38 to −0.04) | −0.01 (−0.06 to +0.03) |
+| ×2 | −0.29 (−0.51 to −0.08) | −0.03 (−0.13 to +0.06) |
+
+The early-2+ intervals rest on 23 season-week clusters; a percentile cluster bootstrap
+with fewer than about 40 clusters tends to come out narrow.
 
 **Early weeks 2+, all forecasts on the same 862 games:** open 12.59, `prior_v1` 13.00,
 `ridge_v1` 13.24, train mean 13.47. `prior_v1` − mean −0.48 (−0.82 to −0.10; Release B's
@@ -114,12 +133,15 @@ Every week-1 forecast runs high, the open included, by 2.7–4.0 points.
 - **Priors are built, not adopted.** `fit_ridge(prior=...)`, the carryover fit and week-1
   ratings exist and are tested. By the declared rule the release is a no-go, so Release B's
   `ridge_v1` stays the base rating for Release C.
-- **The instability has a direction.** Weaker shrinkage (λ ×0.5) or stronger carryover
-  (coefficients ×1.5) erases the early gain; stronger shrinkage (λ ×2) enlarges it and also
-  wins on primary. The tuned λ came from component loss on 2014–2019; a λ chosen for the
-  total, on pre-2021 seasons, is the next test. **λ ×2 cannot be adopted from this run**: it
-  was seen on the scored seasons, so choosing it here would be a threshold picked on the
-  test set.
+- **The fragility is in the carryover size.** The priors' early gain holds at half the
+  fitted carryover and at either λ when both methods share it, and fails when the carryover
+  is inflated by half. Over-trusting last season is the failure mode; the fitted shares
+  (0.47–0.60) sit on the safe side of it, but not by a margin the declared rule accepts.
+- **λ looks like a ridge question, not a prior question.** Both `ridge_v1` and `prior_v1`
+  do better on the scored seasons at double the tuned penalty. The tuned λ came from
+  component loss on 2014–2019; a λ tuned on the total, on pre-2021 seasons, is the next
+  test. **λ ×2 cannot be adopted from this run**: it was seen on the scored seasons, so
+  choosing it here would be a threshold picked on the test set.
 - **Returning production does not earn its term** ($c$ = 0.13, SE 0.14). A carryover-only
   prior is the simpler equivalent until an input with more signal (talent change, the
   play-caller table) is available.
@@ -130,7 +152,11 @@ Every week-1 forecast runs high, the open included, by 2.7–4.0 points.
 ## What this does not support
 
 - **Not "priors don't help".** The base result is an early improvement with an interval
-  clear of zero; the no-go is about robustness to the settings, as declared, not about sign.
+  clear of zero, and it holds at matched λ; the no-go is about robustness to the carryover
+  size, as declared, not about sign.
+- **The matched-λ table is not a verdict.** It was added after the declared stress results
+  were seen, to separate two effects; it explains the declared rows and cannot overturn
+  them.
 - **Not a verdict on week 1.** Five clusters cannot carry an interval; three of five is a
   count, not evidence.
 - **Not a market finding.** The open's week-1 bias of +3.14 is one number per season pooled

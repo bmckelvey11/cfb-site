@@ -258,7 +258,7 @@ league average, points from line scores, in `scripts/weekly_ratings.py`, scored 
 are built in reduced form — carryover plus offensive returning production, no talent or
 play-caller terms — in `scripts/weekly_priors.py`, and failed their declared go rule
 ([weekly-priors-2026-09-23.md](../../../docs/weekly-priors-2026-09-23.md)): an early-week gain
-that does not survive the stress settings. Fitted carryover: offense 0.47 (+0.13 × RP, not
+that does not survive inflating the carryover by half. Fitted carryover: offense 0.47 (+0.13 × RP, not
 distinguishable from 0), defense 0.60, pace 0.46. **Every coefficient and league average in
 the worked examples below is illustrative, not estimated.**
 
@@ -774,8 +774,8 @@ The source documents each gave a build order from zero. The repo is not at zero.
 | --- | --- | --- |
 | 1. Audit lines | Partly done: floor, provider mix, fields (§2, §5) | Open item (§14): open-vs-close timing agreement against the-odds-api from 2020 |
 | 2. Core game, drive, play tables | Done (warehouse) | — |
-| 3. Point-in-time pace and efficiency | Built: weekly as-of ridge PPP and pace ratings, no priors ([weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md)). Beat raw and train mean on 2021–25; 0.33 MAE behind the open; early weeks indistinguishable from the mean | Neutral-pace snapshots; garbage-time ablation (§14 item 5) |
-| 4. Previous-season priors and blend | Built in reduced form ($b$, $c$, $b_D$, $a$; no $q$, $\kappa$), prior-centered ridge refit at each cutoff. No-go: early gain −0.24 MAE vs ridge_v1, unstable under λ and coefficient stress ([weekly-priors-2026-09-23.md](../../../docs/weekly-priors-2026-09-23.md)) | Tune λ on total loss over pre-2021 seasons (λ ×2 looked better but was seen on scored seasons); add talent change or a play-caller table when available |
+| 3. Point-in-time pace and efficiency | Built: weekly as-of ridge PPP and pace ratings, no priors ([weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md)). Beat raw and train mean on 2021–25; 0.33 MAE behind the open; early weeks indistinguishable from the mean | Tune λ on total loss over pre-2021 seasons (both ridge versions did better at λ ×2 on 2021–25, which cannot be adopted from that run); neutral-pace snapshots; garbage-time ablation (§14 item 5) |
+| 4. Previous-season priors and blend | Built in reduced form ($b$, $c$, $b_D$, $a$; no $q$, $\kappa$), prior-centered ridge refit at each cutoff. No-go: early gain −0.24 MAE vs ridge_v1, lost when the carryover is inflated by half ([weekly-priors-2026-09-23.md](../../../docs/weekly-priors-2026-09-23.md)) | Carryover-only prior (the RP term's SE exceeds its value); add talent change or a play-caller table when available; re-score after step 3's λ re-tune |
 | 5. Rung 0 and 1 baselines | Not recorded for $r^{\text{final}}$ by era | Record the market's own loss per season and era |
 | 6. Rung 2 on the residual | The 2022–25 harness (predicts the total, not the residual) is a null | Refit on $r^{\text{final}}$ and $r^{\text{move}}$ with the §9.1 block |
 | 7. Distribution and pricing | Not built | Rung 3, priced with §8 |

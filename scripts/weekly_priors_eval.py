@@ -194,6 +194,16 @@ def evaluate(scored: pd.DataFrame) -> dict:
         },
         "release_b_check": {f"{a}_vs_{b}": paired_mae_diff(primary, a, b)["diff"]
                             for a, b in B_POOLED},
+        # Post-hoc and descriptive, not a verdict: the declared lambda stress moves prior_v1
+        # against ridge_v1 at its tuned lambda, which mixes the prior's effect with ridge's
+        # own lambda curve. This compares both at the same stressed lambda.
+        "matched_lambda_descriptive": {
+            f"lambda_x{k:g}": {
+                name: {x: p[x] for x in ("diff", "ci95", "by_season")}
+                for name, pop in (("early_2plus", early), ("primary", primary))
+                for p in [paired_mae_diff(pop, f"prior_lam_x{k:g}", f"ridge_x{k:g}")]
+            } for k in LAMBDA_STRESS
+        },
     }
 
 
@@ -233,7 +243,8 @@ def main(argv: list[str] | None = None) -> int:
         b_rows, _ = run_season(games, s, *b_lam, opens)
         p_rows, sn = score_prior_season(games, s, lam, by_scale, finals[s - 1], opens)
         snaps += sn
-        b_rows = b_rows[["game_id", "mean", "raw", "ridge", "min_prior_games"]]
+        b_rows = b_rows[["game_id", "mean", "raw", "ridge", "min_prior_games",
+                         *(f"ridge_x{k:g}" for k in LAMBDA_STRESS)]]
         merged = p_rows.merge(b_rows, on="game_id", how="left")
         # Week 1 has no Release B forecast and no prior games; its mean is the one computed here.
         merged["mean"] = merged["mean"].fillna(merged["mean_all_weeks"])
