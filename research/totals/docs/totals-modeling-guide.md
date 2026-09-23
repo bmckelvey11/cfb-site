@@ -61,7 +61,7 @@ and the record that measured it.
 | Which books are in CFBD lines? | Unknown, audit first | 2013–17: aggregators and model lines only (`consensus`, `teamrankings`, `numberfire`). Real books from 2018. `consensus` dies after 2022 | [cfbd-lines-coverage-2026-09-17.md](../../../docs/cfbd-lines-coverage-2026-09-17.md) |
 | Do CFBD lines carry open/close and a timestamp? | Unknown, audit first | `GameLine` has `overUnder` and `overUnderOpen`. It has **no capture timestamp and no over/under price** (moneylines only) | `cfbd-python/cfbd/models/game_line.py`; [clv-analysis.md](../../../docs/clv-analysis.md) treats `overUnder` as the close |
 | Grade against one book or many? | Unstated | The system builder grades against the median across books, snapped to the half point | [median-line-2026-09-17.md](../../../docs/median-line-2026-09-17.md) |
-| Timestamped multi-book odds | The Odds API, mid-2020 on | Wired in, alongside the Action Network history scrape and oddspapi's Pinnacle feed | [odds-sources-an-vs-apis-2026-09-11.md](../../../docs/odds-sources-an-vs-apis-2026-09-11.md), [oddsapi-ingest.md](../../../docs/oddsapi-ingest.md) |
+| Timestamped multi-book odds | The Odds API, mid-2020 on | **2026 only.** No earlier season has a timed totals price. Action Network ticks (line and price, five sportsbooks) start 2026-04-02 and cannot be backfilled; the-odds-api snapshots start 2026-09-09, and its historical endpoint returns 401 on the free plan | [odds-sources-an-vs-apis-2026-09-11.md](../../../docs/odds-sources-an-vs-apis-2026-09-11.md), [oddsapi-ingest.md](../../../docs/oddsapi-ingest.md), [pregame-replay-2026-09-22.md](../../../docs/pregame-replay-2026-09-22.md), [tick-anchored-model-infeasible-2026-09-17.md](../../spread/docs/tick-anchored-model-infeasible-2026-09-17.md) |
 | Does a feature-based totals model beat the opener? | Untested | **No.** 49.69% (95% CI 47.66–51.71, n=2,383, 2022–25) after removing leaked this-game features | [totals-model.md](../../../docs/totals-model.md) |
 | Seasonal under effect | Not raised | **Null.** Late-season unders 50.80% vs early 51.00%, p=0.83 | [seasonal-totals-backtest.md](../../../docs/seasonal-totals-backtest.md) |
 | Kicker quality/volatility past the close | Special teams "shrink heavily" | **Bound, not a zero.** CI upper bound buys a 51.5% over vs 52.38% break-even; underpowered | [kicker-quality-volatility-totals-2026-09-18.md](kicker-quality-volatility-totals-2026-09-18.md) |
@@ -163,8 +163,8 @@ This section replaces the sources' "audit the lines first" with what the audit h
 | Era | Decision time available | Price at decision | Use for |
 | --- | --- | --- | --- |
 | 2013–2017 | Open or close, untimed; aggregator/model lines | None | Forecast skill and calibration against the line only. No ROI, no CLV claims |
-| 2018–2020 (to mid-2020) | Open or close, untimed; real books | None | Forecast skill; CLV open→close as a within-book measure; ROI only at an assumed price, labeled as such |
-| Mid-2020 on | Timestamped multi-book snapshots (the-odds-api), plus AN history and Pinnacle | Yes | The only era where ROI and CLV at a real decision time pass the gate |
+| 2018–2025 | Open or close, untimed; real books | None | Forecast skill; CLV open→close as a within-book measure; ROI only at an assumed price, labeled as such |
+| 2026 on | Timestamped quotes with prices: Action Network ticks from 2026-04-02, the-odds-api snapshots from 2026-09-09 | Yes | The only era where ROI and CLV at a real decision time pass the gate |
 
 The sources proposed two calendars that conflict: one trains on 2012–2016 and tests from
 2017, the other trains on 2012–18, tunes on 2019–21, and holds out 2022–25. Neither
@@ -680,7 +680,7 @@ FBS totals application.
 | --- | --- |
 | Priority experiment | GAMLSS/NGBoost; dynamic Bayesian latent-state ratings (Kalman updating instead of rolling windows); TabPFN walk-forward; simple era-weighted training around 2023; meta-labeling for bet selection |
 | Secondary | BART; copula joint-score models; survival drive models; matrix factorization; temporal GNNs; symbolic regression |
-| Conditional | HMM or change-point detection (validate against known coaching and QB changes); Hawkes processes; semi-Markov possessions; multi-task learning; coach embeddings; multi-book market-as-sensor models (2020 on only) |
+| Conditional | HMM or change-point detection (validate against known coaching and QB changes); Hawkes processes; semi-Markov possessions; multi-task learning; coach embeddings; multi-book market-as-sensor models (timestamped quotes: 2026 on only) |
 | Weak fit or not recommended | Normalizing flows; deep ensembles; sequence models; player embeddings; reinforcement learning for staking |
 
 **Market as sensor.** Given the PFF movement result, a model of $r^{\text{move}}$ built
@@ -697,8 +697,9 @@ game.
 1. **Forecast-skill folds, 2013 on.** Expanding window, leave one season forward: train
    through $s-1$, test on $s$. Score against the CFBD line with proper scores only. No ROI
    and no CLV in this layer.
-2. **Economic folds, mid-2020 on.** Same design, restricted to games with a timestamped
-   price at the decision time. ROI and CLV come only from here.
+2. **Economic folds, 2026 on.** Same design, restricted to games with a timestamped
+   price at the decision time. ROI and CLV come only from here. No earlier season has one
+   (§5), so there is no historical priced backtest, and 2026 is also the holdout in item 4.
 3. **Within a test season**, update ratings through the previous completed week and predict
    the whole next slate together. Freeze architecture and hyperparameters for the season.
 4. **Holdout.** 2025 is heavily looked-at in this repo already. Treat **2026, graded
@@ -739,7 +740,7 @@ Report the evaluation standard's **Tier 1** list. Mapped to totals:
 - **Calibration slope and intercept**, plus a reliability plot of $p_{\text{o}}$, and PIT
   coverage for distributional models.
 - **CLV**: mean, median, and positive rate against a fixed benchmark close (gated Pinnacle
-  from 2020, per [greenline-clv-market-close-2026-09-22.md](greenline-clv-market-close-2026-09-22.md)).
+  from 2025 week 8 only, per [greenline-clv-market-close-2026-09-22.md](greenline-clv-market-close-2026-09-22.md)).
   Signed so positive favors the side bet: close minus bet total for an over, and bet total
   minus close for an under.
 - **ROI with an interval, bet count, independent events, drawdown**: economic folds only.
@@ -790,8 +791,10 @@ The source documents each gave a build order from zero. The repo is not at zero.
 Each of these would produce a number, so each needs its own dated doc and script when run.
 None is answered here.
 
-1. **Open/close timing fidelity.** On 2020+ games, how well do CFBD's `overUnderOpen` and
-   `overUnder` match the-odds-api's first and last snapshots for the same book?
+1. **Open/close timing fidelity.** On 2026 games, how well do CFBD's `overUnderOpen` and
+   `overUnder` match the first and last timed quotes for the same book? Action Network ticks
+   (from 2026-04-02) reach back to the open; the-odds-api snapshots start 2026-09-09, so they
+   miss any open posted earlier.
 2. **Market loss by era.** Rung 0 and rung 1 residual loss per season, and whether the
    calibration slope differs from 1 by total band. This is the combined-total version of
    Arscott's question. Lead, not an answer: on 2021–25 Bovada opens, totals landed about
@@ -823,7 +826,7 @@ None is answered here.
   results conflict. The wind thresholds are anecdotal.
 - **No fixed parameters.** The shrinkage strengths, the four-game threshold, and the prior
   weights are starting points to fit, not values to hard-code.
-- **No ROI or CLV from 2013–2019 CFBD lines alone.** There is no price, no timestamp, and,
-  before 2018, no book (§5).
+- **No ROI or CLV at a real decision-time price before 2026.** CFBD lines have no price, no
+  timestamp, and, before 2018, no book, and no other source has a timed price before 2026 (§5).
 - **Frontier families are hypotheses.** "No published FBS application found" is a search
   result from the 2026-09-08 survey, not proof of absence and not evidence of promise.
