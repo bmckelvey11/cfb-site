@@ -16,6 +16,7 @@ the gate the model does not bet.
 
     python models/over_zero/research/2026-09-10_spread_magnitude/edge_surface.py
     python models/over_zero/research/2026-09-10_spread_magnitude/edge_surface.py --since 2022
+    python models/over_zero/research/2026-09-10_spread_magnitude/edge_surface.py --until 2025
 """
 
 from __future__ import annotations
@@ -44,10 +45,13 @@ SPREAD_BANDS = [(0, 20), (20, 30), (30, 40), (40, 50), (50, 99)]
 N_BOOT = 9999
 
 
-def load(path: Path, since: int | None = None) -> pd.DataFrame:
+def load(path: Path, since: int | None = None,
+         until: int | None = None) -> pd.DataFrame:
     d = pd.read_csv(path)
     if since:
         d = d[d.season >= since].copy()
+    if until:
+        d = d[d.season <= until].copy()
     dog_imp, fav_imp = implied_team_points(d.spread.to_numpy(), d.total.to_numpy())
     d["total_err"] = d.actual_total - d.total
     d["fav_err"] = d.fav_pts - fav_imp
@@ -228,9 +232,11 @@ def cap_delta(d: pd.DataFrame, cap: float = 50.0, n_boot: int = 9999) -> pd.Data
         return w / n, (w * BREAK_EVEN - (n - w)) / n
 
     rows = []
-    for lab, first in (("2016-2025 (all)", 2016), ("2018-2025", 2018),
-                       ("2021-2025 (binding)", 2021)):
+    # Labels come from the seasons actually present: the ledger's span moved when
+    # the model switched to the warehouse source, and fixed year labels went stale.
+    for tag, first in (("(all)", 2016), ("", 2018), ("(binding)", 2021)):
         f = b[b.season >= first]
+        lab = f"{f.season.min()}-{f.season.max()} {tag}".strip()
         k = f[f.spread <= cap]
         h0, r0 = hit_roi(f)
         h1, r1 = hit_roi(k)
@@ -415,9 +421,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--bets", default=str(BETS))
     ap.add_argument("--since", type=int, help="restrict to seasons >= this")
+    ap.add_argument("--until", type=int, help="restrict to seasons <= this")
     args = ap.parse_args()
 
-    d = load(Path(args.bets), args.since)
+    d = load(Path(args.bets), args.since, args.until)
     print(f"{len(d):,} graded games, seasons {d.season.min()}-{d.season.max()}, "
           f"{int(d.passes_filter.sum())} qualifying bets")
 
@@ -452,7 +459,8 @@ def main() -> int:
 
     for first in (2018, 2021):
         print()
-        print(f"--- fixed cap 50, kept vs dropped, {first}-2025 ---")
+        print(f"--- fixed cap 50, kept vs dropped, "
+              f"{max(first, d.season.min())}-{d.season.max()} ---")
         gate_inference(d, first=first)
 
     print()

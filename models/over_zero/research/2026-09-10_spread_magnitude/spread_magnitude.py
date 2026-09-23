@@ -17,6 +17,7 @@ that file's pooled 234 / 151-83 / 64.53% row as a check.
 
     python models/over_zero/research/2026-09-10_spread_magnitude/spread_magnitude.py
     python models/over_zero/research/2026-09-10_spread_magnitude/spread_magnitude.py --cut 45
+    python models/over_zero/research/2026-09-10_spread_magnitude/spread_magnitude.py --by-season
 """
 
 from __future__ import annotations
@@ -60,13 +61,33 @@ def legs(x: pd.DataFrame) -> dict:
             "total_err": (x.fav_err + x.dog_err).mean()}
 
 
-def load(path: Path) -> pd.DataFrame:
+def load(path: Path, bets_only: bool = True) -> pd.DataFrame:
     b = pd.read_csv(path)
-    b = b[b.passes_filter == 1].copy()
+    if bets_only:
+        b = b[b.passes_filter == 1].copy()
     dog_imp, fav_imp = implied_team_points(b.spread.to_numpy(), b.total.to_numpy())
     b["fav_err"] = b.fav_pts - fav_imp
     b["dog_err"] = b.dog_pts - dog_imp
     return b
+
+
+def by_season(path: Path, cut: float) -> None:
+    """Record and legs above the cut, one row per season.
+
+    RESULTS-2D.md 6 names the trigger for lifting the cap: the favorite leg above
+    50 turning positive and holding over a few seasons. That is a per-season
+    question, so it gets a per-season table, on the bets and on all graded games
+    (the population the trigger was stated on).
+    """
+    for label, x in (("bets", load(path)), ("all graded games", load(path, False))):
+        x = x[x.spread > cut]
+        rows = [{**record(g, s), **legs(g), "units": g.flat_units_pnl.sum()}
+                for s, g in x.groupby("season")]
+        t = pd.DataFrame(rows).rename(columns={"bucket": "season"})
+        if label != "bets":   # a record on games nobody bet is not a record
+            t = t[["season", "n", "fav_err", "dog_err", "total_err"]]
+        print(f"\n{label}, spread > {cut:g}, by season")
+        print(t.to_string(index=False, float_format=lambda v: f"{v:+.2f}"))
 
 
 def main() -> int:
@@ -76,7 +97,13 @@ def main() -> int:
                     help="spread magnitude splitting the two groups; strictly above")
     ap.add_argument("--bins", default="0,30,40,50",
                     help="bucket edges, read as (lo, hi]; the last is open-ended")
+    ap.add_argument("--by-season", action="store_true",
+                    help="per-season legs above --cut: the cap's monitoring trigger")
     args = ap.parse_args()
+
+    if args.by_season:
+        by_season(Path(args.bets), args.cut)
+        return 0
 
     b = load(Path(args.bets))
     print(f"{len(b)} graded bets (bias > 1.75, walk-forward) from "
