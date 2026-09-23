@@ -12,15 +12,19 @@ FBS-vs-FBS regular-season games through that week, and ranks every team:
     pace     P descending   1 = most possessions per game
 
 Ratings only: no forecast is scored against a result, so this never touches the 2026
-prior_v3 confirmation. Writes data/processed/ratings/rankings/<season>.csv (every week) and
-<season>/week_NN.md (one readable table per week). scripts/refresh_cfbd.cmd runs it after
-each daily fetch, so a week's rankings appear once its games are on disk.
+prior_v3 confirmation. Writes data/processed/ratings/rankings/<season>.csv (every week),
+<season>/week_NN.md (one readable table per week), and a web page of every season's CSV there:
+index.html to open locally, artifact.html (the same page without the document wrapper) to
+publish. scripts/refresh_cfbd.cmd runs it after each daily fetch, so a week's rankings
+appear once its games are on disk.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import re
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 
@@ -28,6 +32,10 @@ from scripts.weekly_ratings import Ratings, build_games, fit_ridge
 
 RIDGE_V1 = (40, 8)  # Release B picks; docs/weekly-ratings-2026-09-23.md
 RANK_ORDER = {"O": False, "D": True, "P": False}  # ascending? (D: lower allowed is better)
+PAGE = Path(__file__).with_name("weekly_rankings_page.html")
+PAGE_ROW = ["team", "n_games", "O", "O_rank", "D", "D_rank", "P", "P_rank"]
+LOCAL_HEAD = ('<!doctype html>\n<html lang="en">\n<meta charset="utf-8">\n'
+              '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n')
 
 
 def rank_week(games: pd.DataFrame, lam_ppp: float = RIDGE_V1[0],
@@ -76,6 +84,33 @@ def week_markdown(season: int, week: int, r: Ratings, t: pd.DataFrame,
         *rows, ""])
 
 
+def page_data(out: Path) -> dict:
+    """{season: {week: {fit, scheduled, mu, nu, rows}}} from every <season>.csv in `out`."""
+    seasons = {}
+    for csv in sorted(out.glob("*.csv")):
+        if not csv.stem.isdigit():
+            continue
+        weeks = {}
+        for week, g in pd.read_csv(csv).groupby("through_week"):
+            r0 = g.iloc[0]
+            weeks[int(week)] = {
+                "fit": int(r0["games_fit"]), "scheduled": int(r0["games_scheduled"]),
+                "mu": round(float(r0["mu"]), 4), "nu": round(float(r0["nu"]), 4),
+                "rows": [[t, int(n), round(o, 3), int(orank), round(d, 3), int(drank), round(p, 3), int(prank)]
+                         for t, n, o, orank, d, drank, p, prank
+                         in g.sort_values("O_rank")[PAGE_ROW].itertuples(index=False)]}
+        seasons[csv.stem] = weeks
+    return seasons
+
+
+def write_page(out: Path) -> None:
+    data = json.dumps({"generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                       "seasons": page_data(out)}, separators=(",", ":"))
+    body = PAGE.read_text(encoding="utf-8").replace("/*DATA*/null", data.replace("</", "<\\/"), 1)
+    (out / "artifact.html").write_text(body, encoding="utf-8")
+    (out / "index.html").write_text(LOCAL_HEAD + body, encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--season", type=int, help="default: latest season with a games file")
@@ -107,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
             lambda_ppp=RIDGE_V1[0], lambda_pace=RIDGE_V1[1],
             games_fit=fit, games_scheduled=int(sched[week])))
     pd.concat(frames, ignore_index=True).to_csv(out / f"{season}.csv", index=False)
+    write_page(out)
 
     week, _, t = weeks[-1]
     print(f"{season} rankings through week {week}: wrote {len(weeks)} week(s) to {out}")

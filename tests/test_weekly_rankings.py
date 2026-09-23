@@ -3,7 +3,7 @@ import itertools
 
 import pandas as pd
 
-from scripts.weekly_rankings import rank_week, season_rankings
+from scripts.weekly_rankings import page_data, rank_week, season_rankings
 
 TRUE_O = {"A": 0.6, "B": 0.3, "C": 0.1, "D": -0.2, "E": -0.3, "F": -0.5}
 TRUE_D = {"A": -0.4, "B": 0.2, "C": -0.1, "D": 0.5, "E": 0.0, "F": -0.2}
@@ -40,3 +40,19 @@ def test_each_week_sees_only_games_through_that_week():
     assert [w for w, _, _ in weeks] == [1, 3]
     pd.testing.assert_frame_equal(weeks[0][2], rank_week(week1, **TINY)[1])
     assert weeks[1][2].at["F", "O"] > weeks[0][2].at["F", "O"]
+
+
+def test_page_data_keeps_every_week_with_rows_in_offense_order(tmp_path):
+    frames = []
+    for week in (1, 2):
+        _, t = rank_week(_round_robin(week), **TINY)
+        frames.append(t.reset_index(names="team").assign(
+            through_week=week, mu=2.1, nu=12.0, games_fit=30, games_scheduled=31))
+    pd.concat(frames).to_csv(tmp_path / "2024.csv", index=False)
+    (tmp_path / "notes.csv").write_text("ignored\n", encoding="utf-8")
+
+    data = page_data(tmp_path)
+    assert list(data) == ["2024"] and list(data["2024"]) == [1, 2]
+    rows = data["2024"][2]["rows"]
+    assert [r[3] for r in rows] == list(range(1, 7))  # O_rank ascending
+    assert rows[0][0] == "A" and data["2024"][2]["scheduled"] == 31

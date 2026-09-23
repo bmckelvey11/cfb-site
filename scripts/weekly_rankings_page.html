@@ -1,0 +1,248 @@
+<title>CFB Possession Ratings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<!-- Saturday Signal tokens (docs/design-system.md). Data is injected by scripts/weekly_rankings.py. -->
+<style>
+:root {
+  --bg: #EEF2F8; --surface: #FFFFFF; --text: #111318; --text-2: #5C6272; --text-3: #6B7180;
+  --border: #CDD2DC; --divider: #E2E6EE; --head-bg: #1B1E24; --head-text: #E2E6EE;
+  --accent: #2E4A6B; --accent-hover: #233856; --accent-soft: #DDE5F1; --accent-ink: #192840;
+  --up: #2A7A4E; --down: #C23030; --row-hover: #EEF2F8; --focus: rgba(46, 74, 107, 0.35);
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --radius-sm: 2px; --radius-md: 4px; --radius-lg: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1116; --surface: #1B1E24; --text: #EEF2F8; --text-2: #B3B8C4; --text-3: #8F95A3;
+    --border: #424854; --divider: #2C3038; --head-bg: #070D18; --head-text: #CDD2DC;
+    --accent: #8AAACE; --accent-hover: #BAC9E3; --accent-soft: #192840; --accent-ink: #DDE5F1;
+    --up: #5BB883; --down: #EF7B73; --row-hover: #232730; --focus: rgba(138, 170, 206, 0.4);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1116; --surface: #1B1E24; --text: #EEF2F8; --text-2: #B3B8C4; --text-3: #8F95A3;
+  --border: #424854; --divider: #2C3038; --head-bg: #070D18; --head-text: #CDD2DC;
+  --accent: #8AAACE; --accent-hover: #BAC9E3; --accent-soft: #192840; --accent-ink: #DDE5F1;
+  --up: #5BB883; --down: #EF7B73; --row-hover: #232730; --focus: rgba(138, 170, 206, 0.4);
+}
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 400 14px/1.5 var(--font-body); font-variant-numeric: tabular-nums;
+}
+.shell { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 32px;
+  display: flex; flex-direction: column; gap: 20px; }
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mark { flex: none; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--accent);
+  color: var(--surface); font: 500 11px/38px var(--font-mono); text-align: center; letter-spacing: 0.02em; }
+h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.3; text-wrap: balance; }
+.sub { margin: 2px 0 0; color: var(--text-2); font-size: 12px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }
+.controls label { display: flex; flex-direction: column; gap: 4px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2); }
+select, input[type="search"] {
+  height: 34px; min-width: 0; padding: 0 10px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font: 400 12px var(--font-body);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+input[type="search"] { width: 180px; }
+select:hover, input[type="search"]:hover { border-color: var(--text-3); }
+select:focus-visible, input:focus-visible, button:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus);
+}
+.chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.chip { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.chip .label { font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2); }
+.chip .who { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.chip .team { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip .value { font: 500 18px/1.15 var(--font-mono); letter-spacing: -0.04em; white-space: nowrap; }
+.chip .note { font-size: 12px; color: var(--text-2); }
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead th { background: var(--head-bg); color: var(--head-text); font-size: 9px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; text-align: left; padding: 8px 10px; white-space: nowrap; }
+thead th.num { text-align: right; }
+th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; border-radius: var(--radius-sm); }
+th button::after { content: "↕"; opacity: 0.45; }
+th[aria-sort="ascending"] button::after { content: "▲"; opacity: 1; }
+th button:focus-visible { box-shadow: 0 0 0 3px var(--focus); }
+tbody td { padding: 7px 10px; border-top: 1px solid var(--divider); white-space: nowrap; vertical-align: middle; }
+tbody tr:hover td { background: var(--row-hover); }
+td.num { text-align: right; color: var(--text-2); }
+th.team, td.team { position: sticky; left: 0; z-index: 1; }
+td.team { background: var(--surface); font-weight: 500; min-width: 150px; }
+tbody tr:hover td.team { background: var(--row-hover); }
+tr.thin td.team, tr.thin .rk { color: var(--text-3); }
+.cell { display: grid; grid-template-columns: 3ch 6ch 4ch; gap: 6px; align-items: baseline; justify-content: end; }
+.rk { font-weight: 600; text-align: right; }
+.val { color: var(--text-2); text-align: right; }
+.mv { font-size: 10px; text-align: left; color: var(--text-3); }
+.mv.up { color: var(--up); } .mv.down { color: var(--down); }
+.empty td { text-align: center; color: var(--text-2); padding: 24px 10px; }
+footer { font-size: 12px; color: var(--text-2); line-height: 1.65; max-width: 72ch; display: flex; flex-direction: column; gap: 6px; }
+footer p { margin: 0; }
+footer b { color: var(--text); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 520px) {
+  .controls { width: 100%; }
+  .controls label { flex: 1 1 120px; }
+  input[type="search"] { width: 100%; }
+  td.team { min-width: 118px; }
+}
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">CFB</span>
+      <div>
+        <h1>CFB Possession Ratings</h1>
+        <p class="sub" id="sub"></p>
+      </div>
+    </div>
+    <div class="controls">
+      <label for="season">Season <select id="season"></select></label>
+      <label for="week">Through <select id="week"></select></label>
+      <label for="q">Team <input id="q" type="search" placeholder="Filter teams" autocomplete="off"></label>
+    </div>
+  </header>
+
+  <section class="chips" id="chips" aria-label="Leaders this week"></section>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="team" scope="col">Team</th>
+          <th class="num" scope="col" title="FBS-vs-FBS games behind the rating">G</th>
+          <th class="num" scope="col" data-key="O"><button type="button">Offense</button></th>
+          <th class="num" scope="col" data-key="D"><button type="button">Defense</button></th>
+          <th class="num" scope="col" data-key="P"><button type="button">Pace</button></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p><b>Offense</b> is points per possession above the league average; + is better.
+      <b>Defense</b> is points per possession allowed against the average; − is better.
+      <b>Pace</b> is possessions per team per game against the average; + is faster.
+      Each cell shows the rank, the rating, and the move since the previous week.</p>
+    <p>Ratings adjust for opponents and are pulled toward league average until a team has several
+      games: a team's own results get half the weight after about three games for offense and
+      defense and eight for pace. Grey rows have fewer than three games. Method: ridge_v1,
+      λ 40 possessions and 8 games, fit on completed FBS-vs-FBS regular-season games.</p>
+    <p id="stamp"></p>
+  </footer>
+</div>
+
+<script>
+const DATA = /*DATA*/null;
+const $ = (id) => document.getElementById(id);
+const IDX = { O: 2, D: 4, P: 6 };           // row: [team, games, O, O_rank, D, D_rank, P, P_rank]
+let sortKey = "O";
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+const signed = (v, d = 2) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d);
+const fold = (s) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+const weeksOf = (s) => Object.keys(DATA.seasons[s]).map(Number).sort((a, b) => a - b);
+
+function fillSeasons() {
+  const seasons = Object.keys(DATA.seasons).sort().reverse();
+  $("season").replaceChildren(...seasons.map((s) => new Option(s, s)));
+  fillWeeks();
+}
+function fillWeeks() {
+  const ws = weeksOf($("season").value).reverse();
+  $("week").replaceChildren(...ws.map((w) => new Option("Week " + w, w)));
+  render();
+}
+
+function chip(label, row, key, wk) {
+  const v = row[IDX[key]];
+  const c = el("div", "chip");
+  c.append(el("span", "label", label));
+  const who = el("div", "who");
+  who.append(el("span", "team", row[0]), el("span", "value", signed(v)));
+  c.append(who);
+  const note = key === "P"
+    ? `≈ ${signed(v, 1)} possessions a team, ${signed(2 * wk.mu * v, 1)} points of total a game`
+    : key === "O"
+      ? `≈ ${signed(wk.nu * v, 1)} points a game against an average defense`
+      : `≈ ${Math.abs(wk.nu * v).toFixed(1)} ${v < 0 ? "fewer" : "more"} points allowed a game than average`;
+  c.append(el("span", "note", note));
+  return c;
+}
+
+function moveCell(now, before, prevWeek) {
+  const mv = el("span", "mv");
+  if (before === undefined) { mv.textContent = prevWeek ? "new" : ""; return mv; }
+  const d = before - now;
+  if (d > 0) { mv.classList.add("up"); mv.textContent = "▲" + d; }
+  else if (d < 0) { mv.classList.add("down"); mv.textContent = "▼" + -d; }
+  else mv.textContent = "–";
+  mv.setAttribute("aria-label", d === 0 ? "unchanged" : `${d > 0 ? "up" : "down"} ${Math.abs(d)} since week ${prevWeek}`);
+  return mv;
+}
+
+function render() {
+  const s = $("season").value, w = Number($("week").value);
+  const wk = DATA.seasons[s][w];
+  const prevW = weeksOf(s).filter((x) => x < w).pop();
+  const prev = new Map(prevW ? DATA.seasons[s][prevW].rows.map((r) => [r[0], r]) : []);
+  const rows = wk.rows.slice().sort((a, b) => a[IDX[sortKey] + 1] - b[IDX[sortKey] + 1]);
+
+  $("sub").textContent = `${s} · through week ${w} · ${rows.length} teams · fit on ${wk.fit} of ${wk.scheduled} ` +
+    `scheduled FBS-vs-FBS games · league ${wk.mu.toFixed(2)} points per possession, ${wk.nu.toFixed(1)} possessions a team`;
+
+  const best = (k) => wk.rows.find((r) => r[IDX[k] + 1] === 1);
+  $("chips").replaceChildren(chip("Best offense", best("O"), "O", wk), chip("Best defense", best("D"), "D", wk),
+    chip("Fastest pace", best("P"), "P", wk));
+
+  document.querySelectorAll("th[data-key]").forEach((th) =>
+    th.setAttribute("aria-sort", th.dataset.key === sortKey ? "ascending" : "none"));
+
+  const q = fold($("q").value.trim());
+  const body = [];
+  for (const r of rows) {
+    const tr = el("tr");
+    if (q && !fold(r[0]).includes(q)) continue;
+    if (r[1] < 3) { tr.className = "thin"; tr.title = "Fewer than three games: mostly league average"; }
+    tr.append(el("td", "team", r[0]), el("td", "num", String(r[1])));
+    for (const k of ["O", "D", "P"]) {
+      const td = el("td"), cell = el("div", "cell");
+      cell.append(el("span", "rk", String(r[IDX[k] + 1])), el("span", "val", signed(r[IDX[k]])),
+        moveCell(r[IDX[k] + 1], prev.get(r[0])?.[IDX[k] + 1], prevW));
+      td.append(cell);
+      tr.append(td);
+    }
+    body.push(tr);
+  }
+  if (!body.length) {
+    const tr = el("tr", "empty"), td = el("td", "", `No team matches “${$("q").value.trim()}”.`);
+    td.colSpan = 5; tr.append(td); body.push(tr);
+  }
+  $("rows").replaceChildren(...body);
+  $("stamp").textContent = `Updated ${new Date(DATA.generated).toLocaleString()} from the daily CFBD refresh. ` +
+    `Ratings describe games already played; they are not picks.`;
+}
+
+document.querySelectorAll("th[data-key] button").forEach((b) => b.addEventListener("click", () => {
+  sortKey = b.parentElement.dataset.key; render();
+}));
+$("season").addEventListener("change", fillWeeks);
+$("week").addEventListener("change", render);
+$("q").addEventListener("input", render);
+fillSeasons();
+</script>
