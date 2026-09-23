@@ -1,7 +1,9 @@
 # Carryover scale tuned pre-2021, confirmed on 2026 — design
 
-**Status:** declared 2026-09-23, before the scale is tuned and before any 2026 result is
-read by this thread.
+**Status:** declared 2026-09-23 (`f96b6e0`) before tuning; tuned and frozen the same day
+(`88dbfdc`: k = 1.0, λ 80/8), result in
+[`docs/prior-scale-2026-09-23.md`](../../prior-scale-2026-09-23.md). The 2026 final look is
+open until the regular season completes.
 **Builds on:** [`docs/weekly-lambda-total-2026-09-23.md`](../../weekly-lambda-total-2026-09-23.md):
 at total-tuned λ the priors improve both populations but lose the gain under more prior
 weight, and 2021–2025 is no longer an untouched holdout for this question.
