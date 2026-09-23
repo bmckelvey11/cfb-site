@@ -70,6 +70,18 @@ the season's completed, ungated FBS-vs-FBS games; the forecast is `forecast_tota
 It is replayed only after the period, against Action Network ticks at or before each game's
 decision time. It is not part of the go/no-go.
 
+**Replay rules (declared 2026-09-23, before week 5):** the docstring of
+[`models/tuning/replay.py`](../../../models/tuning/replay.py) and the spec
+`models/tuning/specs/replay_2026_w05_08.json` (`replay-0b8176899086`).
+
+- Decision time is the recorded week cutoff.
+- Action Network ticks are change events, so a price unchanged for more than 24 h counts as
+  stale.
+- The P(over) score is taken against the modal fresh number's mean de-vigged probability.
+- Intervals resample games; they are too narrow.
+- The replay prices the tables and quote files the ledger recorded. `tick` copies each
+  archived history file into the shadow directory for this.
+
 ## Counting rules (declared)
 
 - **Decision time.** Each week's cutoff is its earliest FBS-vs-FBS regular-season kickoff,

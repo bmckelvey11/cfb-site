@@ -2481,7 +2481,8 @@ fit_fold(train, test, run_spec) -> FoldResult
 
 - Design: [`superpowers/specs/2026-09-23-tuning-lab-release-e-design.md`](superpowers/specs/2026-09-23-tuning-lab-release-e-design.md).
 - Shadow `shadow-3be5383c3469` covers 2026 weeks 5–8, with week 4 as a rehearsal. Its champion is `ridge_v1_total`; its challenger is `run-de1927346ab0` plus `dist-0b0cc0382eca`, frozen in `dd9724b5`.
-- An append-only, hash-chained ledger records every snapshot, prediction, and score. The daily refresh (`scripts/refresh_cfbd.cmd`, 05:00 ET, while logged on) runs `shadow tick` from the code pinned in the detached worktree `../cfb-shadow-pin` at `7f155f45`.
+- An append-only, hash-chained ledger records every snapshot, prediction, and score. The daily refresh (`scripts/refresh_cfbd.cmd`, 05:00 ET, while logged on) runs `shadow tick` from the code pinned in the detached worktree `../cfb-shadow-pin` at `f0420699`.
+- **Priced replay, declared before week 5:** `python -m models.tuning replay --spec models/tuning/specs/replay_2026_w05_08.json` runs after the verdict. It uses the frozen policy on the recorded tables and archived quotes, and its rules are in `models/tuning/replay.py`.
 - **Snapshot windows (ET):**
   - Week 5: Sun 9/27 – Thu 10/1.
   - Week 6: Mon 10/5 – Tue 10/6.
