@@ -45,4 +45,12 @@ REM shutdown) loses everything it had printed. Unbuffered keeps the partial trai
 "%PYTHON%" -u "%REPO%\scripts\refresh_cfbd.py" %*>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- exited %RC% ---->> "%LOG%"
+
+REM Weekly offense/defense/pace rankings from whatever games and drives are now on disk
+REM (scripts/weekly_rankings.py). Runs even after a partial fetch -- games with missing
+REM drives are gated out and the next run fills them in -- and never changes RC.
+pushd "%REPO%"
+"%PYTHON%" -u -m scripts.weekly_rankings>> "%LOG%" 2>&1
+if errorlevel 1 echo ---- weekly_rankings exited %ERRORLEVEL% ---->> "%LOG%"
+popd
 exit /b %RC%
