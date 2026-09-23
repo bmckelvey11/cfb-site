@@ -63,8 +63,19 @@ def _league(done_through: dict[int, int], bump=0) -> tuple[dict, dict]:
     return games, drives
 
 
-def _write_data(root: Path, done_through: dict[int, int], bump=0):
+def _write_data(root: Path, done_through: dict[int, int], bump=0, undone=(), moved=None,
+                extra=()):
+    """`undone`: game ids left unfinished; `moved`: game id -> new kickoff; `extra`: games
+    appended to the 2026 schedule (added late)."""
     games, drives = _league(done_through, bump)
+    for g in games[2026]:
+        if g["id"] in undone:
+            g.update(completed=False, homeLineScores=None, awayLineScores=None,
+                     homePoints=None, awayPoints=None)
+        if moved and g["id"] in moved:
+            g["startDate"] = moved[g["id"]]
+    drives[2026] = [d for d in drives[2026] if d["gameId"] not in set(undone)]
+    games[2026] += list(extra)
     raw = root / "raw"
     raw.mkdir(parents=True, exist_ok=True)
     for s in games:
@@ -204,6 +215,49 @@ def test_tampered_artifacts_stop_predictions_and_fail_scoring(world):
     before = len(_ledger(lab, spec).records())
     assert _run(world, "2026-09-24T12:00:00Z") == 1
     assert len(_ledger(lab, spec).records()) == before
+
+
+def test_a_game_never_marked_final_blocks_the_next_snapshot_only_briefly(world):
+    spec, data, lab, _ = world
+    stuck = 2026 * 1000 + 4 * 10 + 0                         # week 4, kicked off 09-22 16:00Z
+    _write_data(data, {2025: 6, 2026: 4}, undone={stuck})
+    _run(world, "2026-09-23T12:00:00Z")                      # 20 h later: still waits
+    assert not [s for s in _ledger(lab, spec).records("snapshot") if s.payload["week"] == 5]
+    _run(world, "2026-09-24T12:00:00Z")                      # 44 h later, 4 days before cutoff
+    week5 = [s.payload for s in _ledger(lab, spec).records("snapshot") if s.payload["week"] == 5]
+    assert week5 and any("never marked final" in w for w in week5[0]["warnings"])
+
+
+def test_a_kickoff_moved_before_the_snapshot_is_a_timing_violation(world):
+    spec, data, lab, _ = world
+    _write_data(data, {2025: 6, 2026: 4})
+    _run(world, "2026-09-23T12:00:00Z")                      # week 5 snapshot at 12:00Z
+    early = 2026 * 1000 + 5 * 10 + 3
+    _write_data(data, {2025: 6, 2026: 5}, moved={early: "2026-09-23T06:00:00+00:00"})
+    _run(world, "2026-09-30T12:00:00Z")
+    week5 = [s.payload for s in _ledger(lab, spec).records("score") if s.payload["week"] == 5]
+    assert week5 and not any(s["timing_ok"] for s in week5)  # the week's decision time moved
+    assert not any(s["game_id"] == early for s in week5)     # no prediction before its kickoff
+
+
+def test_postponed_games_are_no_action_and_late_additions_are_unscheduled(world):
+    spec, data, lab, _ = world
+    _write_data(data, {2025: 6, 2026: 4})
+    _run(world, "2026-09-23T12:00:00Z")                      # week 5 snapshot
+    _write_data(data, {2025: 6, 2026: 5})
+    _run(world, "2026-09-30T12:00:00Z")                      # week 6 snapshot
+    postponed = 2026 * 1000 + 6 * 10 + 1
+    added = {"id": 999, "season": 2026, "week": 6, "seasonType": "regular", "completed": True,
+             "startDate": "2026-10-06T20:00:00+00:00", "neutralSite": False, "homeTeam": "A",
+             "awayTeam": "B", "homeClassification": "fbs", "awayClassification": "fbs",
+             "homeLineScores": [7, 7, 7, 7], "awayLineScores": [3, 3, 3, 3],
+             "homePoints": 28, "awayPoints": 12}
+    _write_data(data, {2025: 6, 2026: 6}, undone={postponed},
+                moved={postponed: "2026-11-21T20:00:00+00:00"}, extra=[added])
+    _run(world, "2026-10-07T12:00:00Z")
+    v = _ledger(lab, spec).records("period_verdict")[0].payload
+    assert v["go"] and v["no_action"] == 1 and v["unscheduled"] == [999]
+    assert v["expected"] == 8 and v["scored"] == 7 and len(v["code_sha256"]) == 1
 
 
 def test_crosswalk_matches_by_team_location_with_aliases(tmp_path):

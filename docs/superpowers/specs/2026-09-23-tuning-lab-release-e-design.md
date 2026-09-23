@@ -10,6 +10,16 @@ is Claude's default.
   (replay parity), §34 (champion/challenger, prediction ledger, drift, fallbacks).
 - Release C's run `run-de1927346ab0` and Release D's run `dist-0b0cc0382eca`.
 
+**Amended 2026-09-23, before any period snapshot.** A second advisor pass found three
+problems in the counting code:
+
+- A game never marked final could block snapshots for 10 days, and with one run a day at
+  05:00 ET that loses weeks.
+- The timing check compared against the prediction's own kickoff, so it could never fire.
+- Postponement was not implemented as written.
+
+The rules below state the fixed behaviour. The hashed spec file is unchanged.
+
 **Review:** none cross-model. An advisor pass set:
 
 - the deadline arithmetic;
@@ -72,14 +82,24 @@ decision time. It is not part of the go/no-go.
   - No snapshot is ever generated at or after a week's cutoff.
 - **Expected games.** The week's FBS-vs-FBS regular-season games in the schedule at its last
   pre-cutoff snapshot.
+- **Waiting for results.**
+  - A snapshot waits while a game is inside the 6 h grace after kickoff.
+  - It also waits while a game is past kickoff, not yet final, and no more than 36 h past
+    kickoff.
+  - After that it goes ahead with a stale-inputs warning.
+  - Within 12 h of the cutoff it goes ahead regardless.
 - **Changes to the schedule:**
-  - A game added after the cutoff is logged as unscheduled, not missing.
-  - A game postponed, cancelled, or never completed by the period's end is no-action, not
-    missing.
+  - A game in the week's current schedule that is not in its last pre-cutoff snapshot is
+    logged as unscheduled, not missing.
+  - A game whose kickoff moved more than 7 days past its week's decision time was
+    postponed out of the period. It is no-action, not missing.
+  - A game never completed within 7 days of its kickoff was cancelled. It is no-action,
+    not missing.
 - **Missing prediction artifact.** An expected game with no counted prediction, or a
   counted prediction whose table file is absent or fails its checksum.
-- **Timing violation.** A counted prediction generated at or after the game's kickoff, as
-  the schedule reads when the game is scored.
+- **Timing violation.** A counted prediction generated at or after its week's decision
+  time, as the schedule reads when the game is scored. This happens when a kickoff moved
+  earlier after the snapshot.
 - **Data revision.** At scoring, the as-of input digest is rebuilt and compared with the one
   recorded at the snapshot. The digest covers the fit set's game ids, regulation points, and
   possessions.

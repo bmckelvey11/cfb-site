@@ -34,6 +34,10 @@ from models.tuning.worker import _git, code_fingerprint, verify_run
 TARGETS = ("target", "home_reg", "away_reg")
 SPECS_DIR = Path(__file__).with_name("specs")
 ALIASES = ("champion", "challenger")
+# A game past kickoff but not final holds the next snapshot only this long; after that
+# the snapshot goes ahead with a stale-inputs warning. With one run a day, waiting longer
+# can lose a whole week, and a later snapshot supersedes this one anyway.
+PENDING_BLOCK_HOURS = 36
 
 
 class ShadowRefused(Exception):
@@ -189,14 +193,16 @@ def _ready(sched: pd.DataFrame, cutoff: pd.Timestamp, now: pd.Timestamp, spec: S
     before = sched[sched["kickoff"] < cutoff]
     if (before["kickoff"] >= now).any():
         return False, ["an earlier game has not kicked off yet"]
-    recent = before[(before["kickoff"] <= now - pd.Timedelta(hours=spec.snapshot_grace_hours))
-                    & (before["kickoff"] > now - pd.Timedelta(days=10))]
-    pending = recent[~recent["completed"]]
-    late = before[(before["kickoff"] > now - pd.Timedelta(hours=spec.snapshot_grace_hours))]
-    stale = [f"{len(pending)} recent games not final"] if len(pending) else []
-    stale += [f"{len(late)} games still inside the grace window"] if len(late) else []
+    grace = pd.Timedelta(hours=spec.snapshot_grace_hours)
+    late = before[before["kickoff"] > now - grace]
+    stuck = before[(before["kickoff"] <= now - grace) & ~before["completed"]]
+    blocking = stuck[stuck["kickoff"] > now - pd.Timedelta(hours=PENDING_BLOCK_HOURS)]
+    stale = [f"{len(late)} games still inside the grace window"] if len(late) else []
+    stale += [f"{len(blocking)} games past kickoff not yet final"] if len(blocking) else []
     if stale and now < cutoff - pd.Timedelta(hours=spec.force_before_cutoff_hours):
         return False, stale
+    old = stuck[stuck["kickoff"] > now - pd.Timedelta(days=10)].drop(blocking.index)
+    stale += [f"{len(old)} games past kickoff never marked final"] if len(old) else []
     return True, stale
 
 
@@ -309,6 +315,7 @@ def tick(spec: ShadowSpec, lab_root: Path, data_root: Path, now: pd.Timestamp | 
     # 2. Score finished games against the prediction that counts.
     final = sched[sched["completed"]].set_index("game_id")
     kick_now = sched.set_index("game_id")["kickoff"]
+    cut_now = sched.groupby("week")["kickoff"].min()
     preds = ledger.records("prediction")
     scored = {(r.payload["game_id"], r.payload["alias"]) for r in ledger.records("score")}
     snap_by_id = {r.payload["snapshot_id"]: r for r in ledger.records("snapshot")}
@@ -324,11 +331,15 @@ def tick(spec: ShadowSpec, lab_root: Path, data_root: Path, now: pd.Timestamp | 
             if p is None:
                 continue
             y = float(final.at[gid, "total"])
+            # The as-of rule: generated before the week's decision time as the schedule reads
+            # now. A kickoff moved earlier after the snapshot is the way this can break.
+            week_cut = cut_now.get(p.payload["week"], kick_now[gid])
             rec = {"game_id": int(gid), "week": p.payload["week"], "alias": alias,
                    "prediction_seq": p.seq, "generated_at": p.payload["generated_at"],
-                   "kickoff_final": kick_now[gid].isoformat(), "final_total": y,
+                   "kickoff_final": kick_now[gid].isoformat(),
+                   "cutoff_final": week_cut.isoformat(), "final_total": y,
                    "point": p.payload["point"], "abs_error": abs(p.payload["point"] - y),
-                   "timing_ok": pd.Timestamp(p.payload["generated_at"]) < kick_now[gid],
+                   "timing_ok": pd.Timestamp(p.payload["generated_at"]) < min(week_cut, kick_now[gid]),
                    "artifact_ok": True}
             if alias == "challenger":
                 snap = snap_by_id[p.payload["snapshot_id"]]
@@ -401,15 +412,22 @@ def period_tally(spec, ledger, sched, final, now) -> dict:
     kick = sched.set_index("game_id")["kickoff"]
     exp = expected_games(spec, ledger)
     scores = {(r.payload["game_id"], r.payload["alias"]): r.payload for r in ledger.records("score")}
+    preds = ledger.records("prediction")
+    snaps = [s.payload for s in ledger.records("snapshot") if s.payload["week"] in exp]
+    # A game moved more than a week past its week's decision time was postponed out of
+    # the period; one never completed within no_action_after_days of kickoff was
+    # cancelled. Either is no-action, never missing, and neither holds the verdict open.
+    week_cut = {s["week"]: pd.Timestamp(s["cutoff"]) for s in snaps}
     t = {"expected": 0, "scored": 0, "no_action": 0, "pending": 0, "missing": [],
-         "timing_violations": [], "artifact_failures": [],
+         "timing_violations": [], "artifact_failures": [], "unscheduled": [],
          "missed_weeks": sorted(r.payload["week"] for r in ledger.records("missed")
                                 if r.payload["week"] in spec.period_weeks),
          "revisions": len([r for r in ledger.records("revision")
                            if r.payload["week"] in spec.period_weeks]),
-         "weeks_snapshotted": sorted(exp)}
-    preds = ledger.records("prediction")
+         "weeks_snapshotted": sorted(exp),
+         "code_sha256": sorted({s["code_sha256"] for s in snaps})}
     for w, gids in exp.items():
+        t["unscheduled"] += sorted(set(sched.loc[sched["week"] == w, "game_id"]) - set(gids))
         for gid in gids:
             t["expected"] += 1
             k = kick.get(gid)
@@ -420,12 +438,15 @@ def period_tally(spec, ledger, sched, final, now) -> dict:
                         t["timing_violations"].append(gid)
                     if not scores[(gid, a)]["artifact_ok"]:
                         t["artifact_failures"].append(gid)
-            elif gid not in final.index and (k is None or now > k + pd.Timedelta(days=spec.no_action_after_days)):
+            elif gid not in final.index and (
+                    k is None or k > week_cut[w] + pd.Timedelta(days=7)
+                    or now > k + pd.Timedelta(days=spec.no_action_after_days)):
                 t["no_action"] += 1
             elif gid in final.index and any(_counted(preds, gid, a, k) is None for a in ALIASES):
                 t["missing"].append(gid)
             else:
                 t["pending"] += 1
+    t["unscheduled"] = [int(g) for g in t["unscheduled"]]
     return t
 
 
@@ -526,9 +547,13 @@ def write_status(spec, ledger, frozen, sched, now, sd, log) -> None:
                      f"{v['scored']}, no-action {v['no_action']}, missing {len(v['missing'])}, timing "
                      f"violations {len(v['timing_violations'])}, artifact failures "
                      f"{len(v['artifact_failures'])}, missed weeks {v['missed_weeks'] or 'none'}, "
-                     f"tracked revisions {v['revisions']}.")
+                     f"tracked revisions {v['revisions']}, unscheduled {len(v['unscheduled'])}, "
+                     f"code fingerprints {', '.join(c[:12] for c in v['code_sha256'])}.")
     else:
-        lines.append("Open: the verdict is written once every expected game is scored or no-action.")
+        fps = sorted({s.payload["code_sha256"][:12] for s in snaps
+                      if s.payload["week"] in spec.period_weeks})
+        lines.append("Open: the verdict is written once every expected game is scored or no-action."
+                     + (f" Code fingerprints in period snapshots so far: {', '.join(fps)}." if fps else ""))
     newest = pd.Timestamp(max((g["kickoff"] for g in sched[sched["completed"]].to_dict("records")),
                               default=pd.NaT)) if len(sched) else pd.NaT
     lines += ["", "## Data freshness", "", f"Newest completed game kicked off {newest}.", "",
