@@ -4,6 +4,7 @@
     python -m models.tuning status [--root DIR]
     python -m models.tuning cancel --run-id RUN_ID [--root DIR]
     python -m models.tuning dist --spec models/tuning/specs/dist_total_v1.json [--root DIR]
+    python -m models.tuning shadow {freeze,tick,alias} --spec models/tuning/specs/shadow_2026_w05_08.json
 
 `run` submits the spec and works that job until it is completed, failed, or cancelled.
 Resubmitting a completed spec returns the existing run when the code fingerprint and
@@ -86,6 +87,32 @@ def _dist(args) -> int:
     return 0
 
 
+def _shadow(args) -> int:
+    from cfb_paths import DATA_ROOT
+
+    from models.tuning.shadow import ShadowRefused, freeze, set_alias, tick
+    from models.tuning.shadow_spec import ShadowSpec
+
+    spec = ShadowSpec.model_validate_json(Path(args.spec).read_text(encoding="utf-8"))
+    root = Path(args.root) if args.root else _default_root()
+    try:
+        if args.action == "freeze":
+            doc = freeze(spec, root, DATA_ROOT)
+            print(json.dumps({k: doc[k] for k in ("shadow_id", "artifacts", "pools")}, indent=1))
+            print("written: commit the freeze file before the first snapshot")
+            return 0
+        if args.action == "alias":
+            if not (args.alias and args.model and args.reason):
+                print("alias needs --alias, --model and --reason", file=sys.stderr)
+                return 2
+            set_alias(spec, root, args.alias, args.model, args.reason)
+            return 0
+        return tick(spec, root, DATA_ROOT)
+    except ShadowRefused as e:
+        print(f"refused: {e}", file=sys.stderr)
+        return 2
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m models.tuning", description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -106,12 +133,21 @@ def main(argv: list[str] | None = None) -> int:
     d = sub.add_parser("dist", help="predictive distributions on a completed run (Release D)")
     d.add_argument("--spec", required=True)
     d.add_argument("--root")
+    sh = sub.add_parser("shadow", help="live shadow ledger (Release E)")
+    sh.add_argument("action", choices=["freeze", "tick", "alias"])
+    sh.add_argument("--spec", required=True)
+    sh.add_argument("--root")
+    sh.add_argument("--alias", choices=["champion", "challenger"])
+    sh.add_argument("--model")
+    sh.add_argument("--reason")
     args = ap.parse_args(argv)
 
     if args.cmd == "run":
         return _run(args)
     if args.cmd == "dist":
         return _dist(args)
+    if args.cmd == "shadow":
+        return _shadow(args)
     store = LabStore(Path(args.root) if args.root else _default_root())
     if args.cmd == "cancel":
         job = store.request_cancel(args.run_id)

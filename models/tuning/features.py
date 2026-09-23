@@ -115,7 +115,7 @@ def source_paths(dataset: DatasetSpec, root: Path) -> list[Path]:
 
 def _release_b_frame(dataset: DatasetSpec, root: Path) -> tuple[pd.DataFrame, list[Path]]:
     from scripts.pregame_replay_audit import snapshot
-    from scripts.weekly_ratings import Ratings, forecast_total
+    from scripts.weekly_ratings import Ratings
     from scripts.weekly_ratings_eval import load, load_opens, week_cutoffs
 
     sources: list[Path] = []
@@ -140,36 +140,95 @@ def _release_b_frame(dataset: DatasetSpec, root: Path) -> tuple[pd.DataFrame, li
         table = grp.set_index("team")[["O", "D", "P", "n_games"]]
         r = Ratings(mu=s.mu, nu=s.nu, h=s.h, c=s.c, table=table, unrated=0.0)
         past_mean = float(snapshot(games, cut)["total"].mean())
-
-        def get(team: str, col: str) -> float:
-            return float(table.at[team, col]) if team in table.index else 0.0
-
         for g in sg[sg["week"] == week].itertuples():
-            total_hat = forecast_total(r, g.home, g.away, g.neutral)
-            rows.append({
-                "game_id": int(g.game_id), "season": int(season), "week": int(week),
-                "kickoff": g.kickoff, "decision_ts": cut, "target": float(g.total),
-                # Target parts, never features: target = home_reg + away_reg + ot_points.
-                "home_reg": float(g.home_reg), "away_reg": float(g.away_reg),
-                "ot_points": float(g.ot),
-                "rv1_off_home": get(g.home, "O"), "rv1_def_home": get(g.home, "D"),
-                "rv1_pace_home": get(g.home, "P"), "rv1_off_away": get(g.away, "O"),
-                "rv1_def_away": get(g.away, "D"), "rv1_pace_away": get(g.away, "P"),
-                "rv1_total": total_hat,
-                "min_prior_games": min(get(g.home, "n_games"), get(g.away, "n_games")),
-                "neutral": float(g.neutral),
-                "open_total": opens.get(g.game_id),
-                "market_open": opens.get(g.game_id), "past_mean": past_mean,
-                "ridge_v1_total": total_hat,
-            })
+            rows.append(game_row(g, int(season), int(week), r, cut, past_mean,
+                                 opens.get(g.game_id), outcome=g))
+    return _finish(rows), sources
+
+
+def game_row(g, season: int, week: int, r, cut: pd.Timestamp, past_mean: float,
+             open_total: float | None, outcome=None) -> dict:
+    """One game's row from one ratings snapshot. The snapshot-CSV path and the live
+    fit-at-cutoff path both call this, so a live prediction sees the same features the
+    model was tuned and calibrated on (plan §29.2). `outcome` carries total, home_reg,
+    away_reg, ot for a played game; an unplayed game gets NaN targets."""
+    from scripts.weekly_ratings import forecast_total
+
+    def get(team: str, col: str) -> float:
+        return float(r.table.at[team, col]) if team in r.table.index else r.unrated
+
+    total_hat = forecast_total(r, g.home, g.away, g.neutral)
+    nan = float("nan")
+    return {
+        "game_id": int(g.game_id), "season": season, "week": week,
+        "kickoff": g.kickoff, "decision_ts": cut,
+        "target": float(outcome.total) if outcome is not None else nan,
+        # Target parts, never features: target = home_reg + away_reg + ot_points.
+        "home_reg": float(outcome.home_reg) if outcome is not None else nan,
+        "away_reg": float(outcome.away_reg) if outcome is not None else nan,
+        "ot_points": float(outcome.ot) if outcome is not None else nan,
+        "rv1_off_home": get(g.home, "O"), "rv1_def_home": get(g.home, "D"),
+        "rv1_pace_home": get(g.home, "P"), "rv1_off_away": get(g.away, "O"),
+        "rv1_def_away": get(g.away, "D"), "rv1_pace_away": get(g.away, "P"),
+        "rv1_total": total_hat,
+        "min_prior_games": min(get(g.home, "n_games"), get(g.away, "n_games")),
+        "neutral": float(g.neutral),
+        "open_total": open_total,
+        "market_open": open_total, "past_mean": past_mean,
+        "ridge_v1_total": total_hat,
+    }
+
+
+def _finish(rows: list[dict]) -> pd.DataFrame:
     frame = pd.DataFrame(rows)
     for fid in CATALOG:
         # Snapshot-derived and schedule features are known at the cutoff; the open has no
         # capture time at all, so its as-of is unknown.
         frame[f"{fid}__as_of"] = pd.NaT if fid == "open_total" else frame["decision_ts"]
     frame["open_total__as_of"] = pd.to_datetime(frame["open_total__as_of"], utc=True)
-    frame = frame.sort_values(["decision_ts", "game_id"], kind="stable").reset_index(drop=True)
-    return frame, sources
+    return frame.sort_values(["decision_ts", "game_id"], kind="stable").reset_index(drop=True)
+
+
+def fit_digest(fit_games: pd.DataFrame) -> str:
+    """sha256 of the as-of evidence a snapshot was fit on: which games, their regulation
+    points, and their possessions. Rebuilt at scoring time to detect a data revision."""
+    import hashlib
+
+    cols = ["game_id", "home_reg", "away_reg", "home_poss", "away_poss"]
+    rows = fit_games[cols].sort_values("game_id").astype("int64").to_csv(index=False,
+                                                                         lineterminator="\n")
+    return hashlib.sha256(rows.encode("utf-8")).hexdigest()
+
+
+def live_week_frame(season: int, week: int, root: Path, first_season: int = 2014,
+                    lam: tuple[float, float] = (40, 8)) -> tuple[pd.DataFrame, dict]:
+    """The week's scheduled FBS-vs-FBS games, featured from ridge_v1 fit at the week's
+    cutoff (its earliest scheduled kickoff) on the season's games before it. Works for a
+    week not yet played; targets are filled for games already completed."""
+    import json
+
+    from scripts.pregame_replay_audit import snapshot
+    from scripts.weekly_forecast import week_schedule
+    from scripts.weekly_ratings import fit_ridge, fit_set
+    from scripts.weekly_ratings_eval import load, load_opens
+
+    payload = json.loads((root / "raw" / f"games_{season}.json").read_text(encoding="utf-8"))
+    sched = week_schedule(payload, week)
+    if sched.empty:
+        return pd.DataFrame(), {}
+    cut = sched["kickoff"].min()
+    games, _ = load(root, list(range(first_season, season + 1)), [])
+    fs = fit_set(games[games["season"] == season], cut)
+    r = fit_ridge(fs, *lam)
+    past_mean = float(snapshot(games, cut)["total"].mean())
+    opens = load_opens(root, [season], [])
+    played = games[games["season"] == season].set_index("game_id")
+    rows = [game_row(g, season, week, r, cut, past_mean, opens.get(g.game_id),
+                     outcome=played.loc[g.game_id] if g.game_id in played.index else None)
+            for g in sched.itertuples()]
+    meta = {"cutoff": cut.isoformat(), "n_fit": int(len(fs)), "fit_digest": fit_digest(fs),
+            "mu": r.mu, "nu": r.nu, "h": r.h, "c": r.c, "scheduled": int(len(sched))}
+    return _finish(rows), meta
 
 
 def synthetic_frame(dataset: DatasetSpec, feature_set: FeatureSetSpec) -> pd.DataFrame:
