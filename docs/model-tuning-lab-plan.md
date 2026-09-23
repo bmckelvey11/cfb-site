@@ -2309,7 +2309,7 @@ The mode is not a separate line. The lab-root banner marks a scratch lab, and ea
   - It shows Release B's per-season exclusions.
 - **Replay** is page 12: a past week's ridge_v1 ratings as of its cutoff, and each game's forecast beside the result. A slow test pins the forecasts to Release B's to 1e-9.
 
-- **Distributions** is page 13, with §37.4's scenario limited to one input: the total line.
+- **Distributions** is page 13, with §37.4's scenario explorer: the total line, and expected possessions for 2021–25 games.
   - It shows each game's predicted table, from this week's shadow snapshot (checked against its ledger checksum) or from Release D's 2021–25 outer folds.
   - It gives P(over/under/push) at a line you enter, labelled as sensitivity analysis, not a price or an edge.
 - **Shadow** covers pages 15 and 18. It shows alerts for a stale tick, a snapshot deadline, a missed week, or the verdict; then the weeks and the replay.
@@ -2332,6 +2332,15 @@ Allow pinning runs and comparing only compatible experiments. Block or clearly w
 
 Permit controlled what-if changes to legitimate pregame inputs such as total line, spread, wind forecast, QB status, or expected possessions. Clearly label scenario outputs as sensitivity analysis, never stored historical predictions. Show prediction change, uncertainty change, and whether the scenario falls outside training support.
 
+**Status (2026-09-23): built for the two inputs the models take**, on the GUI Distributions page, with every result labelled as sensitivity analysis.
+- **Total line:** P(over/under/push) from the game's table.
+- **Expected possessions:** each team's pace rating P, for 2021–25 games.
+  - It shows the change in possessions per team, in the champion's `ridge_v1` total, and in the lab run's point forecast.
+  - Both changes are exact: the ridge_v1 formula, and the run's stored linear fit for that season's fold. That fit reproduces the stored predictions to 1e-14 on 331 checked games.
+  - A pace beyond the range of every team-week before that season is flagged as outside training support.
+- **Uncertainty change: zero by construction.** Each table is its model's mean plus a residual pool chosen by games played, not by pace. The table is not redrawn, because the distribution model's own mean response is not stored.
+- **Not offered:** spread, wind and QB status, because no model takes them.
+
 ### 37.5 Guardrail UX
 
 - Red blocking errors for leakage/timing violations.
@@ -2341,9 +2350,12 @@ Permit controlled what-if changes to legitimate pregame inputs such as total lin
 - Confirmation text showing which holdout will be consumed.
 - No destructive delete in the UI; archive instead.
 
-**Status (2026-09-23): built, except the amber classes.** Every check runs in `validate` (§5 status).
+**Status (2026-09-23): built, except two amber classes.** Every check runs in `validate` (§5 status).
 - **Red:** a sealed season, a feature the catalog refuses (a retrospective feature is a leakage refusal), a RunSpec rule, a job in flight. A provider-opaque feature is refused, which is stricter than amber.
-- **Amber:** outer seasons already evaluated, with the prior trial count. There is no amber for thin samples, drift or extrapolation.
+- **Amber:**
+  - Outer seasons already evaluated, with the prior trial count.
+  - Extrapolation, in the scenario explorer (§37.4).
+  - There is no amber for thin samples or drift.
 - **Reason codes:**
   - The New run feature table gives each refused feature its reason. The same text is the validation error.
   - The Data page shows Release B's excluded games by reason and season.

@@ -175,6 +175,35 @@ def test_context_names_the_latest_snapshot_and_counts_drafts(tmp_path):
     assert ctx["snapshot"]["week"] == 4 and ctx["drafts"] == 1
 
 
+def test_pace_scenario_is_exact_for_both_point_models_and_flags_support(tmp_path):
+    from models.tuning.ui.data import pace_scenario
+
+    common = {"method": "ridge_v1", "mu": 2.2, "nu": 11.5, "h": 0.1, "c": 1.0, "O": 0.0, "D": 0.0}
+    snaps = pd.DataFrame([
+        {**common, "season": 2020, "as_of_week": 5, "team": "X", "P": -1.0},
+        {**common, "season": 2020, "as_of_week": 5, "team": "Y", "P": 1.0},
+        {**common, "season": 2021, "as_of_week": 3, "team": "A", "O": 0.1, "D": -0.1, "P": 0.2},
+        {**common, "season": 2021, "as_of_week": 3, "team": "B", "O": -0.2, "D": 0.05, "P": -0.3}])
+    raw, run = tmp_path / "raw", tmp_path / "run"
+    raw.mkdir()
+    (run / "outer").mkdir(parents=True)
+    (raw / "games_2021.json").write_text(json.dumps(
+        [{"id": 7, "homeTeam": "A", "awayTeam": "B", "neutralSite": False}]), encoding="utf-8")
+    feats = ["rv1_pace_home", "rv1_pace_away", "rv1_total", "neutral"]
+    (run / "outer" / "outer-2021.json").write_text(json.dumps({
+        "features": feats, "predictions": [[7, 55.0]],
+        "fitted": {"coef": [1.2, 1.0, 3.4, -0.1], "scale_sd": [0.4, 0.5, 7.6, 0.1]}}), encoding="utf-8")
+    s = pace_scenario(snaps, run, raw, 2021, 3, 7, p_home=0.5, p_away=-0.3)
+    # possessions per team 11.5 + 0.2 - 0.3 = 11.4 -> 11.7; points per possession, home
+    # 2.2 + 0.1 + 0.05 + 0.1 = 2.45, away 2.2 - 0.2 - 0.1 - 0.1 = 1.8: the total moves 0.3 * 4.25
+    assert s["possessions"] == pytest.approx((11.4, 11.7))
+    assert s["champion"][1] - s["champion"][0] == pytest.approx(0.3 * 4.25)
+    assert s["lab"] == pytest.approx((55.0, 55.0 + 1.2 / 0.4 * 0.3 + 3.4 / 7.6 * 1.275))
+    assert s["support"] == (-1.0, 1.0) and s["outside"] == []
+    assert pace_scenario(snaps, run, raw, 2021, 3, 7, p_home=1.5, p_away=-0.3)["outside"] == ["A"]
+    assert pace_scenario(snaps, run, raw, 2021, 3, 8, p_home=0.5, p_away=-0.3) is None
+
+
 def test_every_hypothesis_points_at_a_record_that_exists():
     h = hypotheses()
     assert h["id"].is_unique and set(h["status"]) <= {"closed", "pending"}

@@ -284,6 +284,49 @@ def replay_week(snapshots: pd.DataFrame, raw_dir: Path, season: int, week: int
             table.sort_values("O", ascending=False).reset_index(), meta)
 
 
+def pace_scenario(snapshots: pd.DataFrame, base_run: Path, raw_dir: Path, season: int, week: int,
+                  game_id: int, p_home: float, p_away: float) -> dict | None:
+    """Plan §37.4: what if the two teams' pace ratings P (expected possessions) were different?
+    Pace is the scenario input both point models consume, and both answers are exact: the
+    ridge_v1 total formula, and the lab run's stored linear fit for this season's outer fold
+    (a change in P moves rv1_pace_* and, through the formula, rv1_total). Support is the range
+    of P in the fold's training seasons. None when a team is unrated or the game is not in the
+    fold."""
+    from dataclasses import replace
+
+    from scripts.weekly_ratings import Ratings, forecast_total
+
+    snap = snapshots[(snapshots["method"] == "ridge_v1") & (snapshots["season"] == season)
+                     & (snapshots["as_of_week"] == week)]
+    fold_path = base_run / "outer" / f"outer-{season}.json"
+    games = raw_dir / f"games_{season}.json"
+    if snap.empty or not fold_path.exists() or not games.exists():
+        return None
+    g = next((x for x in json.loads(games.read_text(encoding="utf-8")) if x.get("id") == game_id), None)
+    table = snap.set_index("team")[["O", "D", "P"]]
+    if g is None or g["homeTeam"] not in table.index or g["awayTeam"] not in table.index:
+        return None
+    fold = json.loads(fold_path.read_text(encoding="utf-8"))
+    pred0 = {int(k): v for k, v in fold["predictions"]}.get(game_id)
+    if pred0 is None:
+        return None
+    home, away, neutral = g["homeTeam"], g["awayTeam"], bool(g.get("neutralSite"))
+    s = snap.iloc[0]
+    r = Ratings(mu=s["mu"], nu=s["nu"], h=s["h"], c=s["c"], table=table, unrated=0.0)
+    p0 = (float(table.at[home, "P"]), float(table.at[away, "P"]))
+    t1 = table.copy()
+    t1.loc[home, "P"], t1.loc[away, "P"] = p_home, p_away
+    champ0, champ1 = forecast_total(r, home, away, neutral), forecast_total(replace(r, table=t1), home, away, neutral)
+    f, idx = fold["fitted"], {n: i for i, n in enumerate(fold["features"])}
+    dx = {"rv1_pace_home": p_home - p0[0], "rv1_pace_away": p_away - p0[1], "rv1_total": champ1 - champ0}
+    lab_delta = sum(f["coef"][idx[k]] / f["scale_sd"][idx[k]] * v for k, v in dx.items() if k in idx)
+    train = snapshots.loc[(snapshots["method"] == "ridge_v1") & (snapshots["season"] < season), "P"]
+    lo, hi = float(train.min()), float(train.max())
+    return {"home": home, "away": away, "p0": p0, "possessions": (r.nu + sum(p0), r.nu + p_home + p_away),
+            "champion": (champ0, champ1), "lab": (pred0, pred0 + lab_delta), "support": (lo, hi),
+            "outside": [t for t, p in ((home, p_home), (away, p_away)) if not lo <= p <= hi]}
+
+
 # --- data quality and lineage (plan §37.2 page 11) ---------------------------------------
 
 def sha256_file(path: Path) -> str:

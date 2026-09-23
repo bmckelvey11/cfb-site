@@ -204,6 +204,37 @@ elif page == "Distributions":
                  actual=float(row["target"]))
         st.caption("A spent holdout: descriptive. The line defaults to the untimed Bovada open.")
 
+        st.subheader("What-if: expected possessions")
+        base_id = json.loads((run / "manifest.json").read_text(encoding="utf-8")).get("base_run_id")
+        snap_csv = RAW.parent / "processed" / "ratings" / "weekly_ratings_snapshots.csv"
+        snaps = ratings_snapshots(str(snap_csv), snap_csv.stat().st_mtime) if snap_csv.exists() else None
+        s0 = (md.pace_scenario(snaps, LAB / "runs" / base_id, RAW, int(season), int(week), int(pick),
+                               0.0, 0.0) if snaps is not None and base_id else None)
+        if s0 is None:
+            st.caption("No rated pair or stored fit for this game.")
+        else:
+            c1, c2 = st.columns(2)
+            ph = c1.number_input(f"{s0['home']} pace P (home)", value=s0["p0"][0], step=0.1, format="%.3f")
+            pa = c2.number_input(f"{s0['away']} pace P (away)", value=s0["p0"][1], step=0.1, format="%.3f")
+            sc = md.pace_scenario(snaps, LAB / "runs" / base_id, RAW, int(season), int(week), int(pick), ph, pa)
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Possessions per team", f"{sc['possessions'][1]:.2f}",
+                      f"{sc['possessions'][1] - sc['possessions'][0]:+.2f}")
+            c2.metric("Champion ridge_v1 total", f"{sc['champion'][1]:.1f}",
+                      f"{sc['champion'][1] - sc['champion'][0]:+.1f}")
+            c3.metric(f"Lab model {base_id}", f"{sc['lab'][1]:.1f}", f"{sc['lab'][1] - sc['lab'][0]:+.1f}")
+            if sc["outside"]:
+                st.warning(f"Outside training support: {', '.join(sc['outside'])} pace is beyond the "
+                           f"{sc['support'][0]:+.2f} to {sc['support'][1]:+.2f} range of every team-week "
+                           f"before {season}. Both models are extrapolating.")
+            st.caption("Sensitivity analysis, never a stored prediction. Pace is the one pregame input "
+                       "both point models take; both answers are exact (the ridge_v1 formula, and "
+                       "the run's stored linear fit for this season's fold). Uncertainty does not "
+                       "change: the table above is its model's mean plus a residual pool chosen by "
+                       "games played, not pace, so pace would move it without widening it. It is not "
+                       "redrawn, because the distribution model's own mean response is not stored. "
+                       "Spread, wind and QB status are not model inputs, so they are not offered.")
+
 elif page == "Compare":
     st.title("Compare runs")
     st.caption("Plan §37.3. Two tuning runs, game by game on their shared outer folds. Blocked "
