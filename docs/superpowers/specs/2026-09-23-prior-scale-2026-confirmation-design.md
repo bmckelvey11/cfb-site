@@ -51,6 +51,8 @@ does the frozen result forecast 2026 better than `ridge_v1`?
   reads no season outside its tuning seasons; `confirm` refuses to run without a frozen file.
 - Finding doc for the tuning result; the 2026 result gets its own dated doc at the final
   look.
+- At the final look, update `prior_v3`'s row in `models/tuning/hypotheses.json` (the lab's
+  hypothesis ledger).
 
 ## What this cannot claim
 
