@@ -1,7 +1,8 @@
 """Release E task 7: the priced replay on a hand-built ledger (no CFB_DATA_ROOT needed).
 
 Three games at one cutoff: a fresh quote the policy takes and wins, a fresh quote it takes
-that lands on the number (push), and a quote too old to use.
+that lands on the number (push), and a quote too old to use. Only the first game's file
+was pulled after kickoff, so only its CLV counts.
 """
 import hashlib
 import json
@@ -20,8 +21,8 @@ CUT = pd.Timestamp("2026-10-01T23:30:00Z")
 KICK = CUT + pd.Timedelta(hours=40)
 
 
-def _offer(event, side, ticks):
-    return {"event_id": event, "book_id": 68, "side": side, "is_live": False,
+def _offer(event, side, ticks, live=False):
+    return {"event_id": event, "book_id": 68, "side": side, "is_live": live,
             "is_alt_market": False,
             "history": [{"updated_at": at.isoformat(), "value": line, "odds": -110,
                          "line_status": "normal"} for at, line in ticks]}
@@ -61,7 +62,10 @@ def _world(tmp_path):
     (sd / "quotes").mkdir()
     files = {}
     for event, ticks in quotes.items():
-        doc = {"68": {"event": {"total": [_offer(event, "over", ticks), _offer(event, "under", ticks)]}}}
+        offers = [_offer(event, "over", ticks), _offer(event, "under", ticks)]
+        if event == 101:                  # pulled after kickoff: this file proves its close
+            offers.append(_offer(event, "over", [(KICK + pd.Timedelta(hours=1), 60.5)], live=True))
+        doc = {"68": {"event": {"total": offers}}}
         path = sd / "quotes" / f"history_event_{event}.json"
         path.write_text(json.dumps(doc), encoding="utf-8")
         files[str(event)] = {"game_id": event - 100, "file": f"quotes/{path.name}",
@@ -84,6 +88,7 @@ def test_replay_prices_a_win_a_push_and_skips_a_stale_quote(tmp_path):
     assert book.loc[1, "units"] == pytest.approx(100 / 110)
     assert book.loc[1, "clv_line"] == 2.0                      # closed at 57 on an over at 55
     assert book.loc[2, "result"] == "push" and book.loc[2, "units"] == 0.0
+    assert pd.isna(book.loc[2, "clv_line"]) and out["clv_close_unknown"] == 1  # no post-kickoff pull
     assert book.loc[3, "action"] == "no_quote"
     assert out["views"]["realized"] == {"bets": 2, "units": pytest.approx(100 / 110),
                                         "wins": 1, "pushes": 1}

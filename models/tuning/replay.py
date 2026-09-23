@@ -12,10 +12,16 @@ Declared before any period game was played (replay spec and this code committed 
 2026-10-02 00:00Z):
 
 - **Policy and execution** are the shadow spec's, not redefined here.
-- **Decision time** is the counted prediction's recorded `decision_ts`, the week cutoff.
-  Quotes are each book's last non-live, available tick at or before it, no older than the
-  execution spec's maximum age. Action Network ticks are change events, so a price that
-  stood unchanged for longer than that counts as stale: this understates availability.
+- **Decision time** is the counted prediction's recorded `decision_ts` (the week cutoff),
+  or the game's final kickoff if that moved earlier. Quotes are each book's last non-live,
+  available tick at or before it, no older than the execution spec's maximum age. Action
+  Network ticks are change events, so a price that stood unchanged for longer than that
+  counts as stale: this understates availability.
+- **CLV needs a proven close.** The collector stops re-pulling a settled game, so a file
+  can end hours before kickoff, and its last pre-kickoff tick is then not the close. CLV
+  counts only where the archived file holds some tick (live included) after the game's
+  kickoff; every other bet is `close_unknown` and counted. The sensitivity table reports
+  bets and units only, since it cannot apply that rule.
 - **Market reference** for the proper score: at the decision time, every fresh book quoting
   both sides at the same number; take the most common number (ties go to the lower), and
   the mean multiplicative de-vigged P(over) there. The model's P(over) at that number is
@@ -174,9 +180,11 @@ def replay(spec: ReplaySpec, lab_root: Path, data_root: Path, rehearsal: bool = 
             if _sha(blob) != snap["pmf_sha256"]:
                 raise ShadowRefused(f"{snap['pmf_file']} changed since its snapshot")
             pmfs[snap["pmf_file"]] = np.load(sd / snap["pmf_file"])
+        kickoff = pd.Timestamp(s["kickoff_final"])
         forecasts.append(Forecast(
-            game_id=s["game_id"], decision_ts=pd.Timestamp(p["decision_ts"]).to_pydatetime(),
-            kickoff=pd.Timestamp(s["kickoff_final"]).to_pydatetime(),
+            game_id=s["game_id"],
+            decision_ts=min(pd.Timestamp(p["decision_ts"]), kickoff).to_pydatetime(),
+            kickoff=kickoff.to_pydatetime(),
             pmf=pmfs[snap["pmf_file"]][p["pmf_row"]], mean=p["pmf_mean"],
             # ponytail: the frozen policy abstains on neither, so neither is recorded.
             min_prior_games=0, selective_score=float("nan"), final_total=s["final_total"]))
@@ -194,10 +202,25 @@ def replay(spec: ReplaySpec, lab_root: Path, data_root: Path, rehearsal: bool = 
     for q in quotes:
         by_game.setdefault(q.game_id, []).append(q)
 
+    last_tick: dict[int, pd.Timestamp] = {}
+    for r in rows:
+        g = event_to_game.get(int(r["event_id"])) if r["event_id"] is not None else None
+        if g is not None and r["updated_at"]:
+            t = pd.Timestamp(r["updated_at"])
+            last_tick[g] = max(t, last_tick.get(g, t))
+    kick = {f.game_id: pd.Timestamp(f.kickoff) for f in forecasts}
+
     book = backtest(forecasts, by_game, shadow.policy, shadow.execution)
+    close_unknown = 0
+    if "clv_line" in book:
+        proven = book["game_id"].map(lambda g: g in last_tick and last_tick[g] > kick[g])
+        close_unknown = int(((book["action"] == "bet") & ~proven).sum())
+        book.loc[~proven, ["clv_line", "clv_prob"]] = None
     bets = book[book["action"] == "bet"] if len(book) else book
     sens = sensitivity(forecasts, by_game, shadow.policy, shadow.execution,
                        spec.sensitivity_thresholds)
+    actionable = sens.attrs["actionable"]
+    sens = sens.drop(columns="mean_clv_line")
     ms = market_scores(forecasts, by_game, timedelta(minutes=shadow.execution.max_quote_age_minutes))
     out = {
         "replay_id": spec.replay_id(), "shadow_id": spec.shadow_id, "rehearsal": rehearsal,
@@ -208,8 +231,9 @@ def replay(spec: ReplaySpec, lab_root: Path, data_root: Path, rehearsal: bool = 
         "quotes": mapped, "views": summarize(book),
         "units_per_bet": _boot_mean(bets["units"] if "units" in bets else [], spec),
         "clv_line": _boot_mean(bets["clv_line"].dropna() if "clv_line" in bets else [], spec),
+        "clv_close_unknown": close_unknown,
         "sensitivity": sens.to_dict(orient="records"),
-        "actionable": sens.attrs["actionable"],
+        "actionable": actionable,
         "p_over_vs_market": _proper(ms, spec),
         "code_sha256": code_fingerprint(),
     }

@@ -16,7 +16,8 @@ Design (period, frozen artifacts, counting rules):
 | 5b. Counting fixes before the period (`7f155f45`); tick pinned to worktree `../cfb-shadow-pin` (`6ecb0aa3`) | Done 2026-09-23: stuck games block 36 h, not 10 days; the timing check reads the week's decision time; postponed games are no-action; unscheduled games are logged |
 | 6. Period verdict after week 8 (~2026-10-26), written by `tick` | waiting on the calendar |
 | 7. Priced replay declared before week 5 (`replay.py`, spec `replay-0b8176899086`); `tick` copies archived AN files; pin moved to `f0420699` | Done 2026-09-23 (`f0420699`): 2 synthetic tests; tick + rehearsal replay on a temp copy of the lab root read 6,359 week 4 quotes |
-| 8. Rehearsal replay on week 4 once it is final (~9/28): mechanics only, fixes only if mechanical, committed before 2026-10-02 00:00Z; week 4 numbers are never a result | pending |
+| 7b. CLV only where the archived file proves a post-kickoff pull; decision time capped at the final kickoff | Done 2026-09-23 |
+| 8. Rehearsal replay on week 4 once it is final (~9/28): mechanics only, fixes only if mechanical, committed before 2026-10-02 00:00Z; week 4 numbers are never a result. Replay fixes land in the main tree only; `../cfb-shadow-pin` stays at `f0420699` from the first week 5 tick (9/27) through week 8 | pending |
 | 9. Replay the period after the verdict: `python -m models.tuning replay --spec models/tuning/specs/replay_2026_w05_08.json` | waiting on the calendar |
 
 ## Global constraints
