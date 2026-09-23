@@ -553,7 +553,8 @@ def _run(root: Path, store: LabStore, job: Job, worker_id: str, lease_s: float,
     manifest = {
         "run_id": job.run_id, "config_hash": spec.config_hash, "replicate": job.attempt,
         "spec_id": spec.spec_id, "git_sha": _git("rev-parse", "--short=12", "HEAD"),
-        "git_dirty": bool(_git("status", "--porcelain", "--", "models/tuning", "scripts")),
+        # Only the fingerprinted files: other work elsewhere in the tree must not mark a run dirty.
+        "git_dirty": bool(_git("status", "--porcelain", "--", *FINGERPRINTED)),
         "code_sha256": job.code_sha256, "python": platform.python_version(),
         "platform": platform.platform(),
         "packages": {d: metadata.version(d) for d in PACKAGES},
