@@ -330,7 +330,8 @@ elif page == "New run":
             default=[f["id"] for f in t["feature_set"]["features"] if f["id"] in feats],
             format_func=lambda i: i if feats[i]["eligible"] else f"{i} (blocked)")
         st.dataframe(pd.DataFrame(cat["features"])[["id", "availability_class", "eligible",
-                                                    "description"]], hide_index=True, width="stretch")
+                                                    "refused_because", "description"]],
+                     hide_index=True, width="stretch")
         c1, c2 = st.columns(2)
         fs_id = c1.text_input("Feature set id", t["feature_set"]["feature_set_id"])
         fs_version = c2.number_input("Feature set version", min_value=1,

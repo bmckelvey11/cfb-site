@@ -2341,6 +2341,16 @@ Permit controlled what-if changes to legitimate pregame inputs such as total lin
 - Confirmation text showing which holdout will be consumed.
 - No destructive delete in the UI; archive instead.
 
+**Status (2026-09-23): built, except the amber classes.** Every check runs in `validate` (§5 status).
+- **Red:** a sealed season, a feature the catalog refuses (a retrospective feature is a leakage refusal), a RunSpec rule, a job in flight. A provider-opaque feature is refused, which is stricter than amber.
+- **Amber:** outer seasons already evaluated, with the prior trial count. There is no amber for thin samples, drift or extrapolation.
+- **Reason codes:**
+  - The New run feature table gives each refused feature its reason. The same text is the validation error.
+  - The Data page shows Release B's excluded games by reason and season.
+- **Diff:** New run diffs the draft against its template, and a template can be any published run's spec.
+- **Holdout text:** the launch checkbox names the outer seasons and the prior trial count.
+- **Deletes:** none. The GUI writes only `drafts/` and `logs/`, and a cancel keeps completed trials.
+
 ---
 
 ## 38. Registry additions
