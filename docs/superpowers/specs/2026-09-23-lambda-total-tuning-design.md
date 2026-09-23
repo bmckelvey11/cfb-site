@@ -1,6 +1,7 @@
 # Re-tuning the rating penalties on total-forecast loss — design
 
-**Status:** declared 2026-09-23, before any scoring run of this design.
+**Status:** declared 2026-09-23 (`fc099b6`) before any scoring run; implemented and scored
+the same day. Result: [`docs/weekly-lambda-total-2026-09-23.md`](../../weekly-lambda-total-2026-09-23.md).
 **Builds on:** [`docs/weekly-ratings-2026-09-23.md`](../../weekly-ratings-2026-09-23.md)
 (`ridge_v1`) and [`docs/weekly-priors-2026-09-23.md`](../../weekly-priors-2026-09-23.md)
 (`prior_v1`). Both scored better at λ ×2 on 2021–2025, which cannot be adopted from those
