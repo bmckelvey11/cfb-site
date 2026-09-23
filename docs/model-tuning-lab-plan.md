@@ -2374,6 +2374,33 @@ ml_drift_metrics
 ml_audit_events
 ```
 
+**Status (2026-09-23): mapped onto the lab's own stores, not built as DuckDB tables.** The lab never writes `cfb.duckdb`. Each entity lives in a file under the lab root (`$CFB_DATA_ROOT/processed/tuning/`) or in the repo:
+
+| Entity | Where it lives |
+| --- | --- |
+| `ml_dataset_snapshots`, `ml_rating_snapshots` | The sha256 of every source file, including the Release B ratings CSV, in each run's `manifest.json` |
+| `ml_target_definitions`, `ml_feature_sets`, `ml_validation_schemes` | Typed, hashed `RunSpec` parts: `DatasetSpec`, `FeatureSetSpec`, `FoldSpec` (`models/tuning/spec.py`) |
+| `ml_feature_definitions` | `CATALOG` in `models/tuning/catalog.py`: version and availability class |
+| `ml_fold_manifests` | `runs/<run_id>/folds.json` |
+| `ml_hypotheses` | `models/tuning/hypotheses.json` |
+| `ml_experiments` | `models/tuning/specs/*.json`, and GUI drafts in `drafts/` |
+| `ml_jobs`, `ml_job_attempts` | `jobs.sqlite3`: `jobs` (attempt, retries) and `job_events` |
+| `ml_optuna_studies`, `ml_optuna_trials`, `ml_trial_fold_metrics` | `optuna.sqlite3`, with per-fold values as trial attributes |
+| `ml_model_runs` | `runs/<run_id>/`: manifest, card, checksums |
+| `ml_model_aliases` | `alias` records in the shadow ledger |
+| `ml_predictions`, `ml_prediction_outcomes` | Run `outer/*.json` and `predictions.csv`; shadow ledger `prediction` and `score` records |
+| `ml_market_quotes_used` | Shadow ledger `quotes_archived` records, with the file sha256 |
+| `ml_bet_decisions`, `ml_bet_settlements` | The replay's `_ledger.csv`: descriptive and flat stake, written after the verdict. There are no live decisions. |
+| `ml_calibration_metrics` | Distribution run `scores.json` |
+| `ml_audit_events` | Partly: `job_events`, the hash-chained ledger (alias moves, revisions, verdict), and git for freezes |
+
+**Not built:**
+- `ml_snapshot_relations`.
+- `ml_experiment_families`: no family-level budget (§32.2).
+- `ml_data_quality_runs` as stored runs: the GUI Data page checks source hashes live.
+- `ml_drift_metrics`: shadow alerts cover staleness only.
+- Holdout access as an audit event: it is counted from `jobs.sqlite3` instead.
+
 ### 38.1 Important constraints
 
 - Immutable IDs for snapshots, specs, runs, predictions, and quotes.
@@ -2445,6 +2472,14 @@ Defer deep neural sequence models, normalizing flows, GNNs, player embeddings, H
 
 ### Release A: trustworthy replay foundation
 
+**Status (2026-09-23):** go/no-go met, but the line counts only as an untimed label.
+
+- Record: [`pregame-replay-2026-09-22.md`](pregame-replay-2026-09-22.md). Script: `scripts/pregame_replay_audit.py`. Leakage test: `tests/test_pregame_replay.py`.
+- **Replay:** 2024 week 6 was rebuilt from rows with a kickoff strictly before each game's own. The manifest holds the sha256 of every input.
+- **Quotes:** no line before 2026 has a capture time or a price. A historical open is scored as a forecast of the total, never as a price.
+- **Baselines:** the open (market-only) and the train mean here; `raw_v1` (simple rating) in Release B.
+- **Not built:** quarantine tables (§25.4). Snapshot manifests are JSON files beside each run, not warehouse tables.
+
 - Audit canonical game IDs and historical identity.
 - Build dataset/target contracts, snapshot manifests, and quarantine tables.
 - Audit line/provider/timestamp semantics against overlapping external quotes where possible.
@@ -2454,6 +2489,18 @@ Defer deep neural sequence models, normalizing flows, GNNs, player embeddings, H
 **Go/no-go:** Recreate a historical week using only then-available data, with zero as-of violations and reconciled outcomes/quotes.
 
 ### Release B: CFB rating core
+
+**Status (2026-09-23):** split. The ratings meet the go/no-go. The priors do not, and one frozen candidate is waiting on 2026.
+
+- **Ratings: go.** On 2,618 games from 2021–25, `ridge_v1` is 1.14 MAE closer than `raw_v1` and 0.84 closer than the train mean, in all five seasons and at half or double the penalty. It trails the Bovada open by 0.33. Record: [`weekly-ratings-2026-09-23.md`](weekly-ratings-2026-09-23.md).
+- **Priors: no-go.** `prior_v1` improves early weeks, but the gain fails the declared stress rule when the carryover is inflated by half. Record: [`weekly-priors-2026-09-23.md`](weekly-priors-2026-09-23.md).
+- **Pending:** `prior_v3`, tuned on 2015–19, is frozen and gets one look on the completed 2026 regular season. Record: [`prior-scale-2026-09-23.md`](prior-scale-2026-09-23.md).
+- **Penalty:** re-tuning on total-forecast loss leaves ridge's penalty where it was. Record: [`weekly-lambda-total-2026-09-23.md`](weekly-lambda-total-2026-09-23.md).
+- **Population policy:** FBS vs FBS, regular season only, with drop counts per reason (`scripts/weekly_ratings.py`).
+- **Not built:**
+  - Continuity, talent and staff inputs. Returning production did not earn its term ($c$ = 0.13, SE 0.14).
+  - A garbage-time filter.
+  - Effective-sample-size shrinkage beyond the ridge penalty.
 
 - Weekly ridge offense, defense, pace, and points-per-possession ratings.
 - Team-specific preseason priors with continuity/talent/staff inputs.
@@ -2580,6 +2627,21 @@ The Lab is not complete when it can launch Optuna. It is complete when it can pr
 8. Whether the model was in research, shadow, challenger, or champion status.
 9. How to reproduce or roll back the result.
 10. What evidence would cause the model or feature to be retired.
+
+**Status (2026-09-23): eight of ten are proven, one waits on the calendar, and one is partial.**
+
+| # | Where it is proven |
+| --- | --- |
+| 1 | Each run's `manifest.json` holds the sha256 of every input. The as-of loader drops any feature dated after `decision_ts` (`tests/test_tuning_features.py`). The shadow ledger hashes each snapshot and each archived quote file. The replay refuses a changed file. |
+| 2 | `manifest.json`: code fingerprint, `config_hash`, feature versions from `CATALOG`, and the ratings-snapshot sha256. No lab run uses priors; they are a no-go (Release B status). |
+| 3 | `runs/<run_id>/folds.json`. `fit_fold` fits the imputer, scaler and estimator on the training fold only (`tests/test_tuning_folds.py`). |
+| 4 | `models/tuning/hypotheses.json`; every trial, failed ones included, in `optuna.sqlite3`; prior trial counts in the card and on the GUI launch review. |
+| 5 | `comparisons.json`: paired against the market label and the past-only mean on the same games. The GUI Compare page does the same for two runs. |
+| 6 | Distribution run `scores.json`: the calibration gate on the 2021–25 outer folds, declared before scoring (Release D). |
+| 7 | **Waiting on the calendar.** The pricing engine (`models/tuning/market.py`) is fixture-tested. The declared replay prices the shadow weeks, with a sensitivity table, after the verdict (~2026-10-26). |
+| 8 | `alias` records in the shadow ledger; GUI Registry page. |
+| 9 | Reproduce: the same spec in a clean root gives the same `run_id` and byte-identical predictions (Releases C and D). Roll back: `python -m models.tuning shadow alias`, written to the ledger. |
+| 10 | **Partial.** Each release's design declares its gates and stop rules before scoring, and F1 was retired by one. The per-feature evidence ledger (§32.4) is not built. |
 
 ---
 
