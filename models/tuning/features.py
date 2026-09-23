@@ -13,44 +13,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
 
-from models.tuning.spec import AvailabilityClass, DatasetSpec, FeatureSetSpec
+from models.tuning.catalog import CATALOG, ELIGIBLE, REFUSED, CatalogEntry  # noqa: F401 (re-export)
+from models.tuning.spec import DatasetSpec, FeatureSetSpec
 
 FEATURE_SETS = Path(__file__).with_name("feature_sets")
 BASELINES = ("market_open", "past_mean", "ridge_v1_total")
-ELIGIBLE = "historical_replayable"
-REFUSED = {
-    "snapshot_dependent": "snapshot_dependent: no snapshot-coverage check exists yet",
-    "prospective_only": "prospective_only: shadow/live only, not reconstructible historically",
-    "retrospective_descriptive": "retrospective_descriptive: known after kickoff, blocked from prediction",
-    "provider_opaque": "provider_opaque: benchmark-only until its timing is audited",
-}
-
-
-class CatalogEntry(NamedTuple):
-    version: int
-    availability_class: AvailabilityClass
-    description: str
-
-
-CATALOG: dict[str, CatalogEntry] = {
-    "rv1_off_home": CatalogEntry(1, "historical_replayable", "ridge_v1 offense O, home team, as of the week cutoff"),
-    "rv1_def_home": CatalogEntry(1, "historical_replayable", "ridge_v1 defense D, home team, as of the week cutoff"),
-    "rv1_pace_home": CatalogEntry(1, "historical_replayable", "ridge_v1 pace P, home team, as of the week cutoff"),
-    "rv1_off_away": CatalogEntry(1, "historical_replayable", "ridge_v1 offense O, away team, as of the week cutoff"),
-    "rv1_def_away": CatalogEntry(1, "historical_replayable", "ridge_v1 defense D, away team, as of the week cutoff"),
-    "rv1_pace_away": CatalogEntry(1, "historical_replayable", "ridge_v1 pace P, away team, as of the week cutoff"),
-    "rv1_total": CatalogEntry(1, "historical_replayable", "forecast_total from the ridge_v1 snapshot"),
-    "min_prior_games": CatalogEntry(1, "historical_replayable", "fewer of the two teams' games in the snapshot"),
-    "neutral": CatalogEntry(1, "historical_replayable", "neutral-site flag from the schedule, known before the cutoff"),
-    "open_total": CatalogEntry(1, "provider_opaque", "Bovada overUnderOpen: no capture time, no price"),
-}
-
-
 @dataclass
 class LoadReport:
     kept: list[str]

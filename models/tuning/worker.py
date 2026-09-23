@@ -37,13 +37,10 @@ import pandas as pd
 from models.tuning.cards import render_card
 from models.tuning.estimators import FitFailure, acceptance_gates, compare_outer, fit_fold
 from models.tuning.features import BASELINES, load_frame, source_paths
+from models.tuning.fingerprint import FINGERPRINTED, REPO, code_fingerprint  # noqa: F401 (re-export)
 from models.tuning.folds import make_folds
 from models.tuning.spec import SEARCH_PROFILES, ModelSpec, RunSpec, SearchSpec
 
-REPO = Path(__file__).resolve().parents[2]
-FINGERPRINTED = ("models/tuning/*.py", "models/tuning/feature_sets/*.json",
-                 "scripts/weekly_ratings.py", "scripts/weekly_ratings_eval.py",
-                 "scripts/pregame_replay_audit.py")
 PACKAGES = ("optuna", "scikit-learn", "pandas", "numpy", "pydantic", "scipy")
 STATES = ("queued", "claimed", "running", "completed", "retry_wait", "failed",
           "cancellation_requested", "cancelled")
@@ -275,16 +272,6 @@ class LabStore:
 
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
-
-
-def code_fingerprint() -> str:
-    """sha256 over the code a run depends on, line endings normalized (git may rewrite them)."""
-    h = hashlib.sha256()
-    for pattern in FINGERPRINTED:
-        for path in sorted(REPO.glob(pattern)):
-            h.update(path.relative_to(REPO).as_posix().encode() + b"\0")
-            h.update(path.read_bytes().replace(b"\r\n", b"\n") + b"\0")
-    return h.hexdigest()
 
 
 def storage_url(root: str | Path) -> str:
