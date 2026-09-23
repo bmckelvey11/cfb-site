@@ -169,6 +169,43 @@ def test_missed_fills_are_seeded():
     assert 5 < (a["action"] == "missed").sum() < 35
 
 
+def test_clv_is_measured_from_the_degraded_line_taken():
+    quotes = _book() + [_q("B", "over", 48.5, -110, KICK - timedelta(minutes=5))]
+    policy = DecisionPolicySpec(policy_id="pe", version=1, kind="point_edge", threshold=0.0)
+    row = backtest([_forecast()], {1: quotes}, policy,
+                   ExecutionSpec(line_degradation=0.5)).iloc[0]
+    assert (row["action"], row["line"]) == ("bet", 47.5)      # B's 47 moved half a point
+    assert row["clv_line"] == pytest.approx(1.0)                # closed 48.5 vs 47.5 taken
+    assert row["clv_prob"] is None or np.isnan(row["clv_prob"])
+
+
+def test_missed_fills_hit_the_same_games_at_every_threshold():
+    low = np.zeros(151)
+    low[48], low[46] = 0.55, 0.45                             # over 47 at -115: EV +0.028
+    forecasts = [Forecast(game_id=g, decision_ts=T, kickoff=KICK, pmf=PMF if g % 2 else low,
+                          mean=47.75, min_prior_games=10, selective_score=0.0, final_total=49)
+                 for g in range(1, 61)]
+    quotes = {g: [q.model_copy(update={"game_id": g}) for q in _book()] for g in range(1, 61)}
+    ex = ExecutionSpec(missed_fill_rate=0.5, fill_seed=3)
+    missed = []
+    for th in (0.0, 0.1):                                     # 0.1 passes the even games
+        led = backtest(forecasts, quotes, DecisionPolicySpec(
+            policy_id="ev", version=1, kind="min_ev", threshold=th), ex)
+        missed.append(set(led.loc[(led["action"] == "missed") & (led["game_id"] % 2 == 1),
+                                  "game_id"]))
+    assert missed[0] == missed[1] and missed[0]
+
+
+def test_sensitivity_runs_on_a_named_book_and_always_scores_the_policy_threshold():
+    forecasts = [_forecast(gid=g) for g in range(1, 5)]
+    quotes = {g: [q.model_copy(update={"game_id": g}) for q in _book()] for g in range(1, 5)}
+    policy = DecisionPolicySpec(policy_id="ev", version=1, kind="min_ev", threshold=0.02)
+    table = sensitivity(forecasts, quotes, policy, ExecutionSpec(quote_rule="named", book="B"),
+                        thresholds=(0.0,))
+    assert "median_book" in set(table["scenario"])
+    assert set(table["threshold"]) == {0.0, 0.02}
+
+
 def test_summary_keeps_the_ledgers_apart_and_sensitivity_flags_fragility():
     forecasts = [_forecast(gid=g, final=49 if g % 2 else 46) for g in range(1, 21)]
     quotes = {g: [q.model_copy(update={"game_id": g}) for q in _book()] for g in range(1, 21)}

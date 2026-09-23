@@ -207,19 +207,24 @@ def _candidate(f: Forecast, quotes: list[Quote], side: str, policy: DecisionPoli
 
 
 def _clv(f: Forecast, quotes: list[Quote], c: dict) -> tuple[float | None, float | None]:
-    """Line and de-vigged probability moved in the bettor's favour by the book's close."""
-    q = c["quote"]
+    """Line and de-vigged probability moved in the bettor's favour by the book's close.
+
+    Measured against the number actually taken (after degradation), not the quote seen.
+    """
+    q, taken = c["quote"], c["taken"]
     close = _latest(quotes, c["side"], f.kickoff, provider=q.provider_id).get(q.provider_id)
     if close is None:
         return None, None
-    moved = close.line_value - q.line_value
+    moved = close.line_value - taken.line_value
     clv_line = moved if c["side"] == "over" else -moved
     other = "under" if c["side"] == "over" else "over"
     pair_now = _latest(quotes, other, q.captured_at_utc, provider=q.provider_id).get(q.provider_id)
     pair_close = _latest(quotes, other, f.kickoff, provider=q.provider_id).get(q.provider_id)
-    if (pair_now is None or pair_close is None or close.line_value != q.line_value
-            or pair_now.line_value != q.line_value or pair_close.line_value != q.line_value):
-        return clv_line, None  # probabilities at different numbers are not comparable
+    if (taken is not q or pair_now is None or pair_close is None
+            or close.line_value != q.line_value or pair_now.line_value != q.line_value
+            or pair_close.line_value != q.line_value):
+        # Probabilities at different numbers, or at a degraded price, are not comparable.
+        return clv_line, None
     return clv_line, devig(close.american_price, pair_close.american_price)[0] \
         - devig(q.american_price, pair_now.american_price)[0]
 
@@ -227,7 +232,6 @@ def _clv(f: Forecast, quotes: list[Quote], c: dict) -> tuple[float | None, float
 def backtest(forecasts: list[Forecast], quotes_by_game: dict[int, list[Quote]],
              policy: DecisionPolicySpec, ex: ExecutionSpec) -> pd.DataFrame:
     """One ledger row per game: pass, abstain, no_quote, missed, or a flat one-unit bet."""
-    rng = np.random.default_rng(ex.fill_seed)
     rows = []
     for f in forecasts:
         if policy.kind == "no_bet":
@@ -259,7 +263,8 @@ def backtest(forecasts: list[Forecast], quotes_by_game: dict[int, list[Quote]],
         if best is None or best["score"] < policy.threshold:
             rows.append(_row(f, policy, "pass", **base))
             continue
-        if rng.random() < ex.missed_fill_rate:
+        # One draw per (seed, game): the same games miss under every threshold and scenario.
+        if np.random.default_rng([ex.fill_seed, f.game_id]).random() < ex.missed_fill_rate:
             rows.append(_row(f, policy, "missed", **base))
             continue
         s = settle(best["side"], best["taken"].line_value, f.final_total,
@@ -299,11 +304,14 @@ def sensitivity(forecasts: list[Forecast], quotes_by_game: dict[int, list[Quote]
                 thresholds: tuple[float, ...]) -> pd.DataFrame:
     """Units and bets per (scenario, threshold). `attrs['actionable']` is False when the
     base is not positive or any modest degradation turns units non-positive (plan §31.6)."""
-    scenarios = {"base": {}, **MODEST, "median_book": {"quote_rule": "median"}}
+    scenarios = {"base": {}, **MODEST, "median_book": {"quote_rule": "median", "book": None}}
+    # The policy's own threshold is always in the grid, so `actionable` is never judged
+    # on a threshold that was not run.
+    grid = tuple(sorted(set(thresholds) | {policy.threshold}))
     rows = []
     for name, over in scenarios.items():
         ex = ExecutionSpec.model_validate({**base.model_dump(), **over})
-        for th in thresholds:
+        for th in grid:
             pol = policy if policy.kind == "no_bet" else policy.model_copy(update={"threshold": th})
             s = summarize(backtest(forecasts, quotes_by_game, pol, ex))
             rows.append({"scenario": name, "threshold": th, "bets": s["realized"]["bets"],
