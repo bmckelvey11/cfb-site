@@ -1,0 +1,137 @@
+{
+  "artifacts": {
+    "challenger.json": "859df6fae8c953d80540d4e4071a20b88fd45d15e284a782f4f6e1a3e01c9281",
+    "ot.npy": "57e41e775aa04ca7df9ea73f6fc36245e1329c9f97fe7bf2f899b31e19f0be03",
+    "pairs_early.npy": "22241bbea4f65df281be6521c71214733f82082e1ac16e630dab4e428bf19462",
+    "pairs_primary.npy": "77dcb09b018f8274e5393cddc42ee71282f6e70c0e2e26d9f5c92d2147911290"
+  },
+  "base_code_sha256": "974315f133f7ee350b6c2efaed3c9b4fc937a198a652f023047777c6fbfb95ea",
+  "base_run_id": "run-de1927346ab0",
+  "code_sha256": "64f8c2fad3ddebd6a30c21400ca48485d90cecdf7faab886975f080378661b8b",
+  "dist_run_id": "dist-0b0cc0382eca",
+  "drift_reference": {
+    "2": {
+      "n": 238,
+      "residual_sd": 16.892581060089718,
+      "rv1_total_mean": 51.96379796311909,
+      "rv1_total_sd": 5.3499997719431365
+    },
+    "3": {
+      "n": 255,
+      "residual_sd": 15.457331404863327,
+      "rv1_total_mean": 52.23104379529135,
+      "rv1_total_sd": 4.919774530760878
+    },
+    "4": {
+      "n": 285,
+      "residual_sd": 17.048557134707753,
+      "rv1_total_mean": 52.8252326803524,
+      "rv1_total_sd": 5.73084846097896
+    },
+    "5": {
+      "n": 277,
+      "residual_sd": 16.00893754147857,
+      "rv1_total_mean": 53.85132704813974,
+      "rv1_total_sd": 6.192081112170471
+    },
+    "6": {
+      "n": 256,
+      "residual_sd": 16.426405546902924,
+      "rv1_total_mean": 53.833231575389256,
+      "rv1_total_sd": 6.460081465091238
+    },
+    "7": {
+      "n": 265,
+      "residual_sd": 16.329977284701233,
+      "rv1_total_mean": 53.56975677342612,
+      "rv1_total_sd": 7.040169525990283
+    },
+    "8": {
+      "n": 277,
+      "residual_sd": 16.602382705769678,
+      "rv1_total_mean": 53.823932038937045,
+      "rv1_total_sd": 7.198744225951769
+    },
+    "9": {
+      "n": 263,
+      "residual_sd": 15.645033890310152,
+      "rv1_total_mean": 53.186644939718725,
+      "rv1_total_sd": 7.358509836563147
+    },
+    "10": {
+      "n": 281,
+      "residual_sd": 18.0671473504457,
+      "rv1_total_mean": 53.63954241011248,
+      "rv1_total_sd": 7.202705161402318
+    },
+    "11": {
+      "n": 289,
+      "residual_sd": 16.45589326706919,
+      "rv1_total_mean": 53.87723597389171,
+      "rv1_total_sd": 7.667155476975958
+    },
+    "12": {
+      "n": 298,
+      "residual_sd": 15.47073052691698,
+      "rv1_total_mean": 53.7396393174121,
+      "rv1_total_sd": 7.921579425279435
+    },
+    "13": {
+      "n": 315,
+      "residual_sd": 16.390646772482246,
+      "rv1_total_mean": 53.45441064189718,
+      "rv1_total_sd": 7.664042444813724
+    },
+    "14": {
+      "n": 166,
+      "residual_sd": 15.756016649838253,
+      "rv1_total_mean": 53.65737826782527,
+      "rv1_total_sd": 7.417375883837679
+    },
+    "15": {
+      "n": 21,
+      "residual_sd": 14.559500466528053,
+      "rv1_total_mean": 53.27296082856258,
+      "rv1_total_sd": 7.419600114982498
+    },
+    "16": {
+      "n": 2,
+      "residual_sd": 9.003691925700933,
+      "rv1_total_mean": 47.946621676206405,
+      "rv1_total_sd": 1.22551733264891
+    }
+  },
+  "early_min_prior_games": 3,
+  "features": [
+    "rv1_off_home",
+    "rv1_def_home",
+    "rv1_pace_home",
+    "rv1_off_away",
+    "rv1_def_away",
+    "rv1_pace_away",
+    "rv1_total",
+    "min_prior_games",
+    "neutral"
+  ],
+  "frozen_at": "2026-09-23T11:17:56+00:00",
+  "git_sha": "624a6f098152",
+  "model": {
+    "alpha": 0.04161411762734064,
+    "epsilon": null,
+    "family": "elastic_net",
+    "l1_ratio": 0.031163542210850423
+  },
+  "pools": {
+    "ot": 104,
+    "pairs_early": 537,
+    "pairs_primary": 1588,
+    "window_seasons": [
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "shadow_id": "shadow-3be5383c3469",
+  "spec_config_hash": "3be5383c34697d25c04378b427edc2ba4d23d85529306e0890177bd3c35f659a",
+  "support_max": 150
+}
