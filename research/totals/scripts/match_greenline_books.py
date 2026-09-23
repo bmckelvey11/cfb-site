@@ -126,7 +126,8 @@ def latest_snapshot() -> tuple[list[dict], str, Path]:
                 if m.get("key") != "totals":
                     continue
                 for o in m.get("outcomes", []):
-                    if o.get("name") == "Over" and o.get("point") is not None:
+                    # Every caller prices an UNDER flag; the Over's juice is the other side.
+                    if o.get("name") == "Under" and o.get("point") is not None:
                         totals[name] = (float(o["point"]), int(o["price"]))
         rows.append({"kick": ko, "home": toks(e["home_team"]), "away": toks(e["away_team"]),
                      "home_name": e["home_team"], "away_name": e["away_team"], "totals": totals})
