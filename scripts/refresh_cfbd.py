@@ -2,7 +2,8 @@
 
 Force-rescrapes the current season's endpoints that actually change during the
 season (games, lines, calendar, conferences, venues -- everything `build_core`'s
-Phase 1 tables need), re-pulls the two GraphQL dumps whose staleness reaches a
+Phase 1 tables need -- plus drives for the weekly rankings that `refresh_cfbd.cmd`
+writes after this script), re-pulls the two GraphQL dumps whose staleness reaches a
 `core` value, reflattens the Action Network tick CSV so the movement
 scraped since the last run is visible, then does a full rebuild of `cfb.duckdb`
 from data/raw + data/graphql + data/processed (that rebuild is a cheap, atomic
@@ -52,7 +53,9 @@ from pff_flatten import write as pff_write  # noqa: E402
 from oddsapi_flatten import IN_DIR as OA_IN_DIR  # noqa: E402
 from oddsapi_flatten import main as oddsapi_flatten_main  # noqa: E402
 
-DEFAULT_ONLY = {"games", "lines", "calendar", "conferences", "venues"}
+# drives: possession counts for scripts/weekly_rankings.py, which refresh_cfbd.cmd runs
+# after this script; without them a new week's games are gated out of the ratings.
+DEFAULT_ONLY = {"games", "lines", "calendar", "conferences", "venues", "drives"}
 
 # The two GraphQL dumps measured as materially behind on 2026-09-11, and the only two whose
 # staleness has a path to a `core` value. The other 48 are pulled by hand; see
