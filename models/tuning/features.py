@@ -149,6 +149,9 @@ def _release_b_frame(dataset: DatasetSpec, root: Path) -> tuple[pd.DataFrame, li
             rows.append({
                 "game_id": int(g.game_id), "season": int(season), "week": int(week),
                 "kickoff": g.kickoff, "decision_ts": cut, "target": float(g.total),
+                # Target parts, never features: target = home_reg + away_reg + ot_points.
+                "home_reg": float(g.home_reg), "away_reg": float(g.away_reg),
+                "ot_points": float(g.ot),
                 "rv1_off_home": get(g.home, "O"), "rv1_def_home": get(g.home, "D"),
                 "rv1_pace_home": get(g.home, "P"), "rv1_off_away": get(g.away, "O"),
                 "rv1_def_away": get(g.away, "D"), "rv1_pace_away": get(g.away, "P"),
@@ -187,6 +190,11 @@ def synthetic_frame(dataset: DatasetSpec, feature_set: FeatureSetSpec) -> pd.Dat
     x = rng.normal(0.0, 1.0, size=(len(frame), len(ids)))
     signal = 55.0 + x @ beta
     frame["target"] = signal + rng.normal(0.0, 12.0, len(frame))
+    # Integer parts derived from the target, with no extra draws (the stream is unchanged).
+    whole = np.clip(np.round(frame["target"]), 0, None)
+    frame["home_reg"] = np.round(whole * 0.52)
+    frame["away_reg"] = whole - frame["home_reg"]
+    frame["ot_points"] = 0.0
     for j, fid in enumerate(ids):
         frame[fid] = x[:, j]
     if ids:

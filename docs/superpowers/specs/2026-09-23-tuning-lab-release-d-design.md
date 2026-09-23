@@ -71,7 +71,8 @@ shadow period, on 2026 ticks with a policy frozen beforehand.
      segment pool, then rounded and floored at 0;
    - a regulation tie adds an overtime total drawn from the window's overtime games.
 
-   Total, home-win probability, and regulation margin all come from the same draws.
+   Total and home-win probability come from the same draws (a regulation tie counts
+   as half a home win).
 
 ## Calibration gate (declared; applied once to the selected candidate on 2021–2025)
 

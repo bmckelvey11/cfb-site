@@ -100,7 +100,8 @@ def test_synthetic_frame_is_deterministic_with_the_documented_columns():
     a, b = synthetic_frame(ds, fs), synthetic_frame(ds, fs)
     pd.testing.assert_frame_equal(a, b)
     ids = [f.id for f in fs.features]
-    expected = ["game_id", "season", "week", "kickoff", "decision_ts", "target", *ids,
+    expected = ["game_id", "season", "week", "kickoff", "decision_ts", "target",
+                "home_reg", "away_reg", "ot_points", *ids,
                 *[f"{i}__as_of" for i in ids], *BASELINES]
     assert list(a.columns) == expected
     assert a["game_id"].is_unique and (a["kickoff"] >= a["decision_ts"]).all()

@@ -11,7 +11,7 @@ This file is the build order; where the two differ, fix both.
 | --- | --- |
 | 0. Pin Release C's run id; declare the gate (spec) | Done 2026-09-23: `test_committed_spec_keeps_its_published_run_id` |
 | 1. D0 contract (`dist_spec.py`) | Done 2026-09-23: 19 tests |
-| 2. D1 distributions (+ frame targets in `features.py`) | pending |
+| 2. D1 distributions (+ frame targets in `features.py`) | Done 2026-09-23: 9 tests; real frame: target = home_reg + away_reg + ot_points on all 7,601 games, 340 with overtime, max total 146 |
 | 3. D2 betting engine (`market.py`) | pending |
 | 4. D3 selective prediction (`selective.py`) | pending |
 | 5. D4 join, real run twice, AN read-only audit, docs | pending |
