@@ -135,10 +135,10 @@ footer b { color: var(--text); font-weight: 600; }
       <b>Volume</b> is possessions per team per game against the average; + is more. Long scoring
       drives use up possessions, so an efficient offense can rank low here.
       Each cell shows the rank, the rating, and the move since the previous week.</p>
-    <p>Ratings adjust for opponents and are pulled toward league average until a team has several
+    <p>Ratings adjust for opponents and are pulled toward a prior until a team has several
       games: a team's own results get half the weight after about three games for offense and
-      defense and eight for volume. Grey rows have fewer than three games. Method: ridge_v1,
-      λ 40 possessions and 8 games, fit on completed FBS-vs-FBS regular-season games.</p>
+      defense and eight for volume. Grey rows have fewer than three games.
+      <span id="method"></span> Fit on completed FBS-vs-FBS regular-season games.</p>
     <p id="stamp"></p>
   </footer>
 </div>
@@ -206,6 +206,9 @@ function render() {
 
   $("sub").textContent = `${s} · through week ${w} · ${rows.length} teams · fit on ${wk.fit} of ${wk.scheduled} ` +
     `scheduled FBS-vs-FBS games · league ${wk.mu.toFixed(2)} points per possession, ${wk.nu.toFixed(1)} possessions a team`;
+  $("method").textContent = wk.method === "prior_v1"
+    ? "Method: prior_v1, λ 40 possessions and 8 games; the prior is a team's own last season, scaled by the fitted carryover (about half), so a two-game outlier does not top the table."
+    : "Method: ridge_v1, λ 40 possessions and 8 games; the prior is the league average.";
 
   const best = (k) => wk.rows.find((r) => r[IDX[k] + 1] === 1);
   $("chips").replaceChildren(chip("Best offense", best("O"), "O", wk), chip("Best defense", best("D"), "D", wk),

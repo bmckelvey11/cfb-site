@@ -33,6 +33,18 @@ def test_rank_one_is_best_offense_best_defense_and_fastest():
     assert sorted(t["O_rank"]) == list(range(1, len(TRUE_O) + 1))
 
 
+def test_prior_rates_idle_team_at_its_prior_and_pulls_played_teams_toward_theirs():
+    prior = pd.DataFrame({"O0": [0.0] * 6 + [0.4], "D0": [0.0] * 7, "P0": [0.0] * 6 + [-0.9]},
+                         index=list(TRUE_O) + ["Z"])
+    _, t = rank_week(_round_robin(), lam_ppp=40, lam_pace=8, prior=prior)
+    assert t.at["Z", "O"] == 0.4 and t.at["Z", "P"] == -0.9 and t.at["Z", "n_games"] == 0
+    assert t.at["Z", "P_rank"] == 7  # ranked with everyone else, on prior alone
+    _, base = rank_week(_round_robin(), lam_ppp=40, lam_pace=8)
+    lifted = prior.assign(O0=[0.5] + [0.0] * 6)  # A's own last season says it is good
+    _, t2 = rank_week(_round_robin(), lam_ppp=40, lam_pace=8, prior=lifted)
+    assert t2.at["A", "O"] > base.at["A", "O"]
+
+
 def test_each_week_sees_only_games_through_that_week():
     week1 = _round_robin(week=1)
     blowout = pd.DataFrame([_game(900, "F", "A", week=3, home_bonus=5.0)])
