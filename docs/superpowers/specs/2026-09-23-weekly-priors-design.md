@@ -1,6 +1,11 @@
 # Previous-season priors for the weekly ratings — design
 
-**Status:** approved design, 2026-09-23.
+**Status:** implemented 2026-09-23 (`1f67c8f` priors, evaluation in the next commit).
+Result: [`docs/weekly-priors-2026-09-23.md`](../../weekly-priors-2026-09-23.md), no-go.
+**Deviation:** the evaluation lives in a new `scripts/weekly_priors_eval.py` with its own
+outputs (`weekly_priors_eval.json`, `weekly_priors_snapshots.csv`) instead of extending
+`scripts/weekly_ratings_eval.py`. That file was already 344 lines, and another session's
+`scripts/weekly_ratings_coefs.py` reads Release B's manifest, so its schema stays unchanged.
 **Builds on:** Release B, [`docs/weekly-ratings-2026-09-23.md`](../../weekly-ratings-2026-09-23.md),
 `scripts/weekly_ratings.py`, `scripts/weekly_ratings_eval.py`.
 **Spec it implements:** [`research/totals/docs/totals-modeling-guide.md`](../../../research/totals/docs/totals-modeling-guide.md)

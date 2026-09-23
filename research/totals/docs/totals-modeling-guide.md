@@ -71,7 +71,7 @@ and the record that measured it.
 | Key numbers in the total | "Respect key numbers" | Measured: one-point bins with neighbour lift, 2014–25 FBS | [total-points-distribution-2026-09-17.md](../../../docs/total-points-distribution-2026-09-17.md) |
 | Wind | Anecdotal 13–15 mph thresholds | Pre-registered plan for crosswind vs along-field wind | [wind-orientation-totals.md](../../../docs/wind-orientation-totals.md) |
 | Which stats are usable pre-game? | "Strictly trailing" | 565 of 1,043 PFF/CFBD columns usable; the dividing line is table grain | [pregame-feature-eligibility-2026-09-16.md](../../../docs/pregame-feature-eligibility-2026-09-16.md) |
-| Opponent-adjusted efficiency | "Build it" | Built: crossed-random-effects PPA ratings, v1.0; five better EPA constructions specified. Weekly as-of ridge points-per-possession and pace ratings (§7.1–7.3, no priors) built; they beat raw ratings and a train mean on 2021–25 totals and trail the Bovada open by 0.33 MAE | [ppa-opponent-adjusted-ratings-2026-09-16.md](../../../docs/ppa-opponent-adjusted-ratings-2026-09-16.md), [epa-metric-constructions-2026-09-18.md](../../../docs/epa-metric-constructions-2026-09-18.md), [weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md) |
+| Opponent-adjusted efficiency | "Build it" | Built: crossed-random-effects PPA ratings, v1.0; five better EPA constructions specified. Weekly as-of ridge points-per-possession and pace ratings (§7.1–7.3, no priors) built; they beat raw ratings and a train mean on 2021–25 totals and trail the Bovada open by 0.33 MAE. Previous-season priors built; no-go on robustness | [ppa-opponent-adjusted-ratings-2026-09-16.md](../../../docs/ppa-opponent-adjusted-ratings-2026-09-16.md), [epa-metric-constructions-2026-09-18.md](../../../docs/epa-metric-constructions-2026-09-18.md), [weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md), [weekly-priors-2026-09-23.md](../../../docs/weekly-priors-2026-09-23.md) |
 
 ---
 
@@ -255,8 +255,12 @@ $D$ is **negative** for a good defense, because it lowers what opponents score.
 league average, points from line scores, in `scripts/weekly_ratings.py`, scored in
 [weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md). Tuned on
 2014–2019, $\lambda_{\text{PPP}}=40$ possessions and $\lambda_{\text{pace}}=8$ games. §7.4–7.5
-(priors, prior-centered ridge) are not built. **Every coefficient and league average in the
-worked examples below is illustrative, not estimated.**
+are built in reduced form — carryover plus offensive returning production, no talent or
+play-caller terms — in `scripts/weekly_priors.py`, and failed their declared go rule
+([weekly-priors-2026-09-23.md](../../../docs/weekly-priors-2026-09-23.md)): an early-week gain
+that does not survive the stress settings. Fitted carryover: offense 0.47 (+0.13 × RP, not
+distinguishable from 0), defense 0.60, pace 0.46. **Every coefficient and league average in
+the worked examples below is illustrative, not estimated.**
 
 ### 7.1 Opponent-adjusted efficiency
 
@@ -771,7 +775,7 @@ The source documents each gave a build order from zero. The repo is not at zero.
 | 1. Audit lines | Partly done: floor, provider mix, fields (§2, §5) | Open item (§14): open-vs-close timing agreement against the-odds-api from 2020 |
 | 2. Core game, drive, play tables | Done (warehouse) | — |
 | 3. Point-in-time pace and efficiency | Built: weekly as-of ridge PPP and pace ratings, no priors ([weekly-ratings-2026-09-23.md](../../../docs/weekly-ratings-2026-09-23.md)). Beat raw and train mean on 2021–25; 0.33 MAE behind the open; early weeks indistinguishable from the mean | Neutral-pace snapshots; garbage-time ablation (§14 item 5) |
-| 4. Previous-season priors and blend | Specified in §7.4–7.5 | Fit $b$, $c$, $q$, $a$, $\kappa$ and the $\lambda$ scale on earlier seasons; prior-centered ridge refit at each cutoff |
+| 4. Previous-season priors and blend | Built in reduced form ($b$, $c$, $b_D$, $a$; no $q$, $\kappa$), prior-centered ridge refit at each cutoff. No-go: early gain −0.24 MAE vs ridge_v1, unstable under λ and coefficient stress ([weekly-priors-2026-09-23.md](../../../docs/weekly-priors-2026-09-23.md)) | Tune λ on total loss over pre-2021 seasons (λ ×2 looked better but was seen on scored seasons); add talent change or a play-caller table when available |
 | 5. Rung 0 and 1 baselines | Not recorded for $r^{\text{final}}$ by era | Record the market's own loss per season and era |
 | 6. Rung 2 on the residual | The 2022–25 harness (predicts the total, not the residual) is a null | Refit on $r^{\text{final}}$ and $r^{\text{move}}$ with the §9.1 block |
 | 7. Distribution and pricing | Not built | Rung 3, priced with §8 |

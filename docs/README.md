@@ -121,6 +121,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [wind-orientation-totals.md](wind-orientation-totals.md) | Crosswind vs head/tail wind and scoring |
 | [ppa-opponent-adjusted-ratings-2026-09-16.md](ppa-opponent-adjusted-ratings-2026-09-16.md) | Opponent-adjusted team PPA ratings early in the season (mixed-effects, v1.0) |
 | [weekly-ratings-2026-09-23.md](weekly-ratings-2026-09-23.md) | Do weekly as-of ridge PPP and pace ratings beat raw ratings and a train mean on 2021–25 totals? Yes (−1.14, −0.84 MAE); 0.33 behind the Bovada open |
+| [weekly-priors-2026-09-23.md](weekly-priors-2026-09-23.md) | Do previous-season priors improve the weekly ratings early in the season? Early gain −0.24 MAE, but it fails the declared stress rule: no-go |
 | [epa-metric-constructions-2026-09-18.md](epa-metric-constructions-2026-09-18.md) | How to build the better-constructed version of five EPA-family metrics from `stg.plays`; four are buildable on one shared pipeline, dropback scramble/pressure splits are not |
 | [total-points-distribution-2026-09-17.md](total-points-distribution-2026-09-17.md) | How combined game totals are distributed and which exact totals spike (55, 41, 44); scoring is down ~5.7 pts since 2016 |
 | [scoring-margin-distribution-2026-09-18.md](scoring-margin-distribution-2026-09-18.md) | How scoring margins are distributed; 3 and 7 take 18.5% of games between them; home-field advantage is flat at +4, not trending |
