@@ -124,39 +124,65 @@ def _evidence(games: pd.DataFrame, teams: list[str]) -> pd.DataFrame:
     }).reindex(teams).fillna(0).astype(int)
 
 
-def fit_ppp(games: pd.DataFrame, lam: float) -> tuple[float, float, pd.DataFrame]:
-    """(mu, h, O/D table) by possession-weighted ridge; mu and h unpenalized."""
+def fit_ppp(games: pd.DataFrame, lam: float,
+            prior: pd.DataFrame | None = None) -> tuple[float, float, pd.DataFrame]:
+    """(mu, h, O/D table) by possession-weighted ridge; mu and h unpenalized.
+
+    With `prior` (columns O0, D0), each rating is prior + deviation and only the
+    deviation is penalized: guide §7.5's shrink-toward-the-prior fit.
+    """
     rows = _team_rows(games)
     teams = sorted(set(rows["team"]) | set(rows["opp"]))
     idx = {t: i for i, t in enumerate(teams)}
     k = len(teams)
+    o0 = _prior_col(prior, "O0", teams)
+    d0 = _prior_col(prior, "D0", teams)
     x = np.zeros((len(rows), 2 + 2 * k))
     x[:, 0] = 1.0
     x[:, 1] = rows["H"]
     x[np.arange(len(rows)), 2 + rows["team"].map(idx)] = 1.0
     x[np.arange(len(rows)), 2 + k + rows["opp"].map(idx)] = 1.0
-    b = _solve(x, rows["y"].to_numpy(float), rows["w"].to_numpy(float),
-               np.r_[0.0, 0.0, np.full(2 * k, lam)])
-    return b[0], b[1], pd.DataFrame({"O": b[2:2 + k], "D": b[2 + k:]}, index=teams)
+    y = rows["y"].to_numpy(float) - rows["team"].map(o0).to_numpy() - rows["opp"].map(d0).to_numpy()
+    b = _solve(x, y, rows["w"].to_numpy(float), np.r_[0.0, 0.0, np.full(2 * k, lam)])
+    return b[0], b[1], pd.DataFrame({"O": b[2:2 + k] + o0.to_numpy(),
+                                     "D": b[2 + k:] + d0.to_numpy()}, index=teams)
 
 
-def fit_pace(games: pd.DataFrame, lam: float) -> tuple[float, pd.Series]:
+def fit_pace(games: pd.DataFrame, lam: float,
+             prior: pd.DataFrame | None = None) -> tuple[float, pd.Series]:
     """(nu, P) by ridge on game possession counts; each game weight 1, nu unpenalized."""
     teams = sorted(set(games["home"]) | set(games["away"]))
     idx = {t: i for i, t in enumerate(teams)}
+    p0 = _prior_col(prior, "P0", teams)
     x = np.zeros((len(games), 1 + len(teams)))
     x[:, 0] = 1.0
     x[np.arange(len(games)), 1 + games["home"].map(idx)] = 1.0
     x[np.arange(len(games)), 1 + games["away"].map(idx)] = 1.0
-    b = _solve(x, games["N"].to_numpy(float), np.ones(len(games)),
-               np.r_[0.0, np.full(len(teams), lam)])
-    return b[0], pd.Series(b[1:], index=teams, name="P")
+    y = games["N"].to_numpy(float) - games["home"].map(p0).to_numpy() - games["away"].map(p0).to_numpy()
+    b = _solve(x, y, np.ones(len(games)), np.r_[0.0, np.full(len(teams), lam)])
+    return b[0], pd.Series(b[1:] + p0.to_numpy(), index=teams, name="P")
 
 
-def fit_ridge(games: pd.DataFrame, lam_ppp: float, lam_pace: float) -> Ratings:
-    mu, h, od = fit_ppp(games, lam_ppp)
-    nu, p = fit_pace(games, lam_pace)
+def _prior_col(prior: pd.DataFrame | None, col: str, teams: list[str]) -> pd.Series:
+    """Prior values for `teams`; 0 (league average) where there is no prior."""
+    if prior is None:
+        return pd.Series(0.0, index=teams)
+    return prior[col].reindex(teams).fillna(0.0).astype(float)
+
+
+def fit_ridge(games: pd.DataFrame, lam_ppp: float, lam_pace: float,
+              prior: pd.DataFrame | None = None) -> Ratings:
+    """`prior=None` is Release B's ridge_v1; a prior (O0, D0, P0 by team) is prior_v1.
+
+    Teams with a prior but no games yet are rated at their prior.
+    """
+    mu, h, od = fit_ppp(games, lam_ppp, prior)
+    nu, p = fit_pace(games, lam_pace, prior)
     table = od.join(p, how="outer")
+    if prior is not None:
+        idle = prior.index.difference(table.index)
+        table = pd.concat([table, prior.loc[idle, ["O0", "D0", "P0"]].set_axis(
+            ["O", "D", "P"], axis=1)]).sort_index()
     table = table.join(_evidence(games, list(table.index)))
     return Ratings(mu=float(mu), nu=float(nu), h=float(h), c=float(games["ot"].mean()),
                    table=table, unrated=0.0)
