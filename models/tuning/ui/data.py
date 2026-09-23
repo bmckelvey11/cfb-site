@@ -327,6 +327,35 @@ def pace_scenario(snapshots: pd.DataFrame, base_run: Path, raw_dir: Path, season
             "outside": [t for t, p in ((home, p_home), (away, p_away)) if not lo <= p <= hi]}
 
 
+# --- betting decision lab (plan §37.2 page 14) -------------------------------------------
+
+def betting(root: Path) -> list[dict]:
+    """Every priced replay the CLI wrote, for display only: nothing here prices a quote. A period
+    replay is shown only while its ledger chain holds and records a verdict, the check `replay()`
+    makes before it runs; a rehearsal needs only the chain."""
+    out = []
+    for sd in sorted((root / "shadow").glob("shadow-*")):
+        if not (sd / "ledger.sqlite3").exists():
+            continue
+        records, (chain_ok, _) = read_only(sd / "ledger.sqlite3")
+        has_verdict = any(r.kind == "period_verdict" for r in records)
+        for path in sorted((sd / "replay").glob("replay-*.json")):
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            why = ("the ledger chain fails" if not chain_ok else None if doc.get("rehearsal") or has_verdict
+                   else "a period replay with no verdict in the ledger")
+            book = path.with_name(f"{path.stem}_ledger.csv")
+            out.append({"shadow": sd.name, "name": path.stem, "doc": doc, "why": why,
+                        "book": _csv_or_empty(book) if why is None and book.exists() else None})
+    return out
+
+
+def _csv_or_empty(path: Path) -> pd.DataFrame:
+    try:
+        return pd.read_csv(path)
+    except pd.errors.EmptyDataError:  # a replay that priced no game writes a header-less file
+        return pd.DataFrame()
+
+
 # --- data quality and lineage (plan §37.2 page 11) ---------------------------------------
 
 def sha256_file(path: Path) -> str:

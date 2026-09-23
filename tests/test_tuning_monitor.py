@@ -204,6 +204,27 @@ def test_pace_scenario_is_exact_for_both_point_models_and_flags_support(tmp_path
     assert pace_scenario(snaps, run, raw, 2021, 3, 8, p_home=0.5, p_away=-0.3) is None
 
 
+def test_betting_shows_a_rehearsal_and_holds_a_period_replay_until_the_verdict(tmp_path):
+    from models.tuning.ui.data import betting
+
+    lab = tmp_path / "lab"
+    (lab / "shadow").mkdir(parents=True)
+    sd = _shadow(lab / "shadow")
+    assert betting(lab) == []                                  # nothing until the CLI writes one
+    (sd / "replay").mkdir()
+    for name, rehearsal in (("replay-x-rehearsal", True), ("replay-x", False)):
+        (sd / "replay" / f"{name}.json").write_text(json.dumps({"rehearsal": rehearsal}), encoding="utf-8")
+        pd.DataFrame({"game_id": [1], "action": ["bet"]}).to_csv(sd / "replay" / f"{name}_ledger.csv",
+                                                                 index=False)
+    by = {r["name"]: r for r in betting(lab)}
+    assert by["replay-x-rehearsal"]["why"] is None and len(by["replay-x-rehearsal"]["book"]) == 1
+    assert "no verdict" in by["replay-x"]["why"] and by["replay-x"]["book"] is None
+    Ledger(sd / "ledger.sqlite3").append("period_verdict", {"go": True})
+    assert all(r["why"] is None for r in betting(lab))
+    pd.DataFrame().to_csv(sd / "replay" / "replay-x_ledger.csv", index=False)  # priced no game
+    assert {r["name"]: len(r["book"]) for r in betting(lab)}["replay-x"] == 0
+
+
 def test_every_hypothesis_points_at_a_record_that_exists():
     h = hypotheses()
     assert h["id"].is_unique and set(h["status"]) <= {"closed", "pending"}

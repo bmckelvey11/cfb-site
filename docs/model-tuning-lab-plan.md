@@ -2301,7 +2301,7 @@ The mode is not a separate line. The lab-root banner marks a scratch lab, and ea
 18 System Health & Drift
 ```
 
-**Status (2026-09-23): pages 11–13 and 15–18 are built, read-only**, in the lab GUI (§5 status).
+**Status (2026-09-23): pages 11–18 are built, read-only**, in the lab GUI (§5 status).
 
 - **Data** is page 11.
   - It shows how fresh the live inputs are.
@@ -2315,7 +2315,16 @@ The mode is not a separate line. The lab-root banner marks a scratch lab, and ea
 - **Shadow** covers pages 15 and 18. It shows alerts for a stale tick, a snapshot deadline, a missed week, or the verdict; then the weeks and the replay.
 - **Registry** is page 16: published runs, the current champion and challenger, and every alias move. Aliases still move only through the CLI.
 - **Hypotheses** is page 17, read from `models/tuning/hypotheses.json`.
-- **Page 14, the betting decision lab, waits** until the shadow replay has run. Pricing live 2026 quotes in the GUI now would show priced results before the frozen replay.
+- **Betting** is page 14. It is built, and it waits on data rather than code.
+  - It reads only the replay files the CLI writes, and never prices a quote itself. Pricing live 2026 quotes in the GUI would show priced results before the frozen replay.
+  - It shows the replay's framing text verbatim, then:
+    - bets, fills and quote availability;
+    - units per bet and closing-line value, each with its interval;
+    - P(over) against the de-vigged market;
+    - the declared threshold table;
+    - every decision.
+  - A period replay is hidden until the ledger records the verdict, the same check `replay()` makes. A rehearsal carries a REHEARSAL banner.
+  - Nothing shows until the week 4 rehearsal (from 2026-09-28) or the period replay (after ~2026-10-26) is run.
 
 ### 37.3 Comparison workspace
 

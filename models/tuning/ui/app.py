@@ -3,7 +3,7 @@
     .venv-lab-ui\\Scripts\\python -m streamlit run models/tuning/ui/app.py
 
 Pages: Shadow (read-only; §37.2 pages 15, 18), Distributions (§37.2 page 13 and the §37.4
-scenario line), New run (plan §5 pages 01-06), Jobs (07), Runs (08-09), Registry (§37.2
+scenarios), Betting (§37.2 page 14: the CLI's replay files, never priced here), New run (plan §5 pages 01-06), Jobs (07), Runs (08-09), Registry (§37.2
 page 16), Replay (§37.2 page 12), Data (§37.2 page 11), Hypotheses (10 / §37.2 page 17). Every check a spec must pass lives in `models.tuning.ui.api`, run in the
 main `.venv`, so the GUI cannot skip one; a launch re-validates the exact file it starts.
 Set CFB_LAB_ROOT to point the whole GUI at a scratch lab. Runs in its own venv so the
@@ -36,7 +36,7 @@ ALERT = {"error": st.error, "warning": st.warning, "success": st.success, "info"
 IN_FLIGHT = ("queued", "claimed", "running", "retry_wait", "cancellation_requested")
 
 st.set_page_config(page_title="CFB Tuning Lab", layout="wide")
-page = st.sidebar.radio("Page", ["Shadow", "Distributions", "New run", "Jobs", "Runs",
+page = st.sidebar.radio("Page", ["Shadow", "Distributions", "Betting", "New run", "Jobs", "Runs",
                                  "Compare", "Registry", "Replay", "Data", "Hypotheses"])
 st.sidebar.caption(f"Lab root: `{LAB}`" + ("  \n**scratch lab**" if "--lab-root" in sys.argv
                                             or os.environ.get("CFB_LAB_ROOT") else ""))
@@ -147,16 +147,8 @@ if page == "Shadow":
         st.dataframe(pd.DataFrame(v["aliases"], columns=["alias", "model", "reason"]),
                      hide_index=True, width="stretch")
     st.subheader("Priced replay")
-    if not v["replays"]:
-        st.caption("Not run yet. It runs after the period verdict (`python -m models.tuning replay`).")
-    for path in v["replays"]:
-        out = json.loads(path.read_text(encoding="utf-8"))
-        with st.expander(path.stem, expanded=True):
-            st.warning(out["framing"])
-            st.json({k: out[k] for k in ("weeks", "games_priced", "views", "units_per_bet",
-                                         "clv_line", "clv_close_unknown", "actionable",
-                                         "p_over_vs_market")}, expanded=False)
-            st.dataframe(pd.DataFrame(out["sensitivity"]), hide_index=True)
+    st.caption(f"{len(v['replays'])} written. Read them on the Betting page, which shows a period "
+               "replay only once the ledger holds its verdict.")
     with st.expander("status.md (written by the tick)"):
         st.markdown(v["status_md"])
 
@@ -234,6 +226,49 @@ elif page == "Distributions":
                        "games played, not pace, so pace would move it without widening it. It is not "
                        "redrawn, because the distribution model's own mean response is not stored. "
                        "Spread, wind and QB status are not model inputs, so they are not offered.")
+
+elif page == "Betting":
+    st.title("Betting decisions")
+    st.caption("Plan §37.2 page 14. Shows the priced replay that `python -m models.tuning replay` "
+               "wrote. This page prices nothing and has no threshold of its own: the sensitivity "
+               "table is the replay's declared one.")
+    reps = md.betting(LAB)
+    if not reps:
+        st.info("No replay yet. The week 4 rehearsal can run from Mon 2026-09-28; the period "
+                "replay runs after the shadow verdict (about 2026-10-26).")
+        st.stop()
+    # Options are indices: Streamlit compares options, and a dict holding a DataFrame cannot.
+    rep = reps[st.selectbox("Replay", range(len(reps)),
+                            format_func=lambda i: f"{reps[i]['shadow']} / {reps[i]['name']}")]
+    if rep["why"]:
+        st.error(f"Not shown: {rep['why']}.")
+        st.stop()
+    doc = rep["doc"]
+    if doc["rehearsal"]:
+        st.error("REHEARSAL: a mechanics check on weeks outside the period. Never a result.")
+    st.warning(doc["framing"])
+
+    def boot(b: dict, digits: int = 3) -> str:
+        return "—" if not b or b.get("mean") is None else (
+            f"{b['mean']:+.{digits}f} (95% {b['ci95'][0]:+.{digits}f} to {b['ci95'][1]:+.{digits}f}, n {b['n']})")
+
+    views = doc["views"]
+    st.markdown(
+        f"**Weeks** {doc['weeks']}: {doc['games_priced']} games priced, "
+        f"{views['edge']['bets']} bets, {views['availability']['no_quote']} with no fresh quote, "
+        f"{views['availability']['missed_fills']} missed fills.  \n"
+        f"**Units per bet:** {boot(doc['units_per_bet'])}  \n"
+        f"**Closing-line value (points), proven closes only:** {boot(doc['clv_line'], 2)}; "
+        f"{doc['clv_close_unknown']} bets have no tick after kickoff, so their close is unknown.")
+    st.subheader("P(over) against the de-vigged market")
+    st.json(doc["p_over_vs_market"], expanded=True)
+    st.subheader("Declared threshold sensitivity")
+    st.dataframe(pd.DataFrame(doc["sensitivity"]), hide_index=True, width="stretch")
+    st.subheader("Every decision")
+    if rep["book"] is not None:
+        st.dataframe(rep["book"], hide_index=True, width="stretch")
+    with st.expander("Frozen policy and execution assumptions"):
+        st.json({"policy": doc["policy"], "execution": doc["execution"], "quotes": doc["quotes"]})
 
 elif page == "Compare":
     st.title("Compare runs")
