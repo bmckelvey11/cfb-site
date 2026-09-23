@@ -78,6 +78,11 @@ decision time. It is not part of the go/no-go.
 - CLV counts only where the archived file holds a tick after kickoff. The collector stops
   re-pulling settled games, and in 2026 weeks 1–3 only 0/51, 32/49 and 3/57 files did.
   Every other bet is `close_unknown`, and the count is reported.
+  - **Only a download during the game can prove the close.**
+    - Every week 1–3 file downloaded during its game has live ticks after kickoff (35 of 35).
+    - A download of a settled game returns offers with empty `history` (probe of event
+      289026, 2026-09-23), so re-downloading after the game recovers nothing.
+    - The collector already refuses to write such a payload.
 - Action Network ticks are change events, so a price unchanged for more than 24 h counts as
   stale.
 - The P(over) score is taken against the modal fresh number's mean de-vigged probability.
