@@ -25,17 +25,22 @@ and every best_bets market reads `locked: "premium"`. With one, the props carry
 `greenline_spread`, the total `projection`, per-side cover probabilities, and
 `best_side`/`best_value`. Verified 2026-09-09 against a Pro web session.
 
-So `--greenline` needs the browser session cookie, in `PFF_WEB_COOKIE` (environment
-or env.env). To get it: signed into pff.com, open DevTools -> Network on any
-/api/scoreboard/matchup request -> Request Headers -> copy the whole `cookie:`
-value. It is a credential; it expires, and a 401 or a `premium: False` row means
-re-copy it.
+So `--greenline` needs a logged-in session, in `PFF_WEB_COOKIE` (environment or
+env.env). Save Clerk's long-lived `__client` cookie there: signed into pff.com, open
+DevTools -> Network, filter `tokens` (the page calls clerk.pff.com/v1/client/sessions/
+<sid>/tokens every ~50s) -> Request Headers -> copy `__client=...` from its `cookie:`.
+It is a credential -- it is your login until you sign out -- and it lasts until
+logout, a password change, or the Clerk session's own expiry (3+ weeks; the first one
+saved, 2026-09-23, runs to 2026-10-16). A 401 from clerk.pff.com means re-copy it.
 
-THE COOKIE IS GOOD FOR SIXTY SECONDS. Its `__session` is a Clerk JWT minted with a
-60s TTL and refreshed in the background by the page; the copy you paste is a
-snapshot of that JWT, so a paste, a file save and a run in three separate steps
-loses the race. Copy, save, and run in one motion. `web_cookie()` reads the JWT's
-own `exp` and refuses before spending 69 requests to discover the same thing.
+THE SESSION TOKEN IS GOOD FOR SIXTY SECONDS. pff.com's API reads `__session`, a Clerk
+JWT with a 60s TTL, and checks it without calling Clerk -- an expired one is simply
+anonymous, `premium: False`, no error. So `web_cookie()` trades `__client` for a fresh
+`__session` (the same call the page makes), and the loop re-mints before each token
+lapses. A full week takes ~2.4s a game, so one token covers about 25 of 69 games: the
+2026-09-22 week-4 pull used a pasted static cookie, went locked at game 26, and
+captured 25. A pasted `cookie:` header with `__session` and no `__client` still works
+for a quick look, but `check_fresh` refuses it once expired, including mid-run.
 
 CURRENT SEASON ONLY, and that is a server-side fact, not a missing parameter.
 Swept 2019-2027 for NCAA and 2025-2026 for NFL against a premium session: every
@@ -74,6 +79,7 @@ import base64
 import csv
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -84,6 +90,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cfb_paths import INGEST, current_season  # noqa: E402
 
 BASE = "https://www.pff.com/api"
+CLERK_FAPI = "https://clerk.pff.com/v1"
+CLIENT_RE = re.compile(r"(?:^|;)\s*__client=([^;\s]+)")
 OUT_DIR = INGEST / "pff_scoreboard"
 PACING_SECONDS = 0.5
 
@@ -170,24 +178,43 @@ def check_fresh(cookie: str, now: float | None = None) -> str:
     if exp is not None and exp < now:
         raise SystemExit(
             f"PFF_WEB_COOKIE's __session JWT expired {now - exp}s ago -- Clerk mints it "
-            "with a 60s TTL, so copy the cookie, save it, and re-run inside the minute"
+            "with a 60s TTL; save the long-lived __client cookie instead (module docstring)"
         )
     return cookie
 
 
+def mint_session(client: str) -> str:
+    """Trade Clerk's long-lived `__client` token for a fresh 60s `__session` cookie."""
+    headers = {"User-Agent": "Mozilla/5.0", "Origin": "https://www.pff.com",
+               "Cookie": f"__client={client}"}
+
+    def fapi(method: str, path: str) -> dict:
+        req = urllib.request.Request(f"{CLERK_FAPI}/{path}?_clerk_js_version=5",
+                                     headers=headers, method=method)
+        with urllib.request.urlopen(req, timeout=30) as fh:
+            return json.load(fh)
+
+    sid = (fapi("GET", "client").get("response") or {}).get("last_active_session_id")
+    if not sid:
+        raise SystemExit("PFF_WEB_COOKIE's __client has no active session -- sign in to "
+                         "pff.com and re-copy it (see the module docstring)")
+    return "__session=" + fapi("POST", f"client/sessions/{sid}/tokens")["jwt"]
+
+
 def web_cookie() -> str:
     value = os.environ.get("PFF_WEB_COOKIE")
-    if value:
-        return check_fresh(value)
     env_file = Path(__file__).resolve().parents[1] / "env.env"
-    if env_file.exists():
+    if not value and env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():
             if line.startswith("PFF_WEB_COOKIE="):
-                return check_fresh(line.split("=", 1)[1].strip())
-    raise SystemExit(
-        "PFF_WEB_COOKIE not set -- Greenline needs a logged-in premium session; "
-        "see the module docstring for how to copy the cookie header"
-    )
+                value = line.split("=", 1)[1].strip()
+    if not value:
+        raise SystemExit(
+            "PFF_WEB_COOKIE not set -- Greenline needs a logged-in premium session; "
+            "see the module docstring for how to copy the __client cookie"
+        )
+    client = CLIENT_RE.search(value)
+    return mint_session(client.group(1)) if client else check_fresh(value)
 
 
 def raw_games(payload: dict) -> list[dict]:
@@ -431,6 +458,10 @@ def self_check() -> None:
         assert "expired 185s ago" in str(exc), exc
     else:
         raise AssertionError("an expired session JWT must not pass check_fresh")
+    # __client routes to minting; __client_uat (in every pff.com header) must not.
+    assert CLIENT_RE.search("__client=ab.cd.ef").group(1) == "ab.cd.ef"
+    assert CLIENT_RE.search("x=1; __client=ab.cd; y=2").group(1) == "ab.cd"
+    assert CLIENT_RE.search("__client_uat=1; __client_uat_aRf=1; __session=a.b.c") is None
     print("self-check ok")
 
 
@@ -492,6 +523,8 @@ def greenline_pull(sched: dict, args, games: list[dict]) -> list[dict]:
     cookie = web_cookie()
     rows, locked, dump = [], 0, []
     for i, g in enumerate(wanted):
+        if (session_expiry(cookie) or float("inf")) - time.time() < 15:
+            cookie = web_cookie()  # 60s token: re-mint from __client, or refuse a lapsed paste
         slug = g.get("slug") or (g.get("matchup_path") or "").rsplit("/", 1)[-1]
         matchup = get(
             "scoreboard/matchup",
