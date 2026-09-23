@@ -52,5 +52,15 @@ REM drives are gated out and the next run fills them in -- and never changes RC.
 pushd "%REPO%"
 "%PYTHON%" -u -m scripts.weekly_rankings>> "%LOG%" 2>&1
 if errorlevel 1 echo ---- weekly_rankings exited %ERRORLEVEL% ---->> "%LOG%"
+
+REM Release E shadow ledger (models/tuning/shadow.py): snapshot the next week between weeks,
+REM score finished games, write status.md. Needs the main .venv (pydantic 2, optuna,
+REM sklearn), not the fetch venv. Reads raw files only and never changes RC.
+REM No ( ) block: %ERRORLEVEL% inside one would expand before the tick runs.
+set "SHADOW_PY=%REPO%\.venv\Scripts\python.exe"
+set "SHADOW_SPEC=%REPO%\models\tuning\specs\shadow_2026_w05_08.json"
+if not exist "%SHADOW_PY%" echo ---- shadow tick skipped: no .venv ---->> "%LOG%"
+if exist "%SHADOW_PY%" "%SHADOW_PY%" -u -m models.tuning shadow tick --spec "%SHADOW_SPEC%">> "%LOG%" 2>&1
+if exist "%SHADOW_PY%" if errorlevel 1 echo ---- shadow tick exited %ERRORLEVEL% ---->> "%LOG%"
 popd
 exit /b %RC%
