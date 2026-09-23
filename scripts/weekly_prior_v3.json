@@ -1,0 +1,153 @@
+{
+  "candidate": "prior_v3",
+  "frozen_at": "2026-09-23T06:38:21+00:00",
+  "design": "docs/superpowers/specs/2026-09-23-prior-scale-2026-confirmation-design.md",
+  "tune_seasons": [
+    2015,
+    2016,
+    2017,
+    2018,
+    2019
+  ],
+  "ridge_v1_lambda": [
+    40,
+    8
+  ],
+  "coefficients": {
+    "b": 0.471067193803489,
+    "c": 0.12721388682932447,
+    "b_D": 0.6032021511964406,
+    "a": 0.46302527351066114
+  },
+  "coefficient_se": {
+    "b": 0.10486207264280219,
+    "c": 0.14396039442805256,
+    "b_D": 0.03729886298399572,
+    "a": 0.04782992467550228
+  },
+  "scale": 1.0,
+  "lambda_ppp": 80.0,
+  "lambda_pace": 8.0,
+  "mae": 13.6829,
+  "scale_on_grid_boundary": false,
+  "by_scale": {
+    "0": {
+      "lambda_ppp": 40.0,
+      "lambda_pace": 4.0,
+      "mae": 13.9274,
+      "n_games": 3644,
+      "pick_on_grid_boundary": false
+    },
+    "0.25": {
+      "lambda_ppp": 80.0,
+      "lambda_pace": 8.0,
+      "mae": 13.8202,
+      "n_games": 3644,
+      "pick_on_grid_boundary": false
+    },
+    "0.5": {
+      "lambda_ppp": 80.0,
+      "lambda_pace": 8.0,
+      "mae": 13.739,
+      "n_games": 3644,
+      "pick_on_grid_boundary": false
+    },
+    "0.75": {
+      "lambda_ppp": 80.0,
+      "lambda_pace": 8.0,
+      "mae": 13.6953,
+      "n_games": 3644,
+      "pick_on_grid_boundary": false
+    },
+    "1": {
+      "lambda_ppp": 80.0,
+      "lambda_pace": 8.0,
+      "mae": 13.6829,
+      "n_games": 3644,
+      "pick_on_grid_boundary": false
+    },
+    "1.25": {
+      "lambda_ppp": 80.0,
+      "lambda_pace": 8.0,
+      "mae": 13.7156,
+      "n_games": 3644,
+      "pick_on_grid_boundary": false
+    }
+  },
+  "code_sha256": {
+    "weekly_prior_scale.py": "02dd9cfd96c7ffcfe9c41c02c9ca91565b734a8999088aeae425760758e7f9bf",
+    "weekly_priors.py": "b2cffeef147d3ff477a05c960c3dfcd92acbcb194a3f65c5b5cad6da02129f53",
+    "weekly_ratings.py": "fca7078614f1a35b92d0e9f4b4505a2367b47c4fe15ba23ae190de36db5f5dc0",
+    "weekly_total_tuning.py": "57d46f3856f47797287bb84bc38f1ced9dda48f1a26208a9ecbcc7c360c9dd82"
+  },
+  "source_files": [
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2014.json",
+      "sha256": "c33a8fd2687d248c0bbf3b9320e1b793abde55dca9cbf9bc1f25a7b4bf04113b"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2014.json",
+      "sha256": "64adb34375cfb7a1347c1e0ee53384755f20da177f96b0fd348c54338df66179"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2015.json",
+      "sha256": "63921d315df440bde538241ecd2e5684b78305c1f1102ef8d4e2abd915936868"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2015.json",
+      "sha256": "bdcc401346167e25cdb05e068216c1b276521ebea99b5bf31e671a1b776443de"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2016.json",
+      "sha256": "b6b734fb2f0b538413bd0c6510014af915dda7e75158bc70e5dd9bf06d74222f"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2016.json",
+      "sha256": "ffd95b15099efe96f45254af72066d3de9e3940c7bee88e7f1cf5bc609bf032a"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2017.json",
+      "sha256": "6cd9c7592e0fb13089136b4e0ccd611b87a4b843474ce6514cfd130b983a9d4d"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2017.json",
+      "sha256": "589c70ff78af757d9f67273c0e4faf0d36b66f5cce5447246075b1268c51175f"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2018.json",
+      "sha256": "ae879f0bc7a21c82ca7639ab1f2ce231ced4973aecc0797886c73e2b2a79f12c"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2018.json",
+      "sha256": "0bb5776518dc22832ae3dcc8b694aa5fa16defc884187a300c269f71dccf1e99"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\games_2019.json",
+      "sha256": "367b30e0f29fdaa8b0cbed987c67656835dae82680cdbbfaca8aa156eb66c79a"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\drives_2019.json",
+      "sha256": "7830b66afe533d1373d64f56a913024bffc3ab2b1995c265f400fdd6b0ad846d"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\returning_production_2015.json",
+      "sha256": "97c6f314bcbd139db0f6840322acb3d83fe0d594d47cbcaf029118553471bee6"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\returning_production_2016.json",
+      "sha256": "f2ba7a775a0a07129712c169fb5e6b4b1875e8cbe0aeb83a5abfdd98ca8fee3d"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\returning_production_2017.json",
+      "sha256": "ca5001ff6aaf95319628f04e3aed9fa8bb7ad2f28083b74eec8dfff403c39dac"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\returning_production_2018.json",
+      "sha256": "0e4b05ab5ba4693ce126a9942c7d10cb1ff351ae4d568805461a4d8565813f6a"
+    },
+    {
+      "path": "C:\\Users\\mckel\\dev\\cfb\\data\\raw\\returning_production_2019.json",
+      "sha256": "5e51c6bea0b4128a9ba9e47779d2ed0bbc6b59fc83c0fe71e81fb862c3ebecff"
+    }
+  ]
+}
