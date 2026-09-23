@@ -14,7 +14,7 @@ This file is the build order; where the two differ, fix both.
 | 2. D1 distributions (+ frame targets in `features.py`) | Done 2026-09-23: 9 tests; real frame: target = home_reg + away_reg + ot_points on all 7,601 games, 340 with overtime, max total 146 |
 | 3. D2 betting engine (`market.py`) | Done 2026-09-23: 20 hand-computed tests. Read-only pass over the real AN tick CSV (counts only): 94,130 full-game total quotes over 333 events at 5 books, 2026-04-02 to 2026-09-23; dropped 50,715 consensus/Open rows and 8,778 live rows. The first pass exposed `astype(bool)` reading blank flags as True; flags are now parsed explicitly |
 | 4. D3 selective prediction (`selective.py`) | Done 2026-09-23: 3 tests; meta-model is a fixed-alpha Ridge (not a second search) |
-| 5. D4 join, real run twice, AN read-only audit, docs | pending |
+| 5. D4 join, real run twice, AN read-only audit, docs | Done 2026-09-23: 2 tests; `dist-0b0cc0382eca` selects `joint_bootstrap`, which passes the gate; byte-identical from two roots; finding doc `docs/total-distributions-2026-09-23.md`; guide §13 rows 1 and 7 |
 
 ## Global constraints
 

@@ -2460,6 +2460,14 @@ fit_fold(train, test, run_spec) -> FoldResult
 
 ### Release D: probabilistic decisions
 
+**Status (2026-09-23):** built; go/no-go met.
+
+- Design: [`superpowers/specs/2026-09-23-tuning-lab-release-d-design.md`](superpowers/specs/2026-09-23-tuning-lab-release-d-design.md).
+- Result: [`total-distributions-2026-09-23.md`](total-distributions-2026-09-23.md).
+- **Calibration:** run `dist-0b0cc0382eca` selected the joint home/away model, which passes the calibration gate on the 2021–25 outer folds, declared before scoring.
+- **Reproducibility:** the run is byte-identical from two clean roots.
+- **No betting claim:** timestamped, priced totals quotes exist for 2026 only, so the second clause holds trivially. The pricing engine (`models/tuning/market.py`) is verified on fixtures only, and priced evaluation moves to Release E.
+
 - Quantile/distributional models and time-aware calibration.
 - Prediction intervals and joint score simulation.
 - Immutable quote selection, push-aware EV, flat-stake backtester, CLV ledger, and execution sensitivity.
