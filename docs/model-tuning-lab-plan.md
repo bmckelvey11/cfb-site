@@ -2412,6 +2412,15 @@ Defer deep neural sequence models, normalizing flows, GNNs, player embeddings, H
 
 ### Release C: governed tuning MVP
 
+**Status (2026-09-23):** built; go/no-go met.
+
+- Design: [`superpowers/specs/2026-09-23-tuning-lab-release-c-design.md`](superpowers/specs/2026-09-23-tuning-lab-release-c-design.md).
+- Build order: [`superpowers/plans/2026-09-23-tuning-lab-release-c-PLAN.md`](superpowers/plans/2026-09-23-tuning-lab-release-c-PLAN.md).
+- Code: `models/tuning/`.
+- **Reproducibility:** the committed run `models/tuning/specs/total_ratings_v1.json` was run into two clean roots in separate processes. Both gave `run-de1927346ab0` with byte-identical predictions.
+- **Crash safety:** a worker killed mid-trial resumes with its completed trials unchanged (`tests/test_tuning_worker.py`).
+- **Deviations from this plan:** the tracks were built one after another, not in parallel, and `fit_fold` takes the trial's `ModelSpec` as a fourth argument.
+
 Same scope as before: typed specs and config hashes, a feature builder with availability classes, Ridge / Elastic Net / Huber on fixed feature sets, nested chronological validation, paired baseline comparisons, persistent Optuna workers, model cards, and job heartbeat / retry / cancel / checksum. The Streamlit pages stay out of this release. The go/no-go is a CLI run.
 
 Work splits into one short serial gate, then four tracks that can run at the same time. Each track owns the files listed on it and does not edit another track's files. They all code against the contract below, so nobody waits on another track's pull request to start.

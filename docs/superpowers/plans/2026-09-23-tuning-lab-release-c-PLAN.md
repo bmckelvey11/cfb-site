@@ -14,7 +14,7 @@ This file is the build order; where the two differ, fix both.
 | 3. C3 folds and estimators | Done 2026-09-23: 11 tests; gates live in `acceptance_gates` beside `compare_outer` |
 | 4. C1 cards | Done 2026-09-23: 5 tests; `RunSpec.notes` (unhashed) added so the card can state holdout status |
 | 5. C4 worker | Done 2026-09-23: 8 tests incl. subprocess crash at trial 3 fold 1 and resume (~25 s); `features.source_paths` added so data is hashed before loading |
-| 6. Join, real run, docs | pending |
+| 6. Join, real run, docs | Done 2026-09-23: 3 tests; real run `run-de1927346ab0` byte-identical from two clean roots (~43 s each); matches `ridge_v1_total` (−0.035), a line in the guide §13 row 3, no finding doc |
 
 ## Global constraints
 
