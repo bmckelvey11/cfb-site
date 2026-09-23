@@ -18,8 +18,9 @@ information about where the total lands.
 - **What was built.** Each week, every FBS team gets three ratings fit only on games
   already played: offense $O$ and defense $D$ (points per possession above or below league
   average) and pace $P$ (possessions per game above or below average). Two teams' ratings
-  combine into a forecast of the game total. `ridge_v1` adjusts for opponents and pulls thin
-  samples toward average; `raw_v1` does neither.
+  combine into a forecast of the game total ([exactly what is predicted](#what-we-are-predicting)).
+  `ridge_v1` adjusts for opponents and pulls thin samples toward average
+  ([how ridge works](#how-ridge-regression-works)); `raw_v1` does neither.
 - **Scoreboard.** Average miss (MAE) on the same 2,618 games: Bovada open 12.60, ridge
   12.94, train mean 13.78, raw 14.08 points.
 - **Beats both baselines.** Ridge is 1.14 points closer than raw and 0.84 closer than the
@@ -53,6 +54,147 @@ equations: [`superpowers/specs/2026-09-22-weekly-ratings-design.md`](superpowers
 Outputs (gitignored): `data/processed/ratings/weekly_ratings_eval.json` (every number
 below, input and code sha256s) and `weekly_ratings_snapshots.csv` (39,924 team rows).
 
+## What we are predicting
+
+The output is one number per game: the forecast **full-game points total**,
+$\widehat{\text{Total}}_g$. That is both teams' final points added together, overtime
+included, the same quantity a totals (over/under) line is set on.
+
+- **Which games.** FBS vs FBS, regular season, week 2 onward. Scored on 2021–2025.
+- **When.** Once a week, frozen at that week's first kickoff. Every game that week, from
+  the first midweek game to the last Saturday game, uses that one snapshot.
+- **From what.** Only this season's completed FBS-vs-FBS games before the cutoff: each
+  team's regulation points and regulation possessions, who the opponent was, and the venue.
+  It uses no previous seasons, rosters, injuries, weather or betting market.
+- **Not predicted.** The winner, the margin or spread, whether the total goes over the
+  open, or any probability. The model implies each team's regulation points on the way, but
+  it is scored only on its miss against the actual total, $|\widehat{\text{Total}}_g-\text{Total}_g|$.
+
+The regressions never fit the total directly. They fit two smaller targets, then multiply,
+because points = possessions × points per possession:
+
+| Step | Target it fits | One row is | Code |
+| --- | --- | --- | --- |
+| Offense and defense | $y_{ig}$: a team's regulation points ÷ its regulation possessions | one team in one game (two rows per game) | `fit_ppp()`, weighted by possessions |
+| Pace | $N_g$: both teams' regulation possessions ÷ 2 | one game | `fit_pace()` |
+| Total | $\widehat{\text{Total}}_g$: possessions × both teams' rates + average overtime points | one upcoming game | `forecast_total()` |
+
+The split lets opponent adjustment work separately on how fast a team plays and how
+efficiently it scores. Each part has its own amount of noise, so each gets its own penalty.
+
+**A worked game.** Navy vs Army, 2025 week 16, at a neutral site ($H=0$). It is the only
+game forecast from the 2025 last-cutoff snapshot used in the
+[coefficient tables](#fitted-coefficients). It was picked for that reason, not because it
+is typical. Ratings after 10 games each:
+
+| Rating | Navy | Army |
+| --- | ---: | ---: |
+| $O$ | +0.317 | −0.037 |
+| $D$ | +0.166 | −0.016 |
+| $P$ | −0.508 | −1.271 |
+
+With $\mu=2.262$, $\nu=11.508$ and $c_t=0.617$:
+
+1. Possessions: $\widehat{N}=11.508-0.508-1.271=9.73$ per team. That is 1.8 below average,
+   because both teams play slowly.
+2. Navy's rate is $\mu+O_{\text{Navy}}+D_{\text{Army}}=2.262+0.317-0.016=2.563$ points per
+   possession. Army's is $2.262-0.037+0.166=2.391$.
+3. Regulation points: Navy $9.73\times2.563=24.9$, Army $9.73\times2.391=23.3$.
+4. Total: $9.73\times(2.563+2.391)+0.617=48.8$.
+
+The raw forecast was 49.0 and the Bovada open 37.5. The game finished 17–16, a total of 33,
+on 8 possessions each at 2.13 and 2.00 points per possession. Ridge missed by 15.8, worse
+than its 12.9 average miss. The open missed by 4.5. The ratings had the direction of pace
+right but not the size. They see only this season's points and possessions, and the open
+can price anything else.
+
+## How ridge regression works
+
+**The problem.** Each team-game row says: this team scored $y$ points per possession
+against this opponent at this venue. We want one offense number and one defense number per
+team that explain all the rows at once. An offense then gets credit only for scoring beyond
+what each opponent's defense usually allows, and a defense likewise. Choosing every $O$,
+$D$, $\mu$ and $h$ to make the squared misses as small as possible is ordinary least
+squares (OLS). That is the opponent adjustment.
+
+OLS alone fails here in two ways:
+
+1. **Noise.** After two games, a team that scored 56 on a bad defense gets an extreme
+   rating. OLS takes every game at face value and cannot tell that two games are a thin
+   sample.
+2. **No unique answer.** Adding 0.1 to every offense and subtracting 0.1 from $\mu$ fits
+   exactly as well. Early in the season, some groups of teams have no opponents in common
+   at all. OLS has no way to choose among tied answers.
+
+**Ridge's fix: a charge for every rating away from 0.** Ridge minimizes the same squared
+misses plus $\lambda$ times the sum of the squared team ratings. 0 is league average, so a
+rating moves away from average only as far as the evidence pays for. Among tied answers,
+the one centred on 0 is cheapest, so the answer is unique. $\mu$, $h$ and $\nu$ are not
+charged: they are league-wide, every game informs them, and charging them would bias the
+league level.
+
+**The phantom-possession picture.** For one team taken alone, the ridge answer has a
+closed form:
+
+$$
+\begin{gathered}
+\widehat{O}_i=\frac{n_i\,\bar{r}_i+\lambda_{\text{PPP}}\times0}{n_i+\lambda_{\text{PPP}}} \\[1em]
+\begin{array}{rl}
+\text{where}\quad \widehat{O}_i: & \text{team } i\text{'s ridge offense rating, points per possession} \\
+n_i: & \text{team } i\text{'s regulation possessions before the cutoff} \\
+\bar{r}_i: & \text{possession-weighted mean of } y_{ig}-\mu-D_{j(g)}-hH_{ig}\text{: scoring beyond what each opponent allows} \\
+\lambda_{\text{PPP}}: & \text{penalty, possessions; } 40 \\
+0: & \text{the league-average residual the penalty pulls toward}
+\end{array}
+\end{gathered}
+$$
+
+Read it as an average of the team's own $n_i$ possessions and $\lambda_{\text{PPP}}=40$
+phantom possessions played at exactly league average. Early in the season the phantoms
+dominate; late, the real possessions do. Defense works the same way. Pace does too, with
+$\lambda_{\text{pace}}=8$ phantom league-average games. At 11.9 possessions a game (the
+season-end $\nu$, averaged over 2021–2025), the weight on a team's own data is:
+
+| Games played | Offense and defense | Pace |
+| ---: | ---: | ---: |
+| 1 | 0.23 | 0.11 |
+| 3 | 0.47 | 0.27 |
+| 6 | 0.64 | 0.43 |
+| 11 | 0.77 | 0.58 |
+
+So a team that is truly 1 point per possession better than average rates about +0.47
+after three games and +0.77 at season end. The real fit is not isolated: each team's
+$\bar{r}_i$ depends on its opponents' ratings, which are shrunk too. So the table is a
+guide, not the exact answer. `fit_ppp()` and `fit_pace()` solve the joint problem exactly:
+
+$$
+\begin{gathered}
+\widehat{\beta}=\left(X^\top WX+\Lambda\right)^{-1}X^\top Wy \\[1em]
+\begin{array}{rl}
+\text{where}\quad \widehat{\beta}: & \text{all coefficients stacked: } \mu,\ h,\ \text{every } O_k,\ \text{every } D_k \text{ (pace: } \nu \text{ and every } P_k\text{)} \\
+X: & \text{one row per team-game: 1 for } \mu\text{, } H_{ig} \text{ for } h\text{, 1 in team } i\text{'s } O \text{ column, 1 in opponent } j\text{'s } D \text{ column} \\
+W: & \text{diagonal row weights: } w_{ig} \text{ possessions (pace: 1 per game)} \\
+y: & \text{row targets: } y_{ig} \text{ (pace: } N_g\text{)} \\
+\Lambda: & \text{diagonal penalty: 0 for } \mu \text{ and } h\text{, } \lambda_{\text{PPP}} \text{ for each team rating (pace: 0 for } \nu\text{, } \lambda_{\text{pace}} \text{ for each } P_k\text{)}
+\end{array}
+\end{gathered}
+$$
+
+With $\Lambda=0$ this is weighted OLS, which fails for the two reasons above; the $\Lambda$
+term is the whole of "ridge". `_solve()` hands that system to `np.linalg.lstsq`, which also
+copes when $h$ has no data yet (an early fit with only neutral-site games).
+
+- **Choosing $\lambda$.** Too small and ratings chase noise; too large and every team looks
+  average. Each $\lambda$ was chosen by predicting the next week's games on 2014–2019 only,
+  trying six values ([loss curve](#fitted-coefficients)), then frozen for 2021–2025.
+- **It is a prior in disguise.** Ridge gives the same answer as a Bayesian estimate with a
+  normal prior centred on league average for every team. Here that centre is 0 for every
+  team every season. Step 4 (priors) moves it to each team's previous-season rating with
+  the same machinery.
+- **`raw_v1` has neither part.** There is no opponent term and no penalty: a team's plain
+  average minus the league average, at full strength after one game. The ridge − raw gap of
+  1.14 points is what adjustment and shrinkage buy together.
+
 ## Model and variables
 
 Every equation below is fit or evaluated at one weekly cutoff $t$. Each block declares its
@@ -81,7 +223,8 @@ $$
 `fit_ppp()` solves this directly. It is weighted least squares on two rows per game, one
 for each side's scoring against the other's defense, plus a charge for moving any team away
 from league average. For one team in isolation, the offense rating is about
-$n\bar{y}/(n+\lambda_{\text{PPP}})$ after $n$ possessions at an adjusted average $\bar{y}$.
+$n\bar{r}/(n+\lambda_{\text{PPP}})$ after $n$ possessions at an adjusted average $\bar{r}$
+([phantom possessions](#how-ridge-regression-works)).
 With $\lambda_{\text{PPP}}=40$ and 36 possessions (about three games) at $+1.10$, that is
 $36\times1.10/76=+0.52$. The team's own average gets half the weight once $n=40$, which is
 where "about three games" in the Method comes from. The real fit couples teams through
@@ -112,12 +255,12 @@ games. Pace is shrunk harder than offense and defense.
 
 $$
 \begin{gathered}
-\widehat{T}_g=\widehat{N}_g\left(\widehat{\text{PPP}}^{\text{h}}_g+\widehat{\text{PPP}}^{\text{a}}_g\right)+c_t \\[0.5em]
+\widehat{\text{Total}}_g=\widehat{N}_g\left(\widehat{\text{PPP}}^{\text{h}}_g+\widehat{\text{PPP}}^{\text{a}}_g\right)+c_t \\[0.5em]
 \widehat{N}_g=\nu+P_{\text{h}}+P_{\text{a}},\qquad
 \widehat{\text{PPP}}^{\text{h}}_g=\mu+O_{\text{h}}+D_{\text{a}}+hH_g,\qquad
 \widehat{\text{PPP}}^{\text{a}}_g=\mu+O_{\text{a}}+D_{\text{h}}-hH_g \\[1em]
 \begin{array}{rl}
-\text{where}\quad \widehat{T}_g: & \text{forecast full-game points total, overtime included} \\
+\text{where}\quad \widehat{\text{Total}}_g: & \text{forecast full-game points total, overtime included} \\
 \widehat{N}_g: & \text{forecast possessions per team} \\
 \widehat{\text{PPP}}^{\text{h}}_g,\ \widehat{\text{PPP}}^{\text{a}}_g: & \text{forecast home and away points per possession} \\
 H_g: & +1 \text{, or } 0 \text{ at a neutral site} \\
@@ -140,15 +283,15 @@ explain the ratings' scale:
 
 $$
 \begin{gathered}
-\text{MAE}_F=\frac{1}{n}\sum_{g}\left|\widehat{T}^{F}_g-T_g\right|,\qquad
-\text{RMSE}_F=\sqrt{\frac{1}{n}\sum_{g}\left(\widehat{T}^{F}_g-T_g\right)^2},\qquad
-\text{Bias}_F=\frac{1}{n}\sum_{g}\left(\widehat{T}^{F}_g-T_g\right) \\[0.5em]
-\Delta_{A-B}=\frac{1}{n}\sum_{g}\left(\left|\widehat{T}^{A}_g-T_g\right|-\left|\widehat{T}^{B}_g-T_g\right|\right),\qquad
+\text{MAE}_F=\frac{1}{n}\sum_{g}\left|\widehat{\text{Total}}^{F}_g-\text{Total}_g\right|,\qquad
+\text{RMSE}_F=\sqrt{\frac{1}{n}\sum_{g}\left(\widehat{\text{Total}}^{F}_g-\text{Total}_g\right)^2},\qquad
+\text{Bias}_F=\frac{1}{n}\sum_{g}\left(\widehat{\text{Total}}^{F}_g-\text{Total}_g\right) \\[0.5em]
+\Delta_{A-B}=\frac{1}{n}\sum_{g}\left(\left|\widehat{\text{Total}}^{A}_g-\text{Total}_g\right|-\left|\widehat{\text{Total}}^{B}_g-\text{Total}_g\right|\right),\qquad
 \text{MDE}=(1.96+0.84)\,\widehat{\text{SE}}\left(\Delta_{A-B}\right) \\[1em]
 \begin{array}{rl}
 \text{where}\quad g,\ n: & \text{a scored game, and the number of games (every forecast is scored on the same games)} \\
-T_g: & \text{actual full-game points total, overtime included} \\
-\widehat{T}^{F}_g: & \text{forecast } F\text{'s total, points; } F\in\{\text{open, train mean, raw, ridge}\} \\
+\text{Total}_g: & \text{actual full-game points total, overtime included} \\
+\widehat{\text{Total}}^{F}_g: & \text{forecast } F\text{'s total, points; } F\in\{\text{open, train mean, raw, ridge}\} \\
 \text{Bias}_F: & \text{points; } +\text{ = forecast too high} \\
 \Delta_{A-B}: & \text{paired MAE difference, points; } -\text{ = } A \text{ is closer to the total} \\
 \widehat{\text{SE}}: & \text{standard deviation of } \Delta \text{ over 10,000 week-cluster bootstrap draws} \\
@@ -167,11 +310,11 @@ $2.8\times0.122=0.34$. The estimated gap is more than three times the MDE.
 
 $$
 \begin{gathered}
-T_g-L_g=a+b\left(\widehat{T}^{F}_g-L_g\right)+e_g \\[1em]
+\text{Total}_g-L_g=a+b\left(\widehat{\text{Total}}^{F}_g-L_g\right)+e_g \\[1em]
 \begin{array}{rl}
-\text{where}\quad T_g: & \text{actual full-game points total} \\
+\text{where}\quad \text{Total}_g: & \text{actual full-game points total} \\
 L_g: & \text{Bovada open label, points} \\
-\widehat{T}^{F}_g: & \text{forecast } F\text{'s total, points} \\
+\widehat{\text{Total}}^{F}_g: & \text{forecast } F\text{'s total, points} \\
 a: & \text{intercept, points: where the total lands vs the open when } F \text{ agrees with it} \\
 b: & \text{slope, unitless: share of } F\text{'s disagreement with the open that shows up in the total} \\
 e_g: & \text{residual, points}
@@ -210,9 +353,9 @@ JSON keys below sit under `results.primary` or `results.early` unless they start
 | $\lambda_{\text{pace}}$ | pace penalty | games | `lam_pace`, grid `LAMBDA_PACE_GRID` | CSV `lambda_pace`; JSON `tuning.pace` |
 | — | games behind a rating | games | `_evidence()` | CSV `n_games` |
 | — | fewer of the two teams' prior games; primary if ≥ 3 | games | `min_prior_games`, `MIN_PRIOR_GAMES` | JSON `results.populations` |
-| $T_g$ | actual total | points | `total` | — |
+| $\text{Total}_g$ | actual total | points | `total` | — |
 | $L_g$ | Bovada open label | points | `load_opens()`: `overUnderOpen` → `open` | JSON `market` |
-| $\widehat{T}^{F}_g$ | forecast $F$'s total | points | `forecast_total()`; columns `open`, `mean`, `raw`, `ridge`, `ridge_x0.5`, `ridge_x2` | JSON `accuracy_pooled.<F>` |
+| $\widehat{\text{Total}}^{F}_g$ | forecast $F$'s total | points | `forecast_total()`; columns `open`, `mean`, `raw`, `ridge`, `ridge_x0.5`, `ridge_x2` | JSON `accuracy_pooled.<F>` |
 | MAE, RMSE, Bias | accuracy | points; bias + = too high | `accuracy()` | JSON `mae`, `rmse`, `bias` |
 | $\Delta_{A-B}$ | paired MAE difference | points; − = $A$ closer | `paired_mae_diff(df, A, B)` | JSON `diff`, `ci95`, `se`, `mde80`, `by_season` |
 | — | verdict | improves / matches / worse | `classify_verdict()` | JSON `verdict`, `stable_under_stress` |
@@ -294,11 +437,11 @@ Stress: at penalties ×0.5 the two verdict differences are −0.89 and −0.59, 
 | Train mean | 0.15 | 0.06 to 0.23 | −0.15 |
 
 The $a$ column was added after the run. It is a point estimate with no interval, from the
-OLS identity $a=\overline{T_g-L_g}-b\,\overline{\widehat{T}^{F}_g-L_g}$ (bars are means
-over the primary games) and the pooled biases above: $\overline{T_g-L_g}=+0.22$ because
+OLS identity $a=\overline{\text{Total}_g-L_g}-b\,\overline{\widehat{\text{Total}}^{F}_g-L_g}$ (bars are means
+over the primary games) and the pooled biases above: $\overline{\text{Total}_g-L_g}=+0.22$ because
 the open ran 0.22 low. With $b$ near 0, ridge's and raw's intercepts are simply that
 shortfall. The train mean's $a$ is lower because its +2.23 bias pulls
-$\overline{\widehat{T}^{F}_g-L_g}$ to +2.45.
+$\overline{\widehat{\text{Total}}^{F}_g-L_g}$ to +2.45.
 
 **Early population** (week 2+, a team with <3 prior games; n = 862, 23 clusters): open
 12.59, ridge 13.24, train mean 13.47. Ridge − mean −0.23 (−0.56 to +0.14, MDE 0.50):
@@ -362,9 +505,11 @@ both verdicts held at each.
 
 One SD of ridge $O$ or $D$ is 0.39–0.47 points per possession, about 4.5–5.7 points a game
 at $\nu\approx11.5$–12. Ridge SDs are 21–25% below raw for $O$ and $D$, and 43–46% below
-for $P$. That gap mixes opponent adjustment with shrinkage and was not split. Pace's
-heavier penalty (half weight at 8 games, against about 3 for offense and defense) fits the
-larger $P$ gap.
+for $P$. At season end (about 11 games, 130 possessions per team) the isolated-team
+weights are 0.77 for offense and defense and 0.58 for pace. The pooled ridge/raw SD ratios
+are 0.77, 0.77 and 0.55. That is close to what shrinkage alone predicts, which suggests
+opponent adjustment changes the spread little on net. It is a consistency check, not a
+decomposition.
 
 **2025 examples**, last cutoff, three lowest and three highest:
 
