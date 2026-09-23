@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from scripts.weekly_prior_scale import confirm, tune_scale
+from scripts.weekly_prior_scale import confirm, season_look, tune_scale, write_freeze
 from scripts.weekly_ratings import fit_ridge
 from test_weekly_priors import COEFS
 from test_weekly_total_tuning import _season
@@ -43,3 +43,36 @@ def test_scale_tuner_reads_no_season_outside_its_tuning_seasons():
 def test_confirm_refuses_without_a_frozen_candidate(tmp_path: Path):
     with pytest.raises(SystemExit, match="frozen"):
         confirm(2026, frozen_path=tmp_path / "missing.json")
+
+
+def test_freeze_is_never_overwritten(tmp_path: Path):
+    path = tmp_path / "freeze.json"
+    write_freeze(path, {"scale": 1.0})
+    with pytest.raises(SystemExit, match="not rewritten"):
+        write_freeze(path, {"scale": 0.5})
+    assert '"scale": 1.0' in path.read_text()
+
+
+def _g(gid, start, completed, cls="fbs", season_type="regular"):
+    return {"id": gid, "startDate": start, "completed": completed, "seasonType": season_type,
+            "homeClassification": "fbs", "awayClassification": cls}
+
+
+NOW = pd.Timestamp("2026-12-20T00:00:00Z")
+
+
+def test_finished_season_with_a_cancelled_game_is_final():
+    look, state = season_look([_g(1, "2026-11-28T20:00:00Z", True),
+                               _g(2, "2026-11-29T20:00:00Z", False),       # cancelled
+                               _g(3, "2026-12-30T20:00:00Z", False, cls="fcs"),
+                               _g(4, "2027-01-01T20:00:00Z", False, season_type="postseason")],
+                              NOW)
+    assert look == "final"
+    assert state == {"future_games": 0, "not_played": 1}
+
+
+def test_season_with_a_game_still_scheduled_is_interim():
+    look, state = season_look([_g(1, "2026-11-28T20:00:00Z", True),
+                               _g(2, "2026-12-21T20:00:00Z", False)], NOW)
+    assert look == "interim" and state["future_games"] == 1
+    assert season_look([_g(1, None, False)], NOW)[0] == "interim"  # no kickoff: not placed

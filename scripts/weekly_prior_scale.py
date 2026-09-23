@@ -1,6 +1,7 @@
 """Tune one carryover scale on pre-2021 total loss, freeze it, confirm on 2026.
 
-    python -m scripts.weekly_prior_scale tune                   # 2015-2019 only; writes the freeze
+    python -m scripts.weekly_prior_scale tune                   # 2015-2019 only; reproduction
+    python -m scripts.weekly_prior_scale tune --freeze          # first time only; refuses to overwrite
     python -m scripts.weekly_prior_scale confirm --season 2026  # reads the freeze; interim or final
 
 The scale k multiplies every carryover coefficient (k = 0 is a prior-free ridge). It is
@@ -54,8 +55,31 @@ def tune_scale(games, seasons, finals, rp, coefs, scales=SCALES,
             "by_scale": by_scale}
 
 
-def run_tune() -> dict:
-    from cfb_paths import DATA_ROOT
+def season_look(games_payload: list[dict], now: pd.Timestamp) -> tuple[str, dict]:
+    """'final' once no FBS-vs-FBS regular-season game is still scheduled after `now`.
+
+    A game whose kickoff has passed but never completed (cancelled, unmarked) is counted,
+    not waited on; one such game anywhere must not hold the season open forever.
+    """
+    fbs = [g for g in games_payload if g.get("seasonType") == "regular"
+           and g.get("homeClassification") == "fbs" and g.get("awayClassification") == "fbs"]
+    kick = [pd.to_datetime(g.get("startDate"), errors="coerce", utc=True) for g in fbs]
+    # A missing kickoff cannot be placed in time, so it counts as still to come.
+    future = sum(1 for k in kick if pd.isna(k) or k > now)
+    not_played = sum(1 for g, k in zip(fbs, kick)
+                     if not pd.isna(k) and k <= now and not g.get("completed"))
+    return ("interim" if future else "final"), {"future_games": future, "not_played": not_played}
+
+
+def write_freeze(path: Path, payload: dict) -> None:
+    """The freeze is written once; re-tuning must never overwrite a committed candidate."""
+    if path.exists():
+        raise SystemExit(f"{path} already holds a frozen candidate; it is not rewritten")
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def run_tune(freeze: bool = False) -> tuple[dict, Path]:
+    from cfb_paths import DATA_ROOT, PROCESSED
 
     sources: list[Path] = []
     games, _ = load(DATA_ROOT, list(range(min(TUNE) - 1, max(TUNE) + 1)), sources)
@@ -77,8 +101,14 @@ def run_tune() -> dict:
         "code_sha256": {p: _sha256(Path(__file__).parent / p) for p in CODE},
         "source_files": [{"path": str(p), "sha256": _sha256(p)} for p in dict.fromkeys(sources)],
     }
-    FROZEN.write_text(json.dumps(frozen, indent=2) + "\n", encoding="utf-8")
-    return frozen
+    if freeze:
+        write_freeze(FROZEN, frozen)
+        return frozen, FROZEN
+    # A reproduction run: same computation, written beside the outputs, freeze untouched.
+    path = PROCESSED / "ratings" / "weekly_prior_scale_tune.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(frozen, indent=2) + "\n", encoding="utf-8")
+    return frozen, path
 
 
 def confirm(season: int, frozen_path: Path = FROZEN) -> dict:
@@ -91,10 +121,11 @@ def confirm(season: int, frozen_path: Path = FROZEN) -> dict:
     from cfb_paths import DATA_ROOT, PROCESSED
 
     sources: list[Path] = [frozen_path]
-    games, drops = load(DATA_ROOT, list(range(2014, season + 1)), sources)
+    games, _ = load(DATA_ROOT, list(range(2014, season + 1)), sources)
     opens = load_opens(DATA_ROOT, [season], sources)
     rp = load_rp(DATA_ROOT, season, sources)
-    look = "interim" if drops[season].get("not_completed", 0) else "final"
+    schedule = json.loads((DATA_ROOT / "raw" / f"games_{season}.json").read_text(encoding="utf-8"))
+    look, schedule_state = season_look(schedule, pd.Timestamp.now(tz="UTC"))
 
     prev = final_ratings(games, season - 1, *fz["ridge_v1_lambda"])
     coefs = {k: {"value": v} for k, v in fz["coefficients"].items()}
@@ -143,7 +174,7 @@ def confirm(season: int, frozen_path: Path = FROZEN) -> dict:
         "frozen_sha256": _sha256(frozen_path),
         "market": {"provider": OPEN_PROVIDER, "field": "overUnderOpen"},
         "completed_weeks": sorted(int(w) for w in scored["week"].unique()),
-        "games_not_yet_completed": drops[season].get("not_completed", 0),
+        "schedule": schedule_state,
         "comparisons": comparisons,
         "week1": week1_report(scored[has_open & (scored["week"] == 1)]),
         "confirmed": confirmed,
@@ -161,18 +192,20 @@ def confirm(season: int, frozen_path: Path = FROZEN) -> dict:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("tune")
+    t = sub.add_parser("tune")
+    t.add_argument("--freeze", action="store_true",
+                   help="write the candidate to scripts/weekly_prior_v3.json (refuses if it exists)")
     c = sub.add_parser("confirm")
     c.add_argument("--season", type=int, required=True)
     args = ap.parse_args(argv)
     if args.cmd == "tune":
-        fz = run_tune()
+        fz, path = run_tune(freeze=args.freeze)
         print(json.dumps({k: fz[k] for k in ("scale", "lambda_ppp", "lambda_pace", "mae",
                                             "scale_on_grid_boundary", "by_scale")}, indent=1))
-        print(f"frozen: {FROZEN} -- commit it before running confirm")
+        print(f"written: {path}" + (" -- commit it before running confirm" if args.freeze else ""))
     else:
         out = confirm(args.season)
-        print(json.dumps({k: out[k] for k in ("look", "completed_weeks", "games_not_yet_completed",
+        print(json.dumps({k: out[k] for k in ("look", "completed_weeks", "schedule",
                                              "comparisons", "confirmed")}, indent=1, default=str))
         print(f"written: {out['path']}")
     return 0
