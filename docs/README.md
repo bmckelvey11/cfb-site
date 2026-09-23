@@ -159,6 +159,7 @@ converted to `$`; equations have not been brought to the where-table standard.
 | [design-system.md](design-system.md) | Saturday Signal design system |
 | [bet-labs-parity-plan.md](bet-labs-parity-plan.md) | Bet Labs parity plan |
 | [betting-system-builder-implementation-plan.md](betting-system-builder-implementation-plan.md) | System builder implementation plan |
+| [model-tuning-lab-plan.md](model-tuning-lab-plan.md) | Model Tuning Lab plan of record (Revision 2.0), including the parallel Release C split |
 | [sports-insights-systems-combined-guide.md](sports-insights-systems-combined-guide.md) | Source material for the above two |
 | [autostart-audit-2026-09-15.md](autostart-audit-2026-09-15.md) | Autostart / scheduled-task audit |
 | [rclone-credential-exposure-2026-09-21.md](rclone-credential-exposure-2026-09-21.md) | Is `rclone.conf` exposing cloud credentials, and does it need encrypting? (rotate first) |
