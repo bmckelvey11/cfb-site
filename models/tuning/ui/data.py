@@ -89,10 +89,11 @@ def _et(ts) -> str:
 
 def week_cutoffs(games_payload: list[dict]) -> pd.Series:
     """Earliest FBS-vs-FBS regular-season kickoff per week: each week's decision time."""
-    kicks = [(g["week"], pd.to_datetime(g.get("startDate"), utc=True, errors="coerce"))
-             for g in games_payload if g.get("seasonType") == "regular"
-             and g.get("homeClassification") == "fbs" and g.get("awayClassification") == "fbs"]
-    return pd.DataFrame(kicks, columns=["week", "kickoff"]).dropna().groupby("week")["kickoff"].min()
+    fbs = pd.DataFrame([(g["week"], g.get("startDate")) for g in games_payload
+                        if g.get("seasonType") == "regular" and g.get("homeClassification") == "fbs"
+                        and g.get("awayClassification") == "fbs"], columns=["week", "kickoff"])
+    fbs["kickoff"] = pd.to_datetime(fbs["kickoff"], utc=True, errors="coerce", format="ISO8601")
+    return fbs.dropna().groupby("week")["kickoff"].min()
 
 
 def shadow_view(sd: Path, raw_dir: Path, now: pd.Timestamp) -> dict:
@@ -196,16 +197,15 @@ def over_under(pmf: np.ndarray, line: float) -> dict[str, float]:
 
 
 def _teams(raw_dir: Path, seasons) -> dict[int, dict]:
-    out = {}
+    rows = []
     for s in sorted(set(int(x) for x in seasons)):
         path = raw_dir / f"games_{s}.json"
         if path.exists():
-            for g in json.loads(path.read_text(encoding="utf-8")):
-                if g.get("id") is None:
-                    continue
-                out[g["id"]] = {"home": g.get("homeTeam"), "away": g.get("awayTeam"),
-                                "kickoff": pd.to_datetime(g.get("startDate"), utc=True, errors="coerce")}
-    return out
+            rows += [(g["id"], g.get("homeTeam"), g.get("awayTeam"), g.get("startDate"))
+                     for g in json.loads(path.read_text(encoding="utf-8")) if g.get("id") is not None]
+    df = pd.DataFrame(rows, columns=["id", "home", "away", "kickoff"])
+    df["kickoff"] = pd.to_datetime(df["kickoff"], utc=True, errors="coerce", format="ISO8601")
+    return df.set_index("id").to_dict("index")
 
 
 def shadow_predictions(sd: Path, raw_dir: Path, week: int) -> tuple[pd.DataFrame, np.ndarray, dict]:
@@ -227,8 +227,9 @@ def shadow_predictions(sd: Path, raw_dir: Path, week: int) -> tuple[pd.DataFrame
         columns={"point": "challenger"}).join(champ)
     teams = _teams(raw_dir, [pd.Timestamp(snap["cutoff"]).year])
     df["game"] = [f"{teams.get(g, {}).get('away', '?')} @ {teams.get(g, {}).get('home', '?')}" for g in df.index]
-    df["kickoff"] = [_et(teams.get(g, {}).get("kickoff")) for g in df.index]
-    df = df.reset_index().sort_values(["kickoff", "game"])
+    df["ts"] = [teams.get(g, {}).get("kickoff") for g in df.index]
+    df = df.reset_index().sort_values(["ts", "game"])  # by time, not by the formatted text
+    df["kickoff"] = df["ts"].map(_et)
     return df[["game_id", "kickoff", "game", "champion", "challenger", "q10", "q50", "q90",
                "p_home_win", "pmf_row"]], pmf, snap
 
@@ -268,12 +269,17 @@ def replay_week(snapshots: pd.DataFrame, raw_dir: Path, season: int, week: int
             continue
         total = (g["homePoints"] + g["awayPoints"]) if g.get("completed") else None
         fc = forecast_total(r, g["homeTeam"], g["awayTeam"], bool(g.get("neutralSite")))
-        rows.append({"game_id": g["id"], "kickoff": _et(pd.to_datetime(g.get("startDate"), utc=True)),
+        rows.append({"game_id": g["id"], "ts": g.get("startDate"),
                      "game": f"{g['awayTeam']} @ {g['homeTeam']}", "forecast": fc,
                      "actual": total, "miss": None if total is None else fc - total})
     meta = {"as_of": first["as_of_ts"], "teams": len(table), "mu": first["mu"], "nu": first["nu"],
             "h": first["h"], "c": first["c"]}
-    return (pd.DataFrame(rows).sort_values("kickoff") if rows else pd.DataFrame(),
+    out = pd.DataFrame(rows)
+    if len(out):
+        out["ts"] = pd.to_datetime(out["ts"], utc=True, format="ISO8601")
+        out = out.sort_values(["ts", "game"])  # by time, not by the formatted text
+        out.insert(1, "kickoff", out.pop("ts").map(_et))
+    return (out,
             table.sort_values("O", ascending=False).reset_index(), meta)
 
 
@@ -327,6 +333,57 @@ def drops(eval_json: Path) -> pd.DataFrame:
         return pd.DataFrame()
     d = json.loads(eval_json.read_text(encoding="utf-8"))["drops_by_season"]
     return pd.DataFrame(d).T.fillna(0).astype(int).rename_axis("season").reset_index()
+
+
+# --- comparison workspace (plan §37.3) --------------------------------------------------
+
+# What two runs must share before their forecasts can be compared game by game.
+COMPARABLE = (("dataset", "source"), ("dataset", "snapshot"), ("dataset", "target"),
+              ("dataset", "population"), ("dataset", "decision_time"),
+              ("folds", "outer_test_seasons"), ("folds", "exclude_seasons"), ("folds", "group_key"))
+
+
+def compare_runs(a: Path, b: Path) -> dict:
+    """Paired outer-fold MAE of run a minus run b, blocked unless the runs are comparable."""
+    from scripts.weekly_ratings_eval import classify_verdict, paired_mae_diff
+
+    specs = [json.loads((d / "run_spec.json").read_text(encoding="utf-8")) for d in (a, b)]
+    diffs = []
+    for part, key in COMPARABLE:
+        va, vb = (s.get(part, {}).get(key) for s in specs)
+        if va != vb:
+            diffs.append(f"{part}.{key}: {va} vs {vb}")
+    if diffs:
+        return {"comparable": False, "differences": diffs}
+    pa, pb = (pd.read_csv(d / "predictions.csv") for d in (a, b))
+    both = pa.merge(pb[["game_id", "y_hat"]], on="game_id", suffixes=("_a", "_b"))
+    both = both.rename(columns={"target": "total"})
+    p = paired_mae_diff(both, "y_hat_a", "y_hat_b")
+    both["abs_err_a"] = (both["y_hat_a"] - both["total"]).abs()
+    both["abs_err_b"] = (both["y_hat_b"] - both["total"]).abs()
+    both["delta"] = both["abs_err_a"] - both["abs_err_b"]
+    return {"comparable": True, "differences": [],
+            "unmatched": int(len(pa) + len(pb) - 2 * len(both)),
+            "paired": {**p, "verdict": classify_verdict(*p["ci95"], list(p["by_season"].values()))},
+            "games": both[["season", "week", "game_id", "total", "y_hat_a", "y_hat_b", "delta"]]}
+
+
+# --- global context (plan §37.1) -------------------------------------------------------
+
+def context(root: Path, raw_dir: Path, now: pd.Timestamp) -> dict:
+    """What the sidebar always shows: jobs in flight, the aliases, data age, blockers."""
+    j = jobs(root)
+    active = int(j["state"].isin(("queued", "claimed", "running", "retry_wait",
+                                   "cancellation_requested")).sum()) if len(j) else 0
+    _, moves = registry(root)
+    aliases = moves.groupby("alias").tail(1).set_index("alias")["model"].to_dict() if len(moves) else {}
+    games = raw_dir / f"games_{now.year}.json"
+    age = (now.timestamp() - games.stat().st_mtime) / 3600 if games.exists() else None
+    blocking = []
+    for sd in sorted((root / "shadow").glob("shadow-*")):
+        if (sd / "ledger.sqlite3").exists():
+            blocking += [t for lvl, t in shadow_view(sd, raw_dir, now)["alerts"] if lvl == "error"]
+    return {"active_jobs": active, "aliases": aliases, "games_age_hours": age, "blocking": blocking}
 
 
 # --- registry (plan §37.2 page 16) ------------------------------------------------------

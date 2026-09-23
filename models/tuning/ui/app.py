@@ -37,7 +37,7 @@ IN_FLIGHT = ("queued", "claimed", "running", "retry_wait", "cancellation_request
 
 st.set_page_config(page_title="CFB Tuning Lab", layout="wide")
 page = st.sidebar.radio("Page", ["Shadow", "Distributions", "New run", "Jobs", "Runs",
-                                 "Registry", "Replay", "Data", "Hypotheses"])
+                                 "Compare", "Registry", "Replay", "Data", "Hypotheses"])
 st.sidebar.caption(f"Lab root: `{LAB}`" + ("  \n**scratch lab**" if "--lab-root" in sys.argv
                                             or os.environ.get("CFB_LAB_ROOT") else ""))
 st.sidebar.caption("Shadow and Hypotheses are read-only. Freeze, tick, alias, and replay "
@@ -45,6 +45,16 @@ st.sidebar.caption("Shadow and Hypotheses are read-only. Freeze, tick, alias, an
 if st.sidebar.button("Reload"):
     st.rerun()
 now = pd.Timestamp.now(tz="UTC")
+
+# Plan §37.1: always visible, whatever the page.
+ctx = md.context(LAB, RAW, now)
+st.sidebar.markdown(
+    f"**Jobs in flight:** {ctx['active_jobs']}  \n"
+    + "".join(f"**{a.title()}:** `{m}`  \n" for a, m in sorted(ctx["aliases"].items()))
+    + ("**CFBD games file:** " + (f"{ctx['games_age_hours']:.0f} h old" if ctx["games_age_hours"]
+                                   is not None else "missing")))
+for text in ctx["blocking"]:
+    st.sidebar.error(text)
 
 
 @st.cache_data(ttl=600)
@@ -60,6 +70,11 @@ def ratings_snapshots(path: str, mtime: float) -> pd.DataFrame:
 @st.cache_data
 def file_sha(path: str, mtime: float, size: int) -> str:
     return md.sha256_file(Path(path))
+
+
+@st.cache_data
+def dist_table(run: str, mtime: float):
+    return md.dist_outer(Path(run), RAW)
 
 
 def templates() -> dict[str, Path]:
@@ -167,7 +182,7 @@ elif page == "Distributions":
             st.info("No distribution run.")
             st.stop()
         run = st.selectbox("Distribution run", dists, format_func=lambda p: p.name)
-        df, pmf = md.dist_outer(run, RAW)
+        df, pmf = dist_table(str(run), (run / "pmf_outer.npy").stat().st_mtime)
         c1, c2 = st.columns(2)
         season = c1.selectbox("Season", sorted(df["season"].unique()))
         week = c2.selectbox("Week", sorted(df.loc[df["season"] == season, "week"].unique()))
@@ -181,6 +196,30 @@ elif page == "Distributions":
         pmf_view(pmf[int(row["pmf_row"])], opened if pd.notna(opened) else round(row["joint_bootstrap__mean"]),
                  actual=float(row["target"]))
         st.caption("A spent holdout: descriptive. The line defaults to the untimed Bovada open.")
+
+elif page == "Compare":
+    st.title("Compare runs")
+    st.caption("Plan §37.3. Two tuning runs, game by game on their shared outer folds. Blocked "
+               "unless source, snapshot, target, population, decision time, and folds match.")
+    tuned = [p for p in md.run_dirs(LAB) if (p / "predictions.csv").exists() and (p / "run_spec.json").exists()]
+    if len(tuned) < 2:
+        st.info(f"{len(tuned)} tuning run(s) published; a comparison needs two.")
+        st.stop()
+    c1, c2 = st.columns(2)
+    a = c1.selectbox("Run A", tuned, format_func=lambda p: p.name)
+    b = c2.selectbox("Run B", [p for p in tuned if p != a], format_func=lambda p: p.name)
+    res = md.compare_runs(a, b)
+    if not res["comparable"]:
+        st.error("Not comparable:\n\n" + "\n".join(f"- {d}" for d in res["differences"]))
+        st.stop()
+    p = res["paired"]
+    st.metric("MAE of A minus B (negative = A closer)", f"{p['diff']:+.3f}",
+              f"95% {p['ci95'][0]:+.3f} to {p['ci95'][1]:+.3f}; {p['verdict']}", delta_color="off")
+    st.caption(f"{p['n']} games, {p['n_clusters']} season-week clusters, MDE {p['mde80']:.3f}. "
+               + (f"{res['unmatched']} games in only one run were left out. " if res["unmatched"] else "")
+               + "Descriptive: outer folds are evaluated once per run, not a fresh holdout.")
+    st.bar_chart(pd.Series(p["by_season"], name="A − B MAE by season"))
+    st.dataframe(res["games"], hide_index=True, width="stretch")
 
 elif page == "Registry":
     st.title("Model registry")

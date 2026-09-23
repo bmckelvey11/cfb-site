@@ -2277,6 +2277,15 @@ Maintain a tiny hand-verified set of games, plays, market quotes, and expected f
 
 Add persistent top-level context: environment, database snapshot, experiment draft status, active job count, current champion, latest data watermark, and blocking warnings. Users should always know whether they are in development, replay, shadow, or live mode.
 
+**Status (2026-09-23): built.** The GUI sidebar always shows:
+- the lab root, with a banner when it is a scratch lab;
+- jobs in flight;
+- the current champion and challenger;
+- the age of the CFBD games file;
+- every blocking shadow alert.
+
+The snapshot and draft status are not shown.
+
 ### 37.2 New pages
 
 ```text
@@ -2309,6 +2318,12 @@ Add persistent top-level context: environment, database snapshot, experiment dra
 ### 37.3 Comparison workspace
 
 Allow pinning runs and comparing only compatible experiments. Block or clearly warn when target, game universe, folds, line timestamp, provider, or target policy differs. Show paired game-level deltas rather than side-by-side aggregate metrics alone.
+
+**Status (2026-09-23): built (GUI Compare page).**
+- It compares two tuning runs game by game on their shared outer folds.
+- It blocks the comparison unless source, snapshot, target, population, decision time and folds all match.
+- It reports the paired MAE difference with the season-week bootstrap and verdict, the per-season differences, and each game's delta.
+- There is no pinning yet, and no line-timestamp or provider check, because no run uses a timestamped line.
 
 ### 37.4 Scenario explorer
 

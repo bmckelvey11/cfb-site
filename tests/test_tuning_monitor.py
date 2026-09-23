@@ -137,6 +137,31 @@ def test_replay_week_reproduces_release_b_forecasts_from_the_snapshot():
     assert both["forecast"].to_numpy() == pytest.approx(both["ridge"].to_numpy(), abs=1e-9)
 
 
+def test_compare_runs_blocks_incompatible_runs_and_pairs_compatible_ones(tmp_path):
+    from models.tuning.ui.data import compare_runs, context
+
+    spec = {"dataset": {"source": "cfb_release_b", "snapshot": "s", "target": "total"},
+            "folds": {"outer_test_seasons": [2021, 2022]}}
+    games = pd.DataFrame({"season": [2021] * 2 + [2022] * 2, "week": [2, 3, 2, 3],
+                          "game_id": [1, 2, 3, 4], "target": [50.0, 60.0, 40.0, 70.0]})
+    runs = {}
+    for name, y in (("run-a", [51, 58, 44, 70]), ("run-b", [55, 60, 40, 60])):
+        d = tmp_path / "runs" / name
+        d.mkdir(parents=True)
+        (d / "run_spec.json").write_text(json.dumps(spec), encoding="utf-8")
+        games.assign(y_hat=y).to_csv(d / "predictions.csv", index=False)
+        runs[name] = d
+    res = compare_runs(runs["run-a"], runs["run-b"])
+    # |err| a: 1, 2, 4, 0; b: 5, 0, 0, 10 -> mean difference (-4 + 2 + 4 - 10) / 4 = -2
+    assert res["comparable"] and res["paired"]["diff"] == pytest.approx(-2.0)
+    other = dict(spec, folds={"outer_test_seasons": [2021]})
+    (runs["run-b"] / "run_spec.json").write_text(json.dumps(other), encoding="utf-8")
+    blocked = compare_runs(runs["run-a"], runs["run-b"])
+    assert not blocked["comparable"] and "folds.outer_test_seasons" in blocked["differences"][0]
+    ctx = context(tmp_path, tmp_path / "raw", pd.Timestamp("2026-09-23T12:00Z"))
+    assert ctx["active_jobs"] == 0 and ctx["blocking"] == [] and ctx["games_age_hours"] is None
+
+
 def test_every_hypothesis_points_at_a_record_that_exists():
     h = hypotheses()
     assert h["id"].is_unique and set(h["status"]) <= {"closed", "pending"}

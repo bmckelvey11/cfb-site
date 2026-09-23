@@ -73,7 +73,8 @@
         "--server.port",
         "8501"
       ],
-      "port": 8501
+      "port": 8501,
+      "url": "http://127.0.0.1:8501"
     },
     {
       "name": "Marimo",
