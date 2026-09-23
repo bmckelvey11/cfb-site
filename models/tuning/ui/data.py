@@ -245,6 +245,90 @@ def dist_outer(run_dir: Path, raw_dir: Path) -> tuple[pd.DataFrame, np.ndarray]:
     return pred, pmf
 
 
+# --- historical replay (plan §37.2 page 12) ---------------------------------------------
+
+def replay_week(snapshots: pd.DataFrame, raw_dir: Path, season: int, week: int
+                ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """One week as the lab saw it at its cutoff: the frozen ridge_v1 ratings, and each game's
+    forecast from them beside what happened. `snapshots` is Release B's snapshot CSV."""
+    from scripts.weekly_ratings import Ratings, forecast_total
+
+    snap = snapshots[(snapshots["method"] == "ridge_v1") & (snapshots["season"] == season)
+                     & (snapshots["as_of_week"] == week)]
+    if snap.empty:
+        return pd.DataFrame(), pd.DataFrame(), {}
+    first = snap.iloc[0]
+    table = snap.set_index("team")[["O", "D", "P", "n_games", "n_possessions"]]
+    r = Ratings(mu=first["mu"], nu=first["nu"], h=first["h"], c=first["c"], table=table, unrated=0.0)
+    games = json.loads((raw_dir / f"games_{season}.json").read_text(encoding="utf-8"))
+    rows = []
+    for g in games:
+        if (g.get("week") != week or g.get("seasonType") != "regular"
+                or g.get("homeClassification") != "fbs" or g.get("awayClassification") != "fbs"):
+            continue
+        total = (g["homePoints"] + g["awayPoints"]) if g.get("completed") else None
+        fc = forecast_total(r, g["homeTeam"], g["awayTeam"], bool(g.get("neutralSite")))
+        rows.append({"game_id": g["id"], "kickoff": _et(pd.to_datetime(g.get("startDate"), utc=True)),
+                     "game": f"{g['awayTeam']} @ {g['homeTeam']}", "forecast": fc,
+                     "actual": total, "miss": None if total is None else fc - total})
+    meta = {"as_of": first["as_of_ts"], "teams": len(table), "mu": first["mu"], "nu": first["nu"],
+            "h": first["h"], "c": first["c"]}
+    return (pd.DataFrame(rows).sort_values("kickoff") if rows else pd.DataFrame(),
+            table.sort_values("O", ascending=False).reset_index(), meta)
+
+
+# --- data quality and lineage (plan §37.2 page 11) ---------------------------------------
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def lineage(root: Path, data_root: Path, hasher=sha256_file) -> pd.DataFrame:
+    """Every published run's recorded source hashes against the files on disk now. A
+    'changed' row is a data revision since the run: its numbers no longer reproduce."""
+    rows = []
+    for d in run_dirs(root):
+        path = d / "manifest.json"
+        if not path.exists():
+            continue
+        for src in json.loads(path.read_text(encoding="utf-8")).get("sources", []):
+            f = data_root / src["path"]
+            now_sha = hasher(f) if f.exists() else None
+            rows.append({"run_id": d.name, "path": src["path"],
+                         "status": "missing" if now_sha is None else
+                         ("same" if now_sha == src["sha256"] else "changed"),
+                         "recorded": src["sha256"][:12], "now": (now_sha or "")[:12]})
+    return pd.DataFrame(rows)
+
+
+def freshness(data_root: Path, season: int) -> pd.DataFrame:
+    """Age of the inputs the live system reads."""
+    items = {"CFBD games": data_root / "raw" / f"games_{season}.json",
+             "CFBD drives": data_root / "raw" / f"drives_{season}.json",
+             "CFBD lines": data_root / "raw" / f"lines_{season}.json"}
+    an = sorted((data_root / "raw" / "actionnetwork").glob("history_event_*.json"),
+                key=lambda p: p.stat().st_mtime)
+    if an:
+        items["Action Network history (newest file)"] = an[-1]
+    now = time.time()
+    return pd.DataFrame([{"input": k, "file": p.name, "updated": _et(pd.Timestamp(p.stat().st_mtime, unit="s", tz="UTC"))
+                          if p.exists() else "missing",
+                          "age_hours": round((now - p.stat().st_mtime) / 3600, 1) if p.exists() else None}
+                         for k, p in items.items()])
+
+
+def drops(eval_json: Path) -> pd.DataFrame:
+    """Release B's per-season game counts and exclusions (why games are not in the frame)."""
+    if not eval_json.exists():
+        return pd.DataFrame()
+    d = json.loads(eval_json.read_text(encoding="utf-8"))["drops_by_season"]
+    return pd.DataFrame(d).T.fillna(0).astype(int).rename_axis("season").reset_index()
+
+
 # --- registry (plan §37.2 page 16) ------------------------------------------------------
 
 def registry(root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:

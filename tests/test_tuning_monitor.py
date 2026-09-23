@@ -102,6 +102,41 @@ def test_shadow_predictions_join_both_aliases_and_refuse_a_changed_table(tmp_pat
         shadow_predictions(sd, tmp_path / "raw", 5)
 
 
+def test_lineage_flags_a_revised_source_and_a_missing_one(tmp_path):
+    import hashlib
+
+    from models.tuning.ui.data import lineage
+
+    data = tmp_path / "data"
+    (data / "raw").mkdir(parents=True)
+    for name in ("a.json", "b.json"):
+        (data / "raw" / name).write_text("v1", encoding="utf-8")
+    run = tmp_path / "lab" / "runs" / "run-x"
+    run.mkdir(parents=True)
+    sha = hashlib.sha256(b"v1").hexdigest()
+    (run / "manifest.json").write_text(json.dumps({"sources": [
+        {"path": f"raw/{n}", "sha256": sha} for n in ("a.json", "b.json", "c.json")]}), encoding="utf-8")
+    (data / "raw" / "b.json").write_text("v2", encoding="utf-8")          # revised after the run
+    status = lineage(tmp_path / "lab", data).set_index("path")["status"].to_dict()
+    assert status == {"raw/a.json": "same", "raw/b.json": "changed", "raw/c.json": "missing"}
+
+
+@pytest.mark.slow
+def test_replay_week_reproduces_release_b_forecasts_from_the_snapshot():
+    from cfb_paths import DATA_ROOT, PROCESSED
+
+    from models.tuning.ui.data import replay_week
+    from scripts.weekly_ratings_eval import load, run_season
+
+    snaps = pd.read_csv(PROCESSED / "ratings" / "weekly_ratings_snapshots.csv")
+    games, _ = load(DATA_ROOT, [2021], [])
+    scored, _ = run_season(games, 2021, 40, 8, {})
+    shown, _, _ = replay_week(snaps, DATA_ROOT / "raw", 2021, 8)
+    both = shown.merge(scored[scored["week"] == 8][["game_id", "ridge"]], on="game_id")
+    assert len(both) > 40
+    assert both["forecast"].to_numpy() == pytest.approx(both["ridge"].to_numpy(), abs=1e-9)
+
+
 def test_every_hypothesis_points_at_a_record_that_exists():
     h = hypotheses()
     assert h["id"].is_unique and set(h["status"]) <= {"closed", "pending"}

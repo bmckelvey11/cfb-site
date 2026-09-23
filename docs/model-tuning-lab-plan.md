@@ -2290,7 +2290,13 @@ Add persistent top-level context: environment, database snapshot, experiment dra
 18 System Health & Drift
 ```
 
-**Status (2026-09-23): pages 13 and 15–18 are built, read-only**, in the lab GUI (§5 status).
+**Status (2026-09-23): pages 11–13 and 15–18 are built, read-only**, in the lab GUI (§5 status).
+
+- **Data** is page 11.
+  - It shows how fresh the live inputs are.
+  - It checks every published run's recorded source hashes against today's files; a "changed" source means a revision since the run.
+  - It shows Release B's per-season exclusions.
+- **Replay** is page 12: a past week's ridge_v1 ratings as of its cutoff, and each game's forecast beside the result. A slow test pins the forecasts to Release B's to 1e-9.
 
 - **Distributions** is page 13, with §37.4's scenario limited to one input: the total line.
   - It shows each game's predicted table, from this week's shadow snapshot (checked against its ledger checksum) or from Release D's 2021–25 outer folds.
@@ -2299,7 +2305,6 @@ Add persistent top-level context: environment, database snapshot, experiment dra
 - **Registry** is page 16: published runs, the current champion and challenger, and every alias move. Aliases still move only through the CLI.
 - **Hypotheses** is page 17, read from `models/tuning/hypotheses.json`.
 - **Page 14, the betting decision lab, waits** until the shadow replay has run. Pricing live 2026 quotes in the GUI now would show priced results before the frozen replay.
-- Pages 11 and 12 are not built.
 
 ### 37.3 Comparison workspace
 

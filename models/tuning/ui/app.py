@@ -4,7 +4,7 @@
 
 Pages: Shadow (read-only; §37.2 pages 15, 18), Distributions (§37.2 page 13 and the §37.4
 scenario line), New run (plan §5 pages 01-06), Jobs (07), Runs (08-09), Registry (§37.2
-page 16), Hypotheses (10 / §37.2 page 17). Every check a spec must pass lives in `models.tuning.ui.api`, run in the
+page 16), Replay (§37.2 page 12), Data (§37.2 page 11), Hypotheses (10 / §37.2 page 17). Every check a spec must pass lives in `models.tuning.ui.api`, run in the
 main `.venv`, so the GUI cannot skip one; a launch re-validates the exact file it starts.
 Set CFB_LAB_ROOT to point the whole GUI at a scratch lab. Runs in its own venv so the
 shadow tick's `.venv` keeps its packages:
@@ -37,7 +37,7 @@ IN_FLIGHT = ("queued", "claimed", "running", "retry_wait", "cancellation_request
 
 st.set_page_config(page_title="CFB Tuning Lab", layout="wide")
 page = st.sidebar.radio("Page", ["Shadow", "Distributions", "New run", "Jobs", "Runs",
-                                 "Registry", "Hypotheses"])
+                                 "Registry", "Replay", "Data", "Hypotheses"])
 st.sidebar.caption(f"Lab root: `{LAB}`" + ("  \n**scratch lab**" if "--lab-root" in sys.argv
                                             or os.environ.get("CFB_LAB_ROOT") else ""))
 st.sidebar.caption("Shadow and Hypotheses are read-only. Freeze, tick, alias, and replay "
@@ -50,6 +50,16 @@ now = pd.Timestamp.now(tz="UTC")
 @st.cache_data(ttl=600)
 def lab_catalog(root: str) -> dict:
     return actions.api(Path(root), "catalog")
+
+
+@st.cache_data
+def ratings_snapshots(path: str, mtime: float) -> pd.DataFrame:
+    return pd.read_csv(path)
+
+
+@st.cache_data
+def file_sha(path: str, mtime: float, size: int) -> str:
+    return md.sha256_file(Path(path))
 
 
 def templates() -> dict[str, Path]:
@@ -187,6 +197,60 @@ elif page == "Registry":
         st.caption("No shadow period has set an alias.")
     st.subheader("Published runs")
     st.dataframe(runs, hide_index=True, width="stretch")
+
+elif page == "Replay":
+    st.title("Historical replay")
+    st.caption("Plan §37.2 page 12. A past week exactly as the lab saw it at its cutoff: "
+               "ridge_v1 ratings fit only on games that kicked off before it (Release A's "
+               "as-of rule), and each game's forecast from them beside what happened.")
+    snap_csv = RAW.parent / "processed" / "ratings" / "weekly_ratings_snapshots.csv"
+    if not snap_csv.exists():
+        st.info(f"No ratings snapshot at `{snap_csv}`.")
+        st.stop()
+    snaps = ratings_snapshots(str(snap_csv), snap_csv.stat().st_mtime)
+    rv1 = snaps[snaps["method"] == "ridge_v1"]
+    c1, c2 = st.columns(2)
+    season = c1.selectbox("Season", sorted(rv1["season"].unique()), index=len(rv1["season"].unique()) - 1)
+    week = c2.selectbox("Week", sorted(rv1.loc[rv1["season"] == season, "as_of_week"].unique()))
+    games, table, meta = md.replay_week(snaps, RAW, int(season), int(week))
+    st.markdown(f"**As of {md._et(meta['as_of'])}**: {meta['teams']} teams rated. League "
+                f"{meta['mu']:.3f} points per possession, {meta['nu']:.1f} possessions per team, "
+                f"home edge {meta['h']:+.3f}, overtime {meta['c']:.2f} points a game.")
+    if len(games):
+        played = games.dropna(subset=["actual"])
+        if len(played):
+            st.metric("Mean absolute miss this week", f"{played['miss'].abs().mean():.2f} points",
+                      f"{len(played)} games", delta_color="off")
+        st.dataframe(games.drop(columns="game_id"), hide_index=True, width="stretch",
+                     column_config={c: st.column_config.NumberColumn(format="%.1f")
+                                    for c in ("forecast", "miss")})
+    with st.expander("Ratings at the cutoff (O and D: points per possession vs average; P: possessions)"):
+        st.dataframe(table, hide_index=True, width="stretch")
+
+elif page == "Data":
+    st.title("Data quality and lineage")
+    st.caption("Plan §37.2 page 11.")
+    st.subheader("Freshness of the live inputs")
+    st.dataframe(md.freshness(RAW.parent, now.year), hide_index=True, width="stretch")
+    st.subheader("Sources behind each published run")
+    st.caption("Each run's recorded hashes against the files now. 'changed' means the data was "
+               "revised after the run, so its numbers no longer reproduce from today's files.")
+
+    def cached(p: Path) -> str:
+        s = p.stat()
+        return file_sha(str(p), s.st_mtime, s.st_size)
+
+    lin = md.lineage(LAB, RAW.parent, hasher=cached)
+    if len(lin):
+        bad = lin[lin["status"] != "same"]
+        if len(bad):
+            st.error(f"{len(bad)} of {len(lin)} recorded sources changed or missing.")
+        else:
+            st.success(f"All {len(lin)} recorded sources match.")
+        st.dataframe(lin, hide_index=True, width="stretch")
+    st.subheader("Why games leave the frame (Release B, per season)")
+    st.dataframe(md.drops(RAW.parent / "processed" / "ratings" / "weekly_ratings_eval.json"),
+                 hide_index=True, width="stretch")
 
 elif page == "New run":
     st.title("New run")
