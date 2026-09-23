@@ -69,8 +69,10 @@ def test_the_launch_skips_stale_replicates_and_refuses_a_run_in_flight(tmp_path)
     spec = load_run_spec(SPEC)
     LabStore(tmp_path).submit(spec, "old-code")
     _set_state(tmp_path, spec.run_id(), "completed", "old-code")
-    launch = _check(tmp_path, _doc())["launch"]
+    stale = _check(tmp_path, _doc())
+    launch = stale["launch"]
     assert launch["replicate"] == 1 and launch["skipped"][0]["same_code"] is False
+    assert stale["holdout"]["prior_trials"] == 60  # replicate 0 spent the same seasons
     _set_state(tmp_path, spec.run_id(), "completed", code_fingerprint())
     same = _check(tmp_path, _doc())
     assert same["launch"]["replicate"] == 0 and any("already completed" in w for w in same["warnings"])
@@ -90,6 +92,23 @@ def test_launch_revalidates_the_exact_file_and_refuses_an_invalid_one(tmp_path):
     except actions.Refused as e:
         assert "confirmation lock" in str(e)
     assert not (tmp_path / "logs").exists() and not (tmp_path / "jobs.sqlite3").exists()
+
+
+def test_launch_refuses_while_a_worker_is_still_starting(tmp_path):
+    """Before its ~16 s import the worker has no job row; its fresh log is the guard."""
+    from models.tuning.ui import actions
+
+    d = _doc()
+    d["dataset"] |= {"source": "synthetic_v1", "synthetic_seed": 1}
+    draft = actions.write_draft(tmp_path, d)
+    run_id = RunSpec.model_validate(d).run_id()
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / f"{run_id}.log").write_text("", encoding="utf-8")
+    try:
+        actions.launch(tmp_path, draft, 0)
+        raise AssertionError("a second worker launched")
+    except actions.Refused as e:
+        assert "still starting" in str(e)
 
 
 def test_trials_decode_categorical_parameters(tmp_path):

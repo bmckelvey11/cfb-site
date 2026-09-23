@@ -93,7 +93,8 @@ def validate(text: str, root: Path) -> dict:
     prior = []
     for j in jobs:
         other = json.loads(j["spec_json"])
-        if j["config_hash"] == spec.config_hash or other["dataset"]["source"] != "cfb_release_b":
+        # Earlier replicates of this same spec count too: they spent the same seasons.
+        if other["dataset"]["source"] != "cfb_release_b":
             continue
         overlap = sorted(outer & set(other["folds"]["outer_test_seasons"]))
         if overlap:

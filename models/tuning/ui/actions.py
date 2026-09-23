@@ -14,9 +14,11 @@ import hashlib
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
+STARTING_S = 600
 MAIN_PY = REPO / ".venv" / "Scripts" / "python.exe"
 DETACHED = (getattr(subprocess, "DETACHED_PROCESS", 0)
             | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
@@ -54,6 +56,13 @@ def launch(root: Path, draft: Path, replicate: int) -> tuple[str, Path]:
                       f"{check['launch']['replicate']}, not {replicate}. Validate again.")
     run_id = check["launch"]["run_id"]
     log = root / "logs" / f"{run_id}.log"
+    # The job row appears only once the worker has imported optuna (~16 s). Until then a
+    # fresh log is the only sign a worker is starting; after STARTING_S it is a crashed start.
+    if log.exists() and check["launch"]["existing_state"] is None:
+        age = time.time() - log.stat().st_mtime
+        if age < STARTING_S:
+            raise Refused(f"a worker for {run_id} was started {age:.0f} s ago and is still "
+                          "starting; watch the Jobs page")
     log.parent.mkdir(parents=True, exist_ok=True)
     with open(log, "ab") as fh:
         subprocess.Popen([str(MAIN_PY), "-u", "-m", "models.tuning", "run", "--spec", str(draft),

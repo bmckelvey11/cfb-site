@@ -167,12 +167,8 @@ def jobs(lab_root: Path) -> pd.DataFrame:
     path = lab_root / "jobs.sqlite3"
     if not path.exists():
         return pd.DataFrame()
-    con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
-    try:
-        df = pd.read_sql_query("SELECT run_id, state, attempt, retries, error_kind, created_at, "
-                               "updated_at FROM jobs ORDER BY job_id DESC", con)
-    finally:
-        con.close()
+    df = _ro_query(path, "SELECT run_id, state, attempt, retries, error_kind, created_at, "
+                         "updated_at FROM jobs ORDER BY job_id DESC")
     for c in ("created_at", "updated_at"):
         df[c] = pd.to_datetime(df[c], unit="s", utc=True).map(_et)
     return df
