@@ -163,6 +163,7 @@ converted to `$`; equations have not been brought to the where-table standard.
 | [betting-system-builder-implementation-plan.md](betting-system-builder-implementation-plan.md) | System builder implementation plan |
 | [model-tuning-lab-plan.md](model-tuning-lab-plan.md) | Model Tuning Lab plan of record (Revision 2.0), including the parallel Release C split |
 | [sports-insights-systems-combined-guide.md](sports-insights-systems-combined-guide.md) | Source material for the above two |
+| [tuning-lab-guide.md](tuning-lab-guide.md) | What the model tuning lab actually does today: data flow, models, live shadow test, GUI, commands, findings, limits, and what the weather files hold |
 | [autostart-audit-2026-09-15.md](autostart-audit-2026-09-15.md) | Autostart / scheduled-task audit |
 | [rclone-credential-exposure-2026-09-21.md](rclone-credential-exposure-2026-09-21.md) | Is `rclone.conf` exposing cloud credentials, and does it need encrypting? (rotate first) |
 | [credential-use-confirmed-2026-09-22.md](credential-use-confirmed-2026-09-22.md) | Were the 2026-09-09 exfiltrated credentials actually used? (yes — Amazon, 9/14) |
