@@ -1,0 +1,12 @@
+# Lab monitor (models/tuning/monitor.py). Streamlit reads this from the working
+# directory, so run it from the repo root.
+
+[server]
+address = "127.0.0.1"   # this machine only: the ledger and model cards stay off the network
+headless = true         # no first-run email prompt, no browser auto-open
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "viewer"  # no Deploy button

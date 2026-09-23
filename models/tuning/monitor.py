@@ -49,13 +49,13 @@ if page == "Shadow":
     c2.metric("Ledger chain", "ok" if v["chain_ok"] else "FAILS", v["chain"], delta_color="off")
     c3.metric("Records", sum(v["counts"].values()))
     st.subheader("Weeks")
-    st.dataframe(v["weeks"], hide_index=True, use_container_width=True)
+    st.dataframe(v["weeks"], hide_index=True, width="stretch")
     st.caption("A game's counted prediction is the last one generated before its kickoff. "
                "Rehearsal weeks never count toward the verdict.")
     if v["aliases"]:
         st.subheader("Aliases")
         st.dataframe(pd.DataFrame(v["aliases"], columns=["alias", "model", "reason"]),
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")
     st.subheader("Priced replay")
     if not v["replays"]:
         st.caption("Not run yet. It runs after the period verdict (`python -m models.tuning replay`).")
@@ -75,7 +75,7 @@ elif page == "Runs":
     jobs = md.jobs(LAB)
     st.subheader("Tuning jobs")
     if len(jobs):
-        st.dataframe(jobs, hide_index=True, use_container_width=True)
+        st.dataframe(jobs, hide_index=True, width="stretch")
     else:
         st.caption("None.")
     runs = md.run_dirs(LAB)
