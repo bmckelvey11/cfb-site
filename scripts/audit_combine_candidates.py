@@ -82,10 +82,12 @@ def main() -> None:
     show("rest rows with NULL teamId", "SELECT count(*) FROM stg.rankings__polls__polls_ranks WHERE \"polls_ranks_teamId\" IS NULL")
 
     print("line scores: GraphQL game__*_line_scores vs REST games__*_line_scores")
-    for side, col in (("home", "homeLineScores"), ("away", "awayLineScores")):
+    for side, col, rest, gql in (
+            ("home", "homeLineScores", "stg.games__home_line_scores", "stg.game__home_line_scores"),
+            ("away", "awayLineScores", "stg.games__away_line_scores", "stg.game__away_line_scores")):
         show(f"{side}: matched periods, value differs", f"""
             SELECT count(*), count(*) FILTER (WHERE r."{col}" IS DISTINCT FROM g."{col}")
-            FROM stg.games__{side}_line_scores r JOIN stg.game__{side}_line_scores g
+            FROM {rest} r JOIN {gql} g
               ON r."gameId" = g."gameId" AND r."{col}_idx" = g."{col}_idx" """)
     show("games with line scores (gql, rest, rest not in gql, gql not in rest)", """
         WITH g AS (SELECT DISTINCT "gameId" FROM stg.game__home_line_scores),
