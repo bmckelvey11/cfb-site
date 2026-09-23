@@ -102,6 +102,17 @@ def load_frame(dataset: DatasetSpec, feature_set: FeatureSetSpec,
     return frame.drop(columns=gone), LoadReport(kept, dropped, sources)
 
 
+def source_paths(dataset: DatasetSpec, root: Path) -> list[Path]:
+    """Every file `load_frame` reads for a Release B dataset, so a worker can hash them first."""
+    if dataset.source != "cfb_release_b":
+        return []
+    span = range(min(dataset.seasons), max(dataset.seasons) + 1)
+    return ([p for s in span for p in (root / "raw" / f"games_{s}.json",
+                                       root / "raw" / f"drives_{s}.json")]
+            + [root / "raw" / f"lines_{s}.json" for s in dataset.seasons]
+            + [root / "processed" / "ratings" / "weekly_ratings_snapshots.csv"])
+
+
 def _release_b_frame(dataset: DatasetSpec, root: Path) -> tuple[pd.DataFrame, list[Path]]:
     from scripts.pregame_replay_audit import snapshot
     from scripts.weekly_ratings import Ratings, forecast_total

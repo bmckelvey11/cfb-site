@@ -13,7 +13,7 @@ This file is the build order; where the two differ, fix both.
 | 2. C2 features | Done 2026-09-23: 10 tests; real loader reproduces Release B (2021–25: 3,488 games, 3,480 opens; primary ridge − open +0.33) |
 | 3. C3 folds and estimators | Done 2026-09-23: 11 tests; gates live in `acceptance_gates` beside `compare_outer` |
 | 4. C1 cards | Done 2026-09-23: 5 tests; `RunSpec.notes` (unhashed) added so the card can state holdout status |
-| 5. C4 worker | pending |
+| 5. C4 worker | Done 2026-09-23: 8 tests incl. subprocess crash at trial 3 fold 1 and resume (~25 s); `features.source_paths` added so data is hashed before loading |
 | 6. Join, real run, docs | pending |
 
 ## Global constraints
