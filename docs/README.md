@@ -75,6 +75,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [sbr-ncaaf-lines-2026-09-17.md](sbr-ncaaf-lines-2026-09-17.md) | Pre-2013 totals and moneylines from the Sportsbook Reviews archive (2007–2012) |
 | [ncaadata-csv-backfill-2026-09-17.md](ncaadata-csv-backfill-2026-09-17.md) | Can `NCAAData_1980-2020.csv` backfill lines? No — it has none |
 | [median-line-2026-09-17.md](median-line-2026-09-17.md) | The system builder now grades against the median line across books, not one provider |
+| [pregame-replay-2026-09-22.md](pregame-replay-2026-09-22.md) | Can 2024 week 6 be replayed pre-kickoff, and does `overUnderOpen` have a capture time? Yes; no, it is a vendor label |
 
 ## PFF
 
