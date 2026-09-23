@@ -88,19 +88,30 @@ Week 1 does not depend on λ, so it is the priors release's result unchanged.
   setting; nothing here supports changing it.
 - **The priors question is sharper, not settled.** At their own total-tuned penalty the
   priors improve both populations, and the early forecasts close most of the gap to the
-  open. Every variant that gives the priors *less* weight keeps or grows the gain; every
-  variant that gives them *more* weight loses it. The fitted carryover (offense 0.47,
-  defense 0.60, pace 0.46) sits on the good side of that line but without the margin the
-  declared rule asks for.
+  open. The clean robustness evidence is the coefficient rows, which change only the prior:
+  half the carryover still improves both populations, one and a half times the carryover
+  does not. The matched-λ rows move both methods off their own tuned pairs, so part of the
+  ×0.5 gain is `ridge_v2` getting worse at (20, 2), not the priors getting better. The
+  fitted carryover (offense 0.47, defense 0.60, pace 0.46) sits on the good side of that
+  line but without the margin the declared rule asks for.
 - **The principled next test** is to fit the priors' overall weight the same way the
-  penalty was just fit — one scale on the carryover, tuned on pre-2021 total loss — and
-  score it once, instead of reading ×0.5 off the scored seasons.
+  penalty was just fit — one scale on the carryover, tuned on pre-2021 total loss — freeze
+  it, and confirm it on 2026 as the season completes, instead of reading ×0.5 off the
+  scored seasons.
 - `ridge_v1` remains the base rating.
 
 ## What this does not support
 
 - **Not "priors work".** The go rule was declared and failed; the base-setting wins are
   real within this run but not robust to the stated perturbations.
+- **2021–2025 is no longer an untouched holdout for the priors question.** It has been
+  scored three times on it (`fb9f1df`, the matched-λ block in `6d7f13d`, and this run),
+  and this run's design was prompted by the earlier looks even though it was declared
+  before running. Across the ratings thread: 12 + 14 + 98 = 124 λ grid points on tuning
+  seasons, 4 carryover coefficients, 4 scored methods (`raw_v1`, `ridge_v1`, `prior_v1`,
+  `prior_v2`, with `ridge_v2` ≈ `ridge_v1`), 12 stress variants. Any further priors
+  variant needs data none of these runs has read; 2026 (157 FBS games complete through
+  week 3 on 2026-09-22, all with a Bovada open) is the candidate.
 - **Not adopting λ ×0.5 or carryover ×0.5.** Both look best here and were seen on the scored
   seasons.
 - **Not a market finding.** Closing the early gap to the open is forecast error against an
