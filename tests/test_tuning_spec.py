@@ -48,7 +48,7 @@ def test_reordered_keys_and_sets_hash_the_same():
 def test_provenance_is_not_hashed_but_results_inputs_are():
     base = RunSpec.model_validate(_spec_dict()).config_hash
     assert RunSpec.model_validate(_spec_dict(created_at="2027-01-01T00:00:00Z",
-                                             created_by="someone")).config_hash == base
+                                             created_by="someone", notes="x")).config_hash == base
     assert RunSpec.model_validate(_spec_dict(**{"seeds.model": 1})).config_hash != base
 
 

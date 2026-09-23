@@ -151,12 +151,13 @@ class Seeds(_Spec):
 
 
 class RunSpec(_Spec):
-    PROVENANCE: ClassVar[frozenset[str]] = frozenset({"created_at", "created_by"})
+    PROVENANCE: ClassVar[frozenset[str]] = frozenset({"created_at", "created_by", "notes"})
 
     schema_version: Literal[1] = 1
     spec_id: str
     created_at: str
     created_by: str
+    notes: str = ""  # free text for the card (e.g. holdout status); not hashed
     dataset: DatasetSpec
     feature_set: FeatureSetSpec
     folds: FoldSpec

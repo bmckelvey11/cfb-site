@@ -65,8 +65,8 @@ Every spec is a frozen pydantic model that rejects unknown fields.
   reuses), `verdict_rule` (`classify_verdict_v1`), `bias_tolerance` (points),
   `max_features`.
 - **`Seeds`:** `split`, `model`, `sampler`.
-- **`RunSpec`:** `schema_version` (1), `spec_id`, `created_at`, `created_by`, the five
-  specs, `seeds`.
+- **`RunSpec`:** `schema_version` (1), `spec_id`, `created_at`, `created_by`, `notes`
+  (free text for the card, such as holdout status), the five specs, `seeds`.
 - **`ModelSpec`:** `family` (`ridge` | `elastic_net` | `huber`) and its parameters.
 - **`FoldResult`:** `run_id`, `config_hash`, `fold_id`, `role` (`inner` | `outer`),
   `model`, fitted parameters (imputer medians, scaler mean/scale, coefficients,
@@ -79,7 +79,7 @@ Every spec is a frozen pydantic model that rejects unknown fields.
   lists, `exclude_seasons`, and `baselines`.
 - Feature order is kept as declared, because it is the design matrix's column order.
 - `config_hash` = sha256 of `json.dumps(spec, sort_keys=True, separators=(",", ":"))`,
-  excluding `created_at` and `created_by`.
+  excluding `created_at`, `created_by`, and `notes`.
 - `run_id` = `run-` + the first 12 hex characters of the hash, plus `-r<k>` for a
   replicate `k ≥ 1`.
 
