@@ -36,8 +36,8 @@ Read-only, each file's sha256 recorded in the manifest, as in Release A.
 
 | File | Used for |
 | --- | --- |
-| `data/raw/games_<s>.json` | kickoff (`startDate`), `week`, `seasonType`, `homeClassification`/`awayClassification`, `neutralSite`, `homePoints`/`awayPoints` |
-| `data/raw/drives_<s>.json` | possessions and offensive points (`gameId`, `offense`, `defense`, `isHomeOffense`, `startPeriod`, `startOffenseScore`, `endOffenseScore`) |
+| `data/raw/games_<s>.json` | kickoff (`startDate`), `week`, `seasonType`, `completed`, `homeClassification`/`awayClassification`, `neutralSite`, `homePoints`/`awayPoints`, `homeLineScores`/`awayLineScores` |
+| `data/raw/drives_<s>.json` | possession counts only (`gameId`, `offense`, `isHomeOffense`, `startPeriod`) |
 | `data/raw/lines_<s>.json` | Bovada `overUnderOpen`, scored seasons only |
 
 Bovada is the fixed market provider: it is the only book with opens on nearly every
@@ -47,13 +47,21 @@ fallback to another book, no close, no imputation. No book has opens in 2019–2
 ## Definitions
 
 - **Possession:** a drive with `startPeriod` in 1–4. Overtime drives are excluded.
-- **Offensive points on a drive:** `endOffenseScore − startOffenseScore`.
-- **Team-game row** $(i,g)$: $y_{ig}$ = team $i$'s regulation offensive points ÷ its
-  regulation possessions; weight $w_{ig}$ = those possessions; $H_{ig}$ = +1 home, −1 away,
-  0 at a neutral site.
+- **Team regulation points:** the sum of the team's Q1–Q4 line scores. Line scores are
+  present and sum to the final score in every FBS-vs-FBS regular-season game checked.
+  Drive score fields (`startOffenseScore`/`endOffenseScore`) are **never read**: from 2021
+  on, 19–58 games a season have drive points above the game's final score.
+- **Team-game row** $(i,g)$: $y_{ig}$ = team $i$'s regulation points ÷ its regulation
+  possessions; weight $w_{ig}$ = those possessions; $H_{ig}$ = +1 home, −1 away, 0 at a
+  neutral site. This is **team** points per possession: a team's own defensive and return
+  touchdowns land in its numerator. Docs say so wherever the rating is named.
 - **Game row** $g$: $N_g$ = both teams' regulation possessions ÷ 2.
 - **Population:** FBS vs FBS, regular season, completed. FBS–FCS games are dropped from
-  fits and from scoring. A game with no drive rows is dropped from fits and counted.
+  fits and from scoring.
+- **Data-quality gate (fits only):** a game is dropped from fits, and counted, when it has
+  no drive rows or when the two teams' regulation drive counts differ by more than 2.
+  Possessions alternate, so a larger gap means missing drives; about 2% of games. A gated
+  game can still be a scored game; only its own evidence is withheld.
 - **Garbage time:** not filtered. Declared as `garbage_filter = "none"` on every row.
 
 ## Cutoff and snapshots
@@ -80,7 +88,7 @@ $$
 \min_{\mu,\,h,\,O,\,D}\;\sum_{(i,g)\in F_t} w_{ig}\left(y_{ig}-\mu-O_i-D_{j(g)}-hH_{ig}\right)^2+\lambda_{\text{PPP}}\sum_{k}\left(O_k^2+D_k^2\right) \\[1em]
 \begin{array}{rl}
 \text{where}\quad F_t: & \text{team-game rows of season } s \text{ with kickoff strictly before cutoff } t \\
-y_{ig}: & \text{team } i\text{'s regulation offensive points per possession in game } g \\
+y_{ig}: & \text{team } i\text{'s regulation points (line scores) per regulation possession in game } g \\
 w_{ig}: & \text{team } i\text{'s regulation possessions in game } g \\
 \mu: & \text{league points per possession at } t \text{ (unpenalized)} \\
 O_i: & \text{offense effect, points per possession; } +\text{ = better offense} \\
@@ -137,15 +145,16 @@ $$
 \begin{array}{rl}
 \text{where}\quad \widehat{T}_g: & \text{forecast full-game points total} \\
 H_g: & +1 \text{, or } 0 \text{ at a neutral site} \\
-c_t: & \text{fit-set mean of (actual total} - \text{regulation offensive points of both teams)}
+c_t: & \text{fit-set mean of overtime points (actual total} - \text{both teams' Q1–Q4 line scores)}
 \end{array}
 \end{gathered}
 $$
 
-Guide §7.3 forecasts the regulation offensive total. The open prices the full game, so
-$c_t$ adds the fit set's average overtime, defensive and return points back, and every
-forecast here targets the same full total. With the guide's worked example (55.0 before
-$c_t$) and an illustrative $c_t=1.8$, the forecast is 56.8. `raw_v1` uses $h=0$.
+Guide §7.3 forecasts the regulation total. The open prices the full game, so $c_t$ adds the
+fit set's average overtime points back, and every forecast here targets the same full
+total. Defensive and return scores are already inside each team's rate. With the guide's
+worked example (55.0 before $c_t$) and an illustrative $c_t=0.8$, the forecast is 55.8.
+`raw_v1` uses $h=0$.
 
 ## λ tuning
 
@@ -252,7 +261,9 @@ betting-threshold terms, grepped as in Release A.
    recovers them, with signs right (good defense negative; $H$ = +1/−1/0).
 3. **Shrinkage:** a very large λ drives every rating to 0 and $\mu$ to the weighted league
    mean.
-4. **Possessions:** overtime drives are excluded; points come from score deltas.
+4. **Possessions and points:** overtime drives are excluded from counts; points come from
+   Q1–Q4 line scores, and corrupting a drive's score fields changes nothing; a game whose
+   drive counts differ by 3 is gated out of the fit and counted.
 5. **Total:** the guide §7.3 worked example gives 55.0 with $c_t=0$.
 6. **Verdict rule:** each branch of `classify_verdict`.
 
