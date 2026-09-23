@@ -2347,7 +2347,8 @@ Permit controlled what-if changes to legitimate pregame inputs such as total lin
   - It shows the change in possessions per team, in the champion's `ridge_v1` total, and in the lab run's point forecast.
   - Both changes are exact: the ridge_v1 formula, and the run's stored linear fit for that season's fold. That fit reproduces the stored predictions to 1e-14 on 331 checked games.
   - A pace beyond the range of every team-week before that season is flagged as outside training support.
-- **Uncertainty change: zero by construction.** Each table is its model's mean plus a residual pool chosen by games played, not by pace. The table is not redrawn, because the distribution model's own mean response is not stored.
+- **Uncertainty change: not computed.** The residual pool is chosen by games played, not by pace. The distribution model's own response to pace, in mean or spread, is not stored, so the table is not redrawn.
+  - Its spread could still move. In `joint_bootstrap` a regulation tie adds an observed overtime total, and a pace change that shifts the home–away margin changes which residual pairs tie.
 - **Not offered:** spread, wind and QB status, because no model takes them.
 
 ### 37.5 Guardrail UX
@@ -2506,7 +2507,7 @@ Defer deep neural sequence models, normalizing flows, GNNs, player embeddings, H
 
 ### Release A: trustworthy replay foundation
 
-**Status (2026-09-23):** go/no-go met, but the line counts only as an untimed label.
+**Status (2026-09-23):** go/no-go met for data and outcomes, not met for quotes. No line before 2026 has a capture time or a price, so a historical quote cannot be reconciled to decision time.
 
 - Record: [`pregame-replay-2026-09-22.md`](pregame-replay-2026-09-22.md). Script: `scripts/pregame_replay_audit.py`. Leakage test: `tests/test_pregame_replay.py`.
 - **Replay:** 2024 week 6 was rebuilt from rows with a kickoff strictly before each game's own. The manifest holds the sha256 of every input.

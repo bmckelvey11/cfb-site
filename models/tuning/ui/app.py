@@ -221,11 +221,10 @@ elif page == "Distributions":
                            f"before {season}. Both models are extrapolating.")
             st.caption("Sensitivity analysis, never a stored prediction. Pace is the one pregame input "
                        "both point models take; both answers are exact (the ridge_v1 formula, and "
-                       "the run's stored linear fit for this season's fold). Uncertainty does not "
-                       "change: the table above is its model's mean plus a residual pool chosen by "
-                       "games played, not pace, so pace would move it without widening it. It is not "
-                       "redrawn, because the distribution model's own mean response is not stored. "
-                       "Spread, wind and QB status are not model inputs, so they are not offered.")
+                       "the run's stored linear fit for this season's fold). The change in the "
+                       "table above, in mean or spread, is not computed: the distribution model's "
+                       "own response to pace is not stored, so the table is not redrawn. Spread, "
+                       "wind and QB status are not model inputs, so they are not offered.")
 
 elif page == "Betting":
     st.title("Betting decisions")
