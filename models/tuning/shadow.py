@@ -9,8 +9,8 @@ joint residual and overtime pools from the window seasons) and writes a freeze J
 is committed before the first snapshot. `tick` runs after the daily data refresh: it
 verifies the ledger chain and the frozen checksums, snapshots the next week while the
 calendar is between weeks, records a `missed` week, scores finished games against the
-prediction made last before each game's kickoff, logs data revisions, hashes the week's
-Action Network history files, writes the period verdict once the period is over, and
+prediction made last before each game's kickoff, logs data revisions, copies and hashes
+the week's Action Network history files, writes the period verdict once the period is over, and
 rewrites `status.md`. Counting rules: the design spec for Release E.
 """
 from __future__ import annotations
@@ -387,7 +387,12 @@ def tick(spec: ShadowSpec, lab_root: Path, data_root: Path, now: pd.Timestamp | 
         for event, gid in sorted(xwalk.items()):
             path = data_root / "raw" / "actionnetwork" / f"history_event_{event}.json"
             if path.exists():
-                files[str(event)] = {"game_id": gid, "sha256": _sha(path.read_bytes())}
+                # The collector may re-pull a raw file later; the replay prices this copy.
+                blob = path.read_bytes()
+                (sd / "quotes").mkdir(parents=True, exist_ok=True)
+                (sd / "quotes" / path.name).write_bytes(blob)
+                files[str(event)] = {"game_id": gid, "sha256": _sha(blob),
+                                     "file": f"quotes/{path.name}"}
         ledger.append("quotes_archived", {"week": w, "matched": len(xwalk), "files": files,
                                           "unmatched_events": unmatched})
         log.append(f"archived {len(files)} AN history files for week {w}")

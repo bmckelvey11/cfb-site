@@ -5,6 +5,7 @@
     python -m models.tuning cancel --run-id RUN_ID [--root DIR]
     python -m models.tuning dist --spec models/tuning/specs/dist_total_v1.json [--root DIR]
     python -m models.tuning shadow {freeze,tick,alias} --spec models/tuning/specs/shadow_2026_w05_08.json
+    python -m models.tuning replay --spec models/tuning/specs/replay_2026_w05_08.json [--rehearsal]
 
 `run` submits the spec and works that job until it is completed, failed, or cancelled.
 Resubmitting a completed spec returns the existing run when the code fingerprint and
@@ -113,6 +114,25 @@ def _shadow(args) -> int:
         return 2
 
 
+def _replay(args) -> int:
+    from cfb_paths import DATA_ROOT
+
+    from models.tuning.replay import ReplaySpec, replay
+    from models.tuning.shadow import ShadowRefused
+
+    spec = ReplaySpec.model_validate_json(Path(args.spec).read_text(encoding="utf-8"))
+    try:
+        out = replay(spec, Path(args.root) if args.root else _default_root(), DATA_ROOT,
+                     rehearsal=args.rehearsal)
+    except ShadowRefused as e:
+        print(f"refused: {e}", file=sys.stderr)
+        return 2
+    print(out["framing"])
+    print(json.dumps({k: out[k] for k in ("replay_id", "weeks", "games_priced", "views",
+                                          "actionable", "p_over_vs_market")}, indent=1))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m models.tuning", description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -140,6 +160,10 @@ def main(argv: list[str] | None = None) -> int:
     sh.add_argument("--alias", choices=["champion", "challenger"])
     sh.add_argument("--model")
     sh.add_argument("--reason")
+    rp = sub.add_parser("replay", help="priced replay of a finished shadow period")
+    rp.add_argument("--spec", required=True)
+    rp.add_argument("--root")
+    rp.add_argument("--rehearsal", action="store_true", help="rehearsal weeks only; not a result")
     args = ap.parse_args(argv)
 
     if args.cmd == "run":
@@ -148,6 +172,8 @@ def main(argv: list[str] | None = None) -> int:
         return _dist(args)
     if args.cmd == "shadow":
         return _shadow(args)
+    if args.cmd == "replay":
+        return _replay(args)
     store = LabStore(Path(args.root) if args.root else _default_root())
     if args.cmd == "cancel":
         job = store.request_cancel(args.run_id)
