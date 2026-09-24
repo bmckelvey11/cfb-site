@@ -12,6 +12,7 @@ bridged through `dim_team.school`. FBS membership is per season from `stg.fbs_te
 """
 from __future__ import annotations
 
+import threading
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import date, datetime
@@ -32,21 +33,36 @@ MAIN_BOOKS = ("draftkings", "fanduel")
 
 
 class WarehouseBusy(Exception):
-    """The rebuild holds `cfb.duckdb`; the page says so instead of failing."""
+    """The warehouse can't serve this request right now; the page says so and offers a retry."""
+
+
+# Every request opens its own DuckDB instance of the 5.3 GB file, and DuckDB's default memory
+# limit is 80% of RAM per instance, so overlapping requests exhausted memory (OutOfMemoryException
+# in pff_team, 2026-09-24). At most two readers at once, each capped.
+# ponytail: a process-local gate, enough for one waitress process; a shared lock if that changes.
+WAREHOUSE_CONFIG = {"memory_limit": "3GB", "threads": 4}
+_GATE = threading.BoundedSemaphore(2)
+GATE_TIMEOUT_S = 30.0
 
 
 @contextmanager
 def warehouse(path: Path):
+    if not _GATE.acquire(timeout=GATE_TIMEOUT_S):
+        raise WarehouseBusy("Other matchups are still loading. Try again in a moment.")
     try:
-        con = duckdb.connect(str(path), read_only=True)
-    except duckdb.Error as exc:
-        raise WarehouseBusy(str(exc)) from exc
-    try:
-        # Kickoffs are TIMESTAMPTZ; pin the zone rather than inherit the server's.
-        con.execute("SET TimeZone = 'America/New_York'")
-        yield con
+        try:
+            con = duckdb.connect(str(path), read_only=True, config=WAREHOUSE_CONFIG)
+        except duckdb.Error as exc:
+            raise WarehouseBusy("The warehouse is being rebuilt or can't be opened. "
+                                "Try again in a few minutes.") from exc
+        try:
+            # Kickoffs are TIMESTAMPTZ; pin the zone rather than inherit the server's.
+            con.execute("SET TimeZone = 'America/New_York'")
+            yield con
+        finally:
+            con.close()
     finally:
-        con.close()
+        _GATE.release()
 
 
 def _plain(v):

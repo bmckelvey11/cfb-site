@@ -326,7 +326,37 @@ def test_slate_marks_lined_games(client):
 def test_busy_warehouse_is_a_503(tmp_path, odds_dir):
     app = create_app(db_path=tmp_path / "missing" / "cfb.duckdb", odds_dir=odds_dir, clock=lambda: NOW)
     r = app.test_client().get("/api/slate")
-    assert r.status_code == 503 and r.get_json()["error"] == "warehouse_rebuilding"
+    assert r.status_code == 503 and r.get_json()["error"] == "warehouse_busy"
+    assert "rebuilt" in r.get_json()["message"]
+
+
+def test_a_failed_query_answers_json_not_a_traceback(client, monkeypatch):
+    def oom(*args, **kwargs):
+        raise duckdb.OutOfMemoryException("Out of Memory Error: failed to allocate")
+    monkeypatch.setattr(q, "profile", oom)
+    r = client.get("/api/matchup?a=1&b=2&season=2026&week=4")
+    body = r.get_json()
+    assert r.status_code == 503 and body["error"] == "warehouse_busy"
+    assert "Out of Memory Error" not in body["message"]  # exception text stays in the log
+
+
+def test_api_errors_are_json_with_a_message(client):
+    r = client.get("/api/matchup?a=1&b=999&season=2026&week=4")
+    assert r.status_code == 404 and r.get_json()["message"] == "unknown team id"
+    r = client.get("/api/matchup?a=1&b=2&week=x")
+    assert r.status_code == 400 and "integer" in r.get_json()["message"]
+
+
+def test_overlapping_requests_wait_at_the_gate_then_answer_busy(client, monkeypatch):
+    monkeypatch.setattr(q, "GATE_TIMEOUT_S", 0.05)
+    held = [q._GATE.acquire(), q._GATE.acquire()]  # two requests already reading the warehouse
+    try:
+        r = client.get("/api/slate")
+        assert r.status_code == 503 and "still loading" in r.get_json()["message"]
+    finally:
+        for _ in held:
+            q._GATE.release()
+    assert client.get("/api/slate").status_code == 200  # the gate frees up again
 
 
 def test_connection_is_closed_after_each_request(client, warehouse, tmp_path):

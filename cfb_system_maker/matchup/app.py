@@ -10,7 +10,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import duckdb
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory
+from werkzeug.exceptions import HTTPException
 
 from cfb_system_maker.matchup import odds as odds_mod
 from cfb_system_maker.matchup import queries as q
@@ -45,10 +47,30 @@ def create_app(db_path: Path | None = None, odds_dir: Path | None = None,
     def lines(con) -> dict:
         return odds_mod.read_lines(odds_mod.newest_snapshot(odds_dir), q.school_index(con))
 
+    # Every API failure answers JSON with a plain message the page can show next to a Retry
+    # button; exception text stays in the server log.
     @app.errorhandler(q.WarehouseBusy)
     def busy(exc):
-        return jsonify(error="warehouse_rebuilding",
-                       message="Warehouse rebuilding. Retry in a few minutes."), 503
+        return jsonify(error="warehouse_busy", message=str(exc)), 503
+
+    @app.errorhandler(duckdb.Error)
+    def query_failed(exc):
+        log.warning("warehouse query failed: %s", exc)
+        return jsonify(error="warehouse_busy",
+                       message="The warehouse ran out of memory or was locked partway through this "
+                               "request. Try again in a moment."), 503
+
+    @app.errorhandler(HTTPException)
+    def http_error(exc):
+        if not request.path.startswith("/api/"):
+            return exc
+        return jsonify(error=exc.name.lower().replace(" ", "_"), message=exc.description), exc.code
+
+    @app.errorhandler(Exception)
+    def unexpected(exc):
+        log.exception("matchup request failed: %s", request.full_path)
+        return jsonify(error="internal", message="Something went wrong building this page. "
+                                                 "The server log has the details."), 500
 
     @app.get("/")
     def page():

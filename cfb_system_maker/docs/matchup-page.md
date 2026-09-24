@@ -32,7 +32,16 @@ uses `autoPort`, so it starts on a free port when a terminal copy already holds 
   and closes it before responding. A process holding the file open makes the nightly rebuild's
   swap fail on Windows ([app-vs-warehouse-read-path-2026-09-16.md](app-vs-warehouse-read-path-2026-09-16.md));
   `test_connection_is_closed_after_each_request` proves the file can be replaced after a
-  request. While the rebuild holds the file, the page answers "Warehouse rebuilding".
+  request.
+- **Concurrency:** each open is its own DuckDB instance of the 5.3 GB file, and DuckDB's default
+  memory limit is 80% of RAM per instance, so overlapping requests ran out of memory
+  (`OutOfMemoryException` in `pff_team`, 2026-09-24). `queries.warehouse` now admits at most
+  two requests at once (`_GATE`) and caps each at 3 GB and 4 threads (`WAREHOUSE_CONFIG`); a
+  request that waits more than 30 s answers busy.
+- **Errors:** every API failure answers JSON `{error, message}` with a plain message: 503 when the
+  warehouse is rebuilding, locked, busy or out of memory; 400/404 for bad parameters; 500 for
+  anything else. Exception text goes to the server log, never the page. The page shows the
+  message with **Try again**; a view already on screen stays visible under the alert.
 - **Odds snapshot:** the one read outside the warehouse. `CFB-Odds-Snapshot` writes a file every
   6 h but the warehouse loads them only at 05:00, so current DraftKings/FanDuel numbers come from
   the newest file. Names resolve with `oddsapi_schema.candidates()` against `dim_team.school`;
