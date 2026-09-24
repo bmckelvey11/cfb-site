@@ -18,7 +18,7 @@ import pytest
 
 from cfb_system_maker.matchup import odds, queries as q
 from cfb_system_maker.matchup.app import create_app
-from cfb_system_maker.matchup.stats import ALL, Stat, edge
+from cfb_system_maker.matchup.stats import ALL, SOURCES, UNITS, Stat, edge
 
 NOW = datetime(2026, 9, 23, 12, tzinfo=timezone.utc)
 
@@ -111,11 +111,53 @@ SNAPSHOT = {
 }
 
 
+# Game-grain rows: (game, week, team, opponent, offense_successRate, offense_plays).
+# Alpha as of wk4 with FCS excluded: games 102 and 103 -> pooled (0.4*100 + 0.5*50) / 150.
+GAME_ROWS = [
+    (101, 1, "Alpha", "Delta", 0.9, 50), (101, 1, "Delta", "Alpha", 0.2, 50),
+    (102, 2, "Alpha", "Gamma", 0.4, 100), (102, 2, "Gamma", "Alpha", 0.35, 70),
+    (103, 3, "Beta", "Alpha", 0.3, 60), (103, 3, "Alpha", "Beta", 0.5, 50),
+]
+
+
+def _game_table(con, name: str, source: str, max_week: int = 99) -> None:
+    """A stg game table with every offense_/defense_ column the registry reads for `source`."""
+    units = [u for u in UNITS if u.source == source]
+    cols = sorted({f"{side}_{x}" for u in units for side in ("offense", "defense")
+                   for x in (u.stem, u.weight) if x})
+    con.execute(f'create table {name} ("gameId" int, season int, week int, "seasonType" varchar, '
+                f'team varchar, opponent varchar, {", ".join(f"{c} double" for c in cols)})')
+    for gid, week, team, opp, sr, plays in GAME_ROWS:
+        if week > max_week:
+            continue
+        vals = {c: 0.5 for c in cols}
+        vals.update({c: 60.0 for c in cols if c.endswith(("_plays", "_totalPlays"))})
+        vals.update(offense_successRate=sr, offense_plays=plays)
+        con.execute(f"insert into {name} values (?, 2026, ?, 'regular', ?, ?, {', '.join('?' * len(cols))})",
+                    [gid, week, team, opp, *[vals.get(c) for c in cols]])
+
+
+DRIVES_SQL = """
+create table core.fact_drive_postgame as select game_id, 2026 as season, offense_team_id, defense_team_id,
+  scoring, plays, start_yards_to_goal, end_yards_to_goal, 0 as start_offense_score, pts as end_offense_score,
+  2 as elapsed_minutes, 0 as elapsed_seconds from (values
+  (102, 1, 3, true, 8, 75, 0, 7), (102, 1, 3, false, 3, 80, 70, 0), (103, 1, 2, true, 6, 60, 20, 3),
+  (102, 3, 1, false, 5, 75, 60, 0), (103, 2, 1, false, 4, 75, 65, 0))
+  t(game_id, offense_team_id, defense_team_id, scoring, plays, start_yards_to_goal, end_yards_to_goal, pts);
+"""
+
+
 @pytest.fixture()
 def warehouse(tmp_path) -> Path:
     db = tmp_path / "cfb.duckdb"
     con = duckdb.connect(str(db))
     con.execute(FIXTURE_SQL)
+    _game_table(con, "stg.advanced_game_stats", "advanced")
+    _game_table(con, "stg.advanced_game_stats_ngt", "advanced", max_week=2)  # lags a week
+    _game_table(con, "stg.ppa_games", "ppa")
+    _game_table(con, "stg.ppa_games_ngt", "ppa")
+    _game_table(con, "stg.game_havoc_stats", "havoc")
+    con.execute(DRIVES_SQL)
     con.close()
     return db
 
@@ -228,15 +270,81 @@ def test_connection_is_closed_after_each_request(client, warehouse, tmp_path):
     os.replace(staged, warehouse)
 
 
+def _win(con, rollup="pooled", fcs=True, week=4, table="stg.advanced_game_stats", source="advanced"):
+    units = [u for u in UNITS if u.source == source]
+    return q.windowed(con, SOURCES[source], units, table, 2026, week, full=False, rollup=rollup, fcs=fcs)
+
+
+def test_pooled_is_play_weighted_and_mean_counts_games_once(warehouse):
+    with q.warehouse(warehouse) as con:
+        pooled, mean = _win(con)[1], _win(con, rollup="mean")[1]
+    assert pooled["n"] == 2 and pooled["offense_successRate"] == pytest.approx(65 / 150)
+    assert mean["offense_successRate"] == pytest.approx(0.45)
+
+
+def test_fcs_toggle_and_week_window(warehouse):
+    with q.warehouse(warehouse) as con:
+        with_fcs = _win(con, fcs=False)[1]
+        wk3 = _win(con, week=3)[1]
+        last3 = _win(con, rollup="last3", fcs=False, week=4)[1]
+    assert with_fcs["n"] == 3 and with_fcs["offense_successRate"] == pytest.approx(110 / 200)
+    assert wk3["n"] == 1 and wk3["offense_successRate"] == pytest.approx(0.4)  # the wk3 game is out
+    assert last3["n"] == 3
+
+
+def test_drives_roll_up_per_game_then_pool_by_drives(warehouse):
+    with q.warehouse(warehouse) as con:
+        pooled = _win(con, table="core.fact_drive_postgame", source="drives")[1]
+        mean = _win(con, rollup="mean", table="core.fact_drive_postgame", source="drives")[1]
+    assert pooled["offense_ppd"] == pytest.approx(10 / 3)  # 7 + 0 + 3 points on 3 drives
+    assert mean["offense_ppd"] == pytest.approx((3.5 + 3) / 2)
+    assert pooled["offense_so_rate"] == pytest.approx(2 / 3)
+
+
+def test_lagging_garbage_time_twin_falls_back_to_all_plays(warehouse):
+    with q.warehouse(warehouse) as con:
+        assert q.pick_table(con, SOURCES["advanced"], 2026, True) == ("stg.advanced_game_stats", False, 1)
+        assert q.pick_table(con, SOURCES["ppa"], 2026, True) == ("stg.ppa_games_ngt", True, None)
+        assert q.pick_table(con, SOURCES["havoc"], 2026, True) == ("stg.game_havoc_stats", False, None)
+
+
+def test_unit_rows_flip_defense_direction_and_rank_within_the_window(client):
+    units = client.get("/api/matchup?a=1&b=2&season=2026&week=4").get_json()["sections"]["units"]
+    assert units["sources"]["advanced"]["ngt_lag"] == 1
+    a_off = units["blocks"][0]
+    assert (a_off["off"], a_off["def"]) == (1, 2)
+    stuff = next(r for g in a_off["groups"] for r in g["rows"] if r["concept"] == "stuff")["options"][0]
+    sr = next(r for g in a_off["groups"] for r in g["rows"] if r["concept"] == "sr")
+    assert [o["key"] for o in sr["options"]] == ["sr", "sr_std", "sr_pass_downs"]
+    assert sr["options"][0]["a"]["games"] == 2 and sr["options"][0]["a"]["n"] == 3  # 3 FBS teams played
+    assert stuff["estimate"] is None and "prior" in stuff
+
+
+def test_snapshot_needs_a_kickoff_within_three_days():
+    lines = {"games": {frozenset({"Alpha", "Beta"}): {"commence_time": "2026-09-26T23:30:00Z", "books": {}}}}
+    assert q.snap_game(lines, "Alpha", "Beta", "2026-09-26T19:30:00-04:00")
+    assert q.snap_game(lines, "Beta", "Alpha", "2025-10-11T12:00:00-04:00") is None  # same pair, other season
+
+
+def test_game_card_is_the_next_meeting_not_one_inside_the_window(warehouse):
+    with q.warehouse(warehouse) as con:
+        assert q.find_game(con, 2026, 1, 2, q.first_kickoff(con, 2026, 4)) == 104
+        assert q.find_game(con, 2026, 1, 3, q.first_kickoff(con, 2026, 4)) is None  # met in wk2
+        assert q.find_game(con, 2026, 1, 2, None) == 104  # full season: the last meeting
+
+
 def test_registry_verdicts_match_the_eligibility_audit():
     audit = Path(os.environ.get("CFB_DATA_ROOT", "")) / "processed" / "pregame_feature_eligibility.csv"
     if not audit.is_file():
         pytest.skip("eligibility audit CSV not built")
     with audit.open(newline="", encoding="utf-8") as fh:
         verdicts = {(r["table"], r["column"]): r["verdict"] for r in csv.DictReader(fh)}
-    for stat in ALL:
-        audited = verdicts.get((stat.table, stat.column))
+    checks = [(s.key, s.table, s.column, s.verdict, s.reason) for s in ALL]
+    checks += [(u.key, u.table, f"{side}_{u.stem}", u.verdict, u.reason)
+               for u in UNITS for side in ("offense", "defense")]
+    for key, table, column, verdict, reason in checks:
+        audited = verdicts.get((table, column))
         if audited is None:
-            assert stat.reason, f"{stat.key}: the audit does not cover {stat.table}.{stat.column}; say why"
+            assert reason, f"{key}: the audit does not cover {table}.{column}; say why"
         else:
-            assert stat.verdict == audited, f"{stat.key}: registry {stat.verdict}, audit {audited}"
+            assert verdict == audited, f"{key}: registry {verdict}, audit {audited} for {table}.{column}"

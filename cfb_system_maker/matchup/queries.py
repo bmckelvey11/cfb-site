@@ -21,7 +21,11 @@ import duckdb
 
 from cfb_paths import current_season
 from cfb_system_maker.matchup import odds as odds_mod
-from cfb_system_maker.matchup.stats import ADJUSTED, PROFILE, RATINGS, Stat, edge
+from dataclasses import replace
+
+from cfb_system_maker.matchup.stats import (
+    ADJUSTED, PROFILE, RATINGS, SOURCES, UNIT_GROUPS, UNITS, Source, Stat, Unit, edge,
+)
 
 SHARP_BOOKS = ("pinnacle", "circa")
 MAIN_BOOKS = ("draftkings", "fanduel")
@@ -185,7 +189,7 @@ def slate(con, season: int, week: int, season_type: str, lines: dict) -> list[di
         where g.season = ? and g.week = ? and g.season_type = ?
         order by g.start_date, g.game_id""", [season, week, season, week, season_type])
     for g in games:
-        snap = lines["games"].get(frozenset((g["home_team"], g["away_team"])))
+        snap = snap_game(lines, g["home_team"], g["away_team"], g["start_date"])
         g["books"] = {bk: _book_for(snap, bk, g["home_team"], g["away_team"]) for bk in MAIN_BOOKS}
         g["lined"] = bool(g["has_line"] or snap)
     return games
@@ -204,17 +208,32 @@ def _book_for(snap: dict | None, book: str, home: str, away: str) -> dict | None
 
 # --- game card ------------------------------------------------------------------------------
 
-def find_game(con, season: int, a: int, b: int, week: int) -> int | None:
-    """The pair's game that season: the first at or after the as-of week, else the last."""
-    found = rows(con, """
-        select game_id, week from core.fact_game
+def find_game(con, season: int, a: int, b: int, cutoff) -> int | None:
+    """The pair's game that season kicking off at or after the as-of cutoff.
+
+    A meeting before the cutoff is already inside the stat window, so it is not "the game";
+    the head-to-head section lists it. Full-season mode (no cutoff) takes the last meeting.
+    """
+    found = con.execute(f"""
+        select game_id from core.fact_game
         where season = ? and least(home_team_id, away_team_id) = least(?, ?)
           and greatest(home_team_id, away_team_id) = greatest(?, ?)
-        order by start_date""", [season, a, b, a, b])
-    later = [g for g in found if g["week"] >= week]
-    if later:
-        return later[0]["game_id"]
-    return found[-1]["game_id"] if found else None
+          {"" if cutoff is None else "and start_date >= ?"}
+        order by start_date {"desc" if cutoff is None else ""} limit 1""",
+        [season, a, b, a, b, *([] if cutoff is None else [cutoff])]).fetchone()
+    return found[0] if found else None
+
+
+def snap_game(lines: dict, home: str, away: str, start: str | None) -> dict | None:
+    """The snapshot's event for this game: same unordered pair, kickoff within 3 days.
+
+    The pair alone is not enough; the same teams can meet in another season (or twice).
+    """
+    ev = lines["games"].get(frozenset((home, away)))
+    if not ev or not start or not ev.get("commence_time"):
+        return None
+    kick = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
+    return ev if abs((kick - datetime.fromisoformat(start)).total_seconds()) < 3 * 86400 else None
 
 
 def game_card(con, game_id: int, lines: dict, *, full: bool) -> dict | None:
@@ -243,12 +262,15 @@ def game_card(con, game_id: int, lines: dict, *, full: bool) -> dict | None:
                moneyline_home, moneyline_away
         from core.fact_game_line where game_id = ? order by provider_key""", [game_id])
     g["sharp"] = [r for r in closes if r["book"] in SHARP_BOOKS]
-    g["other_books"] = [r for r in closes if r["book"] not in SHARP_BOOKS]
-    g["main_books"] = _main_books(con, game_id, lines, home, away)
+    g["other_books"] = [r for r in closes if r["book"] not in SHARP_BOOKS + MAIN_BOOKS]
+    g["main_books"] = _main_books(con, game_id, snap_game(lines, home, away, g["start_date"]),
+                                  lines["pulled_at"], home, away,
+                                  {r["book"]: r for r in closes if r["book"] in MAIN_BOOKS})
     return g
 
 
-def _main_books(con, game_id: int, lines: dict, home: str, away: str) -> dict:
+def _main_books(con, game_id: int, snap: dict | None, pulled_at: str | None, home: str, away: str,
+                closes: dict) -> dict:
     """DK/FD now (newest snapshot, else the warehouse's last tick) plus their movement.
 
     History ticks key the line by the vendor's own home side; `home_school` turns that into a
@@ -259,7 +281,6 @@ def _main_books(con, game_id: int, lines: dict, home: str, away: str) -> dict:
         from core.fact_game_odds
         where game_id = ? and book in ('draftkings', 'fanduel') and market in ('spreads', 'totals', 'h2h')
         order by pulled_at""", [game_id])
-    snap = lines["games"].get(frozenset((home, away)))
     out = {}
     for bk in MAIN_BOOKS:
         series: dict[str, dict] = {}
@@ -277,14 +298,19 @@ def _main_books(con, game_id: int, lines: dict, home: str, away: str) -> dict:
                 history.append(p)
         now = _book_for(snap, bk, home, away)
         if now:
-            now.update(source="snapshot", as_of=lines["pulled_at"])
-            history.append({"t": lines["pulled_at"], "spread_home": now["spread"]["home"],
-                            "total": now["total"]})
+            now.update(source="snapshot", as_of=pulled_at)
+            history.append({"t": pulled_at, "spread_home": now["spread"]["home"], "total": now["total"]})
         elif history:
             last = history[-1]
             now = {"spread": {"home": last["spread_home"], "away": -last["spread_home"]
                               if last["spread_home"] is not None else None},
                    "total": last["total"], "ml": None, "source": "warehouse", "as_of": last["t"]}
+        elif bk in closes:  # before tick history began (2026-09-09): the book's closing line
+            c = closes[bk]
+            now = {"spread": {"home": c["spread_close"], "away": None if c["spread_close"] is None
+                              else -c["spread_close"]}, "total": c["total_close"],
+                   "ml": {"home": c["moneyline_home"], "away": c["moneyline_away"]},
+                   "source": "close", "as_of": None}
         out[bk] = {"now": now, "history": history}
     return out
 
@@ -403,3 +429,182 @@ def ratings(con, season: int, cutoff, a: int, b: int, *, full: bool, show_postga
           and r.cfbd_team in (ta.school, tb.school)
         group by r.system order by r.system""", [a, b, season, d]) if d else []
     return out
+
+
+# --- windowed game-grain stats (unit matchups) ----------------------------------------------
+
+# Drives rolled up to one row per team-game, in the same offense_/defense_ shape as the CFBD
+# game tables. Scores are UBIGINT in core, so the delta is cast before subtracting.
+_DRIVES_SQL = """(
+  with d as (
+    select dr.game_id, dr.offense_team_id, dr.defense_team_id, f.week, f.season_type,
+           dr.plays::double as plays,
+           dr.end_offense_score::bigint - dr.start_offense_score::bigint as pts,
+           (coalesce(dr.scoring, false) or dr.end_yards_to_goal <= 40)::int as opp,
+           dr.start_yards_to_goal::double as start,
+           (coalesce(dr.elapsed_minutes, 0) * 60 + coalesce(dr.elapsed_seconds, 0))::double as secs
+    from core.fact_drive_postgame dr join core.fact_game f using (game_id)
+    where f.season = {season}),
+  side as (
+    select game_id, offense_team_id as tid, defense_team_id as oid, 'offense' as unit, week, season_type,
+           pts, opp, start, plays, secs from d
+    union all
+    select game_id, defense_team_id, offense_team_id, 'defense', week, season_type,
+           pts, opp, start, plays, secs from d),
+  g as (
+    select game_id, tid, unit, any_value(oid) as oid, any_value(week) as week,
+           any_value(season_type) as season_type, count(*)::double as drives,
+           sum(pts) / count(*) as ppd, avg(opp) as so_rate, avg(start) as start,
+           sum(plays) / count(*) as plays_per_drive, sum(secs) / nullif(sum(plays), 0) as sec_per_play,
+           sum(plays) as plays
+    from side group by game_id, tid, unit)
+  select {season} as season, o.week, o.season_type as "seasonType", o.game_id as "gameId",
+         t.school as team, op.school as opponent,
+         o.drives as offense_drives, o.ppd as offense_ppd, o.so_rate as offense_so_rate,
+         o.start as offense_start, o.plays_per_drive as offense_plays_per_drive,
+         o.sec_per_play as offense_sec_per_play, o.plays as offense_plays,
+         x.drives as defense_drives, x.ppd as defense_ppd, x.so_rate as defense_so_rate,
+         x.start as defense_start, x.plays_per_drive as defense_plays_per_drive,
+         x.sec_per_play as defense_sec_per_play, x.plays as defense_plays
+  from g o join g x on x.game_id = o.game_id and x.tid = o.tid and x.unit = 'defense'
+  join core.dim_team t on t.team_id = o.tid
+  join core.dim_team op on op.team_id = o.oid
+  where o.unit = 'offense')"""
+
+
+def latest_week(con, table: str, season: int) -> int | None:
+    if table == SOURCES["drives"].table:
+        table = "core.fact_game"  # drives key on games; completed games bound them
+        r = con.execute("""select max(week) from core.fact_game where season = ? and completed
+                           and season_type = 'regular'""", [season]).fetchone()
+    else:
+        r = con.execute(f"""select max(week) from {table}
+                            where season = ? and "seasonType" = 'regular'""", [season]).fetchone()
+    return r[0]
+
+
+def pick_table(con, src: Source, season: int, ngt: bool) -> tuple[str, bool, int | None]:
+    """(table, used the no-garbage-time twin?, weeks the twin lags).
+
+    The twin is used only when it is as fresh as its all-plays table; otherwise the section
+    falls back to all plays and says so, rather than showing last week's numbers.
+    """
+    if not (ngt and src.ngt):
+        return src.table, False, None
+    lag = (latest_week(con, src.table, season) or 0) - (latest_week(con, src.ngt, season) or 0)
+    return (src.table, False, lag) if lag > 0 else (src.ngt, True, None)
+
+
+def windowed(con, src: Source, units: list[Unit], table: str, season: int, week: int, *,
+             full: bool, rollup: str, fcs: bool) -> dict[int, dict]:
+    """team_id -> {"n": games, "offense_<stem>": v, "defense_<stem>": v} over the window.
+
+    pooled: sum(rate x plays) / sum(plays), what recomputing from the plays would give;
+    mean: every game counts once; last3: pooled over each team's three latest games.
+    A unit with no weight column pools as a game mean.
+    """
+    season = int(season)
+    source = _DRIVES_SQL.format(season=season) if src.key == "drives" else table
+    aggs = []
+    for stem, weight in {u.stem: u.weight for u in units}.items():
+        for side in ("offense", "defense"):
+            col = f'"{side}_{stem}"'
+            if rollup == "mean" or weight is None:
+                aggs.append(f"avg(s.{col}::double) as {col}")
+            else:
+                w = f'"{side}_{weight}"'
+                aggs.append(f"sum(s.{col}::double * s.{w}) / nullif(sum(case when s.{col} is not null "
+                            f"then s.{w} end), 0) as {col}")
+    window = ("""s."seasonType" in ('regular', 'postseason')""" if full
+              else f"""s."seasonType" = 'regular' and s.week < {int(week)}""")
+    fcs_clause = (f"o.team_id in (select teamId from stg.fbs_teams where season = {season})"
+                  if fcs else "true")
+    last3 = "s.recency <= 3" if rollup == "last3" else "true"
+    found = rows(con, f"""
+        with base as (
+            select t.team_id, s.*,
+                   row_number() over (partition by t.team_id
+                       order by s."seasonType" = 'postseason' desc, s.week desc) as recency
+            from {source} s
+            join core.dim_team t on t.school = s.team
+            left join core.dim_team o on o.school = s.opponent
+            where s.season = {season} and {window} and {fcs_clause})
+        select team_id, count(*) as n, max(week) as last_week, {", ".join(aggs)}
+        from base s where {last3} group by team_id""")
+    return {r["team_id"]: r for r in found}
+
+
+def expected_games(con, teams: list[int], season: int, week: int, *, full: bool, fcs: bool) -> dict[int, int]:
+    """Completed games each team has played in the window: the denominator of 'k of m games'."""
+    window = "true" if full else f"g.season_type = 'regular' and g.week < {int(week)}"
+    out = {}
+    for t in teams:
+        opp_fbs = (f"""(case when g.home_team_id = {int(t)} then g.away_team_id else g.home_team_id end)
+                      in (select teamId from stg.fbs_teams where season = {int(season)})""" if fcs else "true")
+        out[t] = con.execute(f"""select count(*) from core.fact_game g where g.season = ? and g.completed
+                                 and ? in (g.home_team_id, g.away_team_id) and {window} and {opp_fbs}""",
+                             [season, t]).fetchone()[0]
+    return out
+
+
+def _pct(s: dict) -> float | None:
+    return (s["n"] - s["rank"]) / (s["n"] - 1) if s.get("rank") and s["n"] > 1 else None
+
+
+def units(con, season: int, week: int, a: int, b: int, *, full: bool, rollup: str, fcs: bool,
+          ngt: bool) -> dict:
+    """Two blocks, A offense vs B defense and B offense vs A defense, one row per concept.
+
+    Each concept row carries every candidate stat already ranked, so switching the row's stat
+    on the page needs no refetch. The edge compares where each unit sits in its own ranking
+    (percentile), not the raw values, since an offense stat and a defense-allowed stat are not
+    one quantity. Prior = last season's full-season value with the same toggles.
+    """
+    universe, before = fbs(con, season), fbs(con, season - 1)
+    cur, prior, status = {}, {}, {}
+    expected = expected_games(con, [a, b], season, week, full=full, fcs=fcs)
+    through = None if full else week - 1
+    for key, src in SOURCES.items():
+        us = [u for u in UNITS if u.source == key]
+        table, used_ngt, lag = pick_table(con, src, season, ngt)
+        cur[key] = windowed(con, src, us, table, season, week, full=full, rollup=rollup, fcs=fcs)
+        p_table, _, _ = pick_table(con, src, season - 1, ngt)
+        prior[key] = windowed(con, src, us, p_table, season - 1, 99, full=True,
+                              rollup="mean" if rollup == "mean" else "pooled", fcs=fcs)
+        latest = latest_week(con, table, season)
+        status[key] = {
+            "label": src.label, "table": table, "ngt": used_ngt, "ngt_lag": lag,
+            "all_plays": not used_ngt, "through_week": latest,
+            "stale": bool(through and (latest or 0) < through),
+            "games": {str(t): cur[key].get(t, {}).get("n", 0) for t in (a, b)},
+            "expected": {str(t): expected[t] for t in (a, b)},
+        }
+
+    def side(stat: Stat, data: dict, pool: dict, team: int) -> dict:
+        vals = {t: r[stat.column] for t, r in data.items()}
+        s = _side(stat, vals, pool, team)
+        s["games"] = data.get(team, {}).get("n", 0)
+        return s
+
+    def option(u: Unit, off: int, dfn: int) -> dict:
+        o = Stat(u.key, u.label, u.table, f"offense_{u.stem}", u.higher_is_better, u.fmt, u.verdict, u.reason, u.dp)
+        d = replace(o, column=f"defense_{u.stem}",
+                    higher_is_better=None if u.higher_is_better is None else not u.higher_is_better)
+        so, sd = side(o, cur[u.source], universe, off), side(d, cur[u.source], universe, dfn)
+        return {"key": u.key, "label": u.label, "fmt": u.fmt, "dp": u.dp, "verdict": u.verdict,
+                "source": f"{status[u.source]['table']}.{{offense,defense}}_{u.stem}",
+                "source_key": u.source, "a": so, "b": sd,
+                "edge": None if u.higher_is_better is None else edge(_pct(so), _pct(sd), True),
+                "prior": {"season": season - 1, "a": side(o, prior[u.source], before, off),
+                          "b": side(d, prior[u.source], before, dfn)},
+                "estimate": None}
+
+    def block(off: int, dfn: int) -> dict:
+        return {"off": off, "def": dfn, "groups": [
+            {"group": g, "rows": [{"concept": ck, "label": label,
+                                   "options": [option(u, off, dfn) for u in cands]}
+                                  for ck, label, cands in concepts]}
+            for g, concepts in UNIT_GROUPS]}
+
+    return {"rollup": rollup, "fcs": fcs, "ngt": ngt, "sources": status,
+            "blocks": [block(a, b), block(b, a)]}

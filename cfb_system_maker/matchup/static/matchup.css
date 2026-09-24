@@ -131,6 +131,15 @@ td.r, th.r { text-align: right; }
 .side.a .bar { margin-left: auto; }
 .side.a .bar i { margin-left: auto; }
 
+.unit-block + .unit-block { margin-top: var(--space-6); }
+.unit-head { display: grid; grid-template-columns: 1fr minmax(150px, 230px) 1fr; padding: var(--space-2) 0;
+  font-weight: var(--weight-semibold); border-bottom: 1.5px solid var(--color-border-strong); }
+.unit-head span:first-child { text-align: right; padding-right: var(--space-2); }
+.unit-head span:nth-child(2) { text-align: center; color: var(--color-text-tertiary); font-weight: var(--weight-regular); }
+.unit-head span:last-child { padding-left: var(--space-2); }
+h2.group { margin: var(--space-4) 0 var(--space-1); color: var(--color-text-secondary); }
+select.pick { min-width: 0; width: 100%; font-size: var(--text-xs); padding: 2px var(--space-1); }
+
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: 0; }
 .kv dt { color: var(--color-text-secondary); font-size: 11px; font-weight: var(--weight-semibold);

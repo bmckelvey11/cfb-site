@@ -199,24 +199,40 @@ function side(s, win, prior, fmt, dp, align) {
   const title = s.conf_rank ? `#${s.conf_rank} of ${s.conf_n} in conference` : "";
   const rank = s.rank ? `<span class="rank" title="${esc(title)}">#${s.rank} / ${s.n}<span class="bar"><i style="width:${pct}%"></i></span></span>`
     : `<span class="rank"></span>`;
-  const pv = prior && prior.value !== null && prior.value !== undefined
-    ? `<span class="prior">'${String(prior.season).slice(2)} ${num(prior.value, fmt, dp)}${prior.rank ? " · #" + prior.rank : ""}</span>` : "";
+  const bits = [];
+  if (s.games !== undefined) bits.push(`n=${s.games}`);
+  if (prior && prior.value !== null && prior.value !== undefined)
+    bits.push(`'${String(prior.season).slice(2)} ${num(prior.value, fmt, dp)}${prior.rank ? " #" + prior.rank : ""}`);
+  const pv = bits.length ? `<span class="prior">${esc(bits.join(" · "))}</span>` : "";
   const val = s.value === null || s.value === undefined
     ? `<span class="val">${nodata("none")}${pv}</span>`
     : `<span class="val${win ? " win" : ""}">${num(s.value, fmt, dp)}${pv}</span>`;
   return `<div class="side ${align}">${align === "a" ? rank + val : val + rank}</div>`;
 }
 
+function tapeRow(r, label) {
+  const pa = r.prior ? { ...r.prior.a, season: r.prior.season } : null;
+  const pb = r.prior ? { ...r.prior.b, season: r.prior.season } : null;
+  const tip = `${r.source} · ${r.verdict}${r.season ? " · " + r.season : ""}`;
+  return side(r.a, r.edge === "a", pa, r.fmt, r.dp, "a")
+    + `<div class="label" title="${esc(tip)}">${label ?? esc(r.label)}</div>`
+    + side(r.b, r.edge === "b", pb, r.fmt, r.dp, "b");
+}
+
 function tape(rows) {
   if (!rows || !rows.length) return nodata("no rows");
-  return `<div class="tape">${rows.map((r) => {
-    const pa = r.prior ? { ...r.prior.a, season: r.prior.season } : null;
-    const pb = r.prior ? { ...r.prior.b, season: r.prior.season } : null;
-    const tip = `${r.source} · ${r.verdict}${r.season ? " · " + r.season : ""}`;
-    return side(r.a, r.edge === "a", pa, r.fmt, r.dp, "a")
-      + `<div class="label" title="${esc(tip)}">${esc(r.label)}</div>`
-      + side(r.b, r.edge === "b", pb, r.fmt, r.dp, "b");
-  }).join("")}</div>`;
+  return `<div class="tape">${rows.map((r) => tapeRow(r)).join("")}</div>`;
+}
+
+// A concept row: every candidate stat arrives ranked; the dropdown only picks which to show.
+function conceptRow(c, picks) {
+  const i = Math.max(0, c.options.findIndex((o) => o.key === picks[c.concept]));
+  const opt = c.options[i];
+  const label = c.options.length > 1
+    ? `<select class="pick" data-concept="${esc(c.concept)}" aria-label="${esc(c.label)} stat">${c.options.map((o, j) =>
+        `<option value="${esc(o.key)}"${j === i ? " selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`
+    : esc(opt.label);
+  return tapeRow(opt, label);
 }
 
 function spark(history, flip) {
@@ -230,7 +246,8 @@ function spark(history, flip) {
 }
 
 function gameSection(g, A, B, full) {
-  if (!g) return card("Game", nodata("these teams do not meet this season"));
+  if (!g) return card("Game", nodata(full ? "these teams do not meet this season"
+    : "no meeting on or after this week; earlier meetings are in head-to-head"));
   const aHome = g.home_team_id === A.team_id;
   const aSpread = (home) => home === null || home === undefined ? null : aHome ? home : -home;
   const bookRow = (name, bk) => {
@@ -239,11 +256,13 @@ function gameSection(g, A, B, full) {
     const sa = aSpread(n.spread.home);
     const pr = n.prices || {};
     const sp = (school) => (pr.spread && pr.spread[school] ? " (" + price(pr.spread[school][1]) + ")" : "");
-    const ml = (school) => (pr.ml && pr.ml[school] !== undefined ? price(pr.ml[school]) : "—");
+    const ml = (school, isHome) => pr.ml && pr.ml[school] !== undefined ? price(pr.ml[school])
+      : n.ml && n.ml[isHome ? "home" : "away"] != null ? price(n.ml[isHome ? "home" : "away"]) : "—";
     const tot = pr.total && pr.total.over ? ` (o${price(pr.total.over[1])} u${price((pr.total.under || [])[1])})` : "";
+    const asOf = n.as_of ? `${n.source} ${stampTime(n.as_of)}` : "closing line";
     return `<tr><td>${esc(name)}</td><td class="r">${line(sa)}${sp(A.school)}</td><td class="r">${line(neg(sa))}${sp(B.school)}</td>
-      <td class="r">${n.total ?? "—"}${tot}</td><td class="r">${ml(A.school)} / ${ml(B.school)}</td>
-      <td>${spark(bk.history, !aHome)}</td><td class="r"><span class="stamp">${esc(n.source)} ${esc(stampTime(n.as_of))}</span></td></tr>`;
+      <td class="r">${n.total ?? "—"}${tot}</td><td class="r">${ml(A.school, aHome)} / ${ml(B.school, !aHome)}</td>
+      <td>${spark(bk.history, !aHome)}</td><td class="r"><span class="stamp">${esc(asOf)}</span></td></tr>`;
   };
   const closeRow = (r) => `<tr><td>${esc(r.book)}</td><td class="r">${line(aSpread(r.spread_open))} → ${line(aSpread(r.spread_close))}</td>
     <td class="r">${r.total_open ?? "—"} → ${r.total_close ?? "—"}</td>
@@ -301,12 +320,42 @@ function ratingsSection(r, A, B, full) {
   return html;
 }
 
+function unitsSection(u, A, B, full, week, picks) {
+  const names = { [A.team_id]: A.school, [B.team_id]: B.school };
+  const stamps = Object.values(u.sources).map((s) => {
+    const ga = s.games[A.team_id], gb = s.games[B.team_id], ea = s.expected[A.team_id], eb = s.expected[B.team_id];
+    const thru = s.through_week ? `through wk ${s.through_week}` : "no data";
+    return { text: `${s.label} · ${thru} · games ${A.school} ${ga}/${ea}, ${B.school} ${gb}/${eb}`,
+      stale: s.stale || (u.rollup !== "last3" && (ga < ea || gb < eb)) };
+  });
+  const tags = Object.values(u.sources).map((s) => s.ngt ? "" : s.ngt_lag
+    ? `<span class="tag" title="The no-garbage-time feed lags its all-plays table">${esc(s.label)}: all plays, ngt lags ${s.ngt_lag} wk</span>`
+    : u.ngt ? `<span class="tag" title="CFBD publishes no garbage-time-filtered version">${esc(s.label)}: all plays</span>` : "").join(" ");
+  const blocks = u.blocks.map((bl) => `<div class="unit-block">
+      <div class="unit-head"><span>${esc(names[bl.off])} offense</span><span>vs</span><span>${esc(names[bl.def])} defense</span></div>
+      ${bl.groups.map((g) => `<h2 class="group">${esc(g.group)}</h2><div class="tape">${g.rows.map((c) => conceptRow(c, picks)).join("")}</div>`).join("")}
+    </div>`).join("");
+  return card("Unit matchups", `<p class="sub">${tags}</p>${blocks}`, {
+    stamps,
+    footer: `${full ? "Whole season, postseason included." : `Games before week ${week}.`} Roll-up: ${esc(u.rollup === "pooled" ? "play-weighted (pooled)" : u.rollup === "mean" ? "game mean" : "last 3 games, pooled")}${u.fcs ? ", FCS games excluded" : ""}. Rank is among FBS teams with a game in the window; the dot marks the unit whose rank is better. Explosiveness is pooled by all plays, an approximation (CFBD averages it over successful plays). PPA-feed rows have no play counts, so they are game means.`,
+  });
+}
+
+const cache = { key: null, data: null };
+
 async function matchup(p) {
-  app.innerHTML = `<p class="sub">Loading matchup…</p>`;
   const full = p.mode === "full";
   const [season_type, wk] = (p.week || "").includes(":") ? p.week.split(":") : ["regular", p.week];
-  const d = await api("/api/matchup", { a: p.a, b: p.b, season: p.season, week: wk, season_type,
-    game_id: p.game_id, mode: p.mode, postgame: p.postgame });
+  const query = { a: p.a, b: p.b, season: p.season, week: wk, season_type, game_id: p.game_id,
+    mode: p.mode, postgame: p.postgame, rollup: p.rollup, fcs: p.fcs, ngt: p.ngt };
+  const key = JSON.stringify(query);
+  if (cache.key !== key) {
+    app.innerHTML = `<p class="sub">Loading matchup…</p>`;
+    cache.data = await api("/api/matchup", query);
+    cache.key = key;
+  }
+  const d = cache.data;
+  const picks = Object.fromEntries(Object.entries(p).filter(([k]) => k.startsWith("pick_")).map(([k, v]) => [k.slice(5), v]));
   const m = d.meta, s = d.sections, A = m.a, B = m.b;
   setSnap(m.snapshot);
   const cw = full ? "full" : m.season_type === "regular" ? String(m.week) : `${m.season_type}:${m.week}`;
@@ -326,6 +375,10 @@ async function matchup(p) {
     <div class="controls">
       <label>Season<select id="m-season">${seasonOptions(m.season, Math.max(m.season, new Date().getFullYear()))}</select></label>
       <label>As of<select id="m-week">${weekOptions(weeks, cw, { full: true })}</select></label>
+      <label>Roll-up<select id="m-rollup">${[["pooled", "Pooled (play-weighted)"], ["mean", "Game mean"], ["last3", "Last 3 games"]]
+        .map(([v, l]) => `<option value="${v}"${(p.rollup || "pooled") === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label class="check"><input type="checkbox" id="m-fcs"${p.fcs === "0" ? "" : " checked"}> Exclude FCS games</label>
+      <label class="check"><input type="checkbox" id="m-ngt"${p.ngt === "0" ? "" : " checked"}> Exclude garbage time</label>
       ${full ? "" : `<label class="check"><input type="checkbox" id="m-post"${p.postgame === "1" ? " checked" : ""}> Show postgame panels</label>`}
       <button class="ghost" id="m-swap">Swap teams</button>
     </div>`;
@@ -336,15 +389,23 @@ async function matchup(p) {
     footer: "Record and polls as of the week (the poll labelled week N is released before week N's games). Talent, recruiting and returning production are fixed before the season; the small grey line under each value is last season's.",
   });
   html += ratingsSection(s.ratings, A, B, full);
+  html += unitsSection(s.units, A, B, full, m.week, picks);
   app.innerHTML = html;
 
-  const base = { a: p.a, b: p.b, season: m.season, week: p.week, mode: p.mode, postgame: p.postgame, game_id: p.game_id };
+  const base = { ...p, season: m.season };
   document.getElementById("m-season").onchange = (e) => go({ ...base, season: e.target.value, week: "", game_id: "" });
   document.getElementById("m-week").onchange = (e) => go({ ...base, week: e.target.value === "full" ? "" : e.target.value,
     mode: e.target.value === "full" ? "full" : "" });
   const post = document.getElementById("m-post");
   if (post) post.onchange = (e) => go({ ...base, postgame: e.target.checked ? "1" : "" });
+  document.getElementById("m-rollup").onchange = (e) => go({ ...base, rollup: e.target.value === "pooled" ? "" : e.target.value });
+  document.getElementById("m-fcs").onchange = (e) => go({ ...base, fcs: e.target.checked ? "" : "0" });
+  document.getElementById("m-ngt").onchange = (e) => go({ ...base, ngt: e.target.checked ? "" : "0" });
   document.getElementById("m-swap").onclick = () => go({ ...base, a: p.b, b: p.a });
+  const y = window.scrollY;
+  app.querySelectorAll("select.pick").forEach((sel) => {
+    sel.onchange = () => { go({ ...base, ["pick_" + sel.dataset.concept]: sel.value }, true); window.scrollTo(0, y); };
+  });
 }
 
 render();
