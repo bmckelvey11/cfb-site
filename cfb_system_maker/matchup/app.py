@@ -112,7 +112,11 @@ def create_app(db_path: Path | None = None, odds_dir: Path | None = None,
                 "special_teams": q.special_teams(con, season, window, cutoff, a, b, full=full, rollup=rollup,
                                                  fcs=fcs, show_postgame=show_postgame),
                 "players": q.players(con, season, window, cutoff, a, b, full=full, fcs=fcs, ngt=ngt),
+                "h2h": q.head_to_head(con, a, b, cutoff, full=full, season=season),
             }
+            sa, sb = q.schedule(con, a, season, cutoff, full=full), q.schedule(con, b, season, cutoff, full=full)
+            sections["schedule"] = {"a": sa, "b": sb, "common": q.common_opponents(sa, sb, a, b)}
+            sections["betting"] = {"a": q.betting_profile(sa), "b": q.betting_profile(sb)}
             season_weeks = q.weeks(con, season)
         elapsed = round((time.perf_counter() - started) * 1000)
         log.info("matchup a=%s b=%s season=%s week=%s full=%s: %s ms", a, b, season, week, full, elapsed)

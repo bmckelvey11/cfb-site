@@ -835,6 +835,121 @@ def _cfbd_players(con, team: int, season: int, week: int, *, full: bool, fcs: bo
             "Receivers": top({"WR", "TE"}, "ppa_pass", 3)}
 
 
+def schedule(con, team: int, season: int, cutoff, *, full: bool) -> list[dict]:
+    """The team's season, one row per game, from its own side.
+
+    As of a week, a game kicking off at or after the cutoff is the future: its score, closing
+    line and result are blanked, never sent. `past` marks the games inside the window.
+    """
+    games = rows(con, """
+        select x.*, f.teamId is not null as opp_fbs, pr.rank as opp_rank from (
+            select g.game_id, g.week, g.season_type, g.start_date, g.completed,
+                   coalesce(sg.neutralSite, false) as neutral, coalesce(sg.conferenceGame, false) as conf,
+                   g.home_team_id = ? as is_home,
+                   case when g.home_team_id = ? then g.away_team_id else g.home_team_id end as opp_id,
+                   case when g.home_team_id = ? then g.away_team else g.home_team end as opp,
+                   case when g.home_team_id = ? then g.home_points else g.away_points end as pts,
+                   case when g.home_team_id = ? then g.away_points else g.home_points end as opp_pts,
+                   case when g.home_team_id = ? then g.median_spread_close else -g.median_spread_close end as spread,
+                   g.median_total_close as total, g.season
+            from core.v_game_book_median g
+            left join (select gameId, neutralSite, conferenceGame from stg.games where season = ?) sg
+                   on sg.gameId = g.game_id
+            where g.season = ? and ? in (g.home_team_id, g.away_team_id)) x
+        left join stg.fbs_teams f on f.teamId = x.opp_id and f.season = x.season
+        left join core.fact_poll_rank pr on pr.team_id = x.opp_id and pr.season = x.season
+             and pr.week = x.week and pr.season_type = x.season_type and pr.poll_type_id = 1
+        order by x.start_date""", [team] * 6 + [season, season, team])
+    cut = None if full or cutoff is None else _plain(cutoff)
+    for g in games:
+        g["past"] = bool(g["completed"]) and (cut is None or g["start_date"] < cut)
+        if not g["past"]:
+            g.update(pts=None, opp_pts=None, spread=None, total=None)
+        g["result"] = _result(g) if g["past"] else None
+    return games
+
+
+def _result(g: dict) -> dict:
+    margin = g["pts"] - g["opp_pts"]
+    out = {"su": "W" if margin > 0 else "L" if margin < 0 else "T", "margin": margin, "ats": None, "ou": None,
+           "cover": None}
+    if g["spread"] is not None:
+        cover = margin + g["spread"]
+        out.update(cover=cover, ats="W" if cover > 0 else "L" if cover < 0 else "P")
+    if g["total"] is not None:
+        diff = g["pts"] + g["opp_pts"] - g["total"]
+        out["ou"] = "O" if diff > 0 else "U" if diff < 0 else "P"
+    return out
+
+
+def betting_profile(games: list[dict]) -> dict:
+    """SU / ATS / O-U over the window's completed games, closing consensus lines.
+
+    Computed from the games rather than the postgame ATS tables, so it stops at the cutoff.
+    """
+    past = [g for g in games if g["past"]]
+
+    def rec(gs: list[dict]) -> dict:
+        lined = [g for g in gs if g["result"]["ats"]]
+        return {"n": len(gs), "su": [sum(g["result"]["su"] == k for g in gs) for k in "WLT"],
+                "ats": [sum(g["result"]["ats"] == k for g in lined) for k in "WLP"],
+                "ou": [sum(g["result"]["ou"] == k for g in gs) for k in "OUP"],
+                "avg_cover": (sum(g["result"]["cover"] for g in lined) / len(lined)) if lined else None,
+                "avg_spread": (sum(g["spread"] for g in lined) / len(lined)) if lined else None,
+                "n_lined": len(lined)}
+
+    lined = [g for g in past if g["spread"] is not None]
+    # A list, not a dict: Flask's JSON sorts keys, and the order here is the reading order.
+    return {"all": rec(past),
+            "splits": [["Favorite", rec([g for g in lined if g["spread"] < 0])],
+                       ["Underdog", rec([g for g in lined if g["spread"] > 0])],
+                       ["Home", rec([g for g in past if g["is_home"] and not g["neutral"]])],
+                       ["Away", rec([g for g in past if not g["is_home"] and not g["neutral"]])],
+                       ["Neutral", rec([g for g in past if g["neutral"]])],
+                       ["vs FBS", rec([g for g in past if g["opp_fbs"]])]]}
+
+
+def common_opponents(sa: list[dict], sb: list[dict], a: int, b: int) -> list[dict]:
+    """Opponents both teams played inside the window, with each team's result against them."""
+    pa = {g["opp_id"]: g for g in sa if g["past"] and g["opp_id"] != b}
+    pb = {g["opp_id"]: g for g in sb if g["past"] and g["opp_id"] != a}
+    return [{"opp": pa[o]["opp"], "opp_id": o, "a": pa[o], "b": pb[o]}
+            for o in sorted(pa.keys() & pb.keys(), key=lambda o: pa[o]["start_date"])]
+
+
+def head_to_head(con, a: int, b: int, cutoff, *, full: bool, season: int) -> dict:
+    """Every meeting (1869 on), before the cutoff as of a week, through the season in full mode.
+
+    Lines exist only from 2012 (core.fact_game); earlier meetings carry scores alone.
+    """
+    limit = "g.start_date < ?" if not full and cutoff is not None else "g.season <= ?"
+    param = cutoff if not full and cutoff is not None else season
+    pair = "least(g.home_team_id, g.away_team_id) = least(?, ?) and greatest(g.home_team_id, g.away_team_id) = greatest(?, ?)"
+    games = rows(con, f"""
+        select * from (
+            select g.season, g.week, g.season_type, g.start_date, g.home_team_id, g.home_team, g.away_team,
+                   g.home_points, g.away_points, coalesce(g.neutral_site, false) as neutral, null::double as spread
+            from core.fact_game_historical g where {pair} and {limit}
+            union all
+            select g.season, g.week, g.season_type, g.start_date, g.home_team_id, g.home_team, g.away_team,
+                   g.home_points, g.away_points, coalesce(sg.neutralSite, false), g.median_spread_close
+            from core.v_game_book_median g left join stg.games sg on sg.gameId = g.game_id
+            where {pair} and g.completed and {limit})
+        order by start_date desc""", [a, b, a, b, param] * 2)
+    for g in games:
+        a_home = g["home_team_id"] == a
+        ap, bp = (g["home_points"], g["away_points"]) if a_home else (g["away_points"], g["home_points"])
+        g.update(a_points=ap, b_points=bp, a_home=a_home,
+                 a_spread=None if g["spread"] is None else (g["spread"] if a_home else -g["spread"]))
+        g["winner"] = "a" if ap > bp else "b" if bp > ap else None
+        g["a_ats"] = (None if g["a_spread"] is None else
+                      "W" if ap - bp + g["a_spread"] > 0 else "L" if ap - bp + g["a_spread"] < 0 else "P")
+    return {"n": len(games), "series": {"a": sum(g["winner"] == "a" for g in games),
+                                        "b": sum(g["winner"] == "b" for g in games),
+                                        "t": sum(g["winner"] is None for g in games)},
+            "first": games[-1]["season"] if games else None, "games": games[:10]}
+
+
 def players(con, season: int, week: int, cutoff, a: int, b: int, *, full: bool, fcs: bool,
             ngt: bool) -> dict:
     """Key players per team: a PFF list and a CFBD list, unlinked (no id crosswalk exists)."""

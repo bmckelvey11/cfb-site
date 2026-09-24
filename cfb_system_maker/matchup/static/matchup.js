@@ -249,6 +249,65 @@ function specialTeamsSection(s, A, B, full) {
   return html;
 }
 
+const pct1 = (w, l) => (w + l ? ` (${((100 * w) / (w + l)).toFixed(1)}%)` : "");
+const recStr = (r, keys = 2) => r.slice(0, keys).join("-") + (r.slice(keys).some(Boolean) ? "-" + r.slice(keys).join("-") : "");
+
+function bettingSection(bt, A, B) {
+  const table = (t, p) => {
+    const rowsHtml = [["All games", p.all], ...p.splits].map(([name, r]) => `<tr${r.n ? "" : ' class="dim"'}>
+      <td>${esc(name)}</td><td class="r">${r.n}</td><td class="r">${recStr(r.su)}</td>
+      <td class="r">${r.n_lined ? recStr(r.ats) + pct1(r.ats[0], r.ats[1]) : "—"}</td>
+      <td class="r">${r.ou[0] + r.ou[1] ? recStr(r.ou) : "—"}</td>
+      <td class="r">${r.avg_cover === null ? "—" : num(r.avg_cover, "signed", 1)}</td>
+      <td class="r">${r.avg_spread === null ? "—" : line(Math.round(r.avg_spread * 10) / 10)}</td></tr>`).join("");
+    return `<div><div class="team-h">${esc(t.school)}</div><table><thead><tr><th></th><th class="r">n</th><th class="r">SU</th>
+      <th class="r">ATS</th><th class="r">O/U</th><th class="r">Avg cover</th><th class="r">Avg close</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+  };
+  return card("Betting profile", `<div class="grid2">${table(A, bt.a)}${table(B, bt.b)}</div>`, {
+    footer: "Completed games inside the window against the closing consensus median (core.v_game_book_median). FCS games stay in; a closing line is not a decision-time price.",
+  });
+}
+
+function resultCell(g) {
+  if (!g.past) return `<span class="dim">${g.completed ? "after cutoff" : "upcoming"}</span>`;
+  const r = g.result;
+  return `${r.su} ${g.pts}-${g.opp_pts}`;
+}
+const oppCell = (g) => `${g.neutral ? "vs " : g.is_home ? "" : "@ "}${g.opp_rank ? `#${g.opp_rank} ` : ""}${esc(g.opp)}`;
+
+function scheduleSection(sc, A, B) {
+  const table = (t, games) => `<div><div class="team-h">${esc(t.school)}</div><table class="sched"><thead><tr><th>Wk</th><th>Date</th><th>Opponent</th>
+      <th>Result</th><th class="r">Close</th><th class="r">ATS</th><th class="r">Total</th><th class="r">O/U</th></tr></thead><tbody>
+      ${games.map((g) => `<tr class="${g.opp_fbs ? "" : "dim"}${g.past ? "" : " dim"}">
+        <td>${g.season_type === "regular" ? g.week : "P" + g.week}</td><td>${esc(when(g.start_date, { month: "short", day: "numeric" }))}</td>
+        <td>${oppCell(g)}${g.conf ? ' <span class="tag">conf</span>' : ""}</td><td>${resultCell(g)}</td>
+        <td class="r">${line(g.spread)}</td><td class="r">${g.result && g.result.ats ? g.result.ats + " " + num(g.result.cover, "signed", 1) : "—"}</td>
+        <td class="r">${g.total ?? "—"}</td><td class="r">${g.result && g.result.ou ? g.result.ou : "—"}</td></tr>`).join("")}
+    </tbody></table></div>`;
+  const common = sc.common.length ? `<table><thead><tr><th>Common opponent</th><th>${esc(A.school)}</th><th class="r">ATS</th>
+      <th>${esc(B.school)}</th><th class="r">ATS</th></tr></thead><tbody>${sc.common.map((c) => `<tr><td>${esc(c.opp)}</td>
+      <td>${resultCell(c.a)}</td><td class="r">${c.a.result.ats ?? "—"}</td><td>${resultCell(c.b)}</td><td class="r">${c.b.result.ats ?? "—"}</td></tr>`).join("")}
+    </tbody></table>` : nodata("no common opponents inside the window");
+  return card("Schedule and results", `<div class="grid2">${table(A, sc.a)}${table(B, sc.b)}</div>
+      <h2 style="margin:16px 0 4px">Common opponents</h2>${common}`, {
+    footer: "Rank is the opponent's AP rank in the poll released before that game. Games at or after the cutoff show no score or line. Dimmed rows are FCS opponents or games outside the window.",
+  });
+}
+
+function h2hSection(h, A, B) {
+  if (!h.n) return card("Head-to-head", nodata("no meetings before this game"));
+  const lead = h.series.a === h.series.b ? `Series tied ${h.series.a}-${h.series.b}`
+    : `${h.series.a > h.series.b ? A.school : B.school} leads ${Math.max(h.series.a, h.series.b)}-${Math.min(h.series.a, h.series.b)}`;
+  const body = `<p><strong>${esc(lead)}${h.series.t ? `-${h.series.t}` : ""}</strong> <span class="dim">n=${h.n} since ${h.first}</span></p>
+    <table><thead><tr><th>Season</th><th>Site</th><th>Winner</th><th class="r">Score</th><th class="r">${esc(A.school)} close</th><th class="r">${esc(A.school)} ATS</th></tr></thead><tbody>
+    ${h.games.map((g) => `<tr><td>${g.season}${g.season_type === "regular" ? "" : " (post)"}</td>
+      <td>${g.neutral ? "Neutral" : g.a_home ? esc(A.school) : esc(B.school)}</td>
+      <td>${g.winner === "a" ? esc(A.school) : g.winner === "b" ? esc(B.school) : "Tie"}</td>
+      <td class="r">${g.a_points}-${g.b_points}</td><td class="r">${line(g.a_spread)}</td><td class="r">${g.a_ats ?? "—"}</td></tr>`).join("")}
+    </tbody></table>`;
+  return card("Head-to-head", body, { footer: "Every meeting since 1869 from core.fact_game_historical and core.fact_game; lines exist from 2012. The last 10 are listed; scores read A-B." });
+}
+
 function playerTable(title, cols, list) {
   if (!list || !list.length) return `<div class="plist"><h3>${esc(title)}</h3>${nodata("none in the window")}</div>`;
   return `<div class="plist"><h3>${esc(title)}</h3><table><thead><tr>${cols.map((c) => `<th${c.r ? ' class="r"' : ""}>${esc(c.h)}</th>`).join("")}</tr></thead>
@@ -451,6 +510,9 @@ async function matchup(p) {
   html += pffSection(s.pff, A, B, picks);
   html += specialTeamsSection(s.special_teams, A, B, full);
   html += playersSection(s.players, A, B);
+  html += bettingSection(s.betting, A, B);
+  html += scheduleSection(s.schedule, A, B);
+  html += h2hSection(s.h2h, A, B);
   app.innerHTML = html;
 
   const base = { ...p, season: m.season };

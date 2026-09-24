@@ -48,6 +48,10 @@ create table core.fact_game as select game_id, 2026 as season, week, 'regular' a
   (103, 3, '2026-09-19 19:00:00-04', true, 2, 1, 'Beta', 'Alpha', 21, 24),
   (104, 4, '2026-09-26 19:30:00-04', false, 1, 2, 'Alpha', 'Beta', null, null))
   t(game_id, week, start, completed, home_team_id, away_team_id, home_team, away_team, home_points, away_points);
+create table core.fact_game_historical as select 9 as game_id, 1999 as season, 5 as week,
+  'regular' as season_type, '1999-10-02 13:00:00-04'::timestamptz as start_date, false as neutral_site,
+  1 as home_team_id, 2 as away_team_id, 'Alpha' as home_team, 'Beta' as away_team, 7 as home_points,
+  14 as away_points;
 create table stg.games as select game_id as gameId, season, week, false as startTimeTBD,
   false as neutralSite, game_id = 103 as conferenceGame, null::varchar as notes from core.fact_game;
 create table core.fact_game_line as select * from (values
@@ -419,6 +423,36 @@ def test_special_teams_paar_is_prior_season_as_of(warehouse):
     assert fg["a"]["value"] == pytest.approx(70.0) and fg["a"]["games"] == 1
     assert st["paar_basis"] == "prior_season" and st["paar"][0]["a"]["value"] == 1.5
     assert st["postgame"][0]["a"]["value"] == 3.0
+
+
+def test_schedule_blanks_games_at_or_after_the_cutoff(warehouse):
+    with q.warehouse(warehouse) as con:
+        games = q.schedule(con, 1, 2026, q.first_kickoff(con, 2026, 3), full=False)
+    by_id = {g["game_id"]: g for g in games}
+    assert by_id[102]["past"] and by_id[102]["result"]["su"] == "L"
+    assert not by_id[103]["past"] and by_id[103]["pts"] is None and by_id[103]["spread"] is None
+
+
+def test_betting_profile_against_the_closing_consensus(warehouse):
+    # Closing home spread is -3.25 and total 51.25 on every fixture game.
+    with q.warehouse(warehouse) as con:
+        prof = q.betting_profile(q.schedule(con, 1, 2026, q.first_kickoff(con, 2026, 4), full=False))
+    assert prof["all"]["su"] == [2, 1, 0] and prof["all"]["ats"] == [2, 1, 0] and prof["all"]["ou"] == [0, 3, 0]
+    splits = dict(prof["splits"])
+    assert splits["Underdog"]["n"] == 1  # the wk3 road game at +3.25
+    assert splits["vs FBS"]["n"] == 2
+
+
+def test_common_opponents_and_head_to_head(warehouse):
+    with q.warehouse(warehouse) as con:
+        cutoff = q.first_kickoff(con, 2026, 4)
+        sa, sb = q.schedule(con, 1, 2026, cutoff, full=False), q.schedule(con, 2, 2026, cutoff, full=False)
+        h = q.head_to_head(con, 1, 2, cutoff, full=False, season=2026)
+    assert [c["opp"] for c in q.common_opponents(sa, sb, 1, 2)] == ["Delta", "Gamma"]
+    assert h["n"] == 2 and h["series"] == {"a": 1, "b": 1, "t": 0} and h["first"] == 1999
+    latest = h["games"][0]
+    assert (latest["season"], latest["a_points"], latest["b_points"], latest["a_ats"]) == (2026, 24, 21, "W")
+    assert h["games"][1]["a_spread"] is None  # no lines before 2012
 
 
 def test_registry_verdicts_match_the_eligibility_audit():
