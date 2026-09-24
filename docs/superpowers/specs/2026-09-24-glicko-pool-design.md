@@ -1,6 +1,10 @@
 # Glicko-margin on a connected Division I pool (rung P1) — design
 
-**Status:** declared 2026-09-24, before any pool code exists. Awaiting approval.
+**Status:** declared 2026-09-24 (`e6443ec2`), approved same day, model change in `0e2e0373`,
+eval script in `c28745e8`. **Scored once: ADOPTED.** `pool_conf` beats v1 on both required
+CRPS tests and is stable under stress. G2 (encompassing β vs the open) newly passes as a
+second-look result, not a confirmed GO — see the result for what that does and does not mean.
+Result: [`../../glicko-pool-2026-09-24.md`](../../glicko-pool-2026-09-24.md).
 **Question:** does rating every Division I team from every Division I game, with FCS and FBS
 teams pulled toward their conference's mean, forecast better than `glicko_margin_v1`, which
 sees only games that had a betting line?
