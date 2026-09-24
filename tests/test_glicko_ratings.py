@@ -91,3 +91,21 @@ def test_sign_convention():
     assert to_home_margin(-7.0) == 7.0
     m.enter("F", FCS, 0.0)
     assert m.r["F"] == -20.0                         # FCS team enters at the FCS seed
+
+
+def test_ratings_table_centres_on_fbs_and_ranks_within_subdivision():
+    from scripts.glicko_ratings_eval import GRIDS
+    from scripts.glicko_ratings_table import ratings_table
+    from scripts.glicko_ratings import FROZEN_V1
+
+    assert all(FROZEN_V1[k] in v for k, v in GRIDS["glicko_margin"].items())
+    m = model()
+    for k, div, r, season in (("X", FBS, 10.0, 2026), ("Y", FBS, 4.0, 2026),
+                              ("F", FCS, -20.0, 2026), ("Old", FBS, 30.0, 2025)):
+        m.enter(k, div, 0.0)
+        m.r[k] = r
+        m.played(k, div, season)
+    t = ratings_table(m, 2026).set_index("team")
+    assert "Old" not in t.index                      # did not play this season
+    assert (t.loc["X", "rating"], t.loc["Y", "rating"], t.loc["F", "rating"]) == (3.0, -3.0, -27.0)
+    assert (t.loc["X", "rank"], t.loc["Y", "rank"], t.loc["F", "rank"]) == (1, 2, 1)

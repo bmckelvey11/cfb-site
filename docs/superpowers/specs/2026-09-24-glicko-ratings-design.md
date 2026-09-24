@@ -399,6 +399,14 @@ runs, and the eval refuses to write results if any sign disagrees.
     and `classify_verdict` from `weekly_ratings_eval`. It edits neither.
   - `snapshot()` is not imported. The event clock in `glicko_ratings.events` applies the same
     strictly-before rule, and test 5 pins it.
+- **`scripts/glicko_ratings_table.py`** (added after scoring, for descriptive use):
+  - It replays `FROZEN_V1`, the scored picks, through the latest final scores.
+  - It writes `data/processed/ratings/glicko_ratings_<season>.csv`: rank within subdivision,
+    rating in points above an average FBS team on a neutral field, RD, and games played.
+  - Command: `python -m scripts.glicko_ratings_table --season 2026`.
+  - To support it, `load()` now drops, and counts, games with no final score (lined games not
+    yet played) instead of asserting. 2013–2025 has no such games, so the scored result is
+    unchanged.
 - **Command:**
   `python -m scripts.glicko_ratings_eval --tune-seasons 2014-2019 --score-seasons 2021-2025`.
   2020 is always skipped, and there are no other flags.

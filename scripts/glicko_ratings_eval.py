@@ -74,15 +74,18 @@ def load(root: Path, last: int, sources: list[Path]) -> tuple[pd.DataFrame, dict
     g = pool.merge(pd.DataFrame(raw).drop_duplicates("game_id"), on="game_id", how="left")
     g = g.rename(columns={"home_team": "home", "away_team": "away"})
     g["margin"] = g["home_points"] - g["away_points"]
-    # One missing result would turn both teams' ratings, and every later opponent's, into NaN.
-    assert g["margin"].notna().all(), "games.csv has a game with no final score"
     g["close"] = to_home_margin(g["spread"])
     g["fbs_fbs"] = (g["home_div"] == FBS) & (g["away_div"] == FBS)
     fcs_fcs = (g["home_div"] == FCS) & (g["away_div"] == FCS)
+    # A game with no final score (not played yet) is dropped, not kept: one NaN result would
+    # turn both teams' ratings, and every later opponent's, into NaN. Counted per season.
+    unplayed = g["margin"].isna()
     drops = {"fcs_vs_fcs_by_season": {int(s): int(n) for s, n in
                                       g[fcs_fcs].groupby("season").size().items()},
+             "no_final_score_by_season": {int(s): int(n) for s, n in
+                                          g[unplayed].groupby("season").size().items()},
              "missing_raw_match": int(g["neutral"].isna().sum())}
-    g = g[~fcs_fcs].sort_values(["kickoff", "game_id"]).reset_index(drop=True)
+    g = g[~fcs_fcs & ~unplayed].sort_values(["kickoff", "game_id"]).reset_index(drop=True)
     return g, drops
 
 

@@ -21,6 +21,10 @@ import pandas as pd
 
 VERSION = "1.0"
 FBS, FCS = "fbs", "fcs"
+# Picks frozen by the one scoring run (docs/glicko-ratings-2026-09-24.md). The FCS seed m0 is
+# not frozen here: glicko_ratings_eval.fcs_seed recomputes it from the 2013 burn-in games.
+FROZEN_V1 = {"sigma": 13, "tau": 0.75, "w": 0.9, "delta": 6, "cap": float("inf"),
+             "hfa": 2.75, "u0": 14}
 _EPOCH = pd.Timestamp("1970-01-01", tz="UTC")
 
 
