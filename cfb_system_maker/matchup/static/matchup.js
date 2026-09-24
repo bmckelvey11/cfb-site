@@ -346,7 +346,7 @@ function side(s, win, prior, fmt, dp, align) {
     bits.push(`'${String(prior.season).slice(2)} ${num(prior.value, fmt, dp)}${prior.rank ? " #" + prior.rank : ""}`);
   const pv = bits.length ? `<span class="prior">${esc(bits.join(" · "))}</span>` : "";
   const val = s.value === null || s.value === undefined
-    ? `<span class="val">${nodata("none")}${pv}</span>`
+    ? `<span class="val">${nodata("not published")}${pv}</span>`
     : `<span class="val${win ? " win" : ""}">${num(s.value, fmt, dp)}${pv}</span>`;
   return `<div class="side ${align}">${align === "a" ? rank + val : val + rank}</div>`;
 }
@@ -719,7 +719,7 @@ async function matchup(p) {
   let html = full ? `<div class="banner">Full season · postgame. Every number includes games played after any betting decision.</div>` : "";
   html += `<div class="vs"><div class="a">${logo(A.team_id, 56, true)}<div><div class="team" style="color: var(--team-a-text)">${esc(A.school)}</div>
       <div class="sub">${esc(A.conference || A.classification || "")}</div><div class="chips">${chips(s.profile.a)}</div></div></div>
-    <div class="mid">${m.season}<br>${full ? "Full season" : "As of week " + m.week}<br><span class="dim">${m.elapsed_ms} ms</span></div>
+    <div class="mid">${m.season}<br>${full ? "Full season" : "As of week " + m.week}</div>
     <div class="b"><div><div class="team" style="color: var(--team-b-text)">${esc(B.school)}</div>
       <div class="sub">${esc(B.conference || B.classification || "")}</div><div class="chips">${chips(s.profile.b)}</div></div>${logo(B.team_id, 56, true)}</div></div>
     <div class="teambar" aria-hidden="true"><i style="background: var(--team-a)"></i><i style="background: var(--team-b)"></i></div>
