@@ -212,13 +212,17 @@ Worked number: a 7-point win gives $m = \ln 8 \times 2.2/(0.001\,\Delta_w + 2.2)
 
 **Market references**, on the same games:
 
-- **`open`:** $\hat M = -\text{Bovada spreadOpen}$. This is the decision-time market. Its
-  predictive distribution for CRPS is $\mathcal N(\hat M, s_{\text{mkt}}^2)$, where
-  $s_{\text{mkt}}$ is the RMSE of the median close on FBS-vs-FBS regular-season games in
-  2014–2019. The close is sharper than any open, so this favours the market. Its
-  spread-implied win probability is $\Phi(\hat M / s_{\text{mkt}})$. **No decision-time
-  moneyline exists.** The market's proper score is therefore spread-implied, not a de-vigged
-  price, and every doc says so.
+- **`open`:** $\hat M = -\text{Bovada spreadOpen}$. This is the decision-time market.
+  - **Distribution:** for CRPS it is $\mathcal N(\hat M, s_{\text{mkt}}^2)$, and its
+    spread-implied win probability is $\Phi(\hat M / s_{\text{mkt}})$.
+  - **Where $s_{\text{mkt}}$ comes from:** the RMSE of the open on the scored primary games
+    themselves. Bovada has no opens before 2021, so the value cannot be tuned out of sample.
+  - **Why that is fair:** CRPS and log loss are lowest at the true sd, so fitting it in
+    sample gives the market its best case. That can only make the benchmark harder to beat.
+  - **Not the close's RMSE:** it is narrower than the open's errors, so it would make the
+    open overconfident and penalise the market.
+  - **No decision-time moneyline exists.** The market's proper score is therefore
+    spread-implied, not a de-vigged price, and every doc says so.
 - **`close`** and **`close_ml`**: the median close, and Bovada's moneyline de-vigged
   multiplicatively. They are secondary and labelled **"not decision-time"** everywhere they
   appear. Bovada's moneylines carry no capture time, so they are treated as closing.
@@ -246,10 +250,17 @@ Worked number: a 7-point win gives $m = \ln 8 \times 2.2/(0.001\,\Delta_w + 2.2)
   - **`glicko1`:** 81 points. $c \in \{10, 20, 35\}$, $\delta_g \in \{50, 100, 150\}$,
     $A \in \{40, 65, 90\}$, $w_g \in \{0.5, 0.7, 0.9\}$, with $\text{RD}_0 = 350$.
   - **Closed-form fits:** `hfa_only` and `cfbd_elo`, 1 each.
-- **Trial count:** 1,577 tuning configurations, plus the stress variants below. It goes in
-  the manifest.
-- **Boundary flag:** any pick on the edge of its grid is flagged in the manifest and the doc.
-  The grid is **not** widened after scoring.
+- **Trial count:** 1,577 tuning configurations, plus any extension trials, plus the stress
+  variants below. It goes in the manifest.
+- **Pre-score boundary step** (reads tuning seasons only):
+  - Before the one scoring run, `tune()` runs by itself from a scratchpad script.
+  - Any axis whose pick lands on a grid edge that can be pushed further gets one more value
+    outward, and that model is re-tuned. $\tau = 0$, $C = \infty$, and $w \in [0,1]$ are
+    natural limits and are never pushed past.
+  - The extension trials join the count. The final grids go into this spec in their own
+    commit **before** the scoring run.
+  - A pick still on an edge after one extension is flagged in the manifest and the doc.
+- **No grid changes after scoring.**
 
 ## Scoring (2021–2025, one run, all parameters frozen)
 
@@ -325,7 +336,7 @@ scores $15 \times 0.234 = 3.5$ points, which is the price of that spread.
 
 | Gate | Rule | Tests |
 | --- | --- | --- |
-| **G1 vs Elo** | `classify_verdict` on paired MAE, Glicko-margin − `elo_mov`, is **improves**: interval upper bound < 0, and negative in at least 4 of 5 seasons | The margin state and variance earn their complexity over plain Elo |
+| **G1 vs Elo** | `classify_verdict` on paired **CRPS**, Glicko-margin − `elo_mov`, is **improves**: interval upper bound < 0, and negative in at least 4 of 5 seasons. Paired MAE on the same games must also not be **worse** | The margin state and variance earn their complexity over plain Elo. The standard keeps MAE secondary when a model gives a full distribution, and MAE cannot see the variance |
 | **G2 vs open** | The encompassing slope $\beta$ for Glicko-margin has a 95% lower bound > 0 | It holds information the open lacks. MAE against the open is reported with its verdict but not gated; beating the open outright is not expected |
 | **G3 coverage** | Pooled 68% coverage in [0.65, 0.71], pooled 95% coverage in [0.93, 0.97], and every uncertainty quintile's 95% coverage in [0.90, 0.98] | The RD means what it says |
 | **Stress** | Each of the 7 Glicko-margin parameters is moved to its neighbouring grid value(s), with the others held at the pick: at most 14 variants. G1 and G2 must keep their verdicts in every variant | The result is a plateau, not a spike |
@@ -386,8 +397,10 @@ runs, and the eval refuses to write results if any sign disagrees.
 
 1. `docs(ratings)`: this spec. **Stop for approval.**
 2. `feat(ratings)`: `glicko_ratings.py` and the tests.
-3. `feat(ratings)`: `glicko_ratings_eval.py`, then one scoring run.
-4. `docs(ratings)`: `docs/glicko-ratings-2026-09-24.md` and its `docs/README.md` row.
+3. `feat(ratings)`: `glicko_ratings_eval.py`.
+4. `docs(ratings)`: the final grids from the pre-score boundary step, recorded in this spec.
+   Then comes the one scoring run.
+5. `docs(ratings)`: `docs/glicko-ratings-2026-09-24.md` and its `docs/README.md` row.
 
 ## Departures from the build prompt, for approval
 
@@ -399,6 +412,8 @@ runs, and the eval refuses to write results if any sign disagrees.
   distributions. MAE stays for comparison with Release B and the open.
 - **Week-cutoff clock, not per-game kickoff.** This keeps the information set comparable to
   the open's.
+- **G1 gates on CRPS, with MAE as a guard.** The prompt named MAE against Elo. The standard
+  makes distributional scores primary for a model that gives a distribution.
 
 ## What this design does not claim
 
