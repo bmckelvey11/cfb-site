@@ -950,6 +950,42 @@ def head_to_head(con, a: int, b: int, cutoff, *, full: bool, season: int) -> dic
             "first": games[-1]["season"] if games else None, "games": games[:10]}
 
 
+def trends(con, season: int, week: int, cutoff, a: int, b: int, *, full: bool, fcs: bool, ngt: bool) -> dict:
+    """Game-by-game values inside the window, for the trend charts: CFBD PPA and success rate
+    (the same table the unit matchups used) and PFF offense/defense grades."""
+    table, used_ngt, _ = pick_table(con, SOURCES["advanced"], season, ngt)
+    window = ("""s."seasonType" in ('regular', 'postseason')""" if full
+              else f"""s."seasonType" = 'regular' and s.week < {int(week)}""")
+    fcs_clause = (f"o.team_id in (select teamId from stg.fbs_teams where season = {int(season)})"
+                  if fcs else "true")
+    cfbd = rows(con, f"""
+        select t.team_id, s.week, s."seasonType" as season_type, s.opponent,
+               s.offense_ppa, s.defense_ppa, s."offense_successRate" as offense_sr,
+               s."defense_successRate" as defense_sr
+        from {table} s join core.dim_team t on t.school = s.team
+        left join core.dim_team o on o.school = s.opponent
+        where s.season = ? and t.team_id in (?, ?) and {window} and {fcs_clause}
+        order by s."seasonType" = 'postseason', s.week""", [season, a, b])
+    grades = []
+    if season >= PFF_FIRST_SEASON:
+        where, params = _pff_where(season, cutoff, full=full, fcs=fcs, split=False)
+        for tbl, col, snaps, key in (("stg.pff_offense_summary", "grades_offense", "snap_counts_total", "pff_offense"),
+                                     ("stg.pff_defense_summary", "grades_defense", "snap_counts_defense", "pff_defense")):
+            grades += [dict(r, metric=key) for r in rows(con, f"""
+                with {_pff_ctes(season)}
+                select m.team_id, p.week as pff_week, any_value(g.week) as week,
+                       (sum(p.{col} * p.{snaps}) filter (where p.{col} is not null))::double
+                         / nullif(sum(p.{snaps}) filter (where p.{col} is not null), 0) as value
+                from {tbl} p {_PFF_JOIN}
+                where {where} and m.team_id in (?, ?)
+                group by 1, 2 order by 2""", [*params, a, b])]
+    return {"table": table, "ngt": used_ngt,
+            "teams": {str(t): {"cfbd": [r for r in cfbd if r["team_id"] == t],
+                               "pff": {k: [r for r in grades if r["team_id"] == t and r["metric"] == k]
+                                       for k in ("pff_offense", "pff_defense")}}
+                      for t in (a, b)}}
+
+
 def players(con, season: int, week: int, cutoff, a: int, b: int, *, full: bool, fcs: bool,
             ngt: bool) -> dict:
     """Key players per team: a PFF list and a CFBD list, unlinked (no id crosswalk exists)."""

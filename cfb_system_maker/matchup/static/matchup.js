@@ -308,6 +308,92 @@ function h2hSection(h, A, B) {
   return card("Head-to-head", body, { footer: "Every meeting since 1869 from core.fact_game_historical and core.fact_game; lines exist from 2012. The last 10 are listed; scores read A-B." });
 }
 
+// ---------- trends: inline SVG small multiples, A solid accent, B dashed grey ----------
+function trendChart(title, series, fmt, dp) {
+  const pts = series.flatMap((s) => s.points).filter((p) => p.y !== null && p.y !== undefined);
+  if (!pts.length) return `<figure class="trend"><figcaption>${esc(title)}</figcaption>${nodata("no games")}</figure>`;
+  const W = 300, H = 120, L = 44, T = 8, B = 20, R = 8;
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const px = (v) => L + ((v - x0) / (x1 - x0 || 1)) * (W - L - R);
+  const py = (v) => T + ((y1 - v) / (y1 - y0 || 1)) * (H - T - B);
+  const lines = series.map((s) => {
+    const ok = s.points.filter((p) => p.y !== null && p.y !== undefined);
+    return `<polyline class="${s.cls}" points="${ok.map((p) => `${px(p.x)},${py(p.y)}`).join(" ")}"/>`
+      + ok.map((p) => `<circle class="${s.cls}" cx="${px(p.x)}" cy="${py(p.y)}" r="3"><title>${esc(`${s.name} · wk ${p.label}: ${num(p.y, fmt, dp)}`)}</title></circle>`).join("");
+  }).join("");
+  const weeks = [...new Set(xs)].sort((a, b) => a - b);
+  return `<figure class="trend"><figcaption>${esc(title)}</figcaption>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)} by week">
+      <text class="axis" x="${L - 6}" y="${py(y1) + 4}" text-anchor="end">${esc(num(y1, fmt, dp))}</text>
+      <text class="axis" x="${L - 6}" y="${py(y0) + 4}" text-anchor="end">${esc(num(y0, fmt, dp))}</text>
+      <line class="grid" x1="${L}" x2="${W - R}" y1="${py(y1)}" y2="${py(y1)}"/><line class="grid" x1="${L}" x2="${W - R}" y1="${py(y0)}" y2="${py(y0)}"/>
+      ${weeks.map((w) => `<text class="axis" x="${px(w)}" y="${H - 4}" text-anchor="middle">${w > 16 ? "P" + (w - 16) : w}</text>`).join("")}
+      ${lines}</svg></figure>`;
+}
+
+function trendsSection(tr, A, B) {
+  const xOf = (r) => (r.season_type === "postseason" ? 16 + r.week : r.week);
+  const cf = (t, key) => tr.teams[t.team_id].cfbd.map((r) => ({ x: xOf(r), y: r[key], label: `${r.week} vs ${r.opponent}` }));
+  const pf = (t, key) => tr.teams[t.team_id].pff[key].map((r) => ({ x: r.week ?? 16 + r.pff_week, y: r.value, label: String(r.week ?? "late") }));
+  const pair = (f, key) => [{ name: A.school, cls: "sa", points: f(A, key) }, { name: B.school, cls: "sb", points: f(B, key) }];
+  const charts = [
+    trendChart("Offense PPA per play", pair(cf, "offense_ppa"), "signed", 3),
+    trendChart("Defense PPA allowed", pair(cf, "defense_ppa"), "signed", 3),
+    trendChart("Offense success rate", pair(cf, "offense_sr"), "pct"),
+    trendChart("Defense success rate allowed", pair(cf, "defense_sr"), "pct"),
+    trendChart("PFF offense grade", pair(pf, "pff_offense"), "num", 1),
+    trendChart("PFF defense grade", pair(pf, "pff_defense"), "num", 1),
+  ].join("");
+  return card("Trends", `<p class="legend"><span class="key sa"></span>${esc(A.school)} <span class="key sb"></span>${esc(B.school)}</p><div class="trends">${charts}</div>`, {
+    footer: `Game by game inside the window. CFBD from ${esc(tr.table)}${tr.ngt ? " (no garbage time)" : ""}; PFF grades weighted by snaps. Hover a point for the opponent.`,
+  });
+}
+
+// ---------- provenance + export ----------
+function sourcesSection(d) {
+  const m = d.meta;
+  const items = [
+    ["As-of cutoff", m.mode === "full" ? "none: full season, postgame" : `${stampTime(m.cutoff)} ET (first kickoff of the selected week); stat windows use games before it`],
+    ["Odds snapshot", m.snapshot.file ? `${m.snapshot.file} · pulled ${stampTime(m.snapshot.pulled_at)} ET` : "none found"],
+    ["Verdicts", "pregame_windowed: aggregated over prior games · pregame_direct: fixed before the season · lookahead_only: season-final, shown as last season's (or in postgame panels) · postgame: result"],
+    ["Warehouse", "cfb.duckdb opened read-only for this request and closed before responding"],
+    ["Request", `${m.elapsed_ms} ms`],
+  ];
+  return card("Sources and cutoffs", `<dl class="kv">${items.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`,
+    { footer: "Hover any stat label for its table.column and verdict." });
+}
+
+function statRows(d, picks) {
+  const s = d.sections, A = d.meta.a.school, B = d.meta.b.school, out = [];
+  const add = (section, block, r, label) => out.push([section, block, label || r.label, r.a && r.a.value, r.a && r.a.rank,
+    r.b && r.b.value, r.b && r.b.rank, r.verdict, r.source]);
+  s.profile.rows.forEach((r) => add("profile", `${A} vs ${B}`, r));
+  s.ratings.rows.forEach((r) => add("ratings", `${A} vs ${B}`, r));
+  for (const [name, sec] of [["units", s.units], ["pff", s.pff]]) {
+    (sec.blocks || []).forEach((bl) => bl.groups.forEach((g) => g.rows.forEach((c) => {
+      const opt = c.options.find((o) => o.key === picks[c.concept]) || c.options[0];
+      add(name, `${bl.off === d.meta.a.team_id ? A : B} offense vs ${bl.def === d.meta.a.team_id ? A : B} defense`, opt, `${g.group}: ${opt.label}`);
+    })));
+  }
+  s.special_teams.rows.forEach((r) => add("special_teams", `${A} vs ${B}`, r));
+  return out;
+}
+
+function download(name, type, text) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function exportCsv(d, picks) {
+  const q = (v) => (v === null || v === undefined ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replaceAll('"', '""')}"` : String(v));
+  const head = ["section", "block", "stat", "a_value", "a_rank", "b_value", "b_rank", "verdict", "source"];
+  return [head, ...statRows(d, picks)].map((r) => r.map(q).join(",")).join("\n");
+}
+
 function playerTable(title, cols, list) {
   if (!list || !list.length) return `<div class="plist"><h3>${esc(title)}</h3>${nodata("none in the window")}</div>`;
   return `<div class="plist"><h3>${esc(title)}</h3><table><thead><tr>${cols.map((c) => `<th${c.r ? ' class="r"' : ""}>${esc(c.h)}</th>`).join("")}</tr></thead>
@@ -498,6 +584,8 @@ async function matchup(p) {
       <label class="check"><input type="checkbox" id="m-ngt"${p.ngt === "0" ? "" : " checked"}> Exclude garbage time</label>
       ${full ? "" : `<label class="check"><input type="checkbox" id="m-post"${p.postgame === "1" ? " checked" : ""}> Show postgame panels</label>`}
       <button class="ghost" id="m-swap">Swap teams</button>
+      <button class="ghost" id="m-csv">Export CSV</button>
+      <button class="ghost" id="m-json">Export JSON</button>
     </div>`;
   html += gameSection(s.game, A, B, full);
   html += card("Team profile", `<div class="grid2">${profileCol(A, s.profile.a, m.week, full)}${profileCol(B, s.profile.b, m.week, full)}</div>
@@ -513,6 +601,8 @@ async function matchup(p) {
   html += bettingSection(s.betting, A, B);
   html += scheduleSection(s.schedule, A, B);
   html += h2hSection(s.h2h, A, B);
+  html += trendsSection(s.trends, A, B);
+  html += sourcesSection(d);
   app.innerHTML = html;
 
   const base = { ...p, season: m.season };
@@ -525,6 +615,9 @@ async function matchup(p) {
   document.getElementById("m-fcs").onchange = (e) => go({ ...base, fcs: e.target.checked ? "" : "0" });
   document.getElementById("m-ngt").onchange = (e) => go({ ...base, ngt: e.target.checked ? "" : "0" });
   document.getElementById("m-swap").onclick = () => go({ ...base, a: p.b, b: p.a });
+  const stem = `matchup-${A.school}-${B.school}-${m.season}-${full ? "full" : "wk" + m.week}`.replace(/[^\w-]+/g, "_");
+  document.getElementById("m-csv").onclick = () => download(stem + ".csv", "text/csv", exportCsv(d, picks));
+  document.getElementById("m-json").onclick = () => download(stem + ".json", "application/json", JSON.stringify(d, null, 2));
   const y = window.scrollY;
   app.querySelectorAll("select.pick").forEach((sel) => {
     sel.onchange = () => { go({ ...base, ["pick_" + sel.dataset.concept]: sel.value }, true); window.scrollTo(0, y); };

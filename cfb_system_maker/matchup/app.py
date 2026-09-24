@@ -113,6 +113,7 @@ def create_app(db_path: Path | None = None, odds_dir: Path | None = None,
                                                  fcs=fcs, show_postgame=show_postgame),
                 "players": q.players(con, season, window, cutoff, a, b, full=full, fcs=fcs, ngt=ngt),
                 "h2h": q.head_to_head(con, a, b, cutoff, full=full, season=season),
+                "trends": q.trends(con, season, window, cutoff, a, b, full=full, fcs=fcs, ngt=ngt),
             }
             sa, sb = q.schedule(con, a, season, cutoff, full=full), q.schedule(con, b, season, cutoff, full=full)
             sections["schedule"] = {"a": sa, "b": sb, "common": q.common_opponents(sa, sb, a, b)}

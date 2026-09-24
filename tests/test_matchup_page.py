@@ -455,6 +455,38 @@ def test_common_opponents_and_head_to_head(warehouse):
     assert h["games"][1]["a_spread"] is None  # no lines before 2012
 
 
+SECTIONS = {"game", "profile", "ratings", "units", "pff", "special_teams", "players", "h2h", "trends",
+            "schedule", "betting"}
+
+
+def _lookahead_rows(node, in_postgame=False):
+    """Every stat row with a lookahead_only verdict, flagged by whether it sits in a postgame panel."""
+    if isinstance(node, dict):
+        if node.get("verdict") == "lookahead_only" and "a" in node:
+            yield node, in_postgame
+        for k, v in node.items():
+            yield from _lookahead_rows(v, in_postgame or k == "postgame")
+    elif isinstance(node, list):
+        for v in node:
+            yield from _lookahead_rows(v, in_postgame)
+
+
+def test_every_section_arrives_and_lookahead_stays_in_postgame_panels(client):
+    body = client.get("/api/matchup?a=1&b=2&season=2026&week=4&postgame=1").get_json()
+    assert set(body["sections"]) == SECTIONS and body["model_signals"] is None
+    found = list(_lookahead_rows(body["sections"]))
+    assert found
+    for row, in_postgame in found:
+        assert in_postgame or row["season"] == 2025, f"{row['key']} shows {row['season']} outside a postgame panel"
+    assert any(p for _, p in found)  # postgame=1 did add panels
+
+
+def test_trends_stop_at_the_window(client):
+    tr = client.get("/api/matchup?a=1&b=2&season=2026&week=3").get_json()["sections"]["trends"]
+    assert [r["week"] for r in tr["teams"]["1"]["cfbd"]] == [2]  # wk1 vs FCS out, wk3 not yet played
+    assert [r["week"] for r in tr["teams"]["1"]["pff"]["pff_offense"]] == [2]
+
+
 def test_registry_verdicts_match_the_eligibility_audit():
     audit = Path(os.environ.get("CFB_DATA_ROOT", "")) / "processed" / "pregame_feature_eligibility.csv"
     if not audit.is_file():
