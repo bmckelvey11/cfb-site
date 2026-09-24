@@ -218,6 +218,9 @@ its rules were committed before week 5 (`replay_2026_w05_08.json`, `models/tunin
 
 ## The GUI
 
+Full manual, with every control, walkthroughs, alerts and troubleshooting:
+[tuning-lab-gui.md](tuning-lab-gui.md). Summary:
+
 **Start:**
 ```text
 .venv-lab-ui\Scripts\python -m streamlit run models/tuning/ui/app.py
@@ -239,28 +242,8 @@ only on this PC. It runs in its own venv so the shadow tick's `.venv` never chan
 | Data | Freshness of live inputs, whether each run's source files have changed, excluded games by reason |
 | Hypotheses | Every question the lab tested, nulls included |
 
-The sidebar always shows:
-- jobs in flight;
-- the champion and challenger;
-- the CFBD data's age;
-- the latest shadow snapshot;
-- saved drafts;
-- any blocking alert.
-
-**What the GUI can change:** only New run launches anything. Freezing, the daily tick, alias
-moves and replays stay on the command line. The GUI writes only `drafts/` and `logs/`, and
-deletes nothing.
-
-**Guardrails:** every check runs in `models/tuning/ui/api.py validate`, so the GUI can't
-skip one.
-- **Red (blocks launch):**
-  - the sealed season (2026);
-  - a refused feature;
-  - a broken spec rule;
-  - a job already running.
-- **Amber (warns):**
-  - outer seasons already used, with the prior trial count;
-  - a what-if outside training support.
+Only New run launches anything. Freezing, the daily tick, alias moves and replays stay on
+the command line. The GUI writes only `drafts/` and `logs/`, and deletes nothing.
 
 ---
 
