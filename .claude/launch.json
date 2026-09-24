@@ -77,6 +77,19 @@
       "url": "http://127.0.0.1:8501"
     },
     {
+      "name": "Matchup page",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "cfb_system_maker",
+        "matchup",
+        "--port",
+        "5050"
+      ],
+      "port": 5050,
+      "url": "http://127.0.0.1:5050"
+    },
+    {
       "name": "Marimo",
       "runtimeExecutable": "marimo",
       "runtimeArgs": [

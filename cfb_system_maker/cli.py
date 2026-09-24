@@ -92,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         return _search(args)
     if args.command == "web":
         return _web(args)
+    if args.command == "matchup":
+        return _matchup(args)
     if args.command == "duckdb":
         return _duckdb(args)
     parser.print_help()
@@ -705,6 +707,21 @@ def _web(args: argparse.Namespace) -> int:
     return 0
 
 
+def _matchup(args: argparse.Namespace) -> int:
+    from cfb_system_maker.matchup.app import create_app
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    app = create_app()
+    if args.debug:
+        app.run(host="127.0.0.1", port=args.port, debug=True)
+    else:
+        from waitress import serve
+
+        # Local only: the page reads the whole warehouse and has no auth.
+        serve(app, host="127.0.0.1", port=args.port, threads=4)
+    return 0
+
+
 def print_result(name: str, result: BacktestResult) -> None:
     print(f"\n{name}")
     print(f"Bets: {result.bets}")
@@ -962,5 +979,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=int(os.environ.get("CFB_WEB_PORT") or os.environ.get("PORT") or "5000"),
     )
     web.add_argument("--debug", action="store_true")
+
+    matchup = subparsers.add_parser("matchup", help="team matchup page at 127.0.0.1")
+    matchup.add_argument("--port", type=int, default=5050)
+    matchup.add_argument("--debug", action="store_true")
 
     return parser

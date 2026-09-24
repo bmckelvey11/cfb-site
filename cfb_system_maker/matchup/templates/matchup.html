@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Matchup</title>
+  <link rel="stylesheet" href="/tokens/colors.css">
+  <link rel="stylesheet" href="/tokens/typography.css">
+  <link rel="stylesheet" href="/tokens/spacing.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='matchup.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="?">Matchup</a>
+    <nav class="tabs" aria-label="Mode">
+      <a href="?" data-nav="slate">Slate</a>
+      <a href="?view=custom" data-nav="custom">Custom matchup</a>
+    </nav>
+    <span class="snap" id="snap"></span>
+  </header>
+  <main id="app" aria-live="polite"></main>
+  <script src="{{ url_for('static', filename='matchup.js') }}"></script>
+</body>
+</html>

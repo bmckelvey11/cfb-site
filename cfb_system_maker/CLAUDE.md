@@ -39,6 +39,7 @@ python -m cfb_system_maker refit-v1   # Arscott tobit cache → processed/v1_fit
 python -m cfb_system_maker backtest --side home --favorite --min-spread -14
 python -m cfb_system_maker backtest --bet-type total --total-side over
 python -m cfb_system_maker web --port 5000   # Flask UI at 127.0.0.1:5000 (waitress; --debug for reloader)
+python -m cfb_system_maker matchup           # team matchup page at 127.0.0.1:5050 (reads the warehouse)
 ```
 
 There is no compile step and no linter configured for our code. `requirements.lock` is the reproducible install; `requirements.txt` is the loose pins (Flask, waitress, duckdb, sklearn, pytest, plus `cfbd-python/requirements.txt`).
@@ -64,7 +65,7 @@ Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 
 `duckdb` loads `data/raw/` + `data/graphql/` into `data/cfb.duckdb` (one file; REST lands in
 `raw`/`stg` under its endpoint names, GraphQL lands in `raw` under a `gql_`-prefixed name and
-in `stg` under its bare name — optional `stg` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`.
+in `stg` under its bare name — optional `stg` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`. The one exception is the separate matchup page (`matchup/`), the unit's only warehouse reader: it opens `cfb.duckdb` read-only per request and closes it, so the nightly rebuild's file swap is never blocked.
 
 **MotherDuck (`md:cfb`) is a manual mirror, local file is source of truth.** Never write to `md:cfb` directly — rebuild and verify local first (`python -m pytest -m slow tests/test_core_agreement.py`), then promote with `python scripts/promote_to_motherduck.py --dry-run` (lists tables/rows, pushes nothing) followed by `--yes` (CTAS-replaces each table, stamps `meta.warehouse_version` on both sides). See `docs/duckdb-warehouse-plan.md` (`## MotherDuck promote`) for the full runbook.
 

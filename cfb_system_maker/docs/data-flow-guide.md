@@ -216,6 +216,7 @@ result-informed carries the `result_lookahead` tag.
 | Consumer | Entry point | Reads | Does not read |
 |---|---|---|---|
 | Flask system maker (filters, systems, dashboard) | `cfb_system_maker/web.py`, `features.py`, `enrich.py`, `prior_game_stats.py` | `processed/games.csv`, `processed/features.json`, raw JSON indexed in-process | the warehouse, at all |
+| Matchup page (local, 127.0.0.1:5050) | `cfb_system_maker/matchup/` (`python -m cfb_system_maker matchup`) | `core` and `stg`, opened `read_only=True` per request and closed before responding; the newest `ingest/oddsapi/*.json` for current DK/FD lines | `raw`; it never writes |
 | Totals model | `models/totals/data.py` | `processed/games.csv` | the warehouse |
 | Over-zero board | `models/over_zero/scripts/build_1h_games.py`, `build_1h_lines.py` | `raw.an_scoreboard`, `raw.an_history` (read-only, the only consumer on `raw`) | |
 | Over-zero slate (scheduled) | `models/over_zero/scripts/best_line_slate.py` | `processed/over_zero/`, `ingest/oddsapi/` → `site/lib/board.json` | the warehouse |
@@ -229,9 +230,9 @@ result-informed carries the `result_lookahead` tag.
 
 The consequence: a bug in `build_core` cannot reach the app or the totals model today. It can
 reach research — `core.fact_game` supplies finals to the version-B spread eval and to
-Greenline grading, so `build_core` is not a dead end. `fact_game_line`, `fact_game_team`,
-`fact_game_odds` and `fact_game_historical` have no reader as of 2026-09-16; they are kept,
-not retired. A bug in `games.csv` or `features.json` reaches the app and the totals model
+Greenline grading, so `build_core` is not a dead end — and, since 2026-09-23, the matchup
+page, which reads `fact_game_line` and `fact_game_odds` for the game card. `fact_game_team`
+and `fact_game_historical` had no reader as of 2026-09-16; they are kept, not retired. A bug in `games.csv` or `features.json` reaches the app and the totals model
 both.
 
 Every warehouse reader above opens `read_only=True` and exits. Keep it that way: a
