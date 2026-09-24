@@ -275,6 +275,20 @@ def main() -> None:
         show(con, "6b. pulls compared per reference book", """
             SELECT book, count(*) n_pulls, count(DISTINCT event_id) n_events
             FROM obs GROUP BY 1 ORDER BY 1""")
+        # A reference nothing matches is either a book nobody is, or a broken join. Pinnacle's
+        # last pre-kickoff pull has to sit on the other books' close for the first reading.
+        show(con, "6c. reference sanity: last pre-kickoff pull vs the books' close median", """
+            WITH last AS (
+              SELECT o.book, e.game_id, arg_max(o.line, o.pulled_at) AS line
+              FROM obs o JOIN an_event e USING (event_id) GROUP BY 1, 2
+            ),
+            med AS (SELECT game_id, any_value(close_med) AS close_med FROM ref
+                    WHERE provider_key = 'circa' GROUP BY 1)
+            SELECT book, count(*) n,
+                   round(avg(abs(line - close_med)), 2) AS mean_gap_close,
+                   round(avg((sign(line) = sign(close_med))::INT)
+                         FILTER (WHERE abs(close_med) >= 3), 3) AS sign_agree_3plus
+            FROM last JOIN med USING (game_id) GROUP BY 1 ORDER BY 1""")
     finally:
         con.close()
 

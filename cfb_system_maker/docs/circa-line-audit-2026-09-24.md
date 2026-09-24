@@ -32,6 +32,10 @@ tape starts 2026-04-02. Warehouse as rebuilt 2026-09-24 00:46.
 The name is wrong. Circa's line never reaches the warehouse. `pull_oddspapi.py` accepts
 `circasports`, but no Circa snapshot has ever been pulled.
 
+`_source = 'gql'` means only "came from `stg.game_lines`", not "came from CFBD GraphQL".
+CFBD's `gameLines` dump has no circa rows at all. All 2,082 rows since 2024 are
+`line_source = 'actionnetwork'`.
+
 ## Findings
 
 **1. A stale opener, not an early snapshot.** On 2026 games, the `circa` value equals AN's
@@ -85,6 +89,10 @@ was matched on line **and** price. The true book is the one that matches:
 
 675 Pinnacle pulls and 2,283–3,922 pulls per odds-api book, over 159–222 events.
 
+Pinnacle's low scores are not a broken join. Its last pre-kickoff pull agrees in sign with the
+other books' close median on 100% of games at 3 or more points, with a mean gap of 0.48
+(n = 171). Every odds-api reference passes the same check.
+
 These results agree with AN's own `/web/v1/books` list, recorded in
 [research/spread/docs/README.md](../../research/spread/docs/README.md) on 2026-09-08. That list
 calls 49 "Caesars NV". No Caesars feed is on disk to confirm it, so this doc claims only
@@ -101,8 +109,9 @@ calls 49 "Caesars NV". No Caesars feed is on disk to confirm it, so this doc cla
 - `caesars`: 2,053 rows, really BetRivers. This is the book the spread session guide caught
   mis-posting by 10–25 points.
 - `pinnacle`: 222 rows, not Pinnacle.
-- `draftkings`: 269 AN-only rows that are the consensus. A further 1,813 `cfbd+an` rows had
-  CFBD nulls filled from the consensus.
+- `draftkings`: 269 AN-only rows that are the consensus. A further 1,813 `cfbd+an` rows are
+  rows where both sides existed. CFBD's values win there, but any CFBD null could be filled
+  from the consensus. How many actually were is not measured here.
 
 [line-coverage-2026-09-16.md](line-coverage-2026-09-16.md) counted these under the loader's
 names, so its "sharp books start in 2024" inherits the error. It is a dated record and is left
