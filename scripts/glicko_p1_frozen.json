@@ -1,0 +1,23 @@
+{
+  "candidate": "glicko_p1",
+  "variant": "pool_conf",
+  "frozen_at": "2026-09-24T12:05:51+00:00",
+  "design": "docs/superpowers/specs/2026-09-24-glicko-p1-2026-confirmation-design.md",
+  "source_scoring_run": "docs/glicko-pool-2026-09-24.md",
+  "params": {
+    "sigma": 15,
+    "tau": 1.5,
+    "w": 0.7,
+    "delta": 6,
+    "cap": Infinity,
+    "hfa": 2,
+    "u0": 14
+  },
+  "glicko_ratings_version": "1.0",
+  "code_sha256": {
+    "glicko_ratings.py": "2dfb1a3ce6e288f9c467d669041673a33448ee0ed51a16b58ff563f8a2282d52",
+    "glicko_pool_eval.py": "9e3d8be07d636ca1fa3e9e798d5d7f683cddd73bbc80c18a1b8b87ee40348844",
+    "glicko_ratings_eval.py": "e30eb84275fc47cffb89db5ee9061fcc7a9028fe2072f5586ad41b3d660dfbea",
+    "glicko_p1_confirm.py": "905782daea8aa75cd17096d404fdaaaedc4b7c71de8cb9b17121dbc7011d45e7"
+  }
+}
