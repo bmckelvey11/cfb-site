@@ -117,7 +117,7 @@ def write(path, sheets):
     with pd.ExcelWriter(path, engine="xlsxwriter", datetime_format="m/d/yy h:mm AM/PM") as w:
         fmt = {k: w.book.add_format({"num_format": v}) for k, v in
                {"units": "0.00;[Red]-0.00", "money": "#,##0.00;[Red]-#,##0.00",
-                "pct": "0.0%", "odds": "+0;-0;0", "spread": "+0.0;-0.0;PK"}.items()}
+                "pct": "0.0%", "odds": "+0;-0;0", "spread": '+0.0;-0.0;"PK"'}.items()}
         col_fmt = {"Units Wagered": fmt["units"], "Units Net": fmt["units"],
                    "$ Wagered": fmt["money"], "$ Net": fmt["money"], "Odds": fmt["odds"],
                    "Spread": fmt["spread"], "Win %": fmt["pct"], "ROI": fmt["pct"]}
