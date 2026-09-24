@@ -74,6 +74,8 @@ def load(root: Path, last: int, sources: list[Path]) -> tuple[pd.DataFrame, dict
     g = pool.merge(pd.DataFrame(raw).drop_duplicates("game_id"), on="game_id", how="left")
     g = g.rename(columns={"home_team": "home", "away_team": "away"})
     g["margin"] = g["home_points"] - g["away_points"]
+    # One missing result would turn both teams' ratings, and every later opponent's, into NaN.
+    assert g["margin"].notna().all(), "games.csv has a game with no final score"
     g["close"] = to_home_margin(g["spread"])
     g["fbs_fbs"] = (g["home_div"] == FBS) & (g["away_div"] == FBS)
     fcs_fcs = (g["home_div"] == FCS) & (g["away_div"] == FCS)
@@ -106,7 +108,8 @@ def _devig(home: pd.Series, away: pd.Series) -> pd.Series:
     """Multiplicative de-vig of two American prices; the home side's no-vig probability."""
     def implied(o):
         return np.where(o < 0, -o / (-o + 100.0), 100.0 / (o + 100.0))
-    ih, ia = implied(home.to_numpy(float)), implied(away.to_numpy(float))
+    with np.errstate(divide="ignore", invalid="ignore"):  # np.where evaluates both branches
+        ih, ia = implied(home.to_numpy(float)), implied(away.to_numpy(float))
     return pd.Series(ih / (ih + ia), index=home.index)
 
 
@@ -460,8 +463,14 @@ def main(argv: list[str] | None = None) -> int:
     if bad:
         print("sign check failed on M_hat; no results written:", *bad, sep="\n  ")
         return 1
+    assert fc["glk"].notna().all() and fc["elo"].notna().all(), "NaN forecast"
     market = load_market(DATA_ROOT, score_seasons, sources)
     d, market_sd = scored_frame(g, fc, market, score_seasons)
+    opens = d.set_index("game_id")["open"].reindex(list(SIGN_CHECK)).dropna()
+    bad = [f"{gid}: open={v}" for gid, v in opens.items() if np.sign(v) != SIGN_CHECK[gid]]
+    if bad:
+        print("sign check failed on the open; no results written:", *bad, sep="\n  ")
+        return 1
     results = score(d)
     verdict = gates(d[d["primary"]])
     stressed = stress(g, tuned, m0, market, score_seasons, verdict)
@@ -502,7 +511,8 @@ def main(argv: list[str] | None = None) -> int:
                         "closed_form_fits": 2,
                         "total_tuning": sum(grid_points.values()) + 2,
                         "stress_variants": stressed["n_variants"], "scoring_runs": 1},
-        "sign_check": {"games": SIGN_CHECK, "result": "pass"},
+        "sign_check": {"games": SIGN_CHECK, "result": "pass",
+                       "checked": "-spread, margin, M_hat, and the open where present"},
         "gates": verdict, "stress": stressed, "go": go,
         "bootstrap": {"unit": "season-week", "draws": BOOT_DRAWS, "seed": BOOT_SEED,
                       "interval": "percentile 95%", "mde": "2.8 x bootstrap SE (80% power)"},
