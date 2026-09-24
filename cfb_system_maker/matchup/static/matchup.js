@@ -107,9 +107,11 @@ async function slate(p) {
   const d = await api("/api/slate", { season: p.season, week: wk, season_type });
   setSnap(d.snapshot);
   const all = p.all === "1";
-  const confs = [...new Set(d.games.flatMap((g) => [g.home_conference, g.away_conference]).filter(Boolean))].sort();
-  const games = d.games.filter((g) => (all ? g.home_fbs || g.away_fbs : g.lined)
-    && (!p.conf || g.home_conference === p.conf || g.away_conference === p.conf));
+  const pool = d.games.filter((g) => (all ? g.home_fbs || g.away_fbs : g.lined));
+  // Only conferences with an FBS team in the shown games, not every division on the schedule.
+  const confs = [...new Set(pool.flatMap((g) => [g.home_fbs && g.home_conference, g.away_fbs && g.away_conference])
+    .filter(Boolean))].sort();
+  const games = pool.filter((g) => !p.conf || g.home_conference === p.conf || g.away_conference === p.conf);
 
   const days = new Map();
   for (const g of games) {
