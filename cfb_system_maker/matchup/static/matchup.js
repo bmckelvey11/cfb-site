@@ -137,14 +137,17 @@ function bookSpreads(books, home, away) {
   const favs = new Set(have.map(([, b]) => fav(b.spread.home)));
   if (favs.size === 1) {
     const f = [...favs][0];
-    return `${esc(f)} ${have.map(([k, b]) => `${num1(b.spread.home, f)} <span class="bk">${k}</span>`).join(" · ")}`;
+    return `<span class="bl">${esc(f)}</span> ${books_(have.map(([k, b]) => `${num1(b.spread.home, f)} <span class="bk">${k}</span>`))}`;
   }
-  return have.map(([k, b]) => `${esc(fav(b.spread.home))} ${num1(b.spread.home, fav(b.spread.home))} <span class="bk">${k}</span>`).join(" · ");
+  return books_(have.map(([k, b]) => `${esc(fav(b.spread.home))} ${num1(b.spread.home, fav(b.spread.home))} <span class="bk">${k}</span>`));
 }
+
+// Books sit on one line with a dot between; narrow screens stack them (CSS on .bl / .sep).
+const books_ = (parts) => parts.map((x) => `<span class="bl">${x}</span>`).join('<span class="sep"> · </span>');
 
 function bookTotals(books) {
   const have = [["DK", books.draftkings], ["FD", books.fanduel]].filter(([, b]) => b && b.total);
-  return have.length ? have.map(([k, b]) => `${b.total} <span class="bk">${k}</span>`).join(" · ") : "—";
+  return have.length ? books_(have.map(([k, b]) => `${b.total} <span class="bk">${k}</span>`)) : "—";
 }
 
 async function slate(p) {
@@ -179,7 +182,7 @@ async function slate(p) {
   for (const [day, gs] of days) {
     // Before kickoff the consensus median is the latest, not a close.
     const consensusHead = gs.every((g) => g.completed) ? "Consensus close" : "Consensus";
-    html += `<div class="day">${esc(day)}</div><table class="slate"><thead><tr>
+    html += `<div class="day">${esc(day)}</div><div class="scroll"><table class="slate"><thead><tr>
       <th>Kickoff</th><th>Matchup</th><th class="r">Spread</th><th class="r">Total</th>
       <th class="r">${consensusHead}</th></tr></thead><tbody>`;
     for (const g of gs) {
@@ -191,7 +194,7 @@ async function slate(p) {
         <td class="r nw">${bookTotals(g.books)}</td>
         <td class="r nw">${g.median_spread_close === null ? "—" : esc(favorite({ spread: { home: g.median_spread_close } }, g.home_team, g.away_team))}${g.median_total_close ? " / " + g.median_total_close : ""}</td></tr>`;
     }
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
   }
   app.innerHTML = html;
 

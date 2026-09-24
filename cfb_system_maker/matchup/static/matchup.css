@@ -96,13 +96,21 @@ td.r, th.r { text-align: right; }
 .books td { white-space: nowrap; }
 .day { margin: var(--space-5) 0 var(--space-2); font-size: var(--text-xs); font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-wider); text-transform: uppercase; color: var(--color-text-secondary); }
-.slate { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  table-layout: fixed; }  /* fixed widths so every day's table lines up */
-.slate th:nth-child(1) { width: 92px; }
-.slate th:nth-child(3) { width: 240px; }
-.slate th:nth-child(4) { width: 170px; }
-.slate th:nth-child(5) { width: 200px; }
-.slate td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
+.slate { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.scroll { overflow-x: auto; }
+@media (max-width: 1099px) {  /* narrow: stack each book's number, let the matchup wrap */
+  .slate .bl { display: block; }
+  .slate .sep { display: none; }
+  .slate .pair { white-space: normal; flex-wrap: wrap; }
+}
+@media (min-width: 1100px) {  /* wide screens: fixed widths so every day's table lines up */
+  .slate { table-layout: fixed; }
+  .slate th:nth-child(1) { width: 92px; }
+  .slate th:nth-child(3) { width: 240px; }
+  .slate th:nth-child(4) { width: 170px; }
+  .slate th:nth-child(5) { width: 200px; }
+  .slate td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
+}
 .slate tbody tr { cursor: pointer; }
 .slate tbody tr:hover { background: var(--color-accent-light); }
 .dim { color: var(--color-text-tertiary); }
