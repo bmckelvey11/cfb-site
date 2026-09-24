@@ -15,8 +15,7 @@
   per the declared rule this is recorded as a second-look pass, not a GO. It becomes a GO
   only on a declared 2026 confirmation.
 - **G3 (coverage) fails, on the wide side.** Pooled 68% coverage is 72.8%, above the declared
-  [65%, 71%] band. P1's intervals are a little too cautious, not too confident — the opposite
-  failure mode from what would raise concern for betting use.
+  [65%, 71%] band. P1's intervals are a little wider than its own error, not narrower.
 - **Per the spec's declared rule, P1 replaces v1 as the base for descriptive use and the
   weekly ratings table.**
 
@@ -83,6 +82,22 @@ matching v1's seed (computed from the lined-only 2013 games) to three decimals: 
 full betting-line coverage of FBS-vs-FCS games, so the two computations draw from the same
 111 games.
 
+**Conference labels, checked before trusting `pool_conf`'s win.** Since the adopted variant
+depends entirely on the conference key, two things were checked directly against the raw
+files:
+
+- **Era-correctness.** CFBD's `homeConference`/`awayConference` fields track realignment at
+  the season it happened, not retroactively: Missouri and Texas A&M read SEC from 2013 (they
+  joined in 2012), and the 2024 wave — Oklahoma and Texas to SEC, USC and UCLA to Big Ten,
+  Colorado to Big 12 — first appears in `games_2024.json`, not earlier seasons. No leakage
+  from a future label appearing in a past season.
+- **No cross-subdivision collision.** `_Teams.conf_mean` keys purely by conference string, so
+  a string shared by an FBS and an FCS conference in the same season would blend their means.
+  Checked directly: zero (season, conference) pairs hold both subdivisions, in every season
+  2013–2025, tuning and scored eras alike.
+
+Both checks pass, so the conference-mean result stands without a rerun.
+
 ## Results
 
 ### Primary population (v1's 3,718 FBS-vs-FBS games, Bovada open present)
@@ -101,8 +116,8 @@ Negative in every season, both metrics: the pool improves consistently, not on o
 | CRPS | −0.829 | [−1.244, −0.401] | 0.601 | improves | −0.760, −1.804, −0.648, −1.186, +0.142 |
 | MAE | −1.269 | [−1.939, −0.588] | 0.956 | improves | −1.378, −2.722, −0.703, −2.039, +0.299 |
 
-2025 is the one season where the pool is (very slightly) worse on these games, though the
-season count is small (about 116 games) and the pooled interval is clear of 0.
+2025 is the one season where the pool is (very slightly) worse on these games. Season counts:
+117, 116, 115, 106, 126 (2021→2025). The pooled interval is clear of 0.
 
 ### Gates re-read for the adopted P1 (same rules v1 used, for comparison — not adoption gates)
 
@@ -121,8 +136,9 @@ GO, and reserves a GO for a 2026 confirmation registered before that season is r
 
 **On G3:** pooled 68% coverage is 72.8%, above the declared [65%, 71%] band; 95% coverage is
 96.75%, inside [93%, 97%]. Every RD quintile's 95% coverage sits inside [90%, 98%] (95.8% to
-97.6%). The picture is a model whose stated uncertainty is a bit wider than its actual error
-— cautious, not overconfident.
+97.6%). The RD is wider than its own error calls for. Wide is not automatically safe: a
+probability squeezed toward 0.5 by an inflated $S$ still misprices a game, and P1's
+calibration slope was not re-read here — only interval coverage was.
 
 ### Stress (13 one-step variants on the adopted `pool_conf` pick)
 
@@ -136,8 +152,9 @@ every variant: σ ∈ {13, 17}, τ ∈ {0.75, 2.25}, w ∈ {0.5, 0.9}, δ ∈ {3
   (3,888) extended once on H and τ (both variants' boundary picks combined).
 - **Stress:** 13 variants of the adopted pick.
 - **Scoring:** 1 run.
-- **Cumulative with v1:** 4,162 (v1) + 13,838 (P1) = **18,000 tuning/stress/scoring trials**
-  on the Glicko family to date.
+- **Cumulative with v1:** v1's own tally was 4,162 tuning + 13 stress + 1 scoring = 4,176.
+  Adding P1's 13,838 (which already includes its stress and scoring): **18,014
+  tuning/stress/scoring trials** on the Glicko family to date.
 
 ## Dropped and counted (not silently skipped)
 
@@ -151,8 +168,8 @@ every variant: σ ∈ {13, 17}, τ ∈ {0.75, 2.25}, w ∈ {0.5, 0.9}, δ ∈ {3
 The jump from 2021 to 2022 (932 → 2,164) reflects CFBD's Division II/III coverage expanding
 in the raw feed from 2022 on — those games were never candidates for FBS/FCS ratings, but
 seeing this many confirms the D-I filter is doing real work, not passing through everything.
-The small "no final score" counts in 2023–2025 (2, 2, 10 games) are data-quality gaps in the
-historical record, not unplayed 2026 games.
+The small "no final score" counts in 2023–2025 (10, 2, 2 games) are not examined further;
+they predate 2026 and are not lined games waiting to be played.
 
 ## What this does not support
 

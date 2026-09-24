@@ -400,7 +400,12 @@ runs, and the eval refuses to write results if any sign disagrees.
   - `snapshot()` is not imported. The event clock in `glicko_ratings.events` applies the same
     strictly-before rule, and test 5 pins it.
 - **`scripts/glicko_ratings_table.py`** (added after scoring, for descriptive use):
-  - It replays `FROZEN_V1`, the scored picks, through the latest final scores.
+  - Originally replayed `FROZEN_V1` through `load()`'s games.csv-based pool. **Superseded
+    2026-09-24 (`c6433a68`):** per rung P1's declared adopt rule
+    ([`2026-09-24-glicko-pool-design.md`](2026-09-24-glicko-pool-design.md)), it now replays
+    `FROZEN_P1` through `glicko_pool_eval.load_pool_games` instead — every completed D-I game
+    from the raw files, with conference-mean offseason targets. `FROZEN_V1` and this file's
+    `load()` are unaffected and stay reproducible for v1's own record.
   - It writes `data/processed/ratings/glicko_ratings_<season>.csv`: rank within subdivision,
     rating in points above an average FBS team on a neutral field, RD, and games played.
   - Command: `python -m scripts.glicko_ratings_table --season 2026`.

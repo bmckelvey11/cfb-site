@@ -4,7 +4,13 @@
 eval script in `c28745e8`. **Scored once: ADOPTED.** `pool_conf` beats v1 on both required
 CRPS tests and is stable under stress. G2 (encompassing β vs the open) newly passes as a
 second-look result, not a confirmed GO — see the result for what that does and does not mean.
-Result: [`../../glicko-pool-2026-09-24.md`](../../glicko-pool-2026-09-24.md).
+Result: [`../../glicko-pool-2026-09-24.md`](../../glicko-pool-2026-09-24.md). Table switched
+in `c6433a68`.
+**Descriptive-use clearance carries over** from v1's (`4c505ce8`): show the rating and RD as
+a power rating and win probability, never as an edge against a line. P1's own G3 failed on
+the wide side (68% intervals cover 72.8%), so its RD reads a little more cautious than its
+actual error — still descriptive, not a reason to withhold it, but named here rather than
+silently inherited.
 **Question:** does rating every Division I team from every Division I game, with FCS and FBS
 teams pulled toward their conference's mean, forecast better than `glicko_margin_v1`, which
 sees only games that had a betting line?
