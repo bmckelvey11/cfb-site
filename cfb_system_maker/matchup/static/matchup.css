@@ -217,8 +217,40 @@ select.pick { min-width: 0; width: 100%; font-size: var(--text-xs); padding: 2px
 details summary { cursor: pointer; color: var(--color-accent); font-size: var(--text-xs); margin: var(--space-2) 0; }
 svg.spark { display: block; overflow: visible; }
 svg.spark polyline { fill: none; stroke-width: 1.5; }
-.error { padding: var(--space-4); background: var(--color-warning-surface); color: var(--color-warning);
-  border-radius: var(--radius-md); }
+/* Failure: what happened in plain words, Try again, and a way back. Full border, not a stripe. */
+.alert { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-3) var(--space-5); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4);
+  background: var(--color-error-surface); color: var(--color-text-primary);
+  border: 1px solid var(--color-error); border-radius: var(--radius-md); }
+.alert p { margin: 0; }
+.alert strong { color: var(--color-error); }
+.alert-actions { display: flex; align-items: center; gap: var(--space-4); }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Loading. The bar sits on the top bar's bottom edge; the view underneath stays readable but
+ * dimmed (controls stay live, so a second change simply replaces the first request). */
+.progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden;
+  background: var(--color-accent-subtle); }
+.progress::after { content: ""; position: absolute; inset: 0; width: 30%; background: var(--color-accent);
+  animation: progress 1.1s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
+@keyframes progress { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+#app[aria-busy="true"] > :not(.controls):not(.alert) { opacity: 0.5; transition: opacity 150ms ease-out; }
+
+.sk { display: inline-block; max-width: 100%; border-radius: var(--radius-sm); background: var(--color-bg-alt);
+  animation: sk-pulse 1.2s ease-in-out infinite alternate; }
+.sk-row { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border-subtle); }
+.sk-card > header .sk { vertical-align: middle; }
+.teambar i.sk { display: block; height: 4px; }
+@keyframes sk-pulse { from { opacity: 1; } to { opacity: 0.55; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; }
+  .progress::after { animation: none; width: 100%; opacity: 0.6; }
+  #app[aria-busy="true"] > * { transition: none; }
+}
 
 @media (max-width: 960px) {
   main { padding: var(--space-4); }

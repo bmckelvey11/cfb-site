@@ -18,8 +18,10 @@
       <a href="?view=custom" data-nav="custom">Custom matchup</a>
     </nav>
     <span class="snap" id="snap"></span>
+    <div class="progress" id="progress" hidden></div>
   </header>
-  <main id="app" aria-live="polite"></main>
+  <p id="status" class="visually-hidden" role="status" aria-live="polite"></p>
+  <main id="app"></main>
   <script src="{{ url_for('static', filename='matchup.js') }}"></script>
 </body>
 </html>

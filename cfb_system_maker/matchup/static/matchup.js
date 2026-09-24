@@ -21,16 +21,53 @@ window.addEventListener("popstate", render);
 // (the matchup data is cached, so this refetches nothing).
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
 
-async function api(path, query = {}) {
+// One request in flight at a time: a newer navigation aborts the older one, so a slow response
+// can never overwrite the view the user has already moved on to.
+let inflight = null;
+function newRequest() {
+  if (inflight) inflight.abort();
+  inflight = new AbortController();
+  return inflight.signal;
+}
+
+async function api(path, query = {}, signal) {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== null && v !== "") q.set(k, v);
-  const r = await fetch(path + "?" + q);
+  let r;
+  try {
+    r = await fetch(path + "?" + q, { signal });
+  } catch (e) {
+    if (e.name === "AbortError") throw e;
+    throw Object.assign(new Error("Can't reach the matchup server. Check that it's still running, then try again."), { status: 0 });
+  }
   if (!r.ok) {
     const body = await r.json().catch(() => ({}));
-    throw new Error(body.message || `${r.status} ${r.statusText}`);
+    throw Object.assign(new Error(body.message || `The server answered ${r.status}. Try again.`), { status: r.status });
   }
   return r.json();
 }
+
+// Loading feedback: a thin bar under the top bar, the old content dimmed (never blanked) while a
+// new view loads, and a screen-reader announcement once it lands.
+const statusEl = document.getElementById("status");
+const progressEl = document.getElementById("progress");
+const announce = (text) => { statusEl.textContent = text; };
+function setBusy(on) {
+  progressEl.hidden = !on;
+  if (on) app.setAttribute("aria-busy", "true"); else app.removeAttribute("aria-busy");
+}
+
+const skel = (w, h = 14) => `<span class="sk" style="width:${w}; height:${h}px"></span>`;
+function skeletonCards(n) {
+  return Array.from({ length: n }, (_, i) => `<section class="card sk-card" aria-hidden="true"><header>${skel("120px", 12)}</header>
+    <div class="body">${Array.from({ length: i === 0 ? 4 : 6 }, () => `<div class="sk-row">${skel("22%")}${skel("30%")}${skel("22%")}</div>`).join("")}</div></section>`).join("");
+}
+const skeletonMatchup = () => `<div class="vs" aria-hidden="true"><div class="a">${skel("56px", 56)}${skel("180px", 26)}</div>
+  <div class="mid">${skel("90px", 12)}</div><div class="b">${skel("180px", 26)}${skel("56px", 56)}</div></div>
+  <div class="teambar" aria-hidden="true"><i class="sk"></i><i class="sk"></i></div>
+  <div class="controls" aria-hidden="true">${skel("120px", 34)}${skel("190px", 34)}${skel("200px", 34)}</div>${skeletonCards(3)}`;
+const skeletonSlate = () => `<div aria-hidden="true">${skel("200px", 28)}<p>${skel("160px", 12)}</p>
+  <div class="controls">${skel("120px", 34)}${skel("120px", 34)}${skel("160px", 34)}</div></div>${skeletonCards(2)}`;
 
 function num(v, kind, dp) {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
@@ -85,7 +122,48 @@ function card(title, body, { stamps = [], footer = "", cls = "", note = "" } = {
     ${footer ? `<footer>${footer}</footer>` : ""}</section>`;
 }
 const nodata = (why) => `<span class="nodata">no data (${esc(why)})</span>`;
-const fail = (e) => { app.innerHTML = `<div class="error" role="alert">${esc(e.message)}</div>`; };
+const currentView = (p) => (p.a && p.b ? "matchup" : p.view === "custom" ? "custom" : "slate");
+
+// Responses cached per view and query: a client-side filter, a stat pick or a theme change
+// re-renders without refetching. Small, since a matchup response runs to a few hundred KB.
+const caches = { slate: new Map(), custom: new Map(), matchup: new Map() };
+const CACHE_SIZE = 6;
+
+async function load(view, path, query, skeleton) {
+  const key = JSON.stringify(query), cache = caches[view];
+  if (cache.has(key)) {
+    // A cached view wins over anything still loading, or that request would land later on top.
+    if (inflight) inflight.abort();
+    setBusy(false);
+    return cache.get(key);
+  }
+  const signal = newRequest();
+  // Same kind of view already on screen: keep it, dimmed, until the new data lands.
+  if (app.dataset.view !== view) { app.innerHTML = skeleton(); app.dataset.view = "loading"; }
+  setBusy(true);
+  announce(view === "matchup" ? "Loading matchup" : view === "custom" ? "Loading teams" : "Loading slate");
+  try {
+    const data = await api(path, query, signal);
+    cache.set(key, data);
+    if (cache.size > CACHE_SIZE) cache.delete(cache.keys().next().value);
+    return data;
+  } finally {
+    if (!signal.aborted) setBusy(false);
+  }
+}
+
+// A failure never wipes a view that's already on screen: the alert goes above it.
+function fail(e, view) {
+  if (e.name === "AbortError") return;
+  setBusy(false);
+  const title = { matchup: "Couldn't load this matchup", custom: "Couldn't load the team list", slate: "Couldn't load the slate" }[view];
+  const alert = `<div class="alert" role="alert"><p><strong>${title}.</strong> ${esc(e.message)}</p>
+    <p class="alert-actions"><button type="button" data-retry>Try again</button>${view === "slate" ? "" : '<a href="?">Back to the slate</a>'}</p></div>`;
+  app.querySelector(":scope > .alert")?.remove();
+  if (app.dataset.view === view) app.insertAdjacentHTML("afterbegin", alert);
+  else { app.innerHTML = alert; app.dataset.view = "error"; }
+  app.querySelector("[data-retry]").onclick = () => render();
+}
 
 function navState(view) {
   document.querySelectorAll("[data-nav]").forEach((a) => {
@@ -114,14 +192,18 @@ function seasonOptions(selected, last) {
 
 // ---------- render ----------
 async function render() {
-  const p = params();
-  if (!(p.a && p.b)) app.style.cssText = "";  // school colors belong to a matchup only
+  const p = params(), view = currentView(p);
+  // A re-render replaces the controls; put keyboard focus back on the one just used.
+  const focusId = app.contains(document.activeElement) ? document.activeElement.id : "";
+  navState(view === "matchup" ? null : view);
   try {
-    if (p.a && p.b) { navState(null); return await matchup(p); }
-    if (p.view === "custom") { navState("custom"); return await custom(p); }
-    navState("slate");
-    return await slate(p);
-  } catch (e) { fail(e); }
+    if (view === "matchup") await matchup(p);
+    else if (view === "custom") await custom(p);
+    else await slate(p);
+    if (view !== "matchup") app.style.cssText = "";  // school colors belong to a matchup only
+    app.dataset.view = view;
+    if (focusId) document.getElementById(focusId)?.focus({ preventScroll: true });
+  } catch (e) { fail(e, view); }
 }
 
 // ---------- slate ----------
@@ -155,9 +237,11 @@ function bookTotals(books) {
 }
 
 async function slate(p) {
-  app.innerHTML = `<p class="sub">Loading slate…</p>`;
   const [season_type, wk] = (p.week || "").includes(":") ? p.week.split(":") : ["regular", p.week];
-  const d = await api("/api/slate", { season: p.season, week: wk, season_type });
+  const d = await load("slate", "/api/slate", { season: p.season, week: wk, season_type }, skeletonSlate);
+  // The landing URL names no week; file the response under the week it resolved to as well, so
+  // the filters (which put season and week in the URL) read it from the cache.
+  caches.slate.set(JSON.stringify({ season: String(d.season), week: String(d.week), season_type: d.season_type }), d);
   setSnap(d.snapshot);
   const all = p.all === "1";
   const pool = d.games.filter((g) => (all ? g.home_fbs || g.away_fbs : g.lined));
@@ -201,6 +285,7 @@ async function slate(p) {
     html += `</tbody></table></div>`;
   }
   app.innerHTML = html;
+  announce(`${d.season} ${d.season_type === "regular" ? "week " + d.week : "postseason"} slate, ${games.length} games`);
 
   const base = { season: d.season, week: curWeek, conf: p.conf, all: all ? "1" : "" };
   document.getElementById("s-season").onchange = (e) => go({ season: e.target.value });
@@ -217,8 +302,8 @@ async function slate(p) {
 
 // ---------- custom ----------
 async function custom(p) {
-  app.innerHTML = `<p class="sub">Loading teams…</p>`;
-  const d = await api("/api/teams", { season: p.season });
+  const d = await load("custom", "/api/teams", { season: p.season }, skeletonSlate);
+  caches.custom.set(JSON.stringify({ season: String(d.season) }), d);
   const all = p.alldiv === "1";
   const pool = d.teams.filter((t) => all || t.fbs);
   const lastSeason = new Date().getMonth() >= 6 ? new Date().getFullYear() : new Date().getFullYear() - 1;
@@ -610,20 +695,12 @@ function unitsSection(u, A, B, full, week, picks) {
   });
 }
 
-const cache = { key: null, data: null };
-
 async function matchup(p) {
   const full = p.mode === "full";
   const [season_type, wk] = (p.week || "").includes(":") ? p.week.split(":") : ["regular", p.week];
   const query = { a: p.a, b: p.b, season: p.season, week: wk, season_type, game_id: p.game_id,
     mode: p.mode, postgame: p.postgame, rollup: p.rollup, fcs: p.fcs, ngt: p.ngt };
-  const key = JSON.stringify(query);
-  if (cache.key !== key) {
-    app.innerHTML = `<p class="sub">Loading matchup…</p>`;
-    cache.data = await api("/api/matchup", query);
-    cache.key = key;
-  }
-  const d = cache.data;
+  const d = await load("matchup", "/api/matchup", query, skeletonMatchup);
   const picks = Object.fromEntries(Object.entries(p).filter(([k]) => k.startsWith("pick_")).map(([k, v]) => [k.slice(5), v]));
   const m = d.meta, s = d.sections, A = m.a, B = m.b;
   setSnap(m.snapshot);
@@ -675,6 +752,7 @@ async function matchup(p) {
   html += trendsSection(s.trends, A, B);
   html += sourcesSection(d);
   app.innerHTML = html;
+  announce(`${A.school} versus ${B.school}, ${full ? "full season" : "as of week " + m.week}, loaded`);
 
   const base = { ...p, season: m.season };
   document.getElementById("m-season").onchange = (e) => go({ ...base, season: e.target.value, week: "", game_id: "" });

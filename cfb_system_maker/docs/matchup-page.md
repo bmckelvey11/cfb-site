@@ -172,6 +172,13 @@ when they disagree. Assigned here, with the reason in the registry:
 
 Measured 2026-09-24: 2.1-3.1 s per matchup through the Flask test client, 3.0 s on a live
 request, 4.7 s for a first load in a browser, against a 5 s budget. Most of it is the PFF and
-unit windows (every FBS team is aggregated for ranks). Opening the 5.3 GB file costs about 0.1 s. One trap found building it: a `CASE`
+unit windows (every FBS team is aggregated for ranks).
+
+While a view loads, the page shows a skeleton on first load and otherwise keeps the current view
+on screen, dimmed, under a progress bar; a screen-reader status line announces when it lands.
+Responses are cached in the page (six per view), so a client-side filter, a stat pick or a theme
+change re-renders without a request, and a newer navigation aborts an older request so a slow
+response can't overwrite it. The page does not use `content-visibility`: it blanked full-page
+captures and shifted the page height for little rendering gain. Opening the 5.3 GB file costs about 0.1 s. One trap found building it: a `CASE`
 inside a `LEFT JOIN ... ON` kept DuckDB off a hash join and cost 5 s a request; the PFF join is
 now plain equality on a precomputed PFF week. Every request logs its time, and the page shows it.
