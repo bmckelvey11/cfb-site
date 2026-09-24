@@ -23,6 +23,7 @@ investigations). This directory holds what is specific to *this* unit's code.
 | [warehouse-catalog-regeneration-2026-09-16.md](warehouse-catalog-regeneration-2026-09-16.md) | What changed in the warehouse since the catalog was last hand-built on 2026-08-29, and whether it can be regenerated rather than re-written. |
 | [data-currency-check-2026-09-16.md](data-currency-check-2026-09-16.md) | Are CFBD and PFF current through week 2? Yes; six stale GraphQL dumps re-pulled. |
 | [line-coverage-2026-09-16.md](line-coverage-2026-09-16.md) | Which books, markets, and seasons the warehouse has lines for, counted in distinct games. Reproduce with `python scripts/audit_line_coverage.py --min-season 2012`. |
+| [circa-line-audit-2026-09-24.md](circa-line-audit-2026-09-24.md) | Is `circa` on `core.fact_game_line` a usable sharp close? **No** — it is Action Network's consensus opener, and the loader's other AN book labels (`pinnacle`, `fanduel`, `betmgm`, `bet365`, `caesars`) are wrong too. Reproduce with `python scripts/audit_an_book_labels.py`. Loader fix pending a decision. |
 | [app-vs-warehouse-read-path-2026-09-16.md](app-vs-warehouse-read-path-2026-09-16.md) | Should the app read `cfb.duckdb` instead of the processed files? **No.** Retiring unread `core` tables stays open. |
 | [sites-hosting-fit-2026-09-16.md](sites-hosting-fit-2026-09-16.md) | Can the Flask app run on Sites unchanged? No; options for a Sites interface over a separately hosted Python service. |
 
