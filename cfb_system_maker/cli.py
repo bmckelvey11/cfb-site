@@ -981,7 +981,7 @@ def _build_parser() -> argparse.ArgumentParser:
     web.add_argument("--debug", action="store_true")
 
     matchup = subparsers.add_parser("matchup", help="team matchup page at 127.0.0.1")
-    matchup.add_argument("--port", type=int, default=5050)
+    matchup.add_argument("--port", type=int, default=int(os.environ.get("PORT") or 5050))
     matchup.add_argument("--debug", action="store_true")
 
     return parser

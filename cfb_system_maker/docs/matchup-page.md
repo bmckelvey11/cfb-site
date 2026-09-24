@@ -13,8 +13,9 @@ commit.
 python -m cfb_system_maker matchup            # http://127.0.0.1:5050
 ```
 
-It binds `127.0.0.1` only: the page reads the whole warehouse and has no auth. The launcher
-entry is **Matchup page** in `.claude/launch.json`. Tests: `python -m pytest tests/test_matchup_page.py`
+It binds `127.0.0.1` only: the page reads the whole warehouse and has no auth. The port is
+`--port`, else `PORT`, else 5050. The launcher entry **Matchup page** in `.claude/launch.json`
+uses `autoPort`, so it starts on a free port when a terminal copy already holds 5050. Tests: `python -m pytest tests/test_matchup_page.py`
 (a fixture warehouse in `tmp_path`, never the real file).
 
 | File | Holds |

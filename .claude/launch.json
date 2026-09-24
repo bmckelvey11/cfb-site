@@ -82,12 +82,10 @@
       "runtimeArgs": [
         "-m",
         "cfb_system_maker",
-        "matchup",
-        "--port",
-        "5050"
+        "matchup"
       ],
       "port": 5050,
-      "url": "http://127.0.0.1:5050"
+      "autoPort": true
     },
     {
       "name": "Marimo",
