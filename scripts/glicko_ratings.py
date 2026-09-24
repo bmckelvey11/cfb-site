@@ -25,6 +25,13 @@ FBS, FCS = "fbs", "fcs"
 # not frozen here: glicko_ratings_eval.fcs_seed recomputes it from the 2013 burn-in games.
 FROZEN_V1 = {"sigma": 13, "tau": 0.75, "w": 0.9, "delta": 6, "cap": float("inf"),
              "hfa": 2.75, "u0": 14}
+# P1 (docs/glicko-pool-2026-09-24.md): adopted variant `pool_conf`, frozen by its one scoring
+# run. Superseded v1 as the descriptive/weekly-table base. Its game set is glicko_pool_eval's
+# load_pool_games (every completed D-I game, not just games.csv's lined ones), and its FCS
+# seed comes from glicko_pool_eval.fcs_seed_pool, run with home_conf/away_conf present so the
+# conference-mean offseason target is used.
+FROZEN_P1 = {"sigma": 15, "tau": 1.5, "w": 0.7, "delta": 6, "cap": float("inf"),
+            "hfa": 2, "u0": 14}
 _EPOCH = pd.Timestamp("1970-01-01", tz="UTC")
 
 
