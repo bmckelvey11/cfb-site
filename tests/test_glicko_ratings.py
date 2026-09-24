@@ -93,6 +93,35 @@ def test_sign_convention():
     assert m.r["F"] == -20.0                         # FCS team enters at the FCS seed
 
 
+def test_no_conference_reproduces_v1_exactly():
+    g = _season()
+    with_conf = g.assign(home_conf=None, away_conf=None)
+    plain = run(model(), g, events(g))
+    labelled_none = run(model(), with_conf, events(with_conf))
+    assert plain.equals(labelled_none)
+
+
+def test_conference_mean_is_offseason_target_with_subdivision_fallback():
+    m = model(w=0.8, delta=0.0)
+    # Season 2020: two Big Sky teams and one team in a conference with no other member yet.
+    for k, r, conf in (("A", 10.0, "Big Sky"), ("B", -2.0, "Big Sky"), ("C", 40.0, "Lonely")):
+        m.enter(k, FBS, 0.0, conf)
+        m.r[k] = r
+        m.played(k, FBS, 2020, conf)
+    m.season_start(2020, 400.0)
+    # A, B pull toward the Big Sky mean (4.0), not the FBS-wide mean.
+    assert math.isclose(m.r["A"], 0.8 * 10.0 + 0.2 * 4.0)
+    assert math.isclose(m.r["B"], 0.8 * -2.0 + 0.2 * 4.0)
+    # C is alone in "Lonely" this season, so its own rating is its own mean: no visible pull.
+    assert math.isclose(m.r["C"], 40.0)
+    # A brand-new Big Sky team enters at the conference mean, not the FBS mean (0.0).
+    m.enter("D", FBS, 400.0, "Big Sky")
+    assert math.isclose(m.r["D"], 4.0)
+    # A team new to a conference nobody has played this cycle falls back to the subdivision mean.
+    m.enter("E", FBS, 400.0, "Never Seen")
+    assert m.r["E"] == m.mean[FBS]
+
+
 def test_ratings_table_centres_on_fbs_and_ranks_within_subdivision():
     from scripts.glicko_ratings_eval import GRIDS
     from scripts.glicko_ratings_table import ratings_table

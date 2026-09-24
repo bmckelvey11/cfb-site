@@ -58,12 +58,16 @@ def events(games: pd.DataFrame) -> list[tuple]:
 def run(model, games: pd.DataFrame, ev: list[tuple], snaps: list | None = None) -> pd.DataFrame:
     """Replay `ev` through `model`; one forecast row per game, taken at its week's cutoff.
 
-    `games` needs home, away, neutral, margin, home_div, away_div. With `snaps` (a list),
-    regular-season cutoffs append the state of every rated team (GlickoMargin only).
+    `games` needs home, away, neutral, margin, home_div, away_div, and optionally home_conf,
+    away_conf (pool rung P1 only -- omitting them reproduces v1 exactly). With `snaps` (a
+    list), regular-season cutoffs append the state of every rated team (GlickoMargin only).
     """
     home, away = games["home"].tolist(), games["away"].tolist()
     neutral, margin = games["neutral"].tolist(), games["margin"].tolist()
     hdiv, adiv = games["home_div"].tolist(), games["away_div"].tolist()
+    n = len(games)
+    hconf = games["home_conf"].tolist() if "home_conf" in games.columns else [None] * n
+    aconf = games["away_conf"].tolist() if "away_conf" in games.columns else [None] * n
     rows: list[tuple] = []
     season = None
     for t, kind, s, x in ev:
@@ -74,15 +78,15 @@ def run(model, games: pd.DataFrame, ev: list[tuple], snaps: list | None = None) 
         if kind == 0:
             key, idx = x
             for i in idx:
-                model.enter(home[i], hdiv[i], t)
-                model.enter(away[i], adiv[i], t)
+                model.enter(home[i], hdiv[i], t, hconf[i])
+                model.enter(away[i], adiv[i], t, aconf[i])
                 rows.append((i, *model.forecast(home[i], away[i], neutral[i], t)))
             if snaps is not None and key[1] == "regular":
                 snaps += [(key[0], key[2], t, k, *model.state(k)) for k in model.r]
         else:
             model.update(home[x], away[x], neutral[x], margin[x], t)
-            model.played(home[x], hdiv[x], s)
-            model.played(away[x], adiv[x], s)
+            model.played(home[x], hdiv[x], s, hconf[x])
+            model.played(away[x], adiv[x], s, aconf[x])
     out = pd.DataFrame(rows, columns=["row", *model.COLS]).set_index("row").sort_index()
     return out
 
@@ -90,22 +94,37 @@ def run(model, games: pd.DataFrame, ev: list[tuple], snaps: list | None = None) 
 # --- models ---------------------------------------------------------------------
 
 class _Teams:
-    """Who is rated, their subdivision, and the subdivision means new teams enter at."""
+    """Who is rated, their subdivision, and the means new teams enter at.
+
+    A team's `conf` is optional (pool rung P1 only; v1 never passes one). `_target` picks a
+    team's conference mean when one has been observed, else its subdivision mean, so passing
+    no conference reproduces v1 exactly -- test_glicko_ratings.py pins that.
+    """
 
     def __init__(self, seed: dict[str, float]):
         self.r: dict[str, float] = {}
         self.div: dict[str, str] = {}
+        self.conf: dict[str, str | None] = {}
         self.last: dict[str, int] = {}
         self.n: dict[str, int] = {}
         self.mean = dict(seed)
+        self.conf_mean: dict[str, float] = {}
 
-    def enter(self, k: str, div: str, t: float) -> None:
+    def _target(self, div: str, conf: str | None) -> float:
+        if conf is not None and conf in self.conf_mean:
+            return self.conf_mean[conf]
+        return self.mean[div]
+
+    def enter(self, k: str, div: str, t: float, conf: str | None = None) -> None:
         if k not in self.r:
-            self.r[k], self.div[k], self.n[k] = self.mean[div], div, 0
+            self.conf[k] = conf
+            self.r[k], self.div[k], self.n[k] = self._target(div, conf), div, 0
             self._new(k, t)
 
-    def played(self, k: str, div: str, season: int) -> None:
+    def played(self, k: str, div: str, season: int, conf: str | None = None) -> None:
         self.div[k], self.last[k] = div, season
+        if conf is not None:
+            self.conf[k] = conf
         self.n[k] += 1
 
     def season_start(self, ended: int, t: float) -> None:
@@ -114,6 +133,13 @@ class _Teams:
             vals = [self.r[k] for k in self.r if self.div[k] == c and self.last.get(k) == ended]
             if vals:
                 self.mean[c] = sum(vals) / len(vals)
+        groups: dict[str, list[float]] = {}
+        for k in self.r:
+            c = self.conf.get(k)
+            if c is not None and self.last.get(k) == ended:
+                groups.setdefault(c, []).append(self.r[k])
+        for c, vals in groups.items():
+            self.conf_mean[c] = sum(vals) / len(vals)
         for k in self.r:
             self.n[k] = 0
             self._offseason(k, t)
@@ -161,7 +187,7 @@ class GlickoMargin(_Teams):
         self.u2[a] *= 1.0 - ka
 
     def _offseason(self, k, t):
-        self.r[k] = self.w * self.r[k] + (1.0 - self.w) * self.mean[self.div[k]]
+        self.r[k] = self.w * self.r[k] + (1.0 - self.w) * self._target(self.div[k], self.conf.get(k))
         self.u2[k] += self.delta2
         self.tl[k] = t
 
