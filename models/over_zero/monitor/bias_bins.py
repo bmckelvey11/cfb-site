@@ -1,7 +1,7 @@
 """Profit by expected-censoring-bias bin, walk-forward.
 
   python monitor/bias_bins.py [--season 2013 ... 2025] [--min-train 3]
-      [--fig docs/figs/bias_bins.png]
+      [--fig docs/figs/bias_bins.png] [--bin-width 0.25 [--bin-max 3.0]]
 
 Answers two different questions that are easy to conflate:
 
@@ -111,9 +111,9 @@ def _row(bias, over, prob, sel, label, risk=110.0, payout=100.0):
             "f_max": float(f.max())}
 
 
-def bin_rows(bias, over, prob):
+def bin_rows(bias, over, prob, edges=BIN_EDGES):
     rows = []
-    for lo_e, hi_e in zip(BIN_EDGES[:-1], BIN_EDGES[1:]):
+    for lo_e, hi_e in zip(edges[:-1], edges[1:]):
         sel = (bias > lo_e) & (bias <= hi_e)
         label = f"{lo_e:.2f}-{hi_e:.2f}" if np.isfinite(hi_e) else f">{lo_e:.2f}"
         rows.append(_row(bias, over, prob, sel, label))
@@ -179,15 +179,19 @@ def make_figure(bins, sweep, path):
             capsize=4, ecolor="#444", width=0.62)
     ax1.axhline(be, color="#C44E52", ls="--", lw=1.4,
                 label=f"breakeven {be:.2f}% (-110)")
+    many = len(bins) > 6   # --bin-width: narrow bins need rotated, sparser labels
     for x, r in enumerate(bins):
         if r["n"]:
             ax1.text(x, wins[x] + hi_err[x] + 1.1, f"n={r['n']}",
-                     ha="center", fontsize=8.5, color="#333")
+                     ha="center", va="bottom", rotation=90 if many else 0,
+                     fontsize=7.5 if many else 8.5, color="#333")
     ax1.set_title("Over win rate by expected-bias bin\n(disjoint, walk-forward)",
                   fontsize=11)
     ax1.set_xlabel("expected censoring bias (points)")
     ax1.set_ylabel("over win rate (%)")
-    ax1.set_ylim(35, 85)
+    # Thin bins at high bias carry wide intervals; widen rather than clip them.
+    ax1.set_ylim(min(35, np.nanmin([r["lo"] for r in bins]) * 100 - 3),
+                 max(85, np.nanmax([r["hi"] for r in bins]) * 100 + (12 if many else 6)))
     ax1.legend(fontsize=8.5, loc="upper left")
     ax1.grid(axis="y", alpha=0.25)
 
@@ -228,9 +232,9 @@ def make_figure(bins, sweep, path):
     for x, r in enumerate(staked_bins):
         above = k_roi[x] >= 0
         ax3.text(x, k_roi[x] + (0.03 if above else -0.03) * span,
-                 f"stake {r['f_mean']*100:.1f}%\nN={r['n']}",
+                 f"N={r['n']}" if many else f"stake {r['f_mean']*100:.1f}%\nN={r['n']}",
                  ha="center", va="bottom" if above else "top",
-                 fontsize=8, color="#333")
+                 fontsize=7.5 if many else 8, color="#333")
     skipped = [r["label"] for r in bins if r["staked"] == 0]
     sub = f"\nstakes nothing (model below breakeven): {', '.join(skipped)}" \
         if skipped else ""
@@ -239,6 +243,9 @@ def make_figure(bins, sweep, path):
     ax3.set_xlabel("expected censoring bias (points)")
     ax3.set_ylabel("return per unit staked (%)")
     ax3.grid(axis="y", alpha=0.25)
+    if many:
+        for ax in (ax1, ax3):
+            ax.tick_params(axis="x", labelrotation=55, labelsize=8)
 
     fig.suptitle(f"Floor Bias: profit by expected censoring bias "
                  f"(walk-forward, train on seasons < t; "
@@ -276,6 +283,10 @@ def main():
     ap.add_argument("--min-train", type=int, default=3)
     ap.add_argument("--fig", default="docs/figs/bias_bins.png")
     ap.add_argument("--no-fig", action="store_true")
+    ap.add_argument("--bin-width", type=float,
+                    help="equal-width bins up to --bin-max, then one open bin "
+                         "(default: the documented edges)")
+    ap.add_argument("--bin-max", type=float, default=3.0)
     ap.add_argument("--self-check", action="store_true",
                     help="run the staking-maths assertions and exit")
     args = ap.parse_args()
@@ -296,7 +307,11 @@ def main():
     print(f"Staking: {KELLY_FRACTION:g}-Kelly off the trained probit's win "
           f"probability, at -110.")
 
-    bins = bin_rows(bias, over, prob)
+    edges = BIN_EDGES
+    if args.bin_width:
+        # Rounded so 0.75 is 0.75, not 0.7500000000000001, in the labels.
+        edges = list(np.round(np.arange(0, args.bin_max + 1e-9, args.bin_width), 6)) + [np.inf]
+    bins = bin_rows(bias, over, prob, edges)
     sweep = sweep_rows(bias, over, prob)
 
     _print_table("PROFIT BY BIAS BIN (disjoint)", bins,
