@@ -41,6 +41,8 @@ create table core.fact_game as select game_id, 2026 as season, week, 'regular' a
   start::timestamptz as start_date, completed, true as has_line, 1 as venue_id,
   home_team_id, away_team_id, home_team, away_team, 'X' as home_conference, 'X' as away_conference,
   home_points, away_points from (values
+  (99, 1, '2026-08-22 19:00:00-04', true, 2, 4, 'Beta', 'Delta', 40, 0),
+  (100, 1, '2026-08-29 19:00:00-04', true, 2, 3, 'Beta', 'Gamma', 14, 10),
   (101, 1, '2026-09-05 19:00:00-04', true, 1, 4, 'Alpha', 'Delta', 30, 10),
   (102, 2, '2026-09-12 19:00:00-04', true, 1, 3, 'Alpha', 'Gamma', 17, 20),
   (103, 3, '2026-09-19 19:00:00-04', true, 2, 1, 'Beta', 'Alpha', 21, 24),
@@ -147,11 +149,58 @@ create table core.fact_drive_postgame as select game_id, 2026 as season, offense
 """
 
 
+# PFF player-weeks: (table, week, franchise, player, {column: value}). Franchises 11/12/13 are
+# Alpha/Beta/Gamma. Beta's PFF week 0 is its Aug 22 game vs FCS Delta, week 1 the Aug 29 game.
+PFF_ROWS = [
+    ("stg.pff_offense_summary", 1, 11, 501, {"grades_offense": 90, "snap_counts_total": 10}),
+    ("stg.pff_offense_summary", 2, 11, 501, {"grades_offense": 60, "snap_counts_total": 30}),
+    ("stg.pff_offense_summary", 3, 11, 501, {"grades_offense": 70, "snap_counts_total": 10}),
+    ("stg.pff_offense_summary", 0, 12, 601, {"grades_offense": 50, "snap_counts_total": 10}),
+    ("stg.pff_offense_summary", 1, 12, 601, {"grades_offense": 80, "snap_counts_total": 10}),
+    ("stg.pff_passing", 2, 11, 501, {"grades_pass": 75, "dropbacks": 30, "epa": 6}),
+    ("stg.pff_passing", 3, 11, 502, {"grades_pass": 55, "dropbacks": 5, "epa": 0}),
+    ("stg.pff_field_goal", 2, 11, 503, {"grades_fgep_kicker": 70, "total_attempts": 2, "total_made": 1}),
+]
+
+
+def _pff_tables(con) -> None:
+    from cfb_system_maker.matchup.stats import PFF_METRICS, PFF_PLAYERS, SPECIAL_TEAMS
+    cols: dict[str, set] = {}
+    for m in PFF_METRICS + SPECIAL_TEAMS:
+        cols.setdefault(m.table, set()).update({m.column, m.weight})
+    for _, table, grade, volume, (_, xnum, xden), _, _ in PFF_PLAYERS:
+        cols.setdefault(table, set()).update(c for c in (grade, volume, xnum, xden) if c)
+    split_tables = {m.table for m in PFF_METRICS if m.split} | {t for _, t, *_, s in PFF_PLAYERS if s}
+    for table, cs in cols.items():
+        cs = sorted(cs)
+        extra = ", split varchar" if table in split_tables else ""
+        con.execute(f"create table {table} (season int, week int, player_id int, franchise_id int{extra}, "
+                    + ", ".join(f"{c} double" for c in cs) + ")")
+        for t, week, fr, pid, vals in PFF_ROWS:
+            if t == table:
+                names = ["season", "week", "player_id", "franchise_id", *(["split"] if extra else []), *vals]
+                con.execute(f"insert into {table} ({', '.join(names)}) values ({', '.join('?' * len(names))})",
+                            [2026, week, pid, fr, *(["all"] if extra else []), *vals.values()])
+    con.execute("""create table stg.pff_franchise as select * from (values (11, 'team', 1), (12, 'team', 2),
+                   (13, 'team', 3)) t(franchise_id, kind, cfbd_team_id)""")
+    con.execute("""create table stg.pff_player_season as select * from (values (2026, 501, 'Al QB', 'QB'),
+                   (2026, 502, 'Backup QB', 'QB')) t(season, player_id, player, position)""")
+    con.execute("""create table stg.kicker_paar as select * from (values (2025, 'Alpha', 1.5, 20),
+                   (2025, 'Beta', -0.5, 18), (2026, 'Alpha', 3.0, 4)) t(season, team, paar, attempts)""")
+    con.execute("""create table stg.ppa_players_games as select * from (values
+                   ('9', 2026, 2, 'regular', 'Alpha', 'Al QB', 'Gamma', 0.4, 0.5, 0.1, 'QB'),
+                   ('9', 2026, 1, 'regular', 'Alpha', 'Al QB', 'Delta', 0.9, 0.9, 0.9, 'QB'))
+                   t("athleteId", season, week, "seasonType", team, name, opponent, "averagePPA_all",
+                     "averagePPA_pass", "averagePPA_rush", position)""")
+    con.execute("create table stg.ppa_players_games_ngt as select * from stg.ppa_players_games")
+
+
 @pytest.fixture()
 def warehouse(tmp_path) -> Path:
     db = tmp_path / "cfb.duckdb"
     con = duckdb.connect(str(db))
     con.execute(FIXTURE_SQL)
+    _pff_tables(con)
     _game_table(con, "stg.advanced_game_stats", "advanced")
     _game_table(con, "stg.advanced_game_stats_ngt", "advanced", max_week=2)  # lags a week
     _game_table(con, "stg.ppa_games", "ppa")
@@ -333,6 +382,45 @@ def test_game_card_is_the_next_meeting_not_one_inside_the_window(warehouse):
         assert q.find_game(con, 2026, 1, 2, None) == 104  # full season: the last meeting
 
 
+def _pff_off(con, week, fcs=True, full=False):
+    from cfb_system_maker.matchup.stats import PFF_OVERALL_O
+    cutoff = None if full else q.first_kickoff(con, 2026, week)
+    return q.pff_team(con, [PFF_OVERALL_O], 2026, cutoff, full=full, rollup="pooled", fcs=fcs)
+
+
+def test_pff_weeks_map_to_games_and_cut_on_kickoff(warehouse):
+    with q.warehouse(warehouse) as con:
+        wk4, wk4_fcs = _pff_off(con, 4), _pff_off(con, 4, fcs=False)
+        wk1, wk2 = _pff_off(con, 1, fcs=False), _pff_off(con, 2)
+        wk2_fcs = _pff_off(con, 2, fcs=False)
+    assert wk4[1]["pff_off"] == pytest.approx((60 * 30 + 70 * 10) / 40)  # wk1 vs FCS Delta out
+    assert wk4_fcs[1]["pff_off"] == pytest.approx((900 + 1800 + 700) / 50)
+    assert 2 not in wk1  # Beta's PFF week 0 is CFBD week 1: nothing before week 1's first kickoff
+    assert wk2[2] == {"n": 1, "pff_off": 80.0}  # week 0 was the FCS game
+    assert wk2_fcs[2]["pff_off"] == pytest.approx(65.0)
+
+
+def test_players_are_windowed_and_named(warehouse):
+    with q.warehouse(warehouse) as con:
+        pl = q.players(con, 2026, 4, q.first_kickoff(con, 2026, 4), 1, 2, full=False, fcs=True, ngt=True)
+    (qb,) = pl["1"]["pff"]["QB"]["players"]
+    assert (qb["player"], qb["volume"], qb["grade"]) == ("Al QB", 30.0, 75.0)
+    assert qb["extra"] == pytest.approx(0.2)  # EPA per dropback
+    (cf,) = pl["1"]["cfbd"]["QB"]
+    assert cf["games"] == 1 and cf["ppa_pass"] == pytest.approx(0.5)  # the FCS game is out
+
+
+def test_special_teams_paar_is_prior_season_as_of(warehouse):
+    with q.warehouse(warehouse) as con:
+        cutoff = q.first_kickoff(con, 2026, 4)
+        st = q.special_teams(con, 2026, 4, cutoff, 1, 2, full=False, rollup="pooled", fcs=True,
+                             show_postgame=True)
+    fg = next(r for r in st["rows"] if r["key"] == "st_fg")
+    assert fg["a"]["value"] == pytest.approx(70.0) and fg["a"]["games"] == 1
+    assert st["paar_basis"] == "prior_season" and st["paar"][0]["a"]["value"] == 1.5
+    assert st["postgame"][0]["a"]["value"] == 3.0
+
+
 def test_registry_verdicts_match_the_eligibility_audit():
     audit = Path(os.environ.get("CFB_DATA_ROOT", "")) / "processed" / "pregame_feature_eligibility.csv"
     if not audit.is_file():
@@ -342,6 +430,9 @@ def test_registry_verdicts_match_the_eligibility_audit():
     checks = [(s.key, s.table, s.column, s.verdict, s.reason) for s in ALL]
     checks += [(u.key, u.table, f"{side}_{u.stem}", u.verdict, u.reason)
                for u in UNITS for side in ("offense", "defense")]
+    from cfb_system_maker.matchup.stats import KICKER_PAAR, PFF_METRICS, SPECIAL_TEAMS
+    checks += [(m.key, m.table, m.column, m.verdict, m.reason) for m in PFF_METRICS + SPECIAL_TEAMS]
+    checks += [(KICKER_PAAR.key, KICKER_PAAR.table, KICKER_PAAR.column, KICKER_PAAR.verdict, KICKER_PAAR.reason)]
     for key, table, column, verdict, reason in checks:
         audited = verdicts.get((table, column))
         if audited is None:

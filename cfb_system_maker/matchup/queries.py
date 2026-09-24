@@ -13,6 +13,7 @@ bridged through `dim_team.school`. FBS membership is per season from `stg.fbs_te
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -21,10 +22,9 @@ import duckdb
 
 from cfb_paths import current_season
 from cfb_system_maker.matchup import odds as odds_mod
-from dataclasses import replace
-
 from cfb_system_maker.matchup.stats import (
-    ADJUSTED, PROFILE, RATINGS, SOURCES, UNIT_GROUPS, UNITS, Source, Stat, Unit, edge,
+    ADJUSTED, CFBD_PLAYERS_REASON, KICKER_PAAR, PFF_GROUPS, PFF_METRICS, PFF_PLAYERS, PROFILE, RATINGS,
+    SOURCES, SPECIAL_TEAMS, UNIT_GROUPS, UNITS, Pff, Source, Stat, Unit, edge,
 )
 
 SHARP_BOOKS = ("pinnacle", "circa")
@@ -330,6 +330,10 @@ def asof(con, season: int, week: int, season_type: str, *, full: bool) -> tuple[
     if full:
         return 99, None
     cutoff = first_kickoff(con, season, week, season_type)
+    if cutoff is None:  # a week with no scheduled games still has a calendar start
+        cutoff = con.execute("""select start_date from core.dim_week where season = ? and week = ?
+                                and season_type = ?""", [season, week, season_type]).fetchone()
+        cutoff = cutoff[0] if cutoff else datetime(season, 12, 31)
     return (99 if season_type == "postseason" else week), cutoff
 
 
@@ -608,3 +612,233 @@ def units(con, season: int, week: int, a: int, b: int, *, full: bool, rollup: st
 
     return {"rollup": rollup, "fcs": fcs, "ngt": ngt, "sources": status,
             "blocks": [block(a, b), block(b, a)]}
+
+
+# --- PFF ------------------------------------------------------------------------------------
+
+PFF_FIRST_SEASON = 2019
+
+# PFF numbers weeks 0-19: 0 is CFBD week 1's early (late-August) game, 1-14 are CFBD weeks
+# 1-14, 15-17 the late regular season, 18+ bowls (checked 2026-09-23 on five 2025
+# schedules). Each team-week is joined to its CFBD game, so the window cuts on kickoff time
+# and the FCS toggle sees the opponent. Weeks 15+ stay unmapped: they enter only full-season
+# views, which is conservative for as-of windows (never early, sometimes a game short).
+def _pff_ctes(season: int) -> str:
+    s = int(season)
+    return f"""
+    pff_map as (select franchise_id, cfbd_team_id as team_id from stg.pff_franchise
+                where kind = 'team' and cfbd_team_id is not null),
+    tw as (select *, row_number() over (partition by team_id, week order by start_date) as rn,
+                  count(*) over (partition by team_id, week) as k
+           from (select game_id, week, start_date, home_team_id as team_id, away_team_id as opp_id
+                 from core.fact_game where season = {s} and season_type = 'regular' and week <= 14
+                 union all
+                 select game_id, week, start_date, away_team_id, home_team_id
+                 from core.fact_game where season = {s} and season_type = 'regular' and week <= 14)),
+    -- the PFF week of each game: a team's first of two CFBD week-1 games is PFF week 0
+    tg as (select *, case when week = 1 and k = 2 and rn = 1 then 0 else week end as pff_week from tw)"""
+
+
+# Plain equality, so DuckDB can hash-join the player-week rows onto their game.
+_PFF_JOIN = """join pff_map m on m.franchise_id = p.franchise_id
+    left join tg g on g.team_id = m.team_id and g.pff_week = p.week"""
+
+
+def _pff_where(season: int, cutoff, *, full: bool, fcs: bool, split: bool) -> tuple[str, list]:
+    clauses, params = [f"p.season = {int(season)}"], []
+    if split:
+        clauses.append("p.split = 'all'")
+    if not full:
+        clauses.append("g.start_date < ?")
+        params.append(cutoff)
+    if fcs:  # unmapped late-season weeks are FBS matchups
+        clauses.append(f"(g.opp_id is null or g.opp_id in "
+                       f"(select teamId from stg.fbs_teams where season = {int(season)}))")
+    return " and ".join(clauses), params
+
+
+def pff_team(con, metrics: list[Pff], season: int, cutoff, *, full: bool, rollup: str,
+             fcs: bool) -> dict[int, dict]:
+    """team_id -> {"n": games, metric.key: value}; one query per PFF table."""
+    out: dict[int, dict] = {}
+    if season < PFF_FIRST_SEASON:
+        return out
+    for table in dict.fromkeys(m.table for m in metrics):
+        ms = [m for m in metrics if m.table == table]
+        sums, finals = [], []
+        for m in ms:
+            c, w = f'p."{m.column}"', f'p."{m.weight}"'
+            num = f"sum({c})" if m.ratio else f"sum({c} * {w})"
+            sums.append(f"({num} filter (where {c} is not null))::double as n_{m.key}, "
+                        f"(sum({w}) filter (where {c} is not null))::double as d_{m.key}")
+            finals.append(f"avg(n_{m.key} / nullif(d_{m.key}, 0)) as {m.key}" if rollup == "mean"
+                          else f"sum(n_{m.key}) / nullif(sum(d_{m.key}), 0) as {m.key}")
+        where, params = _pff_where(season, cutoff, full=full, fcs=fcs, split=any(m.split for m in ms))
+        found = rows(con, f"""
+            with {_pff_ctes(season)},
+            per_game as (
+                select m.team_id, coalesce(g.game_id, -p.week) as gk, max(p.week) as pw, {", ".join(sums)}
+                from {table} p {_PFF_JOIN}
+                where {where} group by 1, 2),
+            ranked as (select *, row_number() over (partition by team_id order by pw desc) as recency
+                       from per_game)
+            select team_id, count(*) as n, {", ".join(finals)}
+            from ranked where {"recency <= 3" if rollup == "last3" else "true"}
+            group by team_id""", params)
+        for r in found:
+            out.setdefault(r["team_id"], {"n": 0}).update({k: v for k, v in r.items() if k != "team_id"})
+            out[r["team_id"]]["n"] = max(out[r["team_id"]]["n"], r["n"])
+    return out
+
+
+def _pff_stat(m: Pff) -> Stat:
+    return Stat(m.key, m.label, m.table, m.column, m.higher_is_better, m.fmt, m.verdict, m.reason, m.dp)
+
+
+def _pff_side(m: Pff, data: dict, pool: dict, team: int) -> dict:
+    s = _side(_pff_stat(m), {t: r.get(m.key) for t, r in data.items()}, pool, team)
+    s["games"] = data.get(team, {}).get("n", 0)
+    return s
+
+
+def pff_latest(con, season: int) -> int | None:
+    """The newest PFF week that season, as a CFBD week (0 counts as 1)."""
+    r = con.execute("select max(week) from stg.pff_offense_summary where season = ? and week <= 14",
+                    [season]).fetchone()[0]
+    return None if r is None else max(r, 1)
+
+
+def pff(con, season: int, week: int, cutoff, a: int, b: int, *, full: bool, rollup: str,
+        fcs: bool) -> dict:
+    """PFF unit grades in the same two blocks as the CFBD units, edge by rank percentile."""
+    if season < PFF_FIRST_SEASON:
+        return {"available": False, "reason": f"PFF grades start in {PFF_FIRST_SEASON}"}
+    universe, before = fbs(con, season), fbs(con, season - 1)
+    metrics = list(PFF_METRICS)
+    cur = pff_team(con, metrics, season, cutoff, full=full, rollup=rollup, fcs=fcs)
+    prior = pff_team(con, metrics, season - 1, None, full=True,
+                     rollup="mean" if rollup == "mean" else "pooled", fcs=fcs)
+    latest = pff_latest(con, season)
+    status = {"label": "PFF", "through_week": latest,
+              "stale": bool(not full and (latest or 0) < week - 1),
+              "games": {str(t): cur.get(t, {}).get("n", 0) for t in (a, b)}}
+
+    def option(label: str, o: Pff, d: Pff, off: int, dfn: int) -> dict:
+        so, sd = _pff_side(o, cur, universe, off), _pff_side(d, cur, universe, dfn)
+        return {"key": f"{o.key}:{d.key}", "label": label, "fmt": [o.fmt, d.fmt], "dp": [o.dp, d.dp],
+                "verdict": o.verdict, "source": f"{o.table}.{o.column} vs {d.table}.{d.column}",
+                "a": so, "b": sd, "edge": edge(_pct(so), _pct(sd), True),
+                "prior": {"season": season - 1, "a": _pff_side(o, prior, before, off),
+                          "b": _pff_side(d, prior, before, dfn)},
+                "estimate": None}
+
+    def block(off: int, dfn: int) -> dict:
+        return {"off": off, "def": dfn, "groups": [
+            {"group": g, "rows": [{"concept": ck, "label": label,
+                                   "options": [option(ol, o, d, off, dfn) for ol, o, d in opts]}
+                                  for ck, label, opts in concepts]}
+            for g, concepts in PFF_GROUPS]}
+
+    return {"available": True, "rollup": rollup, "fcs": fcs, "status": status,
+            "blocks": [block(a, b), block(b, a)]}
+
+
+def special_teams(con, season: int, week: int, cutoff, a: int, b: int, *, full: bool, rollup: str,
+                  fcs: bool, show_postgame: bool) -> dict:
+    """PFF special-teams grades A against B, plus kicker PAAR.
+
+    PAAR is a season-final snapshot, so as-of views show last season's (PRIOR SEASON) and this
+    season's only in the postgame panel.
+    """
+    universe, before = fbs(con, season), fbs(con, season - 1)
+    cur = pff_team(con, list(SPECIAL_TEAMS), season, cutoff, full=full, rollup=rollup, fcs=fcs)
+    prior = pff_team(con, list(SPECIAL_TEAMS), season - 1, None, full=True,
+                     rollup="mean" if rollup == "mean" else "pooled", fcs=fcs)
+    out_rows = []
+    for m in SPECIAL_TEAMS:
+        sa, sb = _pff_side(m, cur, universe, a), _pff_side(m, cur, universe, b)
+        out_rows.append({"key": m.key, "label": m.label, "fmt": m.fmt, "dp": m.dp, "verdict": m.verdict,
+                         "source": f"{m.table}.{m.column}", "a": sa, "b": sb,
+                         "edge": edge(sa["value"], sb["value"], m.higher_is_better),
+                         "prior": {"season": season - 1, "a": _pff_side(m, prior, before, a),
+                                   "b": _pff_side(m, prior, before, b)},
+                         "estimate": None})
+
+    def paar(s: int) -> list[dict]:
+        vals = dict(con.execute("""
+            select d.team_id, arg_max(k.paar, k.attempts)::double from stg.kicker_paar k
+            join core.dim_team d on d.school = k.team where k.season = ? group by d.team_id""",
+            [s]).fetchall())
+        return [stat_row(KICKER_PAAR, vals, fbs(con, s), a, b, season=s)]
+
+    out = {"available": season >= PFF_FIRST_SEASON, "rows": out_rows,
+           "paar": paar(season if full else season - 1), "paar_basis": "postgame" if full else "prior_season"}
+    if show_postgame and not full:
+        out["postgame"] = paar(season)
+    return out
+
+
+def _pff_players(con, team: int, season: int, cutoff, *, full: bool, fcs: bool) -> dict:
+    out = {}
+    names = {r["player_id"]: r for r in rows(con, """
+        select player_id, any_value(player) as player, any_value(position) as position
+        from stg.pff_player_season where season = ? group by player_id""", [season])}
+    for role, table, grade, volume, (xlabel, xnum, xden), limit, split in PFF_PLAYERS:
+        where, params = _pff_where(season, cutoff, full=full, fcs=fcs, split=split)
+        extra = (f'sum(p."{xnum}")::double / nullif(sum(p."{xden}"), 0)' if xden
+                 else f'sum(p."{xnum}")::double')
+        found = rows(con, f"""
+            with {_pff_ctes(season)}
+            select p.player_id, count(distinct coalesce(g.game_id, -p.week)) as games,
+                   sum(p."{volume}")::double as volume,
+                   (sum(p."{grade}" * p."{volume}") filter (where p."{grade}" is not null))::double
+                     / nullif(sum(p."{volume}") filter (where p."{grade}" is not null), 0) as grade,
+                   {extra} as extra
+            from {table} p {_PFF_JOIN}
+            where {where} and m.team_id = ?
+            group by p.player_id having sum(p."{volume}") > 0""", [*params, team])
+        if role == "Defenders":  # best grades among the regulars (40%+ of the top snap count)
+            top = max((r["volume"] for r in found), default=0)
+            found = sorted((r for r in found if r["volume"] >= 0.4 * top and r["grade"] is not None),
+                           key=lambda r: -r["grade"])[:limit]
+        else:
+            found = sorted(found, key=lambda r: -r["volume"])[:limit]
+        out[role] = {"volume": volume, "extra": xlabel, "players": [
+            dict(r, **{k: names.get(r["player_id"], {}).get(k) for k in ("player", "position")})
+            for r in found]}
+    return out
+
+
+def _cfbd_players(con, team: int, season: int, week: int, *, full: bool, fcs: bool, ngt: bool) -> dict:
+    src = Source("players", "stg.ppa_players_games", "stg.ppa_players_games_ngt", "CFBD player PPA")
+    table, used_ngt, lag = pick_table(con, src, season, ngt)
+    window = ("""p."seasonType" in ('regular', 'postseason')""" if full
+              else f"""p."seasonType" = 'regular' and p.week < {int(week)}""")
+    fcs_clause = (f"o.team_id in (select teamId from stg.fbs_teams where season = {int(season)})"
+                  if fcs else "true")
+    found = rows(con, f"""
+        select p."athleteId" as athlete_id, any_value(p.name) as player, any_value(p.position) as position,
+               count(*) as games, avg(p."averagePPA_all") as ppa, avg(p."averagePPA_pass") as ppa_pass,
+               avg(p."averagePPA_rush") as ppa_rush
+        from {table} p join core.dim_team t on t.school = p.team
+        left join core.dim_team o on o.school = p.opponent
+        where p.season = ? and t.team_id = ? and {window} and {fcs_clause}
+        group by 1""", [season, team])
+
+    def top(positions, key, limit):
+        pool = [r for r in found if r["position"] in positions and r[key] is not None]
+        return sorted(pool, key=lambda r: (-r["games"], -r[key]))[:limit]
+
+    return {"table": table, "ngt": used_ngt, "ngt_lag": lag, "verdict": "pregame_windowed",
+            "reason": CFBD_PLAYERS_REASON,
+            "QB": top({"QB"}, "ppa_pass", 1), "Rushers": top({"RB", "FB"}, "ppa_rush", 3),
+            "Receivers": top({"WR", "TE"}, "ppa_pass", 3)}
+
+
+def players(con, season: int, week: int, cutoff, a: int, b: int, *, full: bool, fcs: bool,
+            ngt: bool) -> dict:
+    """Key players per team: a PFF list and a CFBD list, unlinked (no id crosswalk exists)."""
+    return {str(t): {"pff": _pff_players(con, t, season, cutoff, full=full, fcs=fcs)
+                     if season >= PFF_FIRST_SEASON else None,
+                     "cfbd": _cfbd_players(con, t, season, week, full=full, fcs=fcs, ngt=ngt)}
+            for t in (a, b)}

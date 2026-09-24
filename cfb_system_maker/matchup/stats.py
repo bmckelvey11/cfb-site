@@ -188,6 +188,108 @@ UNIT_GROUPS: tuple[tuple[str, tuple[tuple[str, str, tuple[Unit, ...]], ...]], ..
 UNITS: tuple[Unit, ...] = tuple(u for _, rows in UNIT_GROUPS for _, _, cands in rows for u in cands)
 
 
+# --- PFF: player-week grades rolled up to team-game, then windowed ------------------------
+
+@dataclass(frozen=True)
+class Pff:
+    """A team-level PFF number from player-week rows.
+
+    Grade: sum(grade x weight) / sum(weight) over the team's players (weight = the snaps the
+    grade covers). ratio=True: sum(column) / sum(weight), e.g. pressures per pass-rush snap.
+    """
+    key: str
+    label: str
+    table: str
+    column: str
+    weight: str
+    higher_is_better: bool | None = True
+    fmt: str = "num"
+    dp: int | None = 1
+    ratio: bool = False
+    split: bool = False  # the table repeats each player-week per split; keep split='all'
+    verdict: str = PREGAME_WINDOWED
+    reason: str = ""
+
+
+def _off(key, label, column, weight):
+    return Pff(key, label, "stg.pff_offense_summary", column, weight)
+
+
+def _def(key, label, column, weight):
+    return Pff(key, label, "stg.pff_defense_summary", column, weight)
+
+
+PFF_OVERALL_O = _off("pff_off", "Offense grade", "grades_offense", "snap_counts_total")
+PFF_OVERALL_D = _def("pff_def", "Defense grade", "grades_defense", "snap_counts_defense")
+PFF_PASS_O = _off("pff_pass", "Passing grade", "grades_pass", "snap_counts_pass")
+PFF_ROUTE_O = Pff("pff_route", "Receiving grade", "stg.pff_receiving", "grades_pass_route", "routes", split=True)
+PFF_COVER_D = _def("pff_cover", "Coverage grade", "grades_coverage_defense", "snap_counts_coverage")
+PFF_PBLK_O = _off("pff_pblk", "Pass-block grade", "grades_pass_block", "snap_counts_pass_block")
+PFF_RUSH_D = _def("pff_prush", "Pass-rush grade", "grades_pass_rush_defense", "snap_counts_pass_rush")
+PFF_PRESS_O = Pff("pff_press_allowed", "Pressure allowed rate", "stg.pff_team_pass_block_week",
+                  "pressures_allowed", "pass_snaps", False, "pct", None, ratio=True)
+PFF_PRESS_D = Pff("pff_press", "Pressures per rush snap", "stg.pff_defense_summary",
+                  "total_pressures", "snap_counts_pass_rush", True, "pct", None, ratio=True)
+PFF_RUN_O = _off("pff_run", "Rushing grade", "grades_run", "snap_counts_run")
+PFF_RBLK_O = _off("pff_rblk", "Run-block grade", "grades_run_block", "snap_counts_run_block")
+PFF_RUND_D = _def("pff_rund", "Run-defense grade", "grades_run_defense", "snap_counts_run_defense")
+PFF_ELUS_O = Pff("pff_avoided", "Avoided tackles per carry", "stg.pff_rushing", "avoided_tackles",
+                 "attempts", True, "num", 3, ratio=True)
+PFF_YCO_O = Pff("pff_yco", "Yards after contact per carry", "stg.pff_rushing", "yards_after_contact",
+                "attempts", True, "num", 2, ratio=True)
+PFF_TACK_D = _def("pff_tackle", "Tackling grade", "grades_tackle", "snap_counts_defense")
+PFF_MISS_D = Pff("pff_missed", "Missed-tackle rate", "stg.pff_defense_summary", "missed_tackles",
+                 "tackles", False, "num", 3, ratio=True)
+
+# (concept, row label, (option label, offense metric, defense metric)...); first is the default.
+PFF_GROUPS: tuple[tuple[str, tuple], ...] = (
+    ("PFF grades", (
+        ("pff_overall", "Overall", (("Offense vs defense grade", PFF_OVERALL_O, PFF_OVERALL_D),)),
+        ("pff_passing", "Passing vs coverage", (
+            ("Passing grade vs coverage grade", PFF_PASS_O, PFF_COVER_D),
+            ("Receiving grade vs coverage grade", PFF_ROUTE_O, PFF_COVER_D))),
+        ("pff_protection", "Protection vs pass rush", (
+            ("Pass-block grade vs pass-rush grade", PFF_PBLK_O, PFF_RUSH_D),
+            ("Pressure allowed vs pressure rate", PFF_PRESS_O, PFF_PRESS_D))),
+        ("pff_run", "Run game vs run defense", (
+            ("Rushing grade vs run-defense grade", PFF_RUN_O, PFF_RUND_D),
+            ("Run-block grade vs run-defense grade", PFF_RBLK_O, PFF_RUND_D))),
+        ("pff_tackling", "Elusiveness vs tackling", (
+            ("Avoided tackles vs tackling grade", PFF_ELUS_O, PFF_TACK_D),
+            ("Yards after contact vs missed-tackle rate", PFF_YCO_O, PFF_MISS_D))),
+    )),
+)
+
+PFF_METRICS: tuple[Pff, ...] = tuple(dict.fromkeys(
+    m for _, rows in PFF_GROUPS for _, _, opts in rows for _, o, d in opts for m in (o, d)))
+
+# Special teams: one metric, A against B.
+SPECIAL_TEAMS: tuple[Pff, ...] = (
+    Pff("st_fg", "Field-goal grade", "stg.pff_field_goal", "grades_fgep_kicker", "total_attempts"),
+    Pff("st_fg_pct", "Field-goal %", "stg.pff_field_goal", "total_made", "total_attempts", True, "pct", None, ratio=True),
+    Pff("st_punt", "Punting grade", "stg.pff_punting", "grades_punter", "attempts"),
+    Pff("st_net", "Net punt average", "stg.pff_punting", "total_net_yards", "attempts", True, "num", 1, ratio=True),
+    Pff("st_kickoff", "Kickoff grade", "stg.pff_kickoff", "grades_kickoff_kicker", "attempts"),
+    Pff("st_touchback", "Touchback rate", "stg.pff_kickoff", "touchbacks", "attempts", True, "pct", None, ratio=True),
+    Pff("st_kr", "Kick-return grade", "stg.pff_return", "grades_kick_return", "kickoff_attempts"),
+    Pff("st_pr", "Punt-return grade", "stg.pff_return", "grades_punt_return", "punt_attempts"),
+    Pff("st_cover", "Coverage units grade", "stg.pff_special_teams", "grades_misc_st", "snap_counts_punt_coverage"),
+)
+
+KICKER_PAAR = Stat("paar", "Kicker PAAR", "stg.kicker_paar", "paar", True, "signed", LOOKAHEAD_ONLY,
+                   "season-final kicker snapshot with no week column", dp=2)
+
+# Key players. PFF and CFBD ids have no crosswalk, so the two lists stay separate.
+# (role, table, grade column, volume column, extra ratio (label, numerator, denominator), limit)
+PFF_PLAYERS = (
+    ("QB", "stg.pff_passing", "grades_pass", "dropbacks", ("EPA/dropback", "epa", "dropbacks"), 1, True),
+    ("Rushers", "stg.pff_rushing", "grades_run", "attempts", ("YCO/att", "yards_after_contact", "attempts"), 3, False),
+    ("Receivers", "stg.pff_receiving", "grades_pass_route", "routes", ("Yds/route", "yards", "routes"), 3, True),
+    ("Defenders", "stg.pff_defense_summary", "grades_defense", "snap_counts_defense", ("Pressures", "total_pressures", None), 5, False),
+)
+CFBD_PLAYERS_REASON = "player-game grain with week; windowed over prior games like the audited game tables"
+
+
 def edge(a: float | None, b: float | None, higher_is_better: bool | None) -> str | None:
     """Which side a stat row favours: "a", "b", or None for no marker.
 

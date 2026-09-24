@@ -140,6 +140,11 @@ td.r, th.r { text-align: right; }
 h2.group { margin: var(--space-4) 0 var(--space-1); color: var(--color-text-secondary); }
 select.pick { min-width: 0; width: 100%; font-size: var(--text-xs); padding: 2px var(--space-1); }
 
+.plist { margin-bottom: var(--space-3); }
+.plist h3 { font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: var(--tracking-wider);
+  text-transform: uppercase; color: var(--color-text-secondary); margin: var(--space-3) 0 var(--space-1); }
+.plist td, .plist th { padding: 4px 6px; font-size: var(--text-xs); }
+
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: 0; }
 .kv dt { color: var(--color-text-secondary); font-size: 11px; font-weight: var(--weight-semibold);

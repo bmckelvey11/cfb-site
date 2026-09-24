@@ -89,6 +89,7 @@ def create_app(db_path: Path | None = None, odds_dir: Path | None = None,
         rollup = request.args.get("rollup") or "pooled"
         if rollup not in ("pooled", "mean", "last3"):
             abort(400, "rollup must be pooled, mean or last3")
+        fcs, ngt = _flag("fcs", True), _flag("ngt", True)
         with q.warehouse(db_path) as con:
             cur = q.current_week(con, clock())
             season = _int("season", cur["season"])
@@ -106,8 +107,11 @@ def create_app(db_path: Path | None = None, odds_dir: Path | None = None,
                             "b": q.profile(con, b, season, window, cutoff, full=full),
                             "rows": q.profile_rows(con, season, a, b)},
                 "ratings": q.ratings(con, season, cutoff, a, b, full=full, show_postgame=show_postgame),
-                "units": q.units(con, season, window, a, b, full=full, rollup=rollup,
-                                 fcs=_flag("fcs", True), ngt=_flag("ngt", True)),
+                "units": q.units(con, season, window, a, b, full=full, rollup=rollup, fcs=fcs, ngt=ngt),
+                "pff": q.pff(con, season, window, cutoff, a, b, full=full, rollup=rollup, fcs=fcs),
+                "special_teams": q.special_teams(con, season, window, cutoff, a, b, full=full, rollup=rollup,
+                                                 fcs=fcs, show_postgame=show_postgame),
+                "players": q.players(con, season, window, cutoff, a, b, full=full, fcs=fcs, ngt=ngt),
             }
             season_weeks = q.weeks(con, season)
         elapsed = round((time.perf_counter() - started) * 1000)

@@ -214,9 +214,71 @@ function tapeRow(r, label) {
   const pa = r.prior ? { ...r.prior.a, season: r.prior.season } : null;
   const pb = r.prior ? { ...r.prior.b, season: r.prior.season } : null;
   const tip = `${r.source} · ${r.verdict}${r.season ? " · " + r.season : ""}`;
-  return side(r.a, r.edge === "a", pa, r.fmt, r.dp, "a")
+  // PFF pairs put a different metric on each side, so fmt/dp can be [offense, defense].
+  const pick = (v, i) => (Array.isArray(v) ? v[i] : v);
+  return side(r.a, r.edge === "a", pa, pick(r.fmt, 0), pick(r.dp, 0), "a")
     + `<div class="label" title="${esc(tip)}">${label ?? esc(r.label)}</div>`
-    + side(r.b, r.edge === "b", pb, r.fmt, r.dp, "b");
+    + side(r.b, r.edge === "b", pb, pick(r.fmt, 1), pick(r.dp, 1), "b");
+}
+
+function pairBlocks(blocks, names, picks) {
+  return blocks.map((bl) => `<div class="unit-block">
+      <div class="unit-head"><span>${esc(names[bl.off])} offense</span><span>vs</span><span>${esc(names[bl.def])} defense</span></div>
+      ${bl.groups.map((g) => `<h2 class="group">${esc(g.group)}</h2><div class="tape">${g.rows.map((c) => conceptRow(c, picks)).join("")}</div>`).join("")}
+    </div>`).join("");
+}
+
+function pffSection(p, A, B, picks) {
+  if (!p.available) return card("PFF grades", nodata(p.reason));
+  const st = p.status, ga = st.games[A.team_id], gb = st.games[B.team_id];
+  return card("PFF grades", pairBlocks(p.blocks, { [A.team_id]: A.school, [B.team_id]: B.school }, picks), {
+    stamps: [{ text: `PFF through wk ${st.through_week ?? "—"} · games ${A.school} ${ga}, ${B.school} ${gb}`, stale: st.stale }, { text: "all plays" }],
+    footer: "Player-week grades rolled up per team, weighted by the snaps each grade covers. Each PFF week is matched to its CFBD game, so the window cuts on kickoff. PFF's late-season weeks (15+) are left out of as-of windows. The dot marks the unit whose rank is better.",
+  });
+}
+
+function specialTeamsSection(s, A, B, full) {
+  if (!s.available && !s.paar.length) return card("Special teams", nodata("PFF grades start in 2019"));
+  const paarNote = s.paar_basis === "prior_season" ? ` <small>PRIOR SEASON ${s.paar[0].season}</small>` : "";
+  let html = card("Special teams", (s.available ? tape(s.rows) : nodata("PFF grades start in 2019"))
+    + `<div class="tape">${tapeRow(s.paar[0], esc(s.paar[0].label) + paarNote)}</div>`, {
+    footer: "PFF special-teams grades over the window. Kicker PAAR is a season-final snapshot, so as-of views show last season's.",
+  });
+  if (s.postgame) html += card(`Kicker PAAR, ${s.postgame[0].season} to date`, tape(s.postgame),
+    { cls: "postgame", note: `<span class="postgame-note">Postgame · not knowable before kickoff</span>` });
+  return html;
+}
+
+function playerTable(title, cols, list) {
+  if (!list || !list.length) return `<div class="plist"><h3>${esc(title)}</h3>${nodata("none in the window")}</div>`;
+  return `<div class="plist"><h3>${esc(title)}</h3><table><thead><tr>${cols.map((c) => `<th${c.r ? ' class="r"' : ""}>${esc(c.h)}</th>`).join("")}</tr></thead>
+    <tbody>${list.map((p) => `<tr>${cols.map((c) => `<td${c.r ? ' class="r"' : ""}>${c.f(p)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+function playersSection(pl, A, B) {
+  const col = (t) => {
+    const x = pl[t.team_id], pf = x.pff, cf = x.cfbd;
+    const pffCols = (role) => [
+      { h: "Player", f: (p) => `${esc(p.player || "#" + p.player_id)} <span class="dim">${esc(p.position || "")}</span>` },
+      { h: "Grade", r: 1, f: (p) => num(p.grade, "num", 1) },
+      { h: pf[role].volume.replaceAll("_", " "), r: 1, f: (p) => num(p.volume, "int") },
+      { h: pf[role].extra, r: 1, f: (p) => num(p.extra, role === "Defenders" ? "int" : "num", role === "QB" ? 3 : 2) },
+      { h: "n", r: 1, f: (p) => p.games }];
+    const cfCols = (key) => [
+      { h: "Player", f: (p) => `${esc(p.player)} <span class="dim">${esc(p.position || "")}</span>` },
+      { h: key === "ppa_rush" ? "Rush PPA" : "Pass PPA", r: 1, f: (p) => num(p[key], "signed", 3) },
+      { h: "All PPA", r: 1, f: (p) => num(p.ppa, "signed", 3) },
+      { h: "n", r: 1, f: (p) => p.games }];
+    const pffHtml = pf ? ["QB", "Rushers", "Receivers", "Defenders"].map((r) => playerTable(`PFF · ${r}`, pffCols(r), pf[r].players)).join("")
+      : nodata("PFF grades start in 2019");
+    const cfTag = cf.ngt ? "" : cf.ngt_lag ? ` <span class="tag">all plays, ngt lags ${cf.ngt_lag} wk</span>` : "";
+    const cfHtml = playerTable("CFBD · QB", cfCols("ppa_pass"), cf.QB) + playerTable("CFBD · Rushers", cfCols("ppa_rush"), cf.Rushers)
+      + playerTable("CFBD · Receivers", cfCols("ppa_pass"), cf.Receivers);
+    return `<div><div class="team-h">${esc(t.school)}${cfTag}</div>${pffHtml}${cfHtml}</div>`;
+  };
+  return card("Key players", `<div class="grid2">${col(A)}${col(B)}</div>`, {
+    footer: "PFF and CFBD player ids have no crosswalk, so the two lists stay separate. PFF: QB by dropbacks, rushers by carries, receivers by routes, defenders by grade among players with 40%+ of the top snap count. CFBD: most games, then PPA; PPA is a game mean (the feed has no play counts).",
+  });
 }
 
 function tape(rows) {
@@ -331,11 +393,7 @@ function unitsSection(u, A, B, full, week, picks) {
   const tags = Object.values(u.sources).map((s) => s.ngt ? "" : s.ngt_lag
     ? `<span class="tag" title="The no-garbage-time feed lags its all-plays table">${esc(s.label)}: all plays, ngt lags ${s.ngt_lag} wk</span>`
     : u.ngt ? `<span class="tag" title="CFBD publishes no garbage-time-filtered version">${esc(s.label)}: all plays</span>` : "").join(" ");
-  const blocks = u.blocks.map((bl) => `<div class="unit-block">
-      <div class="unit-head"><span>${esc(names[bl.off])} offense</span><span>vs</span><span>${esc(names[bl.def])} defense</span></div>
-      ${bl.groups.map((g) => `<h2 class="group">${esc(g.group)}</h2><div class="tape">${g.rows.map((c) => conceptRow(c, picks)).join("")}</div>`).join("")}
-    </div>`).join("");
-  return card("Unit matchups", `<p class="sub">${tags}</p>${blocks}`, {
+  return card("Unit matchups", `<p class="sub">${tags}</p>${pairBlocks(u.blocks, names, picks)}`, {
     stamps,
     footer: `${full ? "Whole season, postseason included." : `Games before week ${week}.`} Roll-up: ${esc(u.rollup === "pooled" ? "play-weighted (pooled)" : u.rollup === "mean" ? "game mean" : "last 3 games, pooled")}${u.fcs ? ", FCS games excluded" : ""}. Rank is among FBS teams with a game in the window; the dot marks the unit whose rank is better. Explosiveness is pooled by all plays, an approximation (CFBD averages it over successful plays). PPA-feed rows have no play counts, so they are game means.`,
   });
@@ -390,6 +448,9 @@ async function matchup(p) {
   });
   html += ratingsSection(s.ratings, A, B, full);
   html += unitsSection(s.units, A, B, full, m.week, picks);
+  html += pffSection(s.pff, A, B, picks);
+  html += specialTeamsSection(s.special_teams, A, B, full);
+  html += playersSection(s.players, A, B);
   app.innerHTML = html;
 
   const base = { ...p, season: m.season };
