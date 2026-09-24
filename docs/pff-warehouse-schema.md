@@ -129,6 +129,14 @@ straight to `stg` the way `massey_*` and `an_history_tick` already are. `data/ra
 keeps the exports as landed; the loader's `data/raw/*.json` glob is not recursive, so they
 never mint tables on their own.
 
+> **Week numbering in the loaded tables (checked 2026-09-24).** In `stg.pff_*` as loaded,
+> `week = 0` holds real week-0 *games* (the late-August openers), not season aggregates: every
+> season 2019-2026 has 4-17 franchises at week 0 with per-game volumes (max 56 dropbacks in 2025).
+> PFF week 0 is a team's first CFBD week-1 game, weeks 1-14 match CFBD weeks 1-14, 15-17 are the
+> late regular season and 18+ bowls. Windowing PFF with `week < W` therefore puts week-0 games
+> into an as-of-week-1 view; join each team-week to its CFBD game instead, as
+> [the matchup page](../cfb_system_maker/docs/matchup-page.md#as-of-rules) does.
+
 Conventions: `season INTEGER` and `week INTEGER` come from the filename; `week` is `0` on
 season-aggregate rows (not NULL — DuckDB rejects NULL in a primary key, checked). `pulled_at DATE` is the file mtime, because a facet season file is a
 snapshot of the season *so far* and a re-pull overwrites it (see §6). Column names stay

@@ -60,8 +60,9 @@ the week when no game is scheduled).
 "Full season (postgame)" drops the cutoff and puts a banner on the page.
 
 **PFF weeks.** PFF numbers weeks 0-19. Measured on five 2025 schedules (Iowa State, Kansas
-State, Ohio State, Hawai'i, Georgia): PFF week 0 is a team's first CFBD week-1 game (the late-
-August openers), 1-14 are CFBD weeks 1-14, 15-17 the late regular season (conference title games,
+State, Ohio State, Hawai'i, Georgia), and week 0 checked for every season 2019-2026 (4-17
+franchises at per-game volumes, so games rather than season aggregates): PFF week 0 is a
+team's first CFBD week-1 game (the late-August openers), 1-14 are CFBD weeks 1-14, 15-17 the late regular season (conference title games,
 Army-Navy), 18+ bowls. A naive `week < W` would let a week-0 game into an as-of-week-1 view.
 The page precomputes each CFBD game's PFF week and joins on it, so the cutoff applies to real
 kickoffs and the FCS toggle sees the opponent. PFF weeks 15+ are left unmapped and enter only
@@ -159,7 +160,8 @@ when they disagree. Assigned here, with the reason in the registry:
 
 ## Performance
 
-About 2-3 s per matchup warm, most of it the PFF and unit windows (every FBS team is aggregated
-for ranks). Opening the 5.3 GB file costs about 0.1 s. One trap found building it: a `CASE`
+Measured 2026-09-24: 2.1-3.1 s per matchup through the Flask test client, 3.0 s on a live
+request, 4.7 s for a first load in a browser, against a 5 s budget. Most of it is the PFF and
+unit windows (every FBS team is aggregated for ranks). Opening the 5.3 GB file costs about 0.1 s. One trap found building it: a `CASE`
 inside a `LEFT JOIN ... ON` kept DuckDB off a hash join and cost 5 s a request; the PFF join is
 now plain equality on a precomputed PFF week. Every request logs its time, and the page shows it.
