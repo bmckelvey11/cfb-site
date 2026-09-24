@@ -3,7 +3,9 @@
 **Status:** declared 2026-09-24 (`f93ab320`, `76ec5171`) before any code existed, and
 approved the same day. The model and tests are in `de4104f5` and the eval in `0c4da51b`. The
 pre-score boundary step ran on 2014–2019 only, and its final grids are recorded below before
-the scoring run.
+the scoring run. **Scored once (`be9d5692`): NO-GO.** G1 and G3 pass, G2 fails, and the
+verdicts are stable under stress. Result:
+[`../../glicko-ratings-2026-09-24.md`](../../glicko-ratings-2026-09-24.md).
 **Question:** does a rating that carries a team's strength *and* its uncertainty from game
 to game give a fair home margin that holds information the Bovada open lacks? It is a
 candidate "new information source for the fair spread" for
