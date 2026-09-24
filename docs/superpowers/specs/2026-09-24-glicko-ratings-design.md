@@ -6,6 +6,12 @@ pre-score boundary step ran on 2014–2019 only, and its final grids are recorde
 the scoring run. **Scored once (`be9d5692`): NO-GO.** G1 and G3 pass, G2 fails, and the
 verdicts are stable under stress. Result:
 [`../../glicko-ratings-2026-09-24.md`](../../glicko-ratings-2026-09-24.md).
+**Cleared for descriptive use** (user decision, 2026-09-24):
+- Glicko-margin may be shown as a team power rating with its RD, and as a pregame win
+  probability. G1 and G3 support that: it ranks teams better than Elo, and its uncertainty is
+  calibrated.
+- It is not a price. It is never shown as an edge against a line or used to pick sides:
+  that is what G2 failed.
 **Question:** does a rating that carries a team's strength *and* its uncertainty from game
 to game give a fair home margin that holds information the Bovada open lacks? It is a
 candidate "new information source for the fair spread" for
