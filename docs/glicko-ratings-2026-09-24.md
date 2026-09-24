@@ -237,8 +237,12 @@ after scoring.
   | Elo-MOV | 16.10 | −7.98 |
   | Median close | 12.30 | −1.02 |
 
-  Elo-MOV under-predicts FBS blowouts of FCS teams by about 8 points. Glicko-margin's
-  per-team variance lets FCS teams, seen once a season, absorb most of each surprise.
+  Elo-MOV under-predicts FBS blowouts of FCS teams by about 8 points. Two explanations fit,
+  and neither was tested:
+  - Glicko-margin's per-team variance lets FCS teams, seen about once a season, absorb most
+    of each surprise.
+  - Elo-MOV's points-per-Elo slope b was fit on FBS-vs-FBS games only, so it may compress the
+    wide rating gaps in FBS-vs-FCS games.
 - **Bovada's closing moneyline, de-vigged** (3,504 games): not decision-time, with no capture
   time. Its log loss is 0.545, against 0.564 for Glicko-margin and 0.549 for the open's
   spread-implied probability on the same games.
