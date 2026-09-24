@@ -17,6 +17,9 @@ function go(next, replace = false) {
   render();
 }
 window.addEventListener("popstate", render);
+// Team colors are picked in JS against the current theme, so redraw when the OS theme flips
+// (the matchup data is cached, so this refetches nothing).
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
 
 async function api(path, query = {}) {
   const q = new URLSearchParams();
@@ -49,10 +52,11 @@ const kickoff = (iso, tbd) => tbd ? "TBD" : when(iso, { hour: "numeric", minute:
 const stampTime = (iso) => when(iso, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 // Team logos: CFBD's CDN keys them by team id, with a variant drawn for dark backgrounds.
-function logo(id, size = 24) {
+// Small logos lazy-load (the slate alone has ~140); the two header logos load eagerly.
+function logo(id, size = 24, eager = false) {
   const src = (dir) => `https://cdn.collegefootballdata.com/${dir}/64/${Number(id)}.png`;
   return `<picture class="logo"><source srcset="${src("logos-dark")}" media="(prefers-color-scheme: dark)">
-    <img src="${src("logos")}" width="${size}" height="${size}" alt="" onerror="this.parentNode.remove()"></picture>`;
+    <img src="${src("logos")}" width="${size}" height="${size}" alt=""${eager ? "" : ' loading="lazy"'} onerror="this.parentNode.remove()"></picture>`;
 }
 
 // School colors, picked per theme: of the primary and alternate, the first that reads against
@@ -636,11 +640,11 @@ async function matchup(p) {
   app.style.cssText = `--team-a: ${ca.mark}; --team-a-text: ${ca.text}; --team-b: ${cb.mark}; --team-b-text: ${cb.text};`
     + " --left: var(--team-a); --left-text: var(--team-a-text); --right: var(--team-b); --right-text: var(--team-b-text);";
   let html = full ? `<div class="banner">Full season · postgame. Every number includes games played after any betting decision.</div>` : "";
-  html += `<div class="vs"><div class="a">${logo(A.team_id, 56)}<div><div class="team" style="color: var(--team-a-text)">${esc(A.school)}</div>
+  html += `<div class="vs"><div class="a">${logo(A.team_id, 56, true)}<div><div class="team" style="color: var(--team-a-text)">${esc(A.school)}</div>
       <div class="sub">${esc(A.conference || A.classification || "")}</div><div class="chips">${chips(s.profile.a)}</div></div></div>
     <div class="mid">${m.season}<br>${full ? "Full season" : "As of week " + m.week}<br><span class="dim">${m.elapsed_ms} ms</span></div>
     <div class="b"><div><div class="team" style="color: var(--team-b-text)">${esc(B.school)}</div>
-      <div class="sub">${esc(B.conference || B.classification || "")}</div><div class="chips">${chips(s.profile.b)}</div></div>${logo(B.team_id, 56)}</div></div>
+      <div class="sub">${esc(B.conference || B.classification || "")}</div><div class="chips">${chips(s.profile.b)}</div></div>${logo(B.team_id, 56, true)}</div></div>
     <div class="teambar" aria-hidden="true"><i style="background: var(--team-a)"></i><i style="background: var(--team-b)"></i></div>
     <div class="controls">
       <label>Season<select id="m-season">${seasonOptions(m.season, Math.max(m.season, new Date().getFullYear()))}</select></label>

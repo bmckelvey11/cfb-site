@@ -14,10 +14,10 @@
     --color-accent-on: var(--ink-900);
     --color-warning: var(--warning-100); --color-warning-surface: var(--warning-900);
     --color-error: var(--error-100); --color-error-surface: var(--error-900);
-    color-scheme: dark;
   }
 }
-:root { --bar: var(--signal-300); }
+/* Native UI (scrollbars, selects, checkboxes) follows the user's light/dark preference. */
+:root { color-scheme: light dark; --bar: var(--signal-300); }
 @media (prefers-color-scheme: dark) { :root { --bar: var(--signal-400); } }
 
 * { box-sizing: border-box; }
@@ -71,6 +71,13 @@ button.ghost { background: transparent; color: var(--color-accent); }
 .card > .body { padding: var(--space-3) var(--space-4); overflow-x: auto; }  /* wide tables scroll inside the card */
 .card > footer { padding: var(--space-2) var(--space-4); border-top: 1px solid var(--color-border-subtle);
   color: var(--color-text-secondary); font-size: var(--text-xs); }
+/* The matchup page runs 9,000-12,000px. Sections from ratings down start below the fold, so
+ * the browser skips their layout and paint until they scroll near; `auto` in
+ * contain-intrinsic-size remembers each section's real height once it has rendered. */
+#app > section.card:nth-of-type(n + 3) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 900px;
+}
 .card.postgame { border: 1.5px solid var(--color-error); }
 .card.postgame > header { background: var(--color-error-surface); }
 .postgame-note { color: var(--color-error); font-size: var(--text-xs); font-weight: var(--weight-semibold);
