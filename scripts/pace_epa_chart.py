@@ -55,8 +55,15 @@ def pooled_r(df: pd.DataFrame) -> tuple[float, int]:
     return z["tempo_s"].corr(z["off_epa"]), len(z)
 
 
+def ci95(r: float, n: int) -> tuple[float, float]:
+    """Fisher-z 95% interval for a Pearson r."""
+    half = 1.96 / np.sqrt(n - 3)
+    return tuple(np.tanh(np.arctanh(r) + np.array([-half, half])))
+
+
 def chart(d: pd.DataFrame, season: int, out: Path) -> None:
     r = d["tempo_s"].corr(d["off_epa"])
+    lo, hi = ci95(r, len(d))
     # ponytail: tempo_s sits on a 0.5 s grid, so teams stack into columns; jitter is display-only.
     x = d["tempo_s"] + np.random.default_rng(0).uniform(-0.15, 0.15, len(d))
 
@@ -88,7 +95,8 @@ def chart(d: pd.DataFrame, season: int, out: Path) -> None:
                   color=INK, fontsize=10)
     ax.set_title(f"{season}: offensive tempo vs offensive EPA", color=INK, fontsize=13,
                  loc="left", fontweight="bold", pad=22)
-    ax.text(0.0, 1.01, f"r = {r:.2f}   n = {len(d)} FBS teams   dashed: least-squares fit",
+    ax.text(0.0, 1.01, f"r = {r:.2f} [{lo:.2f}, {hi:.2f}] on seconds/snap (negative = faster "
+            f"offenses slightly higher EPA)   n = {len(d)} FBS teams   dashed: least-squares fit",
             transform=ax.transAxes, color=MUTED, fontsize=9, va="bottom")
     fig.tight_layout()
     fig.savefig(out, dpi=150)
@@ -104,9 +112,12 @@ def main() -> None:
     out = PROCESSED / "pace" / f"tempo_vs_off_epa_{season}.png"
     chart(d, season, out)
 
-    print(f"{season}: r(tempo_s, off_epa) = {d['tempo_s'].corr(d['off_epa']):.3f}, n {len(d)}")
+    r = d["tempo_s"].corr(d["off_epa"])
+    print(f"{season}: r(tempo_s, off_epa) = {r:.3f}, 95% CI [{ci95(r, len(d))[0]:.3f}, "
+          f"{ci95(r, len(d))[1]:.3f}], n {len(d)}")
+    # Same teams appear in both seasons, so n overstates the independent sample; no CI here.
     r, n = pooled_r(df[df["season"].isin(POOLED)])
-    print(f"pooled {POOLED[0]}-{POOLED[1]} within-season z: r = {r:.3f}, n {n}")
+    print(f"pooled {POOLED[0]}-{POOLED[1]} within-season z: r = {r:.3f}, n {n} team-seasons")
     print(f"wrote {out}")
 
 
