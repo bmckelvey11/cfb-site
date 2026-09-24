@@ -202,6 +202,7 @@ absent:
 | `fact_game_weather` | `stg.game_weather` + `stg.weather` | FULL OUTER on game id, REST wins; neither feed is a superset. 6,413 rows are 2001-2011 games whose parent is `fact_game_historical`, not `fact_game` |
 | `fact_poll_rank` | `stg.poll_rank` + `dim_poll_type` | `SELECT DISTINCT` -- the 2022 dump emits 150 byte-identical duplicate ballots |
 | `fact_drive_postgame` | `stg.drives` | result-informed; offense/defense ids LEFT JOINed from school names |
+| `fact_game_clock_quality` | `stg.plays` | per game, `clock_ok` / `wallclock_ok`: the play clock is stale in whole games (55–68% of 2015–23 FBS), so gate any seconds-per-play measure on it. Regulation only |
 | `v_game` (view) | `fact_game` + `dim_venue` + `dim_week` + `fact_game_line` | the selected spread and total are joined **separately**: their provider keys differ on 2,943 games, so one join gets one market wrong |
 | `v_game_book_median` (view) | `fact_game` + `fact_game_line` | median spread/total, open and close, across books; `consensus` (an average, not a book) fills a column only when no book posted it, with `n_books_*` = 0; close medians are not decision-time |
 | `meta.table_dictionary`, `meta.relationship` | every table in the file; orphan counts measured at build | written last, so they describe what the build actually left behind |

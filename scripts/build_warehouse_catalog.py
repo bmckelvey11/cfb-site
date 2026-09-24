@@ -90,6 +90,7 @@ CORE_NOTES = {
     "fact_game_weather": "Game weather, GraphQL and REST feeds merged",
     "fact_poll_rank": "Poll ballot: season × week × poll × team, rank and points",
     "fact_drive_postgame": "One drive: result, yards, plays, start/end field position",
+    "fact_game_clock_quality": "One game: is its per-play clock (and wallclock) usable for timing",
     "coach_name_conflicts": "Audit: one name, several coach ids",
     "coach_name_conflicts__coach_ids": "Audit: one name, several coach ids, one row per id",
     "coach_season_unmatched": "Audit: coach seasons that would not join",

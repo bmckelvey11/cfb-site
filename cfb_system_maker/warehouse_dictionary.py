@@ -215,6 +215,15 @@ TABLE_NOTES: dict[tuple[str, str], str] = {
         "names outside dim_team leave a NULL id rather than dropping the drive; "
         "the names are kept alongside."
     ),
+    ("core", "fact_game_clock_quality"): (
+        "One row per game in stg.plays: whether its per-play game clock and wallclock "
+        "are usable for timing (clock_ok, wallclock_ok), from the share of post-rush "
+        "snap pairs whose delta is zero or negative. The clock goes stale in whole "
+        "games -- 55-68% of 2015-2023 FBS games -- so filter on clock_ok before any "
+        "seconds-per-play measure. Regulation only. A feed property, not an outcome, "
+        "but known only once the game's plays are in. A game with no rush pairs has "
+        "no row. See docs/pace-stats-2026-09-24.md."
+    ),
     ("core", "coach_name_conflicts"): "Coaches whose name resolved to more than one id.",
     ("core", "coach_season_unmatched"): (
         "Coach seasons whose school did not resolve to a team."
@@ -380,6 +389,7 @@ _EDGES: tuple[tuple[str, str, str, str, str], ...] = (
     ("fact_poll_rank", "team_id", "dim_team", "team_id", ""),
     ("fact_poll_rank", "poll_type_id", "dim_poll_type", "poll_type_id", ""),
     ("fact_drive_postgame", "game_id", "fact_game", "game_id", ""),
+    ("fact_game_clock_quality", "game_id", "fact_game", "game_id", ""),
     (
         "fact_drive_postgame",
         "offense_team_id",

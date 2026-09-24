@@ -97,6 +97,8 @@ def build_core(
             built.append("fact_poll_rank")
         if _build_fact_drive_postgame(con):
             built.append("fact_drive_postgame")
+        if _build_fact_game_clock_quality(con):
+            built.append("fact_game_clock_quality")
         _add_phase_1_indexes(con)
         _build_core_views(con)
         built += ["v_game", "v_game_book_median"]
@@ -1793,6 +1795,71 @@ def _build_fact_drive_postgame(con: duckdb.DuckDBPyConnection) -> bool:
         """
     )
     con.execute("ALTER TABLE core.fact_drive_postgame ADD PRIMARY KEY (drive_id)")
+    return True
+
+
+# Offensive snaps: what can follow a rush in the same drive with no change of
+# possession and no special-teams unit coming on.
+SCRIMMAGE_PLAY_TYPES = (
+    "Rush", "Pass Reception", "Pass Incompletion", "Pass Completion", "Sack",
+    "Rushing Touchdown", "Passing Touchdown", "Interception", "Pass Interception Return",
+    "Interception Return Touchdown", "Fumble Recovery (Own)", "Fumble Recovery (Opponent)",
+    "Fumble Return Touchdown", "Fumble",
+)
+CLOCK_STALE_MAX = 0.10  # a game's clock is usable below this share of non-positive deltas
+
+
+def _build_fact_game_clock_quality(con: duckdb.DuckDBPyConnection) -> bool:
+    """One row per game: is its per-play clock usable for timing?
+
+    CFBD's play clock goes stale in whole games -- 55-68% of 2015-2023 FBS games repeat
+    the clock across most consecutive snaps -- and the per-game split is bimodal, so the
+    game is the grain. Measured on post-rush pairs: a ``Rush`` and the next scrimmage
+    snap in the same drive, period and offense. The clock runs between those two snaps,
+    so a delta of zero or less means the clock was not updated. ``wallclock`` is scored
+    the same way. Regulation only: college overtime has no game clock.
+
+    Not suffixed ``_postgame``: a property of the feed, not an outcome, though it is
+    known only once the game's plays are in. Measured in docs/pace-stats-2026-09-24.md.
+    """
+    if not _has(con, "stg", "plays"):
+        return False
+    secs = "CAST(clock_minutes * 60 + clock_seconds AS INTEGER)"
+    wall = "TRY_CAST(wallclock AS TIMESTAMPTZ)"
+    con.execute("DROP TABLE IF EXISTS core.fact_game_clock_quality")
+    con.execute(
+        f"""
+        CREATE TABLE core.fact_game_clock_quality AS
+        WITH p AS (
+          SELECT "gameId" AS game_id, season, week, "playType" AS play_type, offense,
+                 period, {secs} AS secs, {wall} AS wall,
+                 LEAD("playType") OVER w AS nxt_type,
+                 LEAD(offense) OVER w AS nxt_offense,
+                 LEAD(period) OVER w AS nxt_period,
+                 LEAD({secs}) OVER w AS nxt_secs,
+                 LEAD({wall}) OVER w AS nxt_wall
+          FROM stg.plays
+          WHERE period <= 4
+          WINDOW w AS (PARTITION BY "driveId" ORDER BY "playNumber", "playId")
+        ),
+        g AS (
+          SELECT game_id, ANY_VALUE(season) AS season, ANY_VALUE(week) AS week,
+                 COUNT(*) AS rush_pairs,
+                 AVG((secs - nxt_secs <= 0)::INTEGER) AS clock_stale_share,
+                 AVG(COALESCE(epoch(nxt_wall) - epoch(wall) <= 0, TRUE)::INTEGER)
+                   AS wallclock_stale_share
+          FROM p
+          WHERE play_type = 'Rush' AND nxt_offense = offense AND nxt_period = period
+            AND nxt_type IN {SCRIMMAGE_PLAY_TYPES}
+          GROUP BY game_id
+        )
+        SELECT *,
+               clock_stale_share < {CLOCK_STALE_MAX} AS clock_ok,
+               wallclock_stale_share < {CLOCK_STALE_MAX} AS wallclock_ok
+        FROM g
+        """
+    )
+    con.execute("ALTER TABLE core.fact_game_clock_quality ADD PRIMARY KEY (game_id)")
     return True
 
 
