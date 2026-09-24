@@ -1,7 +1,9 @@
 # Glicko-style margin ratings vs Elo and the vendor open — design
 
-**Status:** declared 2026-09-24, before any model, tuning, or scoring code exists. Awaiting
-approval.
+**Status:** declared 2026-09-24 (`f93ab320`, `76ec5171`) before any code existed, and
+approved the same day. The model and tests are in `de4104f5` and the eval in `0c4da51b`. The
+pre-score boundary step ran on 2014–2019 only, and its final grids are recorded below before
+the scoring run.
 **Question:** does a rating that carries a team's strength *and* its uncertainty from game
 to game give a fair home margin that holds information the Bovada open lacks? It is a
 candidate "new information source for the fair spread" for
@@ -236,7 +238,8 @@ Worked number: a 7-point win gives $m = \ln 8 \times 2.2/(0.001\,\Delta_w + 2.2)
     rewards the mean and the spread together, and it is comparable across caps.
   - `elo_mov`: mean squared error of $\hat M$.
   - `glicko1`: mean log loss.
-- **Grids** (full factorial):
+- **Declared grids** (full factorial). The pre-score boundary step extended these; the final
+  grids are in "Boundary step result" below.
   - **`glicko_margin_v1`:** 1,458 points.
     - $\sigma \in \{13, 15, 17\}$
     - $\tau \in \{0, 0.75, 1.5\}$
@@ -261,6 +264,20 @@ Worked number: a 7-point win gives $m = \ln 8 \times 2.2/(0.001\,\Delta_w + 2.2)
     commit **before** the scoring run.
   - A pick still on an edge after one extension is flagged in the manifest and the doc.
 - **No grid changes after scoring.**
+
+**Boundary step result** (2026-09-24, tuning seasons only):
+
+| Model | Edge picks on the declared grid | Added value | Final grid | Edge after extension |
+| --- | --- | --- | --- | --- |
+| `glicko_margin_v1` | σ low (13), w high (0.9), $u_0$ high (14) | σ 11, w 1.0, $u_0$ 20 | 3,888 points | none; the pick is unchanged |
+| `elo_mov` | K high (50), A low (50), $w_e$ high (0.85) | K 60, A 30, $w_e$ 1.0 | 80 points | **K = 60, flagged** |
+| `glicko1` | c low (10), $\delta_g$ high (150), $w_g$ high (0.9) | c 0, $\delta_g$ 200, $w_g$ 1.0 | 192 points | none |
+
+- **Final trial count:** 3,888 + 80 + 192 + 2 closed-form fits = **4,162 tuning
+  configurations**. Every declared grid is a subset of its final grid, so no trial is
+  counted twice.
+- **Why the K flag matters:** Elo-MOV may be slightly under-tuned, and a weaker baseline
+  makes G1 slightly easier to pass. The finding doc states this next to G1.
 
 ## Scoring (2021–2025, one run, all parameters frozen)
 
@@ -370,8 +387,10 @@ runs, and the eval refuses to write results if any sign disagrees.
 - **`scripts/glicko_ratings_eval.py`:**
   - Contents: the loaders (pool plus raw JSON fields, a Bovada `spreadOpen` and moneyline
     loader mirroring `load_opens`), tuning, scoring, and the CLI.
-  - It imports `load_pool`, `snapshot`, and `_sha256` from `pregame_replay_audit`, and
-    `_cluster_boot` and `classify_verdict` from `weekly_ratings_eval`. It edits neither.
+  - It imports `load_pool` and `_sha256` from `pregame_replay_audit`, and `_cluster_boot`
+    and `classify_verdict` from `weekly_ratings_eval`. It edits neither.
+  - `snapshot()` is not imported. The event clock in `glicko_ratings.events` applies the same
+    strictly-before rule, and test 5 pins it.
 - **Command:**
   `python -m scripts.glicko_ratings_eval --tune-seasons 2014-2019 --score-seasons 2021-2025`.
   2020 is always skipped, and there are no other flags.
