@@ -31,6 +31,8 @@ create table stg.fbs_teams as select * from (values
   (1, 2025, 'Alpha', 'X'), (2, 2025, 'Beta', 'X'), (3, 2025, 'Gamma', 'Y'),
   (1, 2026, 'Alpha', 'X'), (2, 2026, 'Beta', 'X'), (3, 2026, 'Gamma', 'Y'))
   t(teamId, season, school, conference);
+create table stg.teams as select * from (values (1, 2026, '#0a254e', '#b72025'), (2, 2025, '#006f71', null))
+  t("teamId", season, color, "alternateColor");
 create table core.dim_week as select season, week, 'regular' as season_type,
   s::timestamptz as start_date, e::timestamptz as end_date from (values
   (2026, 1, '2026-08-29 03:00:00-04', '2026-09-08 02:59:00-04'),
@@ -75,7 +77,8 @@ create table stg.pregame_win_prob (gameId integer, homeWinProbability double, sp
 create table core.dim_poll_type as select * from (values (1, 'AP Top 25', 'AP Poll'),
   (2, 'Coaches Poll', 'Coaches Poll')) t(poll_type_id, name, short_name);
 create table core.fact_poll_rank as select 2026 as season, week, 'regular' as season_type,
-  1 as poll_type_id, 1 as team_id, rank from (values (3, 20), (4, 15), (5, 10)) t(week, rank);
+  1 as poll_type_id, team_id, rank from (values (3, 1, 20), (4, 1, 15), (5, 1, 10), (3, 2, 22), (4, 3, 5))
+  t(week, team_id, rank);
 create table stg.massey_editions as select d::date as date, 2026 as season, 'Alpha' as cfbd_team,
   cmp as cmp_rank, 30 as n_systems, 2 as wins, 1 as losses from (values
   ('2026-09-20', 30), ('2026-09-27', 25)) t(d, cmp);
@@ -268,6 +271,15 @@ def test_poll_and_massey_are_as_of_the_week(warehouse):
     assert pr["massey"]["cmp_rank"] == 30  # the 09-27 edition postdates the 09-26 kickoff
 
 
+def test_poll_rank_is_the_latest_poll_not_the_teams_last_ranked_week(warehouse):
+    with q.warehouse(warehouse) as con:
+        cutoff = q.first_kickoff(con, 2026, 4)
+        beta = q.profile(con, 2, 2026, 4, cutoff, full=False)["polls"]
+        gamma = q.profile(con, 3, 2026, 4, cutoff, full=False)["polls"]
+    assert [(p["week"], p["rank"]) for p in beta] == [(4, None)]  # ranked in wk3, dropped out of wk4
+    assert [(p["week"], p["rank"]) for p in gamma] == [(4, 5)]
+
+
 def test_ratings_show_prior_season_until_postgame_is_asked_for(warehouse):
     with q.warehouse(warehouse) as con:
         cutoff = q.first_kickoff(con, 2026, 4)
@@ -292,6 +304,8 @@ def test_newest_snapshot_and_name_resolution(odds_dir):
 def test_matchup_api_shape_and_reserved_slots(client):
     body = client.get("/api/matchup?a=2&b=1&season=2026&week=4").get_json()
     assert body["model_signals"] is None
+    assert body["meta"]["b"]["color"] == "#0a254e"
+    assert body["meta"]["a"]["color"] == "#006f71"  # no 2026 record: falls back to the latest season
     assert body["meta"]["game_id"] == 104  # the wk4 rematch, not the wk3 game
     game = body["sections"]["game"]
     assert game["home_points"] is None  # results stay hidden in as-of mode

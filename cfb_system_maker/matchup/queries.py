@@ -113,7 +113,13 @@ def teams(con, season: int) -> list[dict]:
 
 def team(con, team_id: int, season: int) -> dict | None:
     found = [t for t in teams(con, season) if t["team_id"] == team_id]
-    return found[0] if found else None
+    if not found:
+        return None
+    # School colors from that season's CFBD team record, else the latest earlier one.
+    colors = con.execute("""select color, "alternateColor" from stg.teams
+                            where "teamId" = ? and season <= ? order by season desc limit 1""",
+                         [team_id, season]).fetchone()
+    return dict(found[0], color=colors[0] if colors else None, alt_color=colors[1] if colors else None)
 
 
 def school_index(con) -> dict[str, str]:
@@ -356,16 +362,26 @@ def profile(con, team_id: int, season: int, week: int, cutoff, *, full: bool) ->
 
 
 def _polls(con, team_id: int, season: int, week: int, *, full: bool) -> list[dict]:
-    """The poll labelled week N is released before week N's games, so as-of W reads poll W."""
+    """The team's rank in the latest AP and Coaches polls released by the cutoff (rank None
+    when it is unranked in them).
+
+    The poll labelled week N is released before week N's games, so as of W it reads poll W.
+    The latest poll is found across all teams first; taking the team's own latest ranked week
+    would show a rank it has since lost.
+    """
     return rows(con, f"""
-        select p.short_name as poll, r.week, r.season_type, r.rank from (
-            select *, row_number() over (partition by poll_type_id
-                order by season_type = 'postseason' desc, week desc) as k
-            from core.fact_poll_rank
+        with polls as (
+            select distinct poll_type_id, season_type, week from core.fact_poll_rank
             where season = ? and poll_type_id in (1, 2)
-              and ({'true' if full else "season_type = 'regular' and week <= ?"})) r
-        join core.dim_poll_type p on p.poll_type_id = r.poll_type_id
-        where k = 1 and r.team_id = ?""", [season, *([] if full else [week]), team_id])
+              and ({'true' if full else "season_type = 'regular' and week <= ?"})),
+        latest as (
+            select *, row_number() over (partition by poll_type_id
+                order by season_type = 'postseason' desc, week desc) as k from polls)
+        select p.short_name as poll, l.week, l.season_type, r.rank
+        from latest l join core.dim_poll_type p on p.poll_type_id = l.poll_type_id
+        left join core.fact_poll_rank r on r.season = ? and r.poll_type_id = l.poll_type_id
+             and r.week = l.week and r.season_type = l.season_type and r.team_id = ?
+        where l.k = 1 order by l.poll_type_id""", [season, *([] if full else [week]), season, team_id])
 
 
 def massey_date(con, season: int, cutoff) -> date | None:

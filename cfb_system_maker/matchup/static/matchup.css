@@ -96,15 +96,35 @@ td.r, th.r { text-align: right; }
 .books td { white-space: nowrap; }
 .day { margin: var(--space-5) 0 var(--space-2); font-size: var(--text-xs); font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-wider); text-transform: uppercase; color: var(--color-text-secondary); }
-.slate { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.slate { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  table-layout: fixed; }  /* fixed widths so every day's table lines up */
+.slate th:nth-child(1) { width: 92px; }
+.slate th:nth-child(3) { width: 240px; }
+.slate th:nth-child(4) { width: 170px; }
+.slate th:nth-child(5) { width: 200px; }
+.slate td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
 .slate tbody tr { cursor: pointer; }
 .slate tbody tr:hover { background: var(--color-accent-light); }
 .dim { color: var(--color-text-tertiary); }
 
+/* Logos (CFBD CDN) and team names */
+.logo img { display: inline-block; vertical-align: middle; margin-right: 6px; object-fit: contain; }
+.pair { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.pair .logo img { margin: 0 4px 0 0; }
+.pair .dim { margin: 0 4px; }
+.tname { font-weight: var(--weight-semibold); }
+.nw { white-space: nowrap; }
+.bk { font-size: 10px; font-weight: var(--weight-semibold); letter-spacing: var(--tracking-wide);
+  color: var(--color-text-tertiary); margin-left: 2px; }
+
 /* Matchup head */
-.vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--space-4); align-items: start; }
+.vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--space-4); align-items: center; }
+.vs .a, .vs .b { display: flex; align-items: center; gap: var(--space-3); }
+.vs .a .logo img, .vs .b .logo img { margin: 0; }
 .vs .team { font: var(--type-heading-lg); }
-.vs .b { text-align: right; }
+.vs .b { justify-content: flex-end; text-align: right; }
+.teambar { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; height: 4px; margin: var(--space-3) 0 0; }
+.teambar i { display: block; border-radius: var(--radius-sm); }
 .vs .mid { color: var(--color-text-secondary); text-align: center; font-size: var(--text-xs); padding-top: var(--space-2); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
 .vs .b .chips { justify-content: flex-end; }
@@ -121,9 +141,13 @@ td.r, th.r { text-align: right; }
 .side { display: flex; align-items: center; gap: var(--space-3); }
 .side.a { justify-content: flex-end; text-align: right; }
 .val { font: var(--weight-semibold) var(--text-sm) var(--font-mono); min-width: 72px; }
-.val.win { color: var(--color-accent); }
-.val.win::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: var(--radius-full);
-  background: var(--color-accent); margin: 0 6px 2px 0; vertical-align: middle; }
+/* The edge dot and value take the favoured side's school color (set per matchup on #app). */
+.val.win::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: var(--radius-full);
+  margin: 0 6px 2px 0; vertical-align: middle; }
+.side.a .val.win { color: var(--left-text, var(--color-accent)); }
+.side.a .val.win::before { background: var(--left, var(--color-accent)); }
+.side.b .val.win { color: var(--right-text, var(--color-accent)); }
+.side.b .val.win::before { background: var(--right, var(--color-accent)); }
 .prior { display: block; font: var(--weight-regular) 11px var(--font-mono); color: var(--color-text-tertiary); }
 .rank { font: var(--text-xs) var(--font-mono); color: var(--color-text-secondary); min-width: 72px; }
 .bar { display: block; height: 3px; background: var(--color-bg-alt); border-radius: var(--radius-sm);
@@ -136,6 +160,9 @@ td.r, th.r { text-align: right; }
 .unit-head { display: grid; grid-template-columns: 1fr minmax(150px, 230px) 1fr; padding: var(--space-2) 0;
   font-weight: var(--weight-semibold); border-bottom: 1.5px solid var(--color-border-strong); }
 .unit-head span:first-child { text-align: right; padding-right: var(--space-2); }
+.unit-head > span { display: flex; align-items: center; gap: 4px; }
+.unit-head > span:first-child { justify-content: flex-end; }
+.unit-head > span:nth-child(2) { justify-content: center; }
 .unit-head span:nth-child(2) { text-align: center; color: var(--color-text-tertiary); font-weight: var(--weight-regular); }
 .unit-head span:last-child { padding-left: var(--space-2); }
 h2.group { margin: var(--space-4) 0 var(--space-1); color: var(--color-text-secondary); }
@@ -149,13 +176,14 @@ select.pick { min-width: 0; width: 100%; font-size: var(--text-xs); padding: 2px
 .trend .axis { font: 10px var(--font-mono); fill: var(--color-text-tertiary); }
 .trend .grid { stroke: var(--color-border); stroke-width: 1; }
 .trend polyline { fill: none; stroke-width: 2; }
-.trend .sa { stroke: var(--color-accent); fill: var(--color-accent); }
+/* School colors; B also dashed with hollow points, so two similar colors stay apart. */
+.trend .sa { stroke: var(--team-a, var(--color-accent)); fill: var(--team-a, var(--color-accent)); }
 .trend polyline.sa { fill: none; }
-.trend .sb { stroke: var(--color-text-secondary); fill: var(--color-surface); stroke-dasharray: none; }
+.trend .sb { stroke: var(--team-b, var(--color-text-secondary)); fill: var(--color-surface); stroke-width: 2; }
 .trend polyline.sb { fill: none; stroke-dasharray: 4 3; }
 .legend { font-size: var(--text-xs); color: var(--color-text-secondary); display: flex; align-items: center; gap: var(--space-2); }
-.legend .key { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--color-accent); }
-.legend .key.sb { border-top: 2px dashed var(--color-text-secondary); margin-left: var(--space-3); }
+.legend .key { display: inline-block; width: 18px; height: 0; border-top: 3px solid var(--team-a, var(--color-accent)); }
+.legend .key.sb { border-top: 3px dashed var(--team-b, var(--color-text-secondary)); margin-left: var(--space-3); }
 
 .sched td { white-space: nowrap; padding: 5px 6px; font-size: var(--text-xs); }
 .sched td:nth-child(3) { white-space: normal; }

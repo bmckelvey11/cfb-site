@@ -48,6 +48,31 @@ function when(iso, opts) {
 const kickoff = (iso, tbd) => tbd ? "TBD" : when(iso, { hour: "numeric", minute: "2-digit" });
 const stampTime = (iso) => when(iso, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
+// Team logos: CFBD's CDN keys them by team id, with a variant drawn for dark backgrounds.
+function logo(id, size = 24) {
+  const src = (dir) => `https://cdn.collegefootballdata.com/${dir}/64/${Number(id)}.png`;
+  return `<picture class="logo"><source srcset="${src("logos-dark")}" media="(prefers-color-scheme: dark)">
+    <img src="${src("logos")}" width="${size}" height="${size}" alt="" onerror="this.parentNode.remove()"></picture>`;
+}
+
+// School colors, picked per theme: of the primary and alternate, the first that reads against
+// the card surface (3:1 for bars and lines, 4.5:1 for text); else the house accent / text color.
+function luminance(hex) {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+function contrast(a, b) {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+function teamColors(t) {
+  const surface = matchMedia("(prefers-color-scheme: dark)").matches ? "#1b1e24" : "#ffffff";
+  const cands = [t.color, t.alt_color].filter((c) => /^#[0-9a-f]{6}$/i.test(c || ""));
+  const pick = (min) => cands.find((c) => contrast(c, surface) >= min);
+  return { mark: pick(3) || "var(--color-accent)", text: pick(4.5) || "var(--color-text-primary)" };
+}
+
 function card(title, body, { stamps = [], footer = "", cls = "", note = "" } = {}) {
   const st = stamps.filter(Boolean).map((s) =>
     `<span class="stamp${s.stale ? " stale" : ""}">${esc(s.text)}</span>`).join("");
@@ -86,6 +111,7 @@ function seasonOptions(selected, last) {
 // ---------- render ----------
 async function render() {
   const p = params();
+  if (!(p.a && p.b)) app.style.cssText = "";  // school colors belong to a matchup only
   try {
     if (p.a && p.b) { navState(null); return await matchup(p); }
     if (p.view === "custom") { navState("custom"); return await custom(p); }
@@ -99,6 +125,26 @@ function favorite(book, home, away) {
   if (!book || book.spread.home === null || book.spread.home === undefined) return "—";
   const h = book.spread.home;
   return h <= 0 ? `${home} ${line(h)}` : `${away} ${line(-h)}`;
+}
+
+// One spread cell for both books: the favorite once, then each book's number tagged DK / FD.
+function bookSpreads(books, home, away) {
+  const have = [["DK", books.draftkings], ["FD", books.fanduel]]
+    .filter(([, b]) => b && b.spread.home !== null && b.spread.home !== undefined);
+  if (!have.length) return "—";
+  const fav = (h) => (h <= 0 ? home : away);
+  const num1 = (h, team) => line(team === home ? h : -h);
+  const favs = new Set(have.map(([, b]) => fav(b.spread.home)));
+  if (favs.size === 1) {
+    const f = [...favs][0];
+    return `${esc(f)} ${have.map(([k, b]) => `${num1(b.spread.home, f)} <span class="bk">${k}</span>`).join(" · ")}`;
+  }
+  return have.map(([k, b]) => `${esc(fav(b.spread.home))} ${num1(b.spread.home, fav(b.spread.home))} <span class="bk">${k}</span>`).join(" · ");
+}
+
+function bookTotals(books) {
+  const have = [["DK", books.draftkings], ["FD", books.fanduel]].filter(([, b]) => b && b.total);
+  return have.length ? have.map(([k, b]) => `${b.total} <span class="bk">${k}</span>`).join(" · ") : "—";
 }
 
 async function slate(p) {
@@ -131,18 +177,19 @@ async function slate(p) {
     </div>`;
   if (!games.length) html += `<p class="nodata">No games match. ${all ? "" : "Lines may not be posted yet; try Show all FBS games."}</p>`;
   for (const [day, gs] of days) {
+    // Before kickoff the consensus median is the latest, not a close.
+    const consensusHead = gs.every((g) => g.completed) ? "Consensus close" : "Consensus";
     html += `<div class="day">${esc(day)}</div><table class="slate"><thead><tr>
-      <th>Kickoff</th><th>Matchup</th><th class="r">DK spread</th><th class="r">DK total</th>
-      <th class="r">FD spread</th><th class="r">FD total</th><th class="r">Consensus close</th></tr></thead><tbody>`;
+      <th>Kickoff</th><th>Matchup</th><th class="r">Spread</th><th class="r">Total</th>
+      <th class="r">${consensusHead}</th></tr></thead><tbody>`;
     for (const g of gs) {
-      const dk = g.books.draftkings, fd = g.books.fanduel;
       const cls = !(g.home_fbs && g.away_fbs) ? ' class="dim"' : "";
       html += `<tr tabindex="0" data-a="${g.away_team_id}" data-b="${g.home_team_id}" data-game="${g.game_id}"${cls}>
-        <td>${esc(kickoff(g.start_date, g.tbd))}</td>
-        <td>${esc(g.away_team)} ${g.neutral ? "vs" : "@"} ${esc(g.home_team)}</td>
-        <td class="r">${esc(favorite(dk, g.home_team, g.away_team))}</td><td class="r">${dk && dk.total ? dk.total : "—"}</td>
-        <td class="r">${esc(favorite(fd, g.home_team, g.away_team))}</td><td class="r">${fd && fd.total ? fd.total : "—"}</td>
-        <td class="r">${g.median_spread_close === null ? "—" : esc(favorite({ spread: { home: g.median_spread_close } }, g.home_team, g.away_team))}${g.median_total_close ? " / " + g.median_total_close : ""}</td></tr>`;
+        <td class="nw">${esc(kickoff(g.start_date, g.tbd))}</td>
+        <td><span class="pair">${logo(g.away_team_id, 20)}${esc(g.away_team)} <span class="dim">${g.neutral ? "vs" : "@"}</span> ${logo(g.home_team_id, 20)}${esc(g.home_team)}</span></td>
+        <td class="r nw">${bookSpreads(g.books, g.home_team, g.away_team)}</td>
+        <td class="r nw">${bookTotals(g.books)}</td>
+        <td class="r nw">${g.median_spread_close === null ? "—" : esc(favorite({ spread: { home: g.median_spread_close } }, g.home_team, g.away_team))}${g.median_total_close ? " / " + g.median_total_close : ""}</td></tr>`;
     }
     html += `</tbody></table>`;
   }
@@ -223,9 +270,17 @@ function tapeRow(r, label) {
     + side(r.b, r.edge === "b", pb, pick(r.fmt, 1), pick(r.dp, 1), "b");
 }
 
+// Which side ("a" or "b") a team id is, for its school colors; set per matchup render.
+let TEAM_SIDE = {};
+const teamName = (t, size = 22) =>
+  `${logo(t.team_id, size)}<span class="tname" style="color: var(--team-${TEAM_SIDE[t.team_id] || "a"}-text)">${esc(t.school)}</span>`;
+
 function pairBlocks(blocks, names, picks) {
-  return blocks.map((bl) => `<div class="unit-block">
-      <div class="unit-head"><span>${esc(names[bl.off])} offense</span><span>vs</span><span>${esc(names[bl.def])} defense</span></div>
+  // The left column is always the offense, so a block's colors follow its offense team.
+  const vars = (off, def) => { const o = TEAM_SIDE[off], d = TEAM_SIDE[def];
+    return `--left: var(--team-${o}); --left-text: var(--team-${o}-text); --right: var(--team-${d}); --right-text: var(--team-${d}-text)`; };
+  return blocks.map((bl) => `<div class="unit-block" style="${vars(bl.off, bl.def)}">
+      <div class="unit-head"><span>${teamName({ team_id: bl.off, school: names[bl.off] }, 20)} offense</span><span>vs</span><span>${teamName({ team_id: bl.def, school: names[bl.def] }, 20)} defense</span></div>
       ${bl.groups.map((g) => `<h2 class="group">${esc(g.group)}</h2><div class="tape">${g.rows.map((c) => conceptRow(c, picks)).join("")}</div>`).join("")}
     </div>`).join("");
 }
@@ -262,7 +317,7 @@ function bettingSection(bt, A, B) {
       <td class="r">${r.ou[0] + r.ou[1] ? recStr(r.ou) : "—"}</td>
       <td class="r">${r.avg_cover === null ? "—" : num(r.avg_cover, "signed", 1)}</td>
       <td class="r">${r.avg_spread === null ? "—" : line(Math.round(r.avg_spread * 10) / 10)}</td></tr>`).join("");
-    return `<div><div class="team-h">${esc(t.school)}</div><table><thead><tr><th></th><th class="r">n</th><th class="r">SU</th>
+    return `<div><div class="team-h">${teamName(t)}</div><table><thead><tr><th></th><th class="r">n</th><th class="r">SU</th>
       <th class="r">ATS</th><th class="r">O/U</th><th class="r">Avg cover</th><th class="r">Avg close</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
   };
   return card("Betting profile", `<div class="grid2">${table(A, bt.a)}${table(B, bt.b)}</div>`, {
@@ -278,7 +333,7 @@ function resultCell(g) {
 const oppCell = (g) => `${g.neutral ? "vs " : g.is_home ? "" : "@ "}${g.opp_rank ? `#${g.opp_rank} ` : ""}${esc(g.opp)}`;
 
 function scheduleSection(sc, A, B) {
-  const table = (t, games) => `<div><div class="team-h">${esc(t.school)}</div><table class="sched"><thead><tr><th>Wk</th><th>Date</th><th>Opponent</th>
+  const table = (t, games) => `<div><div class="team-h">${teamName(t)}</div><table class="sched"><thead><tr><th>Wk</th><th>Date</th><th>Opponent</th>
       <th>Result</th><th class="r">Close</th><th class="r">ATS</th><th class="r">Total</th><th class="r">O/U</th></tr></thead><tbody>
       ${games.map((g) => `<tr class="${g.opp_fbs ? "" : "dim"}${g.past ? "" : " dim"}">
         <td>${g.season_type === "regular" ? g.week : "P" + g.week}</td><td>${esc(when(g.start_date, { month: "short", day: "numeric" }))}</td>
@@ -421,7 +476,7 @@ function playersSection(pl, A, B) {
     const cfTag = cf.ngt ? "" : cf.ngt_lag ? ` <span class="tag">all plays, ngt lags ${cf.ngt_lag} wk</span>` : "";
     const cfHtml = playerTable("CFBD · QB", cfCols("ppa_pass"), cf.QB) + playerTable("CFBD · Rushers", cfCols("ppa_rush"), cf.Rushers)
       + playerTable("CFBD · Receivers", cfCols("ppa_pass"), cf.Receivers);
-    return `<div><div class="team-h">${esc(t.school)}${cfTag}</div>${pffHtml}${cfHtml}</div>`;
+    return `<div><div class="team-h">${teamName(t)}${cfTag}</div>${pffHtml}${cfHtml}</div>`;
   };
   return card("Key players", `<div class="grid2">${col(A)}${col(B)}</div>`, {
     footer: "PFF and CFBD player ids have no crosswalk, so the two lists stay separate. PFF: QB by dropbacks, rushers by carries, receivers by routes, defenders by grade among players with 40%+ of the top snap count. CFBD: most games, then PPA; PPA is a game mean (the feed has no play counts).",
@@ -458,6 +513,7 @@ function gameSection(g, A, B, full) {
   if (!g) return card("Game", nodata(full ? "these teams do not meet this season"
     : "no meeting on or after this week; earlier meetings are in head-to-head"));
   const aHome = g.home_team_id === A.team_id;
+  const last = g.completed ? "close" : "latest";  // an unplayed game has no close yet
   const aSpread = (home) => home === null || home === undefined ? null : aHome ? home : -home;
   const bookRow = (name, bk) => {
     const n = bk && bk.now;
@@ -490,22 +546,23 @@ function gameSection(g, A, B, full) {
       <th class="r">Total</th><th class="r">ML ${esc(A.school)} / ${esc(B.school)}</th><th>Spread move</th><th class="r">As of</th></tr></thead>
       <tbody>${bookRow("DraftKings", g.main_books.draftkings)}${bookRow("FanDuel", g.main_books.fanduel)}</tbody></table>
     <h2 style="margin-top:16px">Sharp reference and consensus</h2>
-    <table class="books"><thead><tr><th>Book</th><th class="r">${esc(A.school)} open → close</th><th class="r">Total open → close</th><th class="r">ML ${esc(A.school)} / ${esc(B.school)}</th></tr></thead>
+    <table class="books"><thead><tr><th>Book</th><th class="r">${esc(A.school)} open → ${last}</th><th class="r">Total open → ${last}</th><th class="r">ML ${esc(A.school)} / ${esc(B.school)}</th></tr></thead>
       <tbody>${g.sharp.length ? g.sharp.map(closeRow).join("") : `<tr><td colspan="4">${nodata("no Pinnacle or Circa line")}</td></tr>`}
-      <tr><td>Consensus median</td><td class="r">${line(aSpread(g.median_spread_open))} → ${line(aSpread(g.median_spread_close))} <span class="dim">(n=${g.n_books_spread_close ?? 0})</span></td>
+      <tr><td>Consensus</td><td class="r">${line(aSpread(g.median_spread_open))} → ${line(aSpread(g.median_spread_close))} <span class="dim">(n=${g.n_books_spread_close ?? 0})</span></td>
       <td class="r">${g.median_total_open ?? "—"} → ${g.median_total_close ?? "—"} <span class="dim">(n=${g.n_books_total_close ?? 0})</span></td><td></td></tr></tbody></table>
     <details><summary>All other books (${g.other_books.length})</summary>
-      <table class="books"><thead><tr><th>Book</th><th class="r">${esc(A.school)} open → close</th><th class="r">Total open → close</th><th class="r">ML</th></tr></thead>
+      <table class="books"><thead><tr><th>Book</th><th class="r">${esc(A.school)} open → ${last}</th><th class="r">Total open → ${last}</th><th class="r">ML</th></tr></thead>
       <tbody>${g.other_books.map(closeRow).join("")}</tbody></table></details>`;
   return card("Game", body, { footer: "Lines as posted; no edge or fair-price math. Current DK/FD from the newest Odds API snapshot, movement from core.fact_game_odds; open/close from core.fact_game_line; consensus from core.v_game_book_median (closing lines are not decision-time)." });
 }
 
 function profileCol(t, pr, week, full) {
   const rec = pr.record;
-  const polls = pr.polls.length ? pr.polls.map((x) => `${x.poll.replace(" Poll", "")} #${x.rank}`).join(" · ") : "unranked";
+  const ranked = pr.polls.filter((x) => x.rank);
+  const polls = ranked.length ? ranked.map((x) => `${x.poll.replace(" Poll", "")} #${x.rank}`).join(" · ") : "unranked";
   const pollWeek = pr.polls.length ? Math.max(...pr.polls.map((x) => x.week)) : null;
   const c = pr.coach, m = pr.massey, po = pr.portal;
-  return `<div><div class="team-h">${esc(t.school)} <span class="sub">${esc(t.conference || "")}</span></div><dl class="kv">
+  return `<div><div class="team-h">${teamName(t)} <span class="sub">${esc(t.conference || "")}</span></div><dl class="kv">
     <dt>Record</dt><dd>${rec.w}-${rec.l} <span class="dim">(${rec.conf_w}-${rec.conf_l} conf)</span></dd>
     <dt>Polls</dt><dd>${esc(polls)}${pollWeek !== null && !full && pollWeek < week ? ` <span class="stamp stale">poll wk ${pollWeek}</span>` : ""}</dd>
     <dt>Massey</dt><dd>${m ? `#${m.cmp_rank} <span class="dim">composite of ${m.n_systems} · ${esc(m.date)}</span>` : nodata("no edition before kickoff")}</dd>
@@ -566,17 +623,22 @@ async function matchup(p) {
   const cw = full ? "full" : m.season_type === "regular" ? String(m.week) : `${m.season_type}:${m.week}`;
   const chips = (pr) => [
     `${pr.record.w}-${pr.record.l}`,
-    ...pr.polls.map((x) => `${x.poll.replace(" Poll", "").replace("AP Top 25", "AP")} #${x.rank}`),
+    ...pr.polls.filter((x) => x.rank).map((x) => `${x.poll.replace(" Poll", "").replace("AP Top 25", "AP")} #${x.rank}`),
     pr.massey ? `Massey #${pr.massey.cmp_rank}` : null,
   ].filter(Boolean).map((c) => `<span class="chip">${esc(c)}</span>`).join("");
 
   const weeks = m.weeks;
+  const ca = teamColors(A), cb = teamColors(B);
+  TEAM_SIDE = { [A.team_id]: "a", [B.team_id]: "b" };
+  app.style.cssText = `--team-a: ${ca.mark}; --team-a-text: ${ca.text}; --team-b: ${cb.mark}; --team-b-text: ${cb.text};`
+    + " --left: var(--team-a); --left-text: var(--team-a-text); --right: var(--team-b); --right-text: var(--team-b-text);";
   let html = full ? `<div class="banner">Full season · postgame. Every number includes games played after any betting decision.</div>` : "";
-  html += `<div class="vs"><div class="a"><div class="team">${esc(A.school)}</div><div class="sub">${esc(A.conference || A.classification || "")}</div>
-      <div class="chips">${chips(s.profile.a)}</div></div>
+  html += `<div class="vs"><div class="a">${logo(A.team_id, 56)}<div><div class="team" style="color: var(--team-a-text)">${esc(A.school)}</div>
+      <div class="sub">${esc(A.conference || A.classification || "")}</div><div class="chips">${chips(s.profile.a)}</div></div></div>
     <div class="mid">${m.season}<br>${full ? "Full season" : "As of week " + m.week}<br><span class="dim">${m.elapsed_ms} ms</span></div>
-    <div class="b"><div class="team">${esc(B.school)}</div><div class="sub">${esc(B.conference || B.classification || "")}</div>
-      <div class="chips">${chips(s.profile.b)}</div></div></div>
+    <div class="b"><div><div class="team" style="color: var(--team-b-text)">${esc(B.school)}</div>
+      <div class="sub">${esc(B.conference || B.classification || "")}</div><div class="chips">${chips(s.profile.b)}</div></div>${logo(B.team_id, 56)}</div></div>
+    <div class="teambar" aria-hidden="true"><i style="background: var(--team-a)"></i><i style="background: var(--team-b)"></i></div>
     <div class="controls">
       <label>Season<select id="m-season">${seasonOptions(m.season, Math.max(m.season, new Date().getFullYear()))}</select></label>
       <label>As of<select id="m-week">${weekOptions(weeks, cw, { full: true })}</select></label>
