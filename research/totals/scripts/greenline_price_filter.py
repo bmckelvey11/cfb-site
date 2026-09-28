@@ -109,8 +109,12 @@ def build(pin_after: bool = False) -> tuple[list[dict], dict]:
     teams = {f["pff_game_id"]: f["teams"] for f in load_flags()}
     _, by_teams = book_closes((2026,))
     rows, cover = [], {}
+    odds_snaps = sorted(OA_DIR.glob("odds_americanfootball_ncaaf_*.json"), key=lambda p: p.stem.rsplit("_", 1)[1])
     for wk, snap in CAPTURE_SNAPSHOTS.items():
         oa = latest_snapshot(OA_DIR / snap)[0]
+        # the odds snapshot precedes PFF's capture by up to 3h; the first one after it shows
+        # whether the better number was still there when the flag could be acted on
+        oa_after = latest_snapshot(next(p for p in odds_snaps if p.stem.rsplit("_", 1)[1] > CAPTURED[wk]))[0]
         pin_path = pin_snapshot(wk, pin_after)
         pin = pinnacle_totals(pin_path)[0]
         flags = list(csv.DictReader((GL_DIR / f"pff_greenline_2026_w{wk}.csv").open(encoding="utf-8")))
@@ -135,13 +139,15 @@ def build(pin_after: bool = False) -> tuple[list[dict], dict]:
                 continue
             book, bl, bo = bb
             pf = fair_line(pe["line"], pe["over"], pe["under"], sigma(pe["line"])) if pe else None
+            later = best_book((match(kick, away, home, oa_after, ph) or {}).get("totals", {}))
             res = grade(actual, bl)
             close, _ = consensus(by_teams.get((2026, teams[u["game_id"]]))) if u["game_id"] in teams else (None, "")
             rows.append({"week": wk, "game_id": u["game_id"], "game": f"{u['away']} @ {u['home']}",
                          "date": u["kickoff"][:10], "pff_line": u["line"], "book": book, "book_line": bl,
                          "odds": bo, "pin_fair": pf, "actual": actual, "result": res,
                          "net": decimal(bo) - 1 if res == "win" else (-1.0 if res == "loss" else 0.0),
-                         "clv": bl - close if close is not None else None, **passes(u["line"], bl, pf)})
+                         "clv": bl - close if close is not None else None,
+                         "still_up": later is not None and later[1] > u["line"], **passes(u["line"], bl, pf)})
     return rows, cover
 
 
@@ -186,13 +192,20 @@ def report(rows: list[dict], cover: dict, after: list[dict]) -> str:
     L += ["", "## Sensitivity: first Pinnacle snapshot after capture", "", HEAD]
     for k in ("C", "D"):
         L.append(summary(f"{k} (Pinnacle after)", [r for r in after if r[k]]))
+    L += ["", "## Sensitivity: was the better number still there after PFF's capture?", "",
+          "Added 2026-09-28 after the first run, as a decision-time check, not a variant: the odds",
+          "snapshot precedes the capture by up to 3h, so a gap to PFF's line can be the market",
+          "falling in between. Graded at the pre-capture number either way.", "", HEAD]
+    L.append(summary("C, still above PFF's line in the next odds snapshot", [r for r in rows if r["C"] and r["still_up"]]))
+    L.append(summary("C, gone or unmatched by the next snapshot", [r for r in rows if r["C"] and not r["still_up"]]))
     L += ["", "## Selected bets (C)", "",
-          "| week | game | PFF | book | total | odds | Pinnacle fair | final | result | CLV |",
-          "| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: |"]
+          "| week | game | PFF | book | total | odds | Pinnacle fair | final | result | CLV | still up |",
+          "| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: | --- |"]
     for r in sorted((r for r in rows if r["C"]), key=lambda r: (r["week"], r["date"])):
         L.append(f"| {r['week']} | {r['game']} | {r['pff_line']:g} | {r['book']} | {r['book_line']:g} | "
                  f"{r['odds']:+d} | {r['pin_fair']:.2f} | {r['actual']:g} | {r['result']} | "
-                 + (f"{r['clv']:+.1f}" if r["clv"] is not None else "--") + " |")
+                 + (f"{r['clv']:+.1f}" if r["clv"] is not None else "--")
+                 + f" | {'yes' if r['still_up'] else 'no'} |")
     return "\n".join(L) + "\n"
 
 
