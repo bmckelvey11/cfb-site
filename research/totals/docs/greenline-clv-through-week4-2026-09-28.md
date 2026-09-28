@@ -18,7 +18,10 @@ this n. The single-book check survives at a smaller size: DraftKings at capture 
 close, unders +0.35 ± 0.26 (p 0.004, n=127). Every upper bound still sits below the 0.60 pts
 that would pay for −110 on CLV alone.
 
-By subtraction, week 4's 48 scored unders averaged roughly +0.05 pts on their own.
+Week 4 on its own: **+0.10 ± 0.24** (p 0.21, n=48). Weeks 2 and 3 re-score at +0.42 and
++0.53 on today's closes (+0.48 together, against +0.50 in the 09-23 record), so nearly all of
+the drop is the new week, not re-scored closes. (First published in this record as "+0.05 by
+subtraction"; replaced the same day by the direct per-week rows the script now prints.)
 
 ## Method
 
@@ -30,7 +33,9 @@ record found to be in-game totals stay excluded; that finding is not revisited h
 Two script fixes preceded this run (commit `36f34ca4`): the DraftKings same-book check had a
 week→odds-snapshot map for weeks 2-3 only and skipped week 4 without saying so; week 4 now
 uses `odds_americanfootball_ncaaf_20260923T180008Z.json`, the latest before the 19:49Z
-capture. The "eras disagree" sentence printed regardless of p and is now conditional.
+capture. The "eras disagree" sentence printed regardless of p and is now conditional. The
+script also prints one row per 2026 week, so a move in the 2026 row can be traced to new
+data or to re-scored closes.
 
 ## Data
 
@@ -57,8 +62,8 @@ Upper 95% against the 0.60 break-even: pooled +0.44, 2026 +0.57 — both below.
 
 - **Not that the eras agree.** p 0.195 is a failure to separate them; the point estimates
   (+0.05 vs +0.34) still differ, and the test's resolution is ±0.44 pts.
-- **Not a trend.** One week near zero after two near half a point is what noise at n≈45 per
-  week looks like; three weeks cannot distinguish decay from variance.
+- **Not a trend.** Week 4's +0.10 ± 0.24 overlaps week 2's +0.42 ± 0.39; at n≈45 per week,
+  three weeks cannot distinguish decay from variance.
 - **Not a bet on CLV.** No row's upper bound reaches 0.60 pts.
 - **Not a Pinnacle result.** The Pinnacle-gated 2026 close remains contaminated by GraphQL rows.
 

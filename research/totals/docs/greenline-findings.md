@@ -4,7 +4,9 @@
 known on their day and are never rewritten. This one is the current state of the question,
 kept in sync with them, so nobody has to read fourteen files to find out where things stand.
 Every claim points at the dated record that establishes it; if the two disagree, the dated
-record is right and this file is stale.
+record is right and this file is stale. The exception is a row marked "rerun <date>": its
+numbers are newer than its record and come from the named script, which is their authority;
+the record still establishes the verdict.
 
 ---
 
@@ -20,7 +22,7 @@ sized for uncertainty; the recommendation to cut the unit from 1% to 0.6% was ma
 72% reading. Against the closing line, the pooled unders beat the close by **+0.25 ± 0.18
 points** (p 0.003, n=313). The 2026 flags' edge over 2020 no longer separates (p 0.195): 2026
 is +0.34, holding at a single book (DraftKings at capture vs its own close, unders +0.35 ±
-0.26), and week 4 alone was near zero. Every upper bound sits below the ~0.6 points that
+0.26); week 4 alone was +0.10 ± 0.24. Every upper bound sits below the ~0.6 points that
 would pay for −110 on CLV alone.
 
 ---
@@ -41,7 +43,7 @@ would pay for −110 on CLV alone.
 | 10 | **Pinnacle's position does not rank the unders.** Juice lean, line vs PFF's, distance from projection, limit — n=38, nothing survives Holm. | [pinnacle shade](greenline-pinnacle-shade-2026-09-17.md) |
 | 11 | **The 2022-23 exports carry no price**, so they contribute a record and never a return. Integrity gate, not a rounding choice. | [export picks](greenline-export-picks-graded-2026-09-21.md) |
 | 12 | **The archive's CFBD joins are clean** after one repaired transposition and a matcher fix. `is_greenline_pick` is copied onto all three snapshots — a known trap. | [join audit](greenline-archive-join-audit-2026-09-21.md) |
-| 13 | **Pooled unders beat the close; the eras no longer separate.** +0.25 ± 0.18 pts against REST-backed book closes, n=313, one-sided p 0.003 (through 2026 week 4). 2020 +0.05 ± 0.38 (also ~0 against PFF_hist's own close), 2022-23 +0.46 ± 0.35, 2026 +0.34 ± 0.22; 2026 minus 2020 p 0.195, down from 0.047 at week 3 — a failure to separate, not agreement. The 2026 move holds at one book, DraftKings at capture vs its own close, unders +0.35 ± 0.26 on 127, all flags +0.29 ± 0.28 on 154; week 4 alone was near zero. Three weeks, eight kickoff dates; every upper bound (pooled +0.44, 2026 +0.57) is below the ~0.60 break-even CLV. | [clv through week 4](greenline-clv-through-week4-2026-09-28.md), superseding the numbers in [clv all eras](greenline-clv-all-eras-2026-09-23.md) |
+| 13 | **Pooled unders beat the close; the eras no longer separate.** +0.25 ± 0.18 pts against REST-backed book closes, n=313, one-sided p 0.003 (through 2026 week 4). 2020 +0.05 ± 0.38 (also ~0 against PFF_hist's own close), 2022-23 +0.46 ± 0.35, 2026 +0.34 ± 0.22; 2026 minus 2020 p 0.195, down from 0.047 at week 3 — a failure to separate, not agreement. The 2026 move holds at one book, DraftKings at capture vs its own close, unders +0.35 ± 0.26 on 127, all flags +0.29 ± 0.28 on 154; by week 2026 reads +0.42, +0.53, +0.10. Three weeks, eight kickoff dates; every upper bound (pooled +0.44, 2026 +0.57) is below the ~0.60 break-even CLV. | [clv through week 4](greenline-clv-through-week4-2026-09-28.md), superseding the numbers in [clv all eras](greenline-clv-all-eras-2026-09-23.md) |
 | 14 | **GraphQL-only closes are not closes.** Rows in `core.fact_game_line` that exist only in the CFBD GraphQL feed (Pinnacle, Caesars, FanDuel, BetMGM, bet365, Circa) carry in-game or partial-game totals on some 2026 games — WKU @ UGA closes 52.5–56.0 at REST-backed books and 78.0–82.5 at four GraphQL-only ones. The "corrupt Pinnacle rows" of 2026-09-22 were these, and a median of the other books cannot catch them when live rows are the majority, so that doc's +0.06 is withdrawn and the flag-CLV contrast (row D) reused the same close. Use REST-backed rows (`_source` ≠ `gql`); every 2020-23 row is one. | [clv all eras](greenline-clv-all-eras-2026-09-23.md) |
 | 15 | **Team-level PFF stats do not filter the unders — at a coarse resolution.** Five features registered 2026-09-22 (pass rush, run-heavy, no-deep, weak QB, coverage), both teams on the under side of the FBS median, built from the 2025 full season. The power gate opened at n=136 (2026 weeks 2-4); nothing survives Holm, smallest adjusted p 0.337 (`run_heavy`, pointing the wrong way). Per-feature floors 72–75%, so only very large effects are ruled out. Only the 2026 era can join PFF. Was open question F. | [pff under filters](greenline-pff-under-filters-2026-09-28.md) |
 
