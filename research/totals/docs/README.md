@@ -136,10 +136,13 @@ read as a bound rather than an absence.
 | Doc | What it reports |
 | --- | --- |
 | [kicker-quality-volatility-totals-2026-09-18.md](kicker-quality-volatility-totals-2026-09-18.md) | Do prior-season kicker quality (CFBD PAAR) and kicker volatility (FG overdispersion) move the total past the closing book line? 5,776 games 2018-25, two-way clustered. Nothing bettable: the CI upper bound buys 51.5% over against a 52.38% break-even. Underpowered 3x (mean) and 11x (dispersion) against the mechanical ceiling, so it is a bound, not a zero. PAAR does not persist year to year (r 0.16) |
+| [pff-grade-total-residual-2026-09-22.md](pff-grade-total-residual-2026-09-22.md) | Do entering PFF offense and defense grades still move the total after the book median is subtracted? 4,809 games 2019-25, season-clustered. Thirteen of fourteen intervals cover 0. Run defense vs the open excludes 0; the same grade vs the close does not |
+| [pff-grade-residual-tests-2026-09-22.md](pff-grade-residual-tests-2026-09-22.md) | Do those fourteen slopes reject zero? Webb wild cluster bootstrap-t, Holm across 14. Smallest unadjusted p is run defense vs the open, 0.035; Holm moves it to 0.50. Nothing rejects |
 
 | Script | What it does |
 | --- | --- |
 | [`../scripts/kicker_totals_effect.py`](../scripts/kicker_totals_effect.py) | Builds the prior-season kicker panel, fits both channels with two-way cluster-robust SEs, derives each channel's mechanical ceiling and MDE, and translates the coefficient interval into an over rate against break-even. `--self-check`, `--cache` |
+| [`../scripts/pff_residual_screen.py`](../scripts/pff_residual_screen.py) | Scatter and OLS of the open and close totals residuals on seven pre-game PFF grades. Wild cluster bootstrap by season, leave-one-season range, Webb bootstrap-t p-values, Holm across the 14 tests. 2026 plotted, not fit. `--self-check` |
 
 ---
 
