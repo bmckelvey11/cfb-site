@@ -60,6 +60,15 @@ Snapshots: odds-api `20260909T200531Z`, `20260916T180004Z`, `20260923T180008Z`; 
 C by week: 2-0, 2-3, 1-4. Sensitivity with the first Pinnacle snapshot after capture:
 C 6-7 (−13.8%), D 41-35 (+2.4%).
 
+**What "PFF's line" is, and a timing check added after the first run.** PFF's line is the
+market total PFF displays beside its pick at capture (`market_over_under`; no book named — it
+equals DraftKings' number on 37 of 49 week-5 games, FanDuel's on 39). The DK/FD numbers come
+from the odds snapshot *before* the capture, up to 3 hours earlier, so a book sitting above
+PFF's line can be the market falling in between rather than a soft book. In the first odds
+snapshot after each capture, **10 of the 12 selected numbers were still above PFF's line**
+(4-6, CLV +1.05, 6-0 on moved closes); 2 had fallen to it (HOU @ TT, NDSU @ SAC, both week 3,
+within 49 minutes; 1-1). The price finding holds on the 10; the record stays noise.
+
 Two further readings:
 
 - **Volume.** C selects about 4 bets a week here, against 9 in week 5.
@@ -78,6 +87,8 @@ Two further readings:
   this reopens Pinnacle as a *price check* on the retail book, a different question, and it
   is logged there as open question G, graded prospectively.
 - **Not a reason to change the live rule.** Three weeks, 12 bets, no mechanical fault found.
+  The one live consequence of the timing check: confirm the book still shows the higher
+  total when placing the bet, since 2 of 12 were gone within an hour.
 
 ## Reproduce
 
