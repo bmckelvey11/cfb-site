@@ -233,7 +233,8 @@ def render(res: dict, sizes: list[int], dec: dict, expl: dict, weeks: tuple[str,
            expl_new: dict | None = None) -> str:
     L = [f"# Under list and stated edge against CLV, {dt.date.today().isoformat()}", "",
          "Reproduce: `python research/totals/scripts/greenline_flag_clv_contrast.py "
-         "--out research/totals/docs`.", "",
+         + ("" if weeks == REGISTERED_WEEKS else f"--weeks {','.join(weeks)} ")
+         + "--out research/totals/docs`.", "",
          "## Question", "",
          "Within the Greenline board, does the *published under list* or the *size of PFF's stated",
          "edge* predict closing-line value? These are the two variables that vary inside the board,",
