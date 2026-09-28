@@ -55,6 +55,23 @@ ANALYSIS PLAN, fixed 2026-09-22 before fitting.
 8. Identification. Predictive association. A flag is not randomly assigned and nothing here
    pretends otherwise.
 
+AMENDED 2026-09-28, committed before the rerun printed anything:
+
+9. Close. The first run's close (`greenline_clv.usable_close`) let in GraphQL-only rows that
+   carry in-game totals (greenline-findings row 14), so it is replaced by the median
+   REST-backed book close with the span gate (`greenline_clv_all_eras.book_closes` /
+   `consensus`). This is look 1 done on a valid close, not a second look.
+10. Population. Fixed to weeks 2-3, the flags available when the plan was set; the graded
+   file now holds later weeks, and adding them before ~596 flags would be a peek.
+11. Coupling sensitivity (reported, not a third test). The PFF market line sits inside both
+   `value` (projection vs that line) and CLV (that line vs the close), so a line that is
+   noisy-high raises both even if PFF knows nothing. The decoupled y replaces the capture line
+   with the median capture total across odds-api books other than DraftKings and FanDuel. A
+   slope that survives on it is not the mechanical one.
+12. Exploratory, outside the Holm family: the slope of that decoupled y on (best DK/FD total
+   minus PFF projection), positive-edge unders, weeks 2-3 -- the price-rule quantity. Never
+   against book-minus-close, which shares the book total and is mechanical.
+
 Run from repo root:
     python research/totals/scripts/greenline_flag_clv_contrast.py [--out research/totals/docs]
     python research/totals/scripts/greenline_flag_clv_contrast.py --self-check
@@ -74,10 +91,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bankroll" / "scripts"))
 
 from cfb_paths import INGEST  # noqa: E402
-from greenline_clv import load_closes, load_flags, scored  # noqa: E402
+from greenline_clv import clv_points, load_flags  # noqa: E402
+from greenline_clv_all_eras import CAPTURE_SNAPSHOTS, book_closes, consensus  # noqa: E402
+from match_greenline_books import OA_DIR, is_placeholder, latest_snapshot, match, slug_names  # noqa: E402
 from under_filters import holm  # noqa: E402
 
-UNDER_LISTS = sorted((INGEST / "pff_scoreboard").glob("greenline_unders_2026_w*.csv"))
+GL_DIR = INGEST / "pff_scoreboard"
+UNDER_LISTS = sorted(GL_DIR.glob("greenline_unders_2026_w*.csv"))
+REGISTERED_WEEKS = ("2", "3")          # the flags that existed when the plan was fixed
+RETAIL = ("DraftKings", "FanDuel")     # left out of the decoupled capture line
+ET = dt.timezone(dt.timedelta(hours=-4))
 TARGET_EFFECT = 0.25   # the movement effect pff-line-movement-2026-09-22.md found, for required-N
 ICC_SENSITIVITY = (0.02, 0.05, 0.10)
 Z80 = 1.96 + 0.84      # two-sided alpha 0.05 plus 80% power
@@ -94,6 +117,37 @@ def on_under_list() -> set[str]:
             if r.get("game_id"):
                 ids.add(r["game_id"])
     return ids
+
+
+def rest_scored(flags: list[dict]) -> tuple[list[dict], dict]:
+    """CLV against the median REST-backed close, span gate (amendment 9)."""
+    _, by_teams = book_closes((2026,))
+    kept, why = [], {}
+    for f in flags:
+        close, reason = consensus(by_teams.get((2026, f["teams"])))
+        why[reason] = why.get(reason, 0) + 1
+        if close is not None:
+            kept.append(dict(f, close=close, clv=clv_points(f["side"], f["line"], close)))
+    return kept, why
+
+
+def capture_consensus(weeks: tuple[str, ...]) -> dict[str, float]:
+    """pff_game_id -> median capture total across odds-api books other than DK and FD."""
+    sched = {s["pff_game_id"]: s for s in csv.DictReader((GL_DIR / "pff_schedule_2026.csv").open(encoding="utf-8"))}
+    out = {}
+    for wk in weeks:
+        oa = latest_snapshot(OA_DIR / CAPTURE_SNAPSHOTS[wk])[0]
+        for f in csv.DictReader((GL_DIR / f"pff_greenline_2026_w{wk}.csv").open(encoding="utf-8")):
+            k = (f.get("kickoff_raw") or "")[:16]
+            if not k:
+                continue
+            away, home = slug_names((sched.get(f["pff_game_id"]) or {}).get("matchup_path", ""))
+            kick = dt.datetime.fromisoformat(k).replace(tzinfo=ET).astimezone(dt.timezone.utc)
+            e = match(kick, away, home, oa, is_placeholder(k))
+            pts = [t[0] for b, t in ((e or {}).get("totals") or {}).items() if b not in RETAIL]
+            if len(pts) >= 2:
+                out[f["pff_game_id"]] = st.median(pts)
+    return out
 
 
 def mean_diff(a: list[float], b: list[float]) -> dict:
@@ -159,7 +213,15 @@ def analyse(rows: list[dict], listed: set[str]) -> dict:
 
 # ---------------------------------------------------------------- report
 
-def render(res: dict, sizes: list[int]) -> str:
+def _fmt(label: str, s: dict, holm_p: bool = True) -> str:
+    if not s.get("ok"):
+        return f"| {label} | -- | -- | -- | -- | -- | -- |"
+    n = s["n"] if "n" in s else f"{s['n_a']} vs {s['n_b']}"
+    return (f"| {label} | {n} | {s['est']:+.3f} pts | {s['lo']:+.2f} to {s['hi']:+.2f} | {s['p']:.3f} | "
+            + (f"{s['p_holm']:.3f}" if holm_p else "not in family") + f" | {s['mde']:.2f} |")
+
+
+def render(res: dict, sizes: list[int], dec: dict, expl: dict) -> str:
     L = [f"# Under list and stated edge against CLV, {dt.date.today().isoformat()}", "",
          "Reproduce: `python research/totals/scripts/greenline_flag_clv_contrast.py "
          "--out research/totals/docs`.", "",
@@ -168,13 +230,13 @@ def render(res: dict, sizes: list[int]) -> str:
          "edge* predict closing-line value? These are the two variables that vary inside the board,",
          "which the flag dummy in [line movement](pff-line-movement-2026-09-22.md) did not.", "",
          "## The answer is a bound, not a result", "",
-         f"- {res['n']} flags with a close surviving `usable_close()`. CLV SD {res['sd']:.2f} points, "
-         f"mean {res['mean']:+.3f}.",
+         f"- {res['n']} flags (weeks {', '.join(REGISTERED_WEEKS)}) with a REST-backed close. CLV SD "
+         f"{res['sd']:.2f} points, mean {res['mean']:+.3f}.",
          f"- Smallest effect this n detects 80% of the time: **{res['list']['mde']:.2f} points** for the "
          f"list contrast, **{res['value']['mde']:.2f} points per SD** for the edge slope.",
          f"- A quarter-point effect — the size found on the close in the line-movement record — would "
          f"need **{res['required_n']} flags**, about twelve more weeks at this board's volume.",
-         f"- Worse, the flags sit on **{len(sizes)} slate dates**, {max(sizes)} of them on one. Two",
+         f"- Worse, the flags sit on **{len(sizes)} slate dates**, {max(sizes)} of them on one. So few",
          "  effective clusters supports neither a cluster-robust SE nor a wild bootstrap, so the",
          "  intervals below are iid and optimistic. The sensitivity table says by how much.", "",
          "## Estimates", "",
@@ -199,19 +261,28 @@ def render(res: dict, sizes: list[int]) -> str:
         de = design_effect(sizes, icc)
         L.append(f"| {icc:.2f} | {de:.2f} | {lst['mde'] * math.sqrt(de):.2f} | "
                  f"{val['mde'] * math.sqrt(de):.2f} |")
+    L += ["", "## Coupling sensitivity and the exploratory price-rule fit", "",
+          "Same CLV sign, but measured from the median capture total of odds-api books other than",
+          "DraftKings and FanDuel, so the PFF market line (x's reference) is not also y's. Reported,",
+          "not tested; the exploratory row is outside the Holm family.", "",
+          "| fit | n | estimate | 95% CI (iid) | p | Holm p | MDE |",
+          "|---|---:|---:|---|---:|---:|---:|",
+          _fmt("list contrast, decoupled y", dec["list"], holm_p=False),
+          _fmt("CLV per SD of `value`, decoupled y", dec["value"], holm_p=False),
+          _fmt("exploratory: per SD of best DK/FD total − PFF projection", expl, holm_p=False)]
+    sig = [k for k, s in (("list", lst), ("value", val)) if s.get("ok") and s["p_holm"] < 0.05]
     L += ["", "## Reading", "",
-          "- Neither contrast is distinguishable from zero, and neither could have been: both point",
-          "  estimates are far inside their own MDE. **This is a bound on the question, not an answer",
-          "  to it.** Nothing here says the under list is worthless; it says 79 flags on two Saturdays",
-          "  cannot tell a worthwhile list from a worthless one.",
-          "- The bound is still worth having: it rules out the *large* effects. A list that moved the",
-          f"  close by more than about {lst['mde']:.1f} points would have shown up, and none did.",
-          "- Both point estimates lean slightly negative, i.e. the listed flags and the bigger stated",
-          "  edges moved *away* from PFF's side. At these intervals that is noise and should not be",
-          "  described as a reverse effect.",
-          f"- **This becomes answerable at the end of the 2026 season, not during it.** {res['required_n']} "
-          f"scored flags at roughly forty a week is about thirteen more weeks, which is the rest of the",
-          "  regular season. Plan the look for then; there is nothing to see before it.", "",
+          (f"- Surviving Holm: {', '.join(sig)}." if sig else
+           "- Neither registered contrast survives Holm. **This is a bound on the question, not an "
+           "answer to it**: an effect inside the MDE column could not have been seen."),
+          f"- The bound rules out large effects: a list that moved the close by more than about "
+          f"{lst.get('mde', float('nan')):.1f} points, or an edge slope above "
+          f"{val.get('mde', float('nan')):.1f} points per SD, would have shown up.",
+          f"- Point estimates: list {lst.get('est', float('nan')):+.2f}, edge slope "
+          f"{val.get('est', float('nan')):+.2f} (coupled) vs {dec['value'].get('est', float('nan')):+.2f} "
+          "(decoupled). A slope that shrinks on the decoupled y was partly the shared market line.",
+          f"- **The next look is at ~{res['required_n']} scored flags** (the stop rule, recomputed on "
+          "this close's SD). Nothing is to be read before it.", "",
           "## What this does not support", "",
           "- Any claim about win rate. This is a movement test; open question C owns the `value`",
           "  win-rate question and is embargoed until 56 prospective picks have graded.",
@@ -258,8 +329,19 @@ def main() -> None:
     import duckdb
 
     from cfb_paths import DB_PATH
-    rows, why = scored(load_flags(), load_closes())
+    rows, why = rest_scored([f for f in load_flags() if f["week"] in REGISTERED_WEEKS])
     listed = on_under_list()
+    cc = capture_consensus(REGISTERED_WEEKS)
+    dec_rows = [dict(r, clv=clv_points(r["side"], cc[r["pff_game_id"]], r["close"]))
+                for r in rows if r["pff_game_id"] in cc]
+    dec = analyse(dec_rows, listed)
+    # exploratory: the price-rule quantity against the decoupled y, positive-edge unders only
+    from greenline_price_filter import build
+    close_of = {r["pff_game_id"]: r["close"] for r in rows}
+    pf = [r for r in build()[0] if r["week"] in REGISTERED_WEEKS and r["proj_gap"] is not None
+          and r["game_id"] in close_of and r["game_id"] in cc]
+    expl = slope([r["proj_gap"] for r in pf],
+                 [clv_points("under", cc[r["game_id"]], close_of[r["game_id"]]) for r in pf])
     con = duckdb.connect(str(DB_PATH), read_only=True)
     dates = {frozenset((str(h), str(aw))): str(d) for h, aw, d in con.execute(
         "select home_team_id, away_team_id, start_date::date from core.fact_game "
@@ -273,8 +355,8 @@ def main() -> None:
     res = analyse(rows, listed)
     print(f"scored {res['n']} flags, {sum(r['pff_game_id'] in listed for r in rows)} on an under list, "
           f"across {len(sizes)} slate dates {sizes}")
-    print(f"close gate: {why}")
-    text = render(res, sizes)
+    print(f"close gate: {why}; decoupled y on {len(dec_rows)}; exploratory on {len(pf)}")
+    text = render(res, sizes, dec, expl)
     if a.out:
         p = a.out / f"greenline-flag-clv-contrast-{dt.date.today().isoformat()}.md"
         p.write_text(text, encoding="utf-8")
