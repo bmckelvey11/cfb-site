@@ -7,14 +7,15 @@
 Runs mc_combined_totals.simulate over a grid of Greenline unit size x volume x
 prior and scores every cell two ways:
 
-  (a) max median gain subject to P(-25%) <= 1% and mid-season bust = 0%
+  (a) max median gain subject to P(-25%) <= 3% (MAX_P_M25) and mid-season bust = 0%
   (b) ratio = median gain / (median - 5th pct), a Sharpe-like downside ratio
 
 Volume is the operator's plan by default: 6-12 unders a week (GL_BETS_RANGE),
 drawn uniformly and capped at the week's slate. --gl-volume slate restores the
 coverage grid (13% supported, 25/50/100% conditional on the picked-flag win rate
 transferring to flags that were passed on). The recommended row must pass (a)
-under BOTH priors; with the slate grid it is also restricted to 13% coverage.
+under the planning prior; n58 and pooled are reported as the bracket. With the
+slate grid it is also restricted to 13% coverage.
 
 Over-zero stays at 1% throughout: it contributes ~11 bets and cannot move the
 answer at any sane stake (see mc-combined-totals-2026-09-17.md).
@@ -28,6 +29,7 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -250,7 +252,7 @@ def main() -> None:
           f"{args.seasons} season(s)\n")
     rec, cond = recommend(rows)
     print(to_markdown(rows, args.bankroll))
-    for label, r in (("RECOMMENDED (supported volume, (a) under both priors)", rec),
+    for label, r in (("RECOMMENDED (supported volume, (a) under the planning prior)", rec),
                      ("best if coverage transfer held (conditional, not recommended)", cond)):
         if r is None:
             print(f"{label}: no row passes")
@@ -272,7 +274,7 @@ def main() -> None:
     if args.out:
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
-        stem = "bankroll-config-sweep-2026-09-21"
+        stem = f"bankroll-config-sweep-{date.today().isoformat()}"  # dated records are never overwritten
         with open(out / f"{stem}.csv", "w", newline="") as fh:
             keys = [k for k in rows[0] if not k.endswith("_by_prior")]
             w = csv.DictWriter(fh, fieldnames=keys)
