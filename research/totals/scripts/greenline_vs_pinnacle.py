@@ -54,12 +54,12 @@ def american(price: str | None) -> int | None:
         return None
 
 
-def pinnacle_totals() -> tuple[list[dict], str, Path]:
-    """Full-game main-line totals from the newest oddspapi snapshot."""
+def pinnacle_totals(path: Path | None = None) -> tuple[list[dict], str, Path]:
+    """Full-game main-line totals from the newest oddspapi snapshot, or the one at `path`."""
     snaps = sorted(PIN_DIR.glob("oddspapi_ncaa_*.json"))
     if not snaps:
         raise SystemExit(f"no snapshot in {PIN_DIR} -- run scripts/pull_oddspapi.py")
-    path = snaps[-1]
+    path = path or snaps[-1]
     payload = json.loads(path.read_text(encoding="utf-8"))
     out = []
     for fx in payload["fixtures"]:
