@@ -5,8 +5,8 @@
     python research/bankroll/scripts/pooled_growth_chart.py --self-check
 
 The unit rule is to bracket both priors. This chart deliberately does not: it was
-asked for as "the pooled edge, charted", so it conditions on the 146-113 record
-(posterior mean 56.4%) and shows three configs side by side. The n58 reading is
+asked for as "the pooled edge, charted", so it conditions on the planning prior
+(`mc_combined_totals.planning_p_gl`) and shows three configs side by side. The n58 reading is
 in mc-combined-totals-2026-09-17.md and bankroll-config-sweep-2026-09-21.md.
 """
 
@@ -20,7 +20,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mc_combined_totals import (  # noqa: E402
-    PCTS, Config, simulate,
+    GL_PRIORS, PCTS, Config, planning_p_gl, simulate,
     BLUE, GREEN, GOLD, INK, MUTED, _style,
 )
 
@@ -69,7 +69,8 @@ def figure(runs: list[dict], bankroll: float, path: Path, resized: list[dict] | 
                                        else "\nflat units off the start"), fontsize=10.5)
     axes[0, 0].legend(fontsize=8, frameon=False, loc="upper left")
     narrow = len(runs) == 1  # one panel: the wide-figure title overflows
-    fig.suptitle(f"Bankroll by week, planning prior (kappa 0.5: 89.5–70.0, mean 56.1%), "
+    w, l = GL_PRIORS["n58"][0] + 57 + 0.5, GL_PRIORS["n58"][1] + 43.5 + 0.5  # kappa 0.5 on 114-87
+    fig.suptitle(f"Bankroll by week, planning prior (kappa 0.5: {w:.1f}–{l:.1f}, mean {planning_p_gl(0.5):.1%}), "
                  f"${bankroll:,.0f} start", fontsize=11 if narrow else 13,
                  fontweight="bold", color=INK, wrap=narrow)
     sub = "Win rate drawn per path from the half-pooled posterior. n58 and pooled readings are in the sweep."

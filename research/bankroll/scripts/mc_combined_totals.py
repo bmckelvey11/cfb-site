@@ -15,8 +15,8 @@ Which is why neither win rate is a point estimate here. Both are drawn per path
 from the Beta posterior of their own graded record, so the output is a mixture
 over parameter uncertainty, not a curve conditioned on a number the source data
 does not establish. The Greenline record is the published under list graded by
-research/totals/scripts/grade_unders_list.py: n=58, CI 42.5-67.3%, break-even
-52.38% sits inside it.
+research/totals/scripts/pool_totals_record.py: 55-49 through 2026 week 4, n=104,
+CI 43.4-62.2%, break-even 52.38% sits inside it.
 
 Bets inside a week are correlated through one shared scoring environment: a high-
 scoring Saturday helps every OVER and hurts every UNDER. Because over-zero is all
@@ -41,14 +41,14 @@ from scipy.special import erfinv, ndtr
 # over-zero: 151-83 walk-forward, 2016-2025 (models/over_zero/docs/ROI_HITRATE.md)
 OZ_WINS, OZ_LOSSES = 151, 83
 # Greenline totals. Three defensible priors, selected with --gl-prior.
-#  n58         32-26, the published 2026 under list, weeks 2-3 (36 + 22 picks),
-#              graded at PFF's number and at DraftKings' -- identical both ways
-#              (research/totals/docs/greenline-w3-grade-2026-09-21.md;
-#              research/totals/scripts/grade_unders_list.py --week 2 --week 3).
+#  n58         55-49, the published 2026 under list, weeks 2-4 (36 + 22 + 46 picks),
+#              graded at PFF's number (research/totals/scripts/pool_totals_record.py,
+#              2026-09-28). The key name is historical: weeks 2-3 held 58 picks (32-26)
+#              and scripts read their rows by this key. Weeks 2-3 graded identically at
+#              DraftKings' number (research/totals/docs/greenline-w3-grade-2026-09-21.md).
 #              This is the bet population: the plan bets unders off that list,
-#              never the over flags. The all-flags reading is 58-48 and the
-#              unders-only-flags reading is 46-42; both are in the bracket table
-#              of the proposal, neither is what gets staked.
+#              never the over flags. The all-flags reading is 85-79 and the
+#              unders-only-flags reading is 70-66; neither is what gets staked.
 #  pooled      + the 201 full-game unders in the personal book export, 2023-08
 #              to 2025-12, 114-87 at a mean price of -110.1
 #              (docs/bet-history-analysis-2023-2025.md,
@@ -63,7 +63,7 @@ OZ_WINS, OZ_LOSSES = 151, 83
 #              prior here with no personal selection in it at all: 212 of its 270 picks
 #              predate any bet of ours, so nothing in it was filtered by which flags we
 #              chose to take. Mean 54.1% against the other priors' 55-56%.
-GL_PRIORS = {"n58": (32, 26), "pooled": (146, 113), "pff-window": (104, 76),
+GL_PRIORS = {"n58": (55, 49), "pooled": (169, 136), "pff-window": (127, 99),
              "gl-history": (146, 124)}
 
 # MODEL_GUIDE.md: the 1.75 threshold was chosen on this data, so the 64.5% point
@@ -162,7 +162,7 @@ class Config:
     # --- stress knobs (bankroll_stress.py); defaults reproduce the base model ---
     oz_center: float | None = None   # override the post-haircut over-zero mean (e.g. 0.565)
     oz_extra_sd: float = 0.0         # add N(0, sd) to each path's over-zero haircut
-    gl_kappa: float | None = 0.5     # PLANNING PRIOR: Beta(27.5 + k*114, 22.5 + k*87); None -> gl_prior
+    gl_kappa: float | None = 0.5     # PLANNING PRIOR: Beta(55.5 + k*114, 49.5 + k*87); None -> gl_prior
     seasons: int = 1                 # 1 = rest of 2026; each extra season is a full 15-week 2027-style season
     gl_marginal_penalty: float = 0.0 # Greenline bets beyond GL_MARGINAL_BASE a week win at p - d
     gl_marginal_base: int = 6        # the first N bets a week keep the full p
@@ -384,8 +384,8 @@ def _style(ax):
 def _short(label: str) -> str:
     """Scenario labels are written for the table; the dot plot needs them narrow."""
     lab = label.split(" -- ")[0]
-    for a, b in (("Pooled prior", "pooled"), ("n=58 prior (published under list)", "n=58"),
-                 ("n=58 prior", "n=58"), ("2024-25 window prior (72-50)", "2024-25 window"),
+    for a, b in (("Pooled prior", "pooled"), ("Under-list prior (published list only)", "under list"),
+                 ("Under-list prior", "under list"), ("2024-25 window prior (72-50)", "2024-25 window"),
                  (", bet at the historical rate (~6/wk),", ", ~6/wk,"),
                  (", historical rate,", ", ~6/wk,"), (", historical rate", ", ~6/wk"),
                  (", bet EVERY flag (~49/wk),", ", all 49/wk,"),
@@ -526,8 +526,8 @@ def make_figures(base: Config, scenarios: list[tuple[str, Config]], path: Path) 
 
     # 1-2. the bracket, as two fan charts on a shared scale
     ax1, ax2 = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1])
-    _fan(ax1, pooled, "Pooled prior (146-113)", b0)
-    _fan(ax2, thin, "Published under list only (32-26)", b0)
+    _fan(ax1, pooled, "Pooled prior (%d-%d)" % GL_PRIORS["pooled"], b0)
+    _fan(ax2, thin, "Published under list only (%d-%d)" % GL_PRIORS["n58"], b0)
     lo = min(pooled["fan"][:, 0].min(), thin["fan"][:, 0].min())
     hi = max(pooled["fan"][:, 4].max(), thin["fan"][:, 4].max())
     for ax in (ax1, ax2):
@@ -735,8 +735,9 @@ def self_check() -> None:
     assert two["fan"].shape == (WEEKS_REMAINING + 15 + 1, len(PCTS))
     assert two["mean_turnover"] > fat["mean_turnover"] * 1.8
     # planning prior default is kappa 0.5
-    assert Config().gl_kappa == 0.5 and abs(planning_p_gl(0.5) - 0.5614) < 0.002
-    assert 0.010 < kelly_unit(planning_p_gl(0.5), -110) < 0.014
+    # targets track the under list through 2026 week 4 (55-49); re-derive when the base moves
+    assert Config().gl_kappa == 0.5 and abs(planning_p_gl(0.5) - 0.5474) < 0.002
+    assert 0.007 < kelly_unit(planning_p_gl(0.5), -110) < 0.010
     assert np.allclose(f[0], Config().bankroll), f[0]
     assert (np.diff(f, axis=1) >= 0).all(), "percentiles must be non-decreasing"
     # weekly resizing must lift the upper tail, and at a unit where one week's
@@ -751,7 +752,7 @@ def self_check() -> None:
     # penalty must lower the median; extra haircut sd must widen over-zero p
     k0 = simulate(Config(paths=5_000, seed=6, gl_kappa=0.0))
     k1 = simulate(Config(paths=5_000, seed=6, gl_kappa=1.0))
-    assert abs(k0["p_gl_mean"] - 0.55) < 0.01 and abs(k1["p_gl_mean"] - 0.564) < 0.01
+    assert abs(k0["p_gl_mean"] - 0.529) < 0.01 and abs(k1["p_gl_mean"] - 0.554) < 0.01
     base = simulate(Config(paths=5_000, seed=7))
     pen = simulate(Config(paths=5_000, seed=7, gl_marginal_penalty=0.03))
     assert np.median(pen["final"]) < np.median(base["final"])
@@ -865,9 +866,9 @@ def main() -> None:
          variant(gl_coverage=1.0, gl_unit=0.0025)),
         ("Pooled prior, bet EVERY flag, 1% units",
          variant(gl_coverage=1.0, gl_unit=0.01)),
-        ("n=58 prior (published under list), every flag at 0.25% -- the previous headline",
+        ("Under-list prior (published list only), every flag at 0.25% -- the previous headline",
          variant(gl_prior="n58", gl_coverage=1.0, gl_unit=0.0025)),
-        ("n=58 prior, historical rate at 1%",
+        ("Under-list prior, historical rate at 1%",
          variant(gl_prior="n58", gl_coverage=cov, gl_unit=0.01)),
         ("2024-25 window prior (72-50), historical rate at 1% -- sensitivity",
          variant(gl_prior="pff-window", gl_coverage=cov, gl_unit=0.01)),

@@ -12,12 +12,15 @@ in [`../CLAUDE.md`](../CLAUDE.md).
 Two totals strategies. One bankroll. Betting both, at what size, gets you where by the
 end of the season — and how much of that answer is evidence rather than assumption?
 
-The short version, as of 2026-09-21: **the bankroll is a multi-season growth vehicle,
-the Greenline planning prior is the published under list (32–26 over weeks 2–3) pooled
-at κ = 0.5 with the 2023–25 personal unders, and the unit is the smaller of quarter
-Kelly off that prior and the largest unit under a 3% per-season chance of a 25% loss.**
-Today that is 1% for Greenline, 1% for over-zero.
-Median +8% for the rest of 2026, +21% through 2027, a +16.8% CAGR over the 1.21 funded
+The short version: **the bankroll is a multi-season growth vehicle, the Greenline
+planning prior is the published under list (55–49 through 2026 week 4, updated
+2026-09-28 from 32–26) pooled at κ = 0.5 with the 2023–25 personal unders, and the unit
+is the smaller of quarter Kelly off that prior and the largest unit under a 3%
+per-season chance of a 25% loss.** On the old prior that was 1% for Greenline, 1% for
+over-zero. On 55–49 the planning mean falls from 56.1% to 54.7% and quarter Kelly alone
+caps Greenline at **0.83%**; the drawdown-cap half has not been rerun.
+The projections that follow are from the 2026-09-21 prior and have not been rerun:
+median +8% for the rest of 2026, +21% through 2027, a +16.8% CAGR over the 1.21 funded
 years and a median week of +$125; the n58 and pooled priors are the
 bracket around every number. Over-zero is ~11 bets for the rest of 2026 and about a
 third of 2027's expected profit.

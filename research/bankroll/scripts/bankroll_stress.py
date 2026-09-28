@@ -25,7 +25,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mc_combined_totals import Config, simulate  # noqa: E402
+from mc_combined_totals import Config, planning_p_gl, simulate  # noqa: E402
 
 UNITS = (0.005, 0.01, 0.012)
 MAX_P_M25, MAX_BUST = 0.03, 0   # growth frame: 3% per horizon, no busts
@@ -119,7 +119,7 @@ def self_check() -> None:
     # kappa endpoints reproduce the named priors' means
     assert abs(by[("kappa 0.00", 0.005)]["p_gl"] - by[("n58 prior", 0.005)]["p_gl"]) < 0.01
     assert abs(by[("kappa 1.00", 0.005)]["p_gl"] - by[("pooled prior", 0.005)]["p_gl"]) < 0.01
-    assert abs(by[("planning prior kappa 0.5", 0.005)]["p_gl"] - 0.561) < 0.01
+    assert abs(by[("planning prior kappa 0.5", 0.005)]["p_gl"] - planning_p_gl(0.5)) < 0.01
     # the worst combined case must be worse than base n58 at the same unit
     assert by[("kappa 0, p-3pt, oz 56.5%+sd4, rho 0.5  (worst)", 0.01)]["median"] < by[("n58 prior", 0.01)]["median"]
     assert all(r["es5"] <= r["p5"] for r in rows)
