@@ -54,24 +54,24 @@ pooled upper bound sits below the ~0.6 points that would pay for −110 on CLV a
 
 ## The 2026 season on its own, all three markets
 
-Carried here from the two 2026-09-16 season reviews when they were archived, because it is
-the only place these numbers live. **Through week 2 only** — week 3 is graded in its own doc
-and is not folded in below; regenerate with `greenline_season_review.py` for a current
-version, which writes a new dated review.
+First carried here from the two 2026-09-16 season reviews when they were archived, because
+it is the only place these numbers live. **Weeks 2–4**, regenerated 2026-09-28 with
+`greenline_season_review.py` (no `--out`; prints only). Rerun it after each Monday's
+schedule refresh and replace these tables.
 
 | market | record | win% | 95% CI | units | ROI | MDE |
 | --- | --- | ---: | --- | ---: | ---: | ---: |
-| total | 27-22 | 55.1% | 41–68% | +2.55u | +5.2% | 70% |
-| spread | 21-28 | **42.9%** | 30–57% | **−8.91u** | **−18.2%** | 70% |
-| moneyline | 21-25 | 45.7% | 32–60% | +1.58u | +3.4% | 71% |
-| all | 69-75 | 47.9% | 40–56% | −4.79u | −3.3% | 63% |
+| total | 85-79 | 51.8% | 44–59% | −1.73u | −1.1% | 62% |
+| spread | 79-82-3 | 49.1% | 41–57% | −10.18u | −6.3% | 62% |
+| moneyline | 69-87 | 44.2% | 37–52% | **−28.80u** | **−18.5%** | 62% |
+| all | 233-248-3 | 48.4% | 44–53% | −40.71u | −8.5% | 58% |
 
-**Totals are the only market with a case.** The spread leg lost 18.2% over 49 picks and the
-moneyline leg is unjudgeable without its prices. Everything else in this file is about
-totals for that reason.
+**Totals are the only market near break-even.** Spreads lost 6.3% over 164 picks and
+moneylines 18.5% at the captured prices over 156. Everything else in this file is about
+totals for that reason. Week 2 alone read totals 27-22 (+5.2%); weeks 3–4 went 58-57.
 
-**CLV against PFF's own board close** — totals +0.36 ± 0.32 pts (n=44), spreads +0.34 ± 0.29
-(n=44). Positive means the number moved toward PFF's side after capture. This measures
+**CLV against PFF's own board close** — totals +0.31 ± 0.16 pts (n=152), spreads +0.30 ± 0.34
+(n=152). Positive means the number moved toward PFF's side after capture. This measures
 whether PFF's flags lead *PFF's own displayed market*, not a real one, which is why open
 question A exists.
 
@@ -80,12 +80,13 @@ spreads and totals and the de-vigged price for moneylines):
 
 | market | n | mean stated p | actual | Brier (PFF) | Brier (market) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| total | 49 | 55.0% | 55.1% | 0.2478 | 0.2500 |
-| spread | 49 | 56.3% | **42.9%** | 0.2685 | 0.2500 |
-| moneyline | 46 | 45.0% | 45.7% | 0.1341 | 0.1384 |
+| total | 164 | 55.0% | 51.8% | 0.2498 | 0.2500 |
+| spread | 161 | 55.7% | **49.1%** | 0.2562 | 0.2500 |
+| moneyline | 156 | 48.3% | 44.2% | 0.1337 | 0.1321 |
 
-PFF's totals and moneyline probabilities beat the market baseline by a hair; **its spread
-probabilities are worse than a coin** and overconfident by 13 points. That is the sharpest
+PFF's totals probabilities tie the market baseline; its moneyline probabilities now trail it.
+**Its spread probabilities are worse than a coin** and overconfident by 7 points (13 after
+week 2 alone). That is the sharpest
 single argument for treating Greenline as a totals product and nothing else.
 
 ## Retired, with their records
