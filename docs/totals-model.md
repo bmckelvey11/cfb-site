@@ -12,8 +12,8 @@ and indistinguishable from shuffled predictions. A previous 57% figure is
 invalid.
 
 ```powershell
-python -m models.totals backtest --line ou_open --permute
-python -m models.totals importance --line ou_open --top 15
+python -m models.middle backtest --line ou_open --permute
+python -m models.middle importance --line ou_open --top 15
 python research/spread/scripts/compare_lines.py
 ```
 
@@ -252,6 +252,6 @@ Everything above is retrospective. The honest test is forward:
 > For each game, log the number **available at the moment of the bet** and the
 > number the market **eventually closed at**. Compare.
 
-`python -m models.totals snapshot` / `clv` does that on takeable
+`python -m models.middle snapshot` / `clv` does that on takeable
 DraftKings / ESPN Bet numbers. That is the measurement that can still change
 the verdict.

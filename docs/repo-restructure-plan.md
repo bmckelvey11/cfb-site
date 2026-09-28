@@ -147,7 +147,7 @@ Everything else pushes into a nested `CLAUDE.md`:
 | Section today | Goes to |
 |---|---|
 | Commands (CLI), pipeline/architecture, scraper conventions, `normalize._first`, frozen dataclasses, token resolution, running stats, coach style, sidecar `_meta`, design system | `cfb_system_maker/CLAUDE.md` |
-| Totals-model harness, `ou_open` citation rules, leaked-era warning | `models/totals/CLAUDE.md` |
+| Totals-model harness, `ou_open` citation rules, leaked-era warning | `models/middle/CLAUDE.md` |
 | Over-zero notes, run-from-that-cwd rule | `models/over_zero/CLAUDE.md` |
 | Prediction-tracker / spread findings and pre-registrations | `research/spread/CLAUDE.md` |
 
@@ -289,7 +289,7 @@ Pure-rename commits, zero content edits, `python -m pytest` as the gate.
 
 | Move | Import lines to rewrite |
 |---|---|
-| `cfb_totals_model/` → `models/totals/` | **4** (`scripts/compare_lines.py`, 3 test files) |
+| `cfb_totals_model/` → `models/middle/` | **4** (`scripts/compare_lines.py`, 3 test files) |
 | `over_zero/` → `models/over_zero/` | **0** — all its `sys.path` inserts are `__file__`-relative and survive the move |
 | `docs/prediction-tracker-*` + `scripts/eval_*` → `research/spread/` | 0 (no package) |
 
@@ -316,7 +316,7 @@ Decide one rule and state it in root `CLAUDE.md`: **all scripts run from repo ro
 `compare_lines.py` is the sharp case — the only file importing `cfb_totals_model`, and it
 also exists in the fork being archived in D. Reconcile the two versions before moving it.
 
-**Verify C1:** `python -m pytest` green; `python -m models.totals backtest --line ou_open`
+**Verify C1:** `python -m pytest` green; `python -m models.middle backtest --line ou_open`
 runs; one `over_zero` script runs.
 
 ## C2. Move the system maker (optional — read the cost first)
@@ -342,7 +342,7 @@ Outside the repo, where nested `CLAUDE.md` scoping cannot reach.
 | `C:\Users\mckel\dev\cfb` | empty; this is the requested final checkout path | delete the empty directory so Step E can rename into it |
 | `C:\Users\mckel\OneDrive\cfb_data`, `OneDrive - 150 Out\CFB` | API-key text files, not data | leave |
 
-**Verify D:** no `cfb_totals_model` package outside `models/totals/`.
+**Verify D:** no `cfb_totals_model` package outside `models/middle/`.
 
 ---
 

@@ -80,9 +80,9 @@ landed 2026-09-10, so the chain is open at the top and
 
 ---
 
-## 3. Totals model (`models/totals/`) `#sec-totals` <!-- section: sec-totals -->
+## 3. Totals model (`models/middle/`) `#sec-totals` <!-- section: sec-totals -->
 
-*Main command: `python -m models.totals backtest --line ou_open --permute`.
+*Main command: `python -m models.middle backtest --line ou_open --permute`.
 Cite opening totals from `ou_open`, 2022-2025 prior-season folds, `|edge| >= 0`.
 Never cite leaked-era 57% / +8.82% ROI.*
 

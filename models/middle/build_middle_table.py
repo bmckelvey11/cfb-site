@@ -18,7 +18,7 @@ plus the cell mean so the histogram can be recentred on the user's number.
 Output is written straight into `middle_calculator.html` as a JS object literal
 between the MIDDLE_TABLE markers -- the page makes no network requests.
 
-Run:  python -m models.totals.build_middle_table
+Run:  python -m models.middle.build_middle_table
 
 The page is also published as an artifact at
 https://claude.ai/artifact/4Y1CxComNST9GpPz7g3nXK — that copy is a snapshot, not a

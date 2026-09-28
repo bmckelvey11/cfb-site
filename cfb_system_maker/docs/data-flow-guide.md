@@ -9,7 +9,7 @@ from, what runs on a schedule, what is hand-run, and which files under `data/` m
 
 ```
 CFBD REST ──┐                                        ┌─ Flask system maker (games.csv, features.json)
-CFBD GraphQL ├─► data/raw, data/graphql ─► cfb.duckdb ─┤─ models/totals (games.csv)
+CFBD GraphQL ├─► data/raw, data/graphql ─► cfb.duckdb ─┤─ models/middle (games.csv)
 Action Net. ─┤   data/ingest ─► data/processed        ├─ models/over_zero (raw.an_*, ingest/oddsapi)
 PFF, odds ───┘                     ▲                  └─ research/spread (stg.game, an_history_tick)
                                    │
@@ -222,7 +222,7 @@ result-informed carries the `result_lookahead` tag.
 | Consumer | Entry point | Reads | Does not read |
 |---|---|---|---|
 | Flask system maker (filters, systems, dashboard) | `cfb_system_maker/web.py`, `features.py`, `enrich.py`, `prior_game_stats.py` | `processed/games.csv`, `processed/features.json`, raw JSON indexed in-process | the warehouse, at all |
-| Totals model | `models/totals/data.py` | `processed/games.csv` | the warehouse |
+| Totals model | `models/middle/data.py` | `processed/games.csv` | the warehouse |
 | Over-zero board | `models/over_zero/scripts/build_1h_games.py`, `build_1h_lines.py` | `raw.an_scoreboard`, `raw.an_history` (read-only, the only consumer on `raw`) | |
 | Over-zero slate (scheduled) | `models/over_zero/scripts/best_line_slate.py` | `processed/over_zero/`, `ingest/oddsapi/` → `site/lib/board.json` | the warehouse |
 | Spread line-movement model | `research/spread/scripts/weekly_slate.py` | upstream processed files → `weekly_slate_<stamp>.csv` + `latest` pointer | |

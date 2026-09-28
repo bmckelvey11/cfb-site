@@ -42,7 +42,7 @@ orientation and goes stale; the tracked queue is [`TODO.md`](TODO.md).*
 
 ### Totals model
 
-*`models/totals/` — opening-total edge model. Cite `ou_open`, 2022-25 prior-season folds; never the leaked-era 57% / +8.82%.*
+*`models/middle/` — opening-total edge model. Cite `ou_open`, 2022-25 prior-season folds; never the leaked-era 57% / +8.82%.*
 
 -
 
@@ -135,7 +135,7 @@ orientation and goes stale; the tracked queue is [`TODO.md`](TODO.md).*
 | TODO lint | `python scripts/todo_sweep.py check` |
 | Doc → queue | `python scripts/todo_sweep.py sweep --apply` |
 
-**Units:** `cfb_system_maker/` (app, scrapers, warehouse) · `models/totals/` ·
+**Units:** `cfb_system_maker/` (app, scrapers, warehouse) · `models/middle/` ·
 `models/over_zero/` · `research/spread/` — each has its own `CLAUDE.md`.
 
 **Standing rules worth not re-learning:** no lookahead in pre-game features

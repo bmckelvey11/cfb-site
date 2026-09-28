@@ -13,7 +13,7 @@ human-facing product intent. None should duplicate another file's rules.
 
 - Scoring models and systems is governed by [`docs/model-evaluation-standard.md`](docs/model-evaluation-standard.md). It binds any new work that reports ROI, CLV, a hit rate, or forecast skill — the totals harness, over-zero, spread research, vendor-pick grading, saved system-maker filters. Report the Tier 1 metrics it names (interval, not just a point estimate; proper score against the same-time de-vigged market; trial count; walk-forward folds), and treat its hard gates as invalidating: leakage, prices not reconstructible at decision time, or a threshold chosen on the test set means the result does not count, however good the ROI. Existing dated docs are records and are not re-scored.
 
-- **New findings get written up — not every analysis.** A result is new when it answers a question the unit's `docs/` does not already answer, or when it changes what an existing doc concludes. That gets a markdown file in the owning unit's `docs/` (`research/spread/docs/`, `models/totals/docs/`, ...), else root `docs/`, named `<topic>-<YYYY-MM-DD>.md`. Minimum: the question, the method, the data and date range used, the numbers, and what the result does *not* support. Point at the script that reproduces it. Ad-hoc digging counts — a new finding is a new finding whether or not it was planned.
+- **New findings get written up — not every analysis.** A result is new when it answers a question the unit's `docs/` does not already answer, or when it changes what an existing doc concludes. That gets a markdown file in the owning unit's `docs/` (`research/spread/docs/`, `models/middle/docs/`, ...), else root `docs/`, named `<topic>-<YYYY-MM-DD>.md`. Minimum: the question, the method, the data and date range used, the numbers, and what the result does *not* support. Point at the script that reproduces it. Ad-hoc digging counts — a new finding is a new finding whether or not it was planned.
 
   A result that is **not** new does not get a doc. Re-running a script whose conclusion already stands, confirming a known null on more data without moving the verdict, or re-deriving a number an existing doc reports: update that doc's living summary or add a row to it, and say so in the commit message. Confirmations are worth recording and are not worth a file.
 
@@ -39,7 +39,7 @@ human-facing product intent. None should duplicate another file's rules.
 | Unit | Home | Instructions |
 | --- | --- | --- |
 | System maker, Flask app, scrapers, warehouse | `cfb_system_maker/` | `cfb_system_maker/CLAUDE.md` |
-| Totals model | `models/totals/` | `models/totals/CLAUDE.md` |
+| Totals model | `models/middle/` | `models/middle/CLAUDE.md` |
 | Over-zero models and floor-bias research | `models/over_zero/` | `models/over_zero/CLAUDE.md` |
 | Spread forecast research | `research/spread/` | `research/spread/CLAUDE.md` |
 | Totals research not yet in the harness (Greenline evaluation, modeling reading) | `research/totals/` | `research/totals/CLAUDE.md` |

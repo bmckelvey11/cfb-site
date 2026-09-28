@@ -35,7 +35,7 @@ moneylines and team totals are untested here, and your bet history says totals i
 profit was.
 
 The files also carry the **full tick path** — 2,421 updates on one August game reaching back to
-2 April — which is what a CLV study needs and what `models/totals/clv.py` was built for.
+2 April — which is what a CLV study needs and what `models/middle/clv.py` was built for.
 
 ## 3. Line shopping — promising, not yet established
 

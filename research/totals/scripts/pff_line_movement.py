@@ -300,11 +300,11 @@ def report(rows: list[dict]) -> str:
          "total between open and close? A bet-free test: it accrues on every game with a price,",
          "not only on graded picks, which is what makes it answerable where the win/loss version",
          "was not.", "",
-         "**Why this sits in `research/totals/` and not `models/totals/`.** It was run as the",
+         "**Why this sits in `research/totals/` and not `models/middle/`.** It was run as the",
          "line-movement half of open question D, and the flag half — do the features behave",
          "differently on Greenline's board — turned out to be unidentified here, for a reason worth",
          "recording in this unit. The surviving result is feature screening with no harness behind it,",
-         "so anything that *builds* on it belongs in `models/totals/`; this record does not.", "",
+         "so anything that *builds* on it belongs in `models/middle/`; this record does not.", "",
          "## Data", "",
          f"- {len(rows)} FBS games with an open, a close, and PFF features for both teams "
          f"({by_season[2025]} in 2025, {by_season[2026]} in 2026), on {n_dates} slate days.",

@@ -15,7 +15,7 @@ There is no single ledger. There are six things this repo calls one, split by wh
 | **Action Network betlog** | a bet from a book export | [`cfb_system_maker/betlog.py`](../cfb_system_maker/betlog.py) | `$CFB_DATA_ROOT/betlog/bets.csv` | dormant |
 | **Greenline bet log** | a PFF totals flag, and whether it got bet | [`research/bankroll/scripts/greenline_bet_log.py`](../research/bankroll/scripts/greenline_bet_log.py) | `$CFB_DATA_ROOT/ingest/pff_scoreboard/greenline_bet_log.csv` | live |
 | **Over-zero pick history** | a pick the model qualified | [`models/over_zero/scripts/pick_history.py`](../models/over_zero/scripts/pick_history.py) | `$CFB_DATA_ROOT/processed/over_zero/qualified_picks_history.csv` | live |
-| **Totals forward CLV ledger** | a total the model liked at bet-time | [`models/totals/clv.py`](../models/totals/clv.py) | `models/ledgers/totals_clv_ledger.jsonl` | **broken path — see below** |
+| **Totals forward CLV ledger** | a total the model liked at bet-time | [`models/middle/clv.py`](../models/middle/clv.py) | `models/ledgers/totals_clv_ledger.jsonl` | **broken path — see below** |
 | **Scheduled-task run ledger** *(not betting)* | one scheduled-task run | [`scripts/task_ledger.cmd`](../scripts/task_ledger.cmd) | `$CFB_DATA_ROOT/logs/task_runs.csv` | live |
 
 The last one is an operational record, listed only so a reader grepping `ledger` knows what
@@ -74,7 +74,7 @@ for an away-side bet before any comparison happens.
 | Market | CLV | Unit |
 | --- | --- | --- |
 | spread | `line_taken − close_on_your_side` | points |
-| total | delegated to `models.totals.clv.clv_points` — `close − line` for OVER, `line − close` for UNDER | points |
+| total | delegated to `models.middle.clv.clv_points` — `close − line` for OVER, `line − close` for UNDER | points |
 | moneyline | `implied(close) − implied(taken)` | probability |
 
 Spread and total CLV are both points and comparable to each other. **Moneyline CLV is a
@@ -158,7 +158,7 @@ cannot interleave. This is a *pick* ledger: it records what the model said and a
 it was playable (`bet_to`), not what was wagered. ROI against it is computed walk-forward by
 `models/over_zero/monitor/roi_report.py`.
 
-**`models/totals/clv.py`** — forward CLV: `snapshot` logs a takeable total (DraftKings /
+**`models/middle/clv.py`** — forward CLV: `snapshot` logs a takeable total (DraftKings /
 ESPN Bet only, never Bovada) at bet-time when the model's edge clears `MIN_EDGE = 3.0`;
 `refresh-closes` fills `close`/`clv`/`hit` later; `summarize` reports. JSONL, one row per
 game, keyed on `game_id` so a re-snapshot updates rather than duplicates.
@@ -181,7 +181,7 @@ Stating this plainly, because the code reads as though all five are in use:
 - **The totals forward CLV ledger is orphaned by a path bug.** `DEFAULT_LEDGER` is
   `Path(__file__).resolve().parents[1] / "ledgers" / ...`. When the file was
   `cfb_totals_model/clv.py` (`4222d8b`) that resolved to repo-root `ledgers/`. Commit
-  `96799f3` rehomed it to `models/totals/clv.py`, adding a directory level, so it now
+  `96799f3` rehomed it to `models/middle/clv.py`, adding a directory level, so it now
   resolves to `models/ledgers/totals_clv_ledger.jsonl` — **a directory that does not exist**.
   The 113 rows at [`ledgers/totals_clv_ledger.jsonl`](../ledgers/totals_clv_ledger.jsonl) are
   the pre-move leftover: weeks 1–4 of 2026, all written in one run at

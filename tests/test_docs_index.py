@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIRS = [
     "docs",
     "cfb_system_maker/docs",
-    "models/totals/docs",
+    "models/middle/docs",
     "models/over_zero/docs",
     "research/spread/docs",
     "research/totals/docs",

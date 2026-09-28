@@ -20,7 +20,7 @@ CLV conventions, which differ by market and are easy to invert:
 
     spread      clv = line_taken - close_on_your_side      (points)
     total       clv = close - line for OVER, line - close for UNDER   (points)
-                delegated to models.totals.clv.clv_points, one definition for both
+                delegated to models.middle.clv.clv_points, one definition for both
     moneyline   clv = implied(close) - implied(taken)       (probability)
 
 Positive always means the market moved your way after you bet. Spread and total CLV are
@@ -64,7 +64,7 @@ sys.path.insert(0, str(_ROOT / "research" / "totals" / "scripts"))
 
 from cfb_paths import DB_PATH, INGEST, PROCESSED  # noqa: E402
 from match_greenline_books import strong, toks  # noqa: E402
-from models.totals.clv import clv_points  # noqa: E402
+from models.middle.clv import clv_points  # noqa: E402
 
 TEMPLATE = Path(__file__).resolve().parent / "manual_bets_template.csv"
 SHEET = INGEST / "bet_history" / "manual_bets.csv"

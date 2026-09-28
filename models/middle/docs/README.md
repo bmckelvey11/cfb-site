@@ -1,6 +1,6 @@
 # Totals model docs
 
-Index for `models/totals/docs/`. One row per doc: what question it answers.
+Index for `models/middle/docs/`. One row per doc: what question it answers.
 
 | Doc | Answers |
 | --- | --- |

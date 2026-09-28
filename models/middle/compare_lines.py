@@ -20,9 +20,9 @@ sys.path.insert(0, str(REPO))
 
 import pandas as pd
 
-from models.totals.data import load
-from models.totals.inference import cluster_ids, hit_delta_and_clv
-from models.totals.model import _fit_predict, iter_walk_forward_splits
+from models.middle.data import load
+from models.middle.inference import cluster_ids, hit_delta_and_clv
+from models.middle.model import _fit_predict, iter_walk_forward_splits
 
 
 def _fmt_inf(inf: dict, *, scale: float = 1.0) -> str:

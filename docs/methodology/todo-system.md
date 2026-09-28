@@ -22,7 +22,7 @@ units and doc layout, not a redesign).
   table): `#sec-system-maker` → `cfb_system_maker/` (CLI, Flask UI, backtest
   engine) · `#sec-data` → warehouse/ingestion/scrapers spanning PFF, Action
   Network, odds, GraphQL, DuckDB (cross-cutting, not owned by one unit) ·
-  `#sec-totals` → `models/totals/` · `#sec-over-zero` → `models/over_zero/`
+  `#sec-totals` → `models/middle/` · `#sec-over-zero` → `models/over_zero/`
   · `#sec-spread` → `research/spread/`.
 - **`#sec-now` soft WIP + easy-only.** `#sec-now` (§0) is a weekly
   commitment surface for **sitting-sized / easy-actionable** work — not a
@@ -54,7 +54,7 @@ units and doc layout, not a redesign).
   collides with item ids:
 
   ```markdown
-  ## 3. Totals model (`models/totals/`) `#sec-totals` <!-- section: sec-totals -->
+  ## 3. Totals model (`models/middle/`) `#sec-totals` <!-- section: sec-totals -->
   ```
 
   **Point to a whole section with `#sec-totals`.** Numbers (`§3`) are still

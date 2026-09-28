@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-HTML = Path(__file__).resolve().parents[1] / "models" / "totals" / "middle_calculator.html"
+HTML = Path(__file__).resolve().parents[1] / "models" / "middle" / "middle_calculator.html"
 BLOCK = re.compile(r"/\* ---- EV_MATH:BEGIN.*?\*/(.*?)/\* ---- EV_MATH:END ---- \*/", re.DOTALL)
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")

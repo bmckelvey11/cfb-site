@@ -5,8 +5,8 @@ vendor-pick evaluation (scripts and graded results) and totals modeling research
 and prompt material, no code behind it). Shared data, archive, and no-lookahead rules live
 in root `CLAUDE.md`.
 
-`models/totals/` is the different thing: the implemented backtest harness
-(`python -m models.totals backtest`). A question about running or citing that harness
+`models/middle/` is the different thing: the implemented backtest harness
+(`python -m models.middle backtest`). A question about running or citing that harness
 belongs there, not here. A question about whether a vendor's picks win, or about a modeling
 idea that has no code yet, belongs here.
 
@@ -59,7 +59,7 @@ idea that has no code yet, belongs here.
   `docs/research-prompts/fbs-totals/` are **reading and prompt material**. Nothing in this
   strand has been implemented or tested here. Treat every claim in it as a hypothesis to
   test against the warehouse, not as a result, and do not cite it as a finding.
-- Anything from this strand that gets built and backtested belongs in `models/totals/`.
+- Anything from this strand that gets built and backtested belongs in `models/middle/`.
 
 ## Not in this unit
 

@@ -1,4 +1,4 @@
-"""CLI: `python -m models.totals backtest --line ou_open`."""
+"""CLI: `python -m models.middle backtest --line ou_open`."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def _add_common(p):
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="models.totals")
+    ap = argparse.ArgumentParser(prog="models.middle")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     b = sub.add_parser("backtest", help="walk-forward backtest")
@@ -157,7 +157,7 @@ def _snapshot(args) -> int:
         print()
         print("regime is unvalidated_early — paper-trade CLV only; not a live bet card.")
     print()
-    print("CLV is empty until closes move. Re-run: python -m models.totals clv")
+    print("CLV is empty until closes move. Re-run: python -m models.middle clv")
     return 0
 
 
