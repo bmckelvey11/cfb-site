@@ -235,7 +235,9 @@ def render(res: dict, sizes: list[int], dec: dict, expl: dict) -> str:
          f"- Smallest effect this n detects 80% of the time: **{res['list']['mde']:.2f} points** for the "
          f"list contrast, **{res['value']['mde']:.2f} points per SD** for the edge slope.",
          f"- A quarter-point effect — the size found on the close in the line-movement record — would "
-         f"need **{res['required_n']} flags**, about twelve more weeks at this board's volume.",
+         f"need **{res['required_n']} flags**"
+         + (f", about {math.ceil((res['required_n'] - res['n']) / 50)} more week(s) of flags at ~50 gradeable a week."
+            if res["required_n"] > res["n"] else " -- fewer than this sample holds."),
          f"- Worse, the flags sit on **{len(sizes)} slate dates**, {max(sizes)} of them on one. So few",
          "  effective clusters supports neither a cluster-robust SE nor a wild bootstrap, so the",
          "  intervals below are iid and optimistic. The sensitivity table says by how much.", "",
@@ -288,8 +290,9 @@ def render(res: dict, sizes: list[int], dec: dict, expl: dict) -> str:
           "  win-rate question and is embargoed until 56 prospective picks have graded.",
           "- Reading either null as evidence of absence. See the MDE column.",
           "- A third contrast on this sample. The budget was two looks.",
-          "- Weekly re-looks. The stop rule is ~596 scored flags, which is also when the slate-date",
-          "  count stops being the binding problem.", ""]
+          f"- Weekly re-looks. The stop rule is ~{res['required_n']} scored flags (first set at ~596 on the",
+          "  contaminated close's SD). The slate-date count, not n, is what stays binding: a",
+          "  handful of Saturdays cannot support a clustered interval at any flag count.", ""]
     return "\n".join(L) + "\n"
 
 
