@@ -806,11 +806,18 @@ def _backfill_gamelines(
     home_loc = loc.format(tid="home_team_id")
     away_loc = loc.format(tid="away_team_id")
 
+    # Pregame offerings only, here and in `sb_long`. A collector pull during a game adds a
+    # live offering beside the pregame one, and the `MAX(line)` below would take whichever
+    # is higher: 175 2026 book-game totals and 148 spreads read in-game values (WKU @
+    # Georgia: 78.0-82.5 against a 55.5 close). A book with only a live offering gets no
+    # row. Nothing is lost -- the live rows stay in `stg.an_history`, flagged. `is_live` is
+    # NULL on book 30 (an opener, not a live price), hence the coalesce.
     history_sql = (
         """
         SELECT event_id, book_id, period, market_type, side, line, odds, _source_file
         FROM stg.an_history
         WHERE market_type IN ('spread', 'total', 'moneyline')
+          AND NOT coalesce(is_live, false)
         """
         if has_history
         else """
@@ -844,6 +851,7 @@ def _backfill_gamelines(
           SELECT event_id, book_id, period, market_type, side, line, odds,
                  _source_file
           FROM stg.an_market
+          WHERE NOT coalesce(is_live, false)
         ),
         an_long AS (
           SELECT * FROM sb_long

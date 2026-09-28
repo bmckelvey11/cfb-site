@@ -174,7 +174,11 @@ the old file intact.
    backfill because `COALESCE` treats NaN as populated.
 4. `backfill_gamelines_from_actionnetwork`: widens `stg.game_lines` with `period` and
    `line_source` and merges the Action Network 1H/1Q and extra-book lines in; CFBD values
-   win. If the tape is missing this reports an error instead of skipping quietly.
+   win. If the tape is missing this reports an error instead of skipping quietly. Pregame
+   offerings only: a line-timing pull during a game adds `is_live` offerings to
+   `stg.an_history` (2026 onward), and before 2026-09-23 the per-book `MAX(line)` took them
+   as the close. They stay in `stg.an_history` and `an_history_tick`, flagged; a book with
+   only a live offering gets no `game_lines` row.
 5. `explode_stg_lists`: nested lists to `stg.<table>__<column>` with an `_idx`.
 6. Timestamp promotion, dead-column drop.
 
@@ -188,7 +192,7 @@ absent:
 | `dim_team` | `raw.teams` + `raw.fbs_teams` | opponents outside CFBD's team table get name-derived ids; LEFT JOIN to `dim_team` |
 | `dim_venue` | `stg.venues` | |
 | `fact_game` | REST games 2012+, selected close per provider | `has_line`, `selected_spread`, `selected_total` are REST-defined; the pred-tracker-model reads them |
-| `fact_game_line` | unnest of `stg.lines.lines` at `(game_id, provider_key)` | then `_merge_game_lines` full-outer-joins the `stg.game_lines` tape (`period='game'`); REST wins conflicts, `_source` ∈ {`rest`, `gql`, `both`}, disagreements kept in `fact_game_line_conflicts` |
+| `fact_game_line` | unnest of `stg.lines.lines` at `(game_id, provider_key)` | then `_merge_game_lines` full-outer-joins the `stg.game_lines` tape (`period='game'`); REST wins conflicts, `_source` ∈ {`rest`, `gql`, `both`}, disagreements kept in `fact_game_line_conflicts`. `gql` means "from `stg.game_lines`", not "from CFBD GraphQL": every `gql`-only row (9,373, all 2024-2026) is an Action Network book that tape carries, with no open |
 | `dim_lines_provider` | distinct books on the merged tape | DraftKings aliases collapse to one key |
 | `fact_game_team` | running stats over `fact_game` | same code path as the app's `running_stats` |
 | `fact_game_odds` | `stg.oa_odds_tick` | 2026-09-09 onward only |

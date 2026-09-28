@@ -979,15 +979,15 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
         CREATE TABLE stg.an_history (
           event_id BIGINT, book_id INTEGER, period VARCHAR,
           market_type VARCHAR, side VARCHAR, team_id BIGINT,
-          line DOUBLE, odds BIGINT, _source_file VARCHAR
+          line DOUBLE, odds BIGINT, is_live BOOLEAN, _source_file VARCHAR
         )
         """
     )
     con.execute(
         """
         INSERT INTO stg.an_history VALUES
-          (100, 15, 'firsthalf', 'spread', 'home', 1, -3.5, -110, 'history.json'),
-          (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, 'history.json')
+          (100, 15, 'firsthalf', 'spread', 'home', 1, -3.5, -110, false, 'history.json'),
+          (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, false, 'history.json')
         """
     )
     explode_an_children(con)
@@ -1058,6 +1058,71 @@ def test_the_backfill_stays_quiet_when_there_is_no_cfbd_side_either(tmp_path):
     con.close()
 
     assert backfill_gamelines_from_actionnetwork(db_path) is None
+
+
+def test_the_backfill_takes_the_pregame_line_never_the_live_one(tmp_path):
+    """A collector pull during a game leaves two offerings per book and side in
+    `stg.an_history`: the pregame one and a live one (`is_live`). `MAX(line)` over both put
+    in-game numbers in the close -- WKU @ Georgia 2026 read 78.0-82.5 against a 55.5 total
+    at every CFBD book. The spread is hit too, whenever the live home line is the higher.
+    A book with only a live offering has no pregame close and gets no row; its live rows
+    stay in `stg.an_history`, flagged, so nothing is lost."""
+    import duckdb
+
+    from cfb_system_maker.duckdb_load import _an_provider_id
+
+    db_path = tmp_path / "live.duckdb"
+    con = duckdb.connect(str(db_path))
+    con.execute("CREATE SCHEMA stg")
+    con.execute(
+        "CREATE TABLE stg.games (id INTEGER, season INTEGER, week INTEGER,"
+        " homeTeam VARCHAR, awayTeam VARCHAR)"
+    )
+    con.execute("INSERT INTO stg.games VALUES (99, 2026, 2, 'Alpha', 'Beta')")
+    con.execute(
+        "CREATE TABLE stg.game_lines (gameId INTEGER, linesProviderId INTEGER,"
+        " moneylineAway INTEGER, moneylineHome INTEGER, overUnder DOUBLE,"
+        " overUnderOpen DOUBLE, spread DOUBLE, spreadOpen DOUBLE, _source_file VARCHAR)"
+    )
+    con.execute(
+        "CREATE TABLE stg.an_scoreboard (event_id BIGINT, season INTEGER, week INTEGER,"
+        " home_team_id BIGINT, away_team_id BIGINT, teams JSON, _source_file VARCHAR)"
+    )
+    teams = json.dumps([{"id": 1, "location": "Alpha"}, {"id": 2, "location": "Beta"}])
+    con.execute(
+        "INSERT INTO stg.an_scoreboard VALUES (100, 2026, 2, 1, 2, ?::JSON, 'sb.json')",
+        [teams],
+    )
+    offering = (
+        "(event_id BIGINT, book_id INTEGER, period VARCHAR, market_type VARCHAR,"
+        " side VARCHAR, line DOUBLE, odds BIGINT, is_live BOOLEAN, _source_file VARCHAR)"
+    )
+    con.execute(f"CREATE TABLE stg.an_market {offering}")
+    con.execute(f"CREATE TABLE stg.an_history {offering}")
+    con.execute(
+        """
+        INSERT INTO stg.an_history VALUES
+          (100, 75, 'event', 'spread', 'home', -40.5, -110, false, 'h.json'),
+          (100, 75, 'event', 'spread', 'home', -30.0, -110, true,  'h.json'),
+          (100, 75, 'event', 'total',  'over',  55.5, -110, false, 'h.json'),
+          (100, 75, 'event', 'total',  'over',  82.5, -110, true,  'h.json'),
+          (100, 69, 'event', 'total',  'over',  78.0, -110, true,  'h.json')
+        """
+    )
+    con.close()
+
+    report = backfill_gamelines_from_actionnetwork(db_path)
+    assert report is not None and report.error is None
+
+    con = duckdb.connect(str(db_path), read_only=True)
+    rows = {
+        pid: (spread, total)
+        for pid, spread, total in con.execute(
+            "SELECT linesProviderId, spread, overUnder FROM stg.game_lines"
+            " WHERE period = 'game'"
+        ).fetchall()
+    }
+    assert rows == {_an_provider_id(75): (-40.5, 55.5)}
 
 
 def test_an_children_are_flat_and_the_generic_recursion_leaves_them_alone(tmp_path):
