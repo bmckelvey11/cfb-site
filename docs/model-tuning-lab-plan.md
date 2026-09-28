@@ -2733,4 +2733,3 @@ This revision synthesizes the attached plan, the project's two FBS totals resear
 ### Evidence caution
 
 The project research found little direct published evidence that individual advanced features or frontier models beat FBS game-total markets out of sample after vig. Therefore, this plan treats most football feature ideas as hypotheses, makes the market a mandatory benchmark, requires chronological falsification, and preserves null results.
-

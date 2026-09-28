@@ -1,6 +1,120 @@
-# College Football Feature Research: Framework and Implementation Blueprint
+- [1. College Football Feature Research: Framework and Implementation Blueprint](#1-college-football-feature-research-framework-and-implementation-blueprint)
+  - [1.1. Executive answer](#11-executive-answer)
+  - [1.2. Notation](#12-notation)
+- [2. Part I — Evaluation framework](#2-part-i--evaluation-framework)
+  - [2.1. Define "predictive" precisely](#21-define-predictive-precisely)
+  - [2.2. Separate four questions](#22-separate-four-questions)
+  - [2.3. Choose targets first](#23-choose-targets-first)
+    - [2.3.1. Spread and margin](#231-spread-and-margin)
+    - [](#)
+    - [2.3.3. Totals](#233-totals)
+    - [2.3.4. Win and cover probabilities](#234-win-and-cover-probabilities)
+    - [2.3.5. Line movement](#235-line-movement)
+  - [2.4. Point-in-time data contract](#24-point-in-time-data-contract)
+  - [2.5. College football baseline ladder](#25-college-football-baseline-ladder)
+    - [2.5.1. Baseline 0: structural](#251-baseline-0-structural)
+    - [2.5.2. Baseline 1: team strength](#252-baseline-1-team-strength)
+    - [2.5.3. Baseline 2: preseason priors](#253-baseline-2-preseason-priors)
+    - [2.5.4. Baseline 3: current-season efficiency](#254-baseline-3-current-season-efficiency)
+    - [2.5.5. Baseline 4: decision-time market](#255-baseline-4-decision-time-market)
+    - [2.5.6. Baseline 5: production model](#256-baseline-5-production-model)
+  - [2.6. Candidate feature families](#26-candidate-feature-families)
+    - [2.6.1. Efficiency](#261-efficiency)
+    - [2.6.2. Consistency and success rate](#262-consistency-and-success-rate)
+    - [2.6.3. Explosiveness and tails](#263-explosiveness-and-tails)
+    - [2.6.4. Pace and possessions](#264-pace-and-possessions)
+    - [2.6.5. Finishing drives](#265-finishing-drives)
+    - [2.6.6. Havoc and turnovers](#266-havoc-and-turnovers)
+    - [2.6.7. Field position and special teams](#267-field-position-and-special-teams)
+    - [2.6.8. Personnel, priors, and continuity](#268-personnel-priors-and-continuity)
+    - [2.6.9. Context and environment](#269-context-and-environment)
+    - [2.6.10. Market features](#2610-market-features)
+  - [2.7. Feature construction variants](#27-feature-construction-variants)
+    - [2.7.1. Time windows](#271-time-windows)
+    - [2.7.2. Shrinkage and the early-season blend](#272-shrinkage-and-the-early-season-blend)
+    - [2.7.3. Opponent adjustment](#273-opponent-adjustment)
+    - [2.7.4. Game-state treatment](#274-game-state-treatment)
+  - [2.8. Experimental design](#28-experimental-design)
+    - [2.8.1. Outer walk-forward evaluation](#281-outer-walk-forward-evaluation)
+    - [2.8.2. Weekly simulation](#282-weekly-simulation)
+    - [2.8.3. Inner model selection](#283-inner-model-selection)
+    - [2.8.4. Paired ablation tests](#284-paired-ablation-tests)
+    - [2.8.5. Correlated features](#285-correlated-features)
+    - [2.8.6. Model-family robustness](#286-model-family-robustness)
+    - [2.8.7. Feature selection tools](#287-feature-selection-tools)
+  - [2.9. Model the variance](#29-model-the-variance)
+  - [2.10. Interaction budget](#210-interaction-budget)
+  - [2.11. Missingness taxonomy](#211-missingness-taxonomy)
+  - [2.12. Metrics and decision gates](#212-metrics-and-decision-gates)
+    - [2.12.1. Forecast metrics](#2121-forecast-metrics)
+    - [2.12.2. Market-conditioned metrics](#2122-market-conditioned-metrics)
+    - [2.12.3. Economic confirmation](#2123-economic-confirmation)
+    - [2.12.4. Feature status](#2124-feature-status)
+  - [2.13. Stability requirements](#213-stability-requirements)
+  - [2.14. Negative controls](#214-negative-controls)
+  - [2.15. Multiple testing](#215-multiple-testing)
+  - [2.16. Common false discoveries](#216-common-false-discoveries)
+    - [2.16.1. End-of-season opponent adjustment](#2161-end-of-season-opponent-adjustment)
+    - [2.16.2. Backfilled injuries or starters](#2162-backfilled-injuries-or-starters)
+    - [2.16.3. Closing line in an opening model](#2163-closing-line-in-an-opening-model)
+    - [2.16.4. Raw per-game volume](#2164-raw-per-game-volume)
+    - [2.16.5. Outcome stats masquerading as process](#2165-outcome-stats-masquerading-as-process)
+    - [2.16.6. Overly specific situations](#2166-overly-specific-situations)
+    - [2.16.7. SHAP as selection proof](#2167-shap-as-selection-proof)
+    - [2.16.8. One final holdout reused repeatedly](#2168-one-final-holdout-reused-repeatedly)
+  - [2.17. Decision standard](#217-decision-standard)
+- [3. Part II — Implementation blueprint](#3-part-ii--implementation-blueprint)
+  - [3.1. Purpose](#31-purpose)
+  - [3.2. Separate research tracks](#32-separate-research-tracks)
+  - [3.3. CFBD source map](#33-cfbd-source-map)
+  - [3.4. Warehouse layers](#34-warehouse-layers)
+  - [3.5. Canonical grains](#35-canonical-grains)
+    - [3.5.1. Team-game](#351-team-game)
+    - [3.5.2. Play](#352-play)
+    - [3.5.3. Market quote](#353-market-quote)
+    - [3.5.4. Prediction snapshot](#354-prediction-snapshot)
+  - [3.6. Sequential ratings](#36-sequential-ratings)
+  - [3.7. Feature registry](#37-feature-registry)
+  - [3.8. Feature tournament](#38-feature-tournament)
+    - [3.8.1. Stage A: integrity](#381-stage-a-integrity)
+    - [3.8.2. Stage B: football increment](#382-stage-b-football-increment)
+    - [3.8.3. Stage C: market increment](#383-stage-c-market-increment)
+    - [3.8.4. Stage D: betting confirmation](#384-stage-d-betting-confirmation)
+  - [3.9. Candidate scorecard](#39-candidate-scorecard)
+  - [3.10. Promotion gates](#310-promotion-gates)
+    - [3.10.1. Integrity](#3101-integrity)
+    - [3.10.2. Predictive increment](#3102-predictive-increment)
+    - [3.10.3. Redundancy](#3103-redundancy)
+    - [3.10.4. Market increment](#3104-market-increment)
+    - [3.10.5. Economic confirmation](#3105-economic-confirmation)
+  - [3.11. Promotion matrix](#311-promotion-matrix)
+  - [3.12. Experiment manifest](#312-experiment-manifest)
+  - [3.13. Research database](#313-research-database)
+    - [3.13.1. Experiment tables](#3131-experiment-tables)
+    - [3.13.2. Experiment summary table](#3132-experiment-summary-table)
+  - [3.14. Dashboard](#314-dashboard)
+    - [3.14.1. Leaderboard](#3141-leaderboard)
+    - [3.14.2. Feature report card](#3142-feature-report-card)
+  - [3.15. Research program](#315-research-program)
+    - [3.15.1. Stage 1: construct the dataset](#3151-stage-1-construct-the-dataset)
+    - [3.15.2. Stage 2: lock core baselines](#3152-stage-2-lock-core-baselines)
+    - [3.15.3. Stage 3: screen six families](#3153-stage-3-screen-six-families)
+    - [3.15.4. Stage 4: decompose winners](#3154-stage-4-decompose-winners)
+    - [3.15.5. Stage 5: test interactions](#3155-stage-5-test-interactions)
+    - [3.15.6. Stage 6: calibrate distributions](#3156-stage-6-calibrate-distributions)
+    - [3.15.7. Stage 7: freeze betting translation](#3157-stage-7-freeze-betting-translation)
+  - [3.16. Twelve-week build plan](#316-twelve-week-build-plan)
+    - [3.16.1. Weeks 1–2](#3161-weeks-12)
+    - [3.16.2. Weeks 3–4](#3162-weeks-34)
+    - [3.16.3. Weeks 5–6](#3163-weeks-56)
+    - [3.16.4. Weeks 7–8](#3164-weeks-78)
+    - [3.16.5. Weeks 9–10](#3165-weeks-910)
+    - [3.16.6. Weeks 11–12](#3166-weeks-1112)
+  - [3.17. Implementation checklist](#317-implementation-checklist)
+  - [3.18. Definition of done](#318-definition-of-done)
+# 1. College Football Feature Research: Framework and Implementation Blueprint
 
-## Executive answer
+## 1.1. Executive answer
 
 The goal is not to identify statistics that merely describe good college football teams. It is to identify **point-in-time variables that repeatedly improve future predictions beyond information already contained in a strong baseline and the betting market**.
 
@@ -20,7 +134,7 @@ Scoring of any result produced under this framework is governed by the [model ev
 
 The first half of this document is the **evaluation framework**: what counts as predictive and how to test it. The second half is the **implementation blueprint**: the warehouse, registry, validation calendar, and promotion machinery that make those tests reproducible.
 
-## Notation
+## 1.2. Notation
 
 Symbols reused throughout. Each equation below also declares its own variables.
 
@@ -38,9 +152,9 @@ Symbols reused throughout. Each equation below also declares its own variables.
 
 ---
 
-# Part I — Evaluation framework
+# 2. Part I — Evaluation framework
 
-## Define "predictive" precisely
+## 2.1. Define "predictive" precisely
 
 A feature does not have one universal predictive value. Its usefulness depends on five elements:
 
@@ -52,7 +166,7 @@ A feature does not have one universal predictive value. Its usefulness depends o
 
 A statistic may predict final margin but not ATS returns. It may predict closing-line movement but not the game result. It may matter in Weeks 0–3 and become redundant after current-season efficiency stabilizes. It may help totals but hurt spreads. Every feature result should therefore be stored with its target, timestamp, baseline, model family, seasons, and validation design.
 
-## Separate four questions
+## 2.2. Separate four questions
 
 Each candidate statistic should face four distinct tests:
 
@@ -65,9 +179,9 @@ Each candidate statistic should face four distinct tests:
 
 Do not collapse these into one "feature importance" value. A feature can pass the first two and fail the market test. That is still useful for team ratings, simulations, and missing-line games, but it should not be labeled a betting edge.
 
-## Choose targets first
+## 2.3. Choose targets first
 
-### Spread and margin
+### 2.3.1. Spread and margin
 
 **Outcome.** The margin target is the home team's final scoring margin:
 
@@ -92,6 +206,8 @@ $$
 
 That sign flip is what lets $y_g$ and $L_g$ sit on the same scale. The same three rules as the totals line below apply: pick one book or consensus definition, use a price that was actually available at the decision time, and never substitute the close for an earlier decision.
 
+###
+
 **Market-residual target.**
 
 $$
@@ -111,7 +227,7 @@ Modeling $r_g^{margin}$ instead of $y_g$ forces the model to earn credit only fo
 
 Use MAE and RMSE for point forecasts. Prefer log likelihood or CRPS if the model estimates a full predictive distribution, because cover probability depends on both the mean and the uncertainty.
 
-### Totals
+### 2.3.3. Totals
 
 **Outcome.** For game $g$, the quantity being predicted is the combined final score:
 
@@ -220,13 +336,13 @@ A variable can improve the mean forecast and do nothing for the variance model. 
 - **Mean:** MAE or RMSE of $r_g$.
 - **Variance:** out-of-sample correlation of predicted variance with $r_g^2$, or CRPS and interval coverage.
 
-### Win and cover probabilities
+### 2.3.4. Win and cover probabilities
 
 For binary outcomes, evaluate probability forecasts with log loss and Brier score, then inspect calibration intercept, calibration slope, and reliability by probability band. Betting research has found calibration-based model selection more economically useful than accuracy-based selection in an NBA experiment, illustrating why classification accuracy alone is a poor betting-model objective.[cite:51][cite:54]
 
 Cover labels discard useful information: winning by 1 point and missing by 30 points are both zeroes. A stronger pipeline usually models margin or its distribution first, then converts it into cover and moneyline probabilities.
 
-### Line movement
+### 2.3.5. Line movement
 
 Create a separate target for information discovery:
 
@@ -250,7 +366,7 @@ This target does not involve the score at all. It asks whether a feature anticip
 - A feature predicting both is especially promising.
 - A feature predicting neither should not survive because of an attractive in-sample narrative.
 
-## Point-in-time data contract
+## 2.4. Point-in-time data contract
 
 Feature research is invalid unless each row can answer: **What was known for this game at this prediction timestamp?** CFBD itself warns that training features should include only games before the prediction week.[cite:187] Feature selection, preprocessing, imputation, scaling, and tuning must also occur inside training folds; selection on the complete dataset leaks test information and inflates performance.[cite:214][cite:215][cite:217]
 
@@ -295,11 +411,11 @@ For every feature, store:
 
 Do not reconstruct a Week 5 feature using an end-of-season table, even if the table contains a `week` column. Recalculate from event-level data with a cutoff or use a verified historical snapshot.
 
-## College football baseline ladder
+## 2.5. College football baseline ladder
 
 Feature value should be measured against a ladder of increasingly difficult baselines.
 
-### Baseline 0: structural
+### 2.5.1. Baseline 0: structural
 
 Include only:
 
@@ -311,7 +427,7 @@ Include only:
 
 Home advantage is real but variable; studies have estimated different magnitudes depending on era and specification, including an overall 4.1-point estimate in a 12-season channel-specific model, while broader work finds declining home advantage at high collegiate levels.[cite:203][cite:207] Treat team-specific home effects with shrinkage rather than raw averages.
 
-### Baseline 1: team strength
+### 2.5.2. Baseline 1: team strength
 
 Add a compact, opponent-adjusted team-strength layer:
 
@@ -323,7 +439,7 @@ Add a compact, opponent-adjusted team-strength layer:
 
 CFBD's SRS jointly reconciles scoring margins and opponent strength, caps extreme margins, adjusts home field, and yields a point-based descriptive team rating.[cite:197] This is useful as a baseline but should not automatically be included alongside many components derived from the same games without checking redundancy.
 
-### Baseline 2: preseason priors
+### 2.5.3. Baseline 2: preseason priors
 
 Add:
 
@@ -336,7 +452,7 @@ Add:
 
 College football's short schedule and roster churn make preseason priors especially important early. Public SP+ methodology has used returning production, recent recruiting, and recent program history, with returning production and the prior rating comprising most of the projection in the cited version.[cite:212] CFBD exposes returning PPA and usage components for passing, receiving, and rushing, allowing more granular continuity features than one headline percentage.[cite:190]
 
-### Baseline 3: current-season efficiency
+### 2.5.4. Baseline 3: current-season efficiency
 
 Add broad current-season families:
 
@@ -349,7 +465,7 @@ Add broad current-season families:
 
 CFBD defines PPA as the change in predicted points attributable to a play, success rate using down-specific yardage thresholds, explosiveness as average PPA on successful plays, and havoc as defensive disruption events.[cite:194] Its WEPA output includes opponent-adjusted offense and defense for EPA, success rate, rushing-line measures, and explosiveness.[cite:170][cite:183]
 
-### Baseline 4: decision-time market
+### 2.5.5. Baseline 4: decision-time market
 
 Use the actual line available at the intended betting timestamp:
 
@@ -361,15 +477,15 @@ Use the actual line available at the intended betting timestamp:
 
 This is the decisive benchmark for betting research. In one historical analysis of 1,582 college football games, combinations of computer ratings predicted outcomes but lost joint significance after the final Las Vegas spread was included.[cite:179] A newer metamodel using 29 rating systems reported statistically significant information alongside the opening line, illustrating that the answer can depend on era, line timestamp, data, and model design.[cite:174]
 
-### Baseline 5: production model
+### 2.5.6. Baseline 5: production model
 
 The final test is whether the feature improves the current system, not merely an intentionally weak comparison. Freeze the production feature set, hyperparameter policy, calibration method, and folds before testing a candidate.
 
-## Candidate feature families
+## 2.6. Candidate feature families
 
 Each family below lists what to build and, where relevant, the predeclared comparison ladder to run.
 
-### Efficiency
+### 2.6.1. Efficiency
 
 **Hypothesis:** opponent-adjusted offensive and defensive PPA improve margin prediction beyond scoring margin and simple ratings.
 
@@ -388,7 +504,7 @@ Candidate definitions:
 
 Test whether passing and rushing splits add value after total efficiency. If not, keep the compact total measure. If they help only through interactions with the opponent's defensive splits, label them matchup features rather than universal team-strength features.
 
-### Consistency and success rate
+### 2.6.2. Consistency and success rate
 
 Success rate captures how often an offense stays on schedule, while explosiveness captures the magnitude of successful plays.[cite:194] Test:
 
@@ -402,7 +518,7 @@ Success rate captures how often an offense stays on schedule, while explosivenes
 
 Evaluate whether success rate adds information after PPA. The two are related but conceptually different: a team can generate efficient averages through rare explosive plays while remaining inconsistent. Totals may respond differently to this tradeoff than spreads.
 
-### Explosiveness and tails
+### 2.6.3. Explosiveness and tails
 
 Means alone can hide the variance relevant to alternate spreads and totals. Test:
 
@@ -425,7 +541,7 @@ Explosiveness should be paired with opportunity and success frequency. A team wi
 
 Evaluate whether additions improve the predicted mean, the residual scale, or both. Explosiveness may matter more for distribution tails than for average margin.
 
-### Pace and possessions
+### 2.6.4. Pace and possessions
 
 For totals, pace is not simply seconds per play. Build an expected-possession layer using:
 
@@ -437,10 +553,11 @@ For totals, pace is not simply seconds per play. Build an expected-possession la
 - Expected turnover on downs.
 - Opponent-adjusted expected possessions and opponent pace interaction.
 - End-of-half behavior.
+-v
 
 Separate **intrinsic pace** from **observed play volume**. Raw plays per game mix intrinsic pace with opponent pace, overtime, field position, turnovers, and game script. Estimate pace in neutral situations and test whether it improves expected possessions after controlling for opponent behavior. Use raw plays per game only as a benchmark against the context-adjusted possession features.
 
-### Finishing drives
+### 2.6.5. Finishing drives
 
 Test scoring conditional on reaching scoring territory, comparing raw and shrunk versions of:
 
@@ -453,7 +570,7 @@ Test scoring conditional on reaching scoring territory, comparing raw and shrunk
 
 These variables can be noisy because each team gets relatively few qualifying drives. Compare raw season rates with shrunk estimates and multi-year priors. For kickers, distance-adjusted expected value is preferable to raw field-goal percentage because attempt difficulty varies; CFBD provides a distance-based field-goal expected-points endpoint for this purpose.[cite:193][cite:231]
 
-### Havoc and turnovers
+### 2.6.6. Havoc and turnovers
 
 CFBD defines havoc through tackles for loss, forced fumbles, interceptions, and pass breakups.[cite:194] Test stable and unstable components separately:
 
@@ -476,7 +593,7 @@ Raw turnover margin is highly outcome-linked but mixes repeatable skill with ran
 
 The objective is to determine whether process variables survive future folds better than volatile realized outcomes. Do not assume the luck residual must reverse in the next game; test its horizon empirically.
 
-### Field position and special teams
+### 2.6.7. Field position and special teams
 
 Candidate features include:
 
@@ -489,7 +606,7 @@ Candidate features include:
 
 Special-teams samples are small and individual personnel matter. Start with a group test; retain granular components only if their out-of-sample contribution persists.
 
-### Personnel, priors, and continuity
+### 2.6.8. Personnel, priors, and continuity
 
 College football differs from professional leagues because talent and continuity change sharply between seasons. Test:
 
@@ -507,7 +624,7 @@ Returning production should interact with previous quality. Returning 80% of a p
 
 A study using 2006–2018 major-conference teams found previous Sagarin strength, recruiting, returning starters, and returning-QB status predictive of season performance; previous performance was its strongest single selected predictor.[cite:173] Re-estimate these effects for game-level targets and the modern transfer environment rather than importing old coefficients.
 
-### Context and environment
+### 2.6.9. Context and environment
 
 Test these after the core team-quality model is stable:
 
@@ -522,7 +639,7 @@ Test these after the core team-quality model is stable:
 
 Home-field research indicates that crowd effects, familiarity, weather, and travel can operate through different scoring channels, so home-field adjustments can be modeled separately for the home offense and away offense rather than as one constant margin shift.[cite:203] Avoid generic "situational trends" created by trying many arbitrary combinations.
 
-### Market features
+### 2.6.10. Market features
 
 Market variables can improve predictions while reducing interpretability about football fundamentals:
 
@@ -542,11 +659,11 @@ Create separate model tracks:
 
 Do not mix these objectives when declaring a football statistic important.
 
-## Feature construction variants
+## 2.7. Feature construction variants
 
 Each football concept should be tested through a small, predeclared set of reasonable estimators rather than dozens of mined variants.
 
-### Time windows
+### 2.7.1. Time windows
 
 For each family, compare:
 
@@ -559,7 +676,7 @@ For each family, compare:
 
 Do not assume recent form is superior. Short windows react quickly but have high variance; expanding windows stabilize estimates but adapt slowly to quarterback changes, injuries, transfers, and coordinator changes.
 
-### Shrinkage and the early-season blend
+### 2.7.2. Shrinkage and the early-season blend
 
 A raw team rate computed from a few games is mostly noise. Shrinkage pulls it toward a prior in proportion to how little data stands behind it:
 
@@ -621,7 +738,7 @@ Use stronger shrinkage for:
 - Team-specific home field.
 - FCS teams or incomplete data.
 
-### Opponent adjustment
+### 2.7.3. Opponent adjustment
 
 Raw statistics often measure schedule as much as team ability. CFBD explicitly recommends opponent-adjusted EPA, success rate, and rushing measures for predictive modeling.[cite:188] Compare:
 
@@ -632,7 +749,7 @@ Raw statistics often measure schedule as much as team ability. CFBD explicitly r
 
 Fit opponent adjustments only with games available before the prediction timestamp. End-of-season opponent quality cannot be used retrospectively in a Week 3 forecast unless it was generated through an honest sequential model (see [Sequential ratings](#sequential-ratings)).
 
-### Game-state treatment
+### 2.7.4. Game-state treatment
 
 Test at least:
 
@@ -644,9 +761,9 @@ Test at least:
 
 Garbage-time filters can remove contamination but may also discard information about depth and mismatch ability. Treat the definition as a tunable research choice selected inside training folds, not a universal truth.
 
-## Experimental design
+## 2.8. Experimental design
 
-### Outer walk-forward evaluation
+### 2.8.1. Outer walk-forward evaluation
 
 Ordinary random cross-validation can train on future observations and test on the past. Time-series splitting preserves order and can insert a gap between training and test periods.[cite:256] Walk-forward validation repeatedly fits on the past and forecasts the future.[cite:224] Random game-level cross-validation is inappropriate because later-season team information can leak into earlier games and observations from the same team-season are dependent. College football needs a calendar-aware implementation because Saturday games share an information set and offseasons create large temporal gaps.
 
@@ -665,7 +782,7 @@ Alternatively, train through Week $W-1$ and test Week $W$, grouped across season
 - After launch, add a prospective-only evaluation stream.
 - Treat unusual seasons as explicit regimes. Do not hide regime failures by reporting only a pooled average.
 
-### Weekly simulation
+### 2.8.2. Weekly simulation
 
 Within each test season:
 
@@ -677,7 +794,7 @@ Within each test season:
 
 Keep the whole football week together. Using a Thursday result to update a Saturday forecast must be a declared intraweek policy, not accidental access.
 
-### Inner model selection
+### 2.8.3. Inner model selection
 
 Inside each outer training set:
 
@@ -691,7 +808,7 @@ Inside each outer training set:
 
 Nested validation keeps all data-dependent decisions inside training data and reserves the outer fold for model assessment.[cite:214][cite:217][cite:223]
 
-### Paired ablation tests
+### 2.8.4. Paired ablation tests
 
 For each candidate family $G$, fit two models that differ only by that family:
 
@@ -735,7 +852,7 @@ Run both:
 
 The two answers can differ. A family can be useful when added early but redundant in the completed model, because another feature group absorbs the same signal.
 
-### Correlated features
+### 2.8.5. Correlated features
 
 College football metrics are heavily redundant:
 
@@ -756,7 +873,7 @@ Recommended order:
 4. Use conditional or grouped permutation importance on held-out folds.
 5. Prefer the cheapest, most stable, most interpretable representative when performance is tied.
 
-### Model-family robustness
+### 2.8.6. Model-family robustness
 
 A real feature should not exist only because one algorithm happens to exploit noise. Test candidates in at least:
 
@@ -768,7 +885,7 @@ Linear models reveal stable signed relationships and provide a difficult simplic
 
 Do not require identical importance rankings across algorithms. Require the feature family to improve honest forecasts often enough that its value is not an artifact of one flexible learner.
 
-### Feature selection tools
+### 2.8.7. Feature selection tools
 
 Preferred:
 
@@ -792,7 +909,7 @@ Supporting but insufficient alone:
 
 SHAP explains use inside one fitted model; it does not prove incremental, stable, market-relative value.
 
-## Model the variance
+## 2.9. Model the variance
 
 A betting model should estimate a full predictive distribution, not just a point forecast:
 
@@ -826,7 +943,7 @@ The point of writing $\sigma_g$ with a subscript is that uncertainty differs by 
 
 Evaluate CRPS, log likelihood, interval coverage, and sharpness, not just mean RMSE. A feature can be useful because it improves uncertainty even when MAE barely moves (see the totals worked example in [Totals](#totals)).
 
-## Interaction budget
+## 2.10. Interaction budget
 
 Only after main effects are stable, test a small, hypothesis-driven set of football-motivated interactions:
 
@@ -844,7 +961,7 @@ Only after main effects are stable, test a small, hypothesis-driven set of footb
 
 An all-pairs interaction search creates too many trials. Register hypotheses before evaluation, and use regularization or hierarchical shrinkage even for the predeclared set.
 
-## Missingness taxonomy
+## 2.11. Missingness taxonomy
 
 | Type | Example | Treatment |
 | --- | --- | --- |
@@ -857,9 +974,9 @@ An all-pairs interaction search creates too many trials. Register hypotheses bef
 
 A missingness indicator can be useful only if the same missing state would exist in production. Historical backfill quirks must not become predictors.
 
-## Metrics and decision gates
+## 2.12. Metrics and decision gates
 
-### Forecast metrics
+### 2.12.1. Forecast metrics
 
 | Output | Primary | Supporting |
 | --- | --- | --- |
@@ -871,7 +988,7 @@ A missingness indicator can be useful only if the same missing state would exist
 
 Use the metric that matches the output. Avoid selecting on ATS hit rate because it discards magnitude and depends on one line snapshot.
 
-### Market-conditioned metrics
+### 2.12.2. Market-conditioned metrics
 
 These regressions ask one question: **given the market's own forecast, does the feature still explain anything?**
 
@@ -914,7 +1031,7 @@ This is the same test in points. When $\alpha = 0$ and $\beta = 1$, subtracting 
 
 A candidate passes the market-conditioned stage when it produces repeatable out-of-sample score improvement, a stable directional effect, and no material calibration harm. Coefficient significance alone is insufficient.
 
-### Economic confirmation
+### 2.12.3. Economic confirmation
 
 After forecast selection is complete, freeze the bet rule and evaluate:
 
@@ -929,7 +1046,7 @@ After forecast selection is complete, freeze the bet rule and evaluate:
 
 ROI should confirm forecast utility rather than select among hundreds of feature variants. Otherwise, winner's curse and threshold mining will dominate.
 
-### Feature status
+### 2.12.4. Feature status
 
 | Status | Standard |
 | --- | --- |
@@ -942,7 +1059,7 @@ ROI should confirm forecast utility rather than select among hundreds of feature
 | `RESEARCH_ONLY` | Forecast gain holds but frozen-policy economics do not |
 | `INVALID` | Leakage, unavailable timestamp, bad lineage, or irreproducible result |
 
-## Stability requirements
+## 2.13. Stability requirements
 
 Report every candidate's contribution by:
 
@@ -961,7 +1078,7 @@ Report every candidate's contribution by:
 
 A global average can hide that a feature helps only large favorites or only September totals. That does not require rejection; it requires a predeclared targeted role (`KEEP_TARGETED`), a segment chosen within training data, and new out-of-sample confirmation.
 
-## Negative controls
+## 2.14. Negative controls
 
 Every feature-research harness should include controls designed to fail:
 
@@ -976,7 +1093,7 @@ Compare every candidate with the empirical distribution of control improvements.
 
 Also include placebo timing tests. For example, compare a legitimate Wednesday injury feature with its improperly backfilled game-day version. This helps quantify how much apparent signal can come from timestamp leakage.
 
-## Multiple testing
+## 2.15. Multiple testing
 
 Create an append-only trial ledger. A trial includes any material change to:
 
@@ -995,41 +1112,41 @@ A final untouched season is no longer untouched after its results influence anot
 
 Use false-discovery controls during broad screening, but do not rely on adjusted p-values alone. Require replication across chronological folds, stability under neighboring specifications, and prospective evidence.
 
-## Common false discoveries
+## 2.16. Common false discoveries
 
-### End-of-season opponent adjustment
+### 2.16.1. End-of-season opponent adjustment
 
 Using opponent strength calculated from future games makes early-season features look far more stable than they were in real time. Refit sequentially.
 
-### Backfilled injuries or starters
+### 2.16.2. Backfilled injuries or starters
 
 A depth chart known Friday cannot be attached to a Wednesday prediction. Version player availability by timestamp.
 
-### Closing line in an opening model
+### 2.16.3. Closing line in an opening model
 
 The close is valid as a later evaluation benchmark but not as an input to a model claiming an opening-time edge.
 
-### Raw per-game volume
+### 2.16.4. Raw per-game volume
 
 Yards/game, points/game, and plays/game mix quality, pace, opponents, overtime, and game script. Prefer per-play or per-drive rates with opponent and context adjustment.
 
-### Outcome stats masquerading as process
+### 2.16.5. Outcome stats masquerading as process
 
 Win percentage, scoring margin, and turnover margin are predictive partly because they summarize prior outcomes. Compare them with underlying process metrics to determine whether granular features add anything.
 
-### Overly specific situations
+### 2.16.6. Overly specific situations
 
 "Ranked road underdogs after a bye in conference night games" can look profitable because many combinations were searched. A football explanation does not repair multiple testing.
 
-### SHAP as selection proof
+### 2.16.7. SHAP as selection proof
 
 SHAP explains how a fitted model used its inputs; it does not establish out-of-sample incremental value, independence from correlated features, or betting profitability.
 
-### One final holdout reused repeatedly
+### 2.16.8. One final holdout reused repeatedly
 
 Repeatedly checking the same holdout turns it into training data through researcher decisions. Preserve a genuinely new prospective period.
 
-## Decision standard
+## 2.17. Decision standard
 
 A college football statistic should be called **predictively useful** only when the following sentence can be completed:
 
@@ -1043,15 +1160,15 @@ This standard prevents descriptive football statistics, market echoes, selected 
 
 ---
 
-# Part II — Implementation blueprint
+# 3. Part II — Implementation blueprint
 
-## Purpose
+## 3.1. Purpose
 
 This part turns the evaluation framework into an implementable research system. The goal is an auditable chain from raw CFBD data to point-in-time features, chronological predictions, market-relative tests, and production decisions.
 
 The platform is not complete when it can display correlations or feature importance. It is complete when any claimed signal can be reconstructed, challenged, and evaluated without contaminating future tests.
 
-## Separate research tracks
+## 3.2. Separate research tracks
 
 Maintain three linked but separately scored models:
 
@@ -1063,7 +1180,7 @@ Maintain three linked but separately scored models:
 
 CFBD describes PPA, WEPA, Elo, SRS, CORE, and win probability as models answering different questions rather than interchangeable ratings.[cite:242] Apply that principle internally: a play metric can improve team estimation without improving ATS predictions, and a strong game forecast can still fail after vig or poor execution.
 
-## CFBD source map
+## 3.3. CFBD source map
 
 CFBD and cfbfastR expose games, lines, drives, plays, advanced statistics, PPA, returning production, usage, transfers, coaches, venues, ratings, and other building blocks.[cite:230][cite:231][cite:232] CFBD documents advanced team/game statistics from 2001, havoc from 2004, and play-level player/success data from 2012, so sample periods will differ by feature family.[cite:191]
 
@@ -1085,7 +1202,7 @@ CFBD and cfbfastR expose games, lines, drives, plays, advanced statistics, PPA, 
 
 Historical play rows include game and drive identifiers, teams, score, period, clock, field position, down, distance, play type, text, and PPA.[cite:233] CFBD line responses preserve provider-level open/current spreads and totals plus moneylines, but this does not eliminate the need to verify what was known at the intended decision timestamp.[cite:240]
 
-## Warehouse layers
+## 3.4. Warehouse layers
 
 Use immutable raw data and versioned derived layers.
 
@@ -1101,9 +1218,9 @@ Use immutable raw data and versioned derived layers.
 
 Every raw load should record `ingested_at`, endpoint, parameters, response hash, source timestamp when available, and whether it is an original load, correction, or backfill. Never silently overwrite a corrected play or market record.
 
-## Canonical grains
+## 3.5. Canonical grains
 
-### Team-game
+### 3.5.1. Team-game
 
 Use one row per team per game:
 
@@ -1127,7 +1244,7 @@ fct_team_game
 - source_available_ts
 ```
 
-### Play
+### 3.5.2. Play
 
 Use one row per play:
 
@@ -1159,7 +1276,7 @@ fct_play
 
 CFBD's success definition requires at least 50% of needed yards on first down, 70% on second, and 100% on third or fourth; scoring plays are successful unless explicitly failed.[cite:194] Store the definition version because other ecosystems use alternatives such as positive EPA.
 
-### Market quote
+### 3.5.3. Market quote
 
 Use one row per game, provider, market, side, and observation:
 
@@ -1180,7 +1297,7 @@ market_quote
 
 Consensus should be a derived and versioned object—not a destructively stored replacement for provider prices.
 
-### Prediction snapshot
+### 3.5.4. Prediction snapshot
 
 ```text
 prediction_snapshot
@@ -1200,7 +1317,7 @@ prediction_snapshot
 
 `prediction_ts` is the historical decision cutoff. `prediction_created_at` records when the system generated the row, separating reconstructed backtests from genuine prospective forecasts. `margin_mean`/`total_mean` and `margin_scale`/`total_scale` are the $\mu_g$ and $\sigma_g$ of [Model the variance](#model-the-variance).
 
-## Sequential ratings
+## 3.6. Sequential ratings
 
 At each prediction cutoff:
 
@@ -1213,7 +1330,7 @@ At each prediction cutoff:
 
 The output should be `team_rating_snapshot`, keyed by team and prediction time, rather than a single end-of-season rating joined backward.
 
-## Feature registry
+## 3.7. Feature registry
 
 Each feature needs machine-readable lineage:
 
@@ -1239,9 +1356,9 @@ status: candidate
 
 Also store the expected direction, applicable targets, known confounders, first usable season, owner, and associated experiments.
 
-## Feature tournament
+## 3.8. Feature tournament
 
-### Stage A: integrity
+### 3.8.1. Stage A: integrity
 
 Check:
 
@@ -1255,19 +1372,19 @@ Check:
 
 A correlation with points is useful for QA but cannot promote a feature.
 
-### Stage B: football increment
+### 3.8.2. Stage B: football increment
 
 Compare a locked football baseline with and without the candidate family using the [paired ablation tests](#paired-ablation-tests). Require paired out-of-sample improvement, reasonable worst-fold behavior, and performance above negative controls.
 
-### Stage C: market increment
+### 3.8.3. Stage C: market increment
 
 Compare the decision-time market baseline against market plus candidate, or predict the residual around the market (see [Market-conditioned metrics](#market-conditioned-metrics)). Historical CFB studies have reached different conclusions about whether rating systems add information beyond betting spreads, so the answer must be tested by era and timestamp.[cite:174][cite:179]
 
-### Stage D: betting confirmation
+### 3.8.4. Stage D: betting confirmation
 
 Freeze the forecast, probability conversion, de-vigging, threshold, book universe, and staking. Only then examine CLV, ROI, drawdown, and fill realism.
 
-## Candidate scorecard
+## 3.9. Candidate scorecard
 
 Do not hide everything in one number. Display:
 
@@ -1305,9 +1422,9 @@ Multiplying instead of adding is the design choice. With a weighted sum, a huge 
 
 Keep market increment out of $S_j$ and treat it as a separate hard gate for features labeled as betting signals.
 
-## Promotion gates
+## 3.10. Promotion gates
 
-### Integrity
+### 3.10.1. Integrity
 
 Required:
 
@@ -1318,7 +1435,7 @@ Required:
 
 Failure: `INVALID`.
 
-### Predictive increment
+### 3.10.2. Predictive increment
 
 Required:
 
@@ -1329,7 +1446,7 @@ Required:
 
 Failure: `REJECT_UNSTABLE`, `REJECT_HARMFUL`, or `MONITOR`.
 
-### Redundancy
+### 3.10.3. Redundancy
 
 Required:
 
@@ -1339,7 +1456,7 @@ Required:
 
 Failure: `REDUNDANT`.
 
-### Market increment
+### 3.10.4. Market increment
 
 Required for betting classification:
 
@@ -1349,7 +1466,7 @@ Required for betting classification:
 
 Failure: retain as a football-rating feature only.
 
-### Economic confirmation
+### 3.10.5. Economic confirmation
 
 Required:
 
@@ -1360,7 +1477,7 @@ Required:
 
 Failure: `RESEARCH_ONLY`.
 
-## Promotion matrix
+## 3.11. Promotion matrix
 
 | Forecast gain | Market gain | Economic evidence | Decision |
 | --- | --- | --- | --- |
@@ -1371,7 +1488,7 @@ Failure: `RESEARCH_ONLY`.
 | Negative | Positive CLV only | Mixed | Execution signal, weak forecast feature |
 | Negative | Negative | Positive | Likely outcome noise; reject pending replication |
 
-## Experiment manifest
+## 3.12. Experiment manifest
 
 ```yaml
 experiment_id: cfb_margin_efficiency_0042
@@ -1415,9 +1532,9 @@ promotion_policy: feature_gate_v2
 
 Store the manifest hash with every prediction and result.
 
-## Research database
+## 3.13. Research database
 
-### Experiment tables
+### 3.13.1. Experiment tables
 
 ```text
 experiment_run
@@ -1464,7 +1581,7 @@ feature_result
 
 In `fold_prediction`, `candidate_loss − baseline_loss` is the per-game $d_g$ from [Paired ablation tests](#paired-ablation-tests); `feature_result.primary_loss_delta` is $\bar{d}$ and `ci_low`/`ci_high` its block-bootstrap interval.
 
-### Experiment summary table
+### 3.13.2. Experiment summary table
 
 One row per candidate–baseline–target combination:
 
@@ -1491,9 +1608,9 @@ One row per candidate–baseline–target combination:
 | `trial_count_at_test` | Search burden |
 | `decision` | Keep/target/monitor/reject |
 
-## Dashboard
+## 3.14. Dashboard
 
-### Leaderboard
+### 3.14.1. Leaderboard
 
 Show:
 
@@ -1509,7 +1626,7 @@ Show:
 - Trial count.
 - Status.
 
-### Feature report card
+### 3.14.2. Feature report card
 
 For each feature family, display:
 
@@ -1531,9 +1648,9 @@ For each feature family, display:
 16. Trial count, selection history, and decision history.
 17. Final status and allowed use cases.
 
-## Research program
+## 3.15. Research program
 
-### Stage 1: construct the dataset
+### 3.15.1. Stage 1: construct the dataset
 
 Build one row per game and prediction timestamp with home-minus-away feature differences and selected interactions. Begin with CFBD sources for games, lines, opponent-adjusted WEPA, advanced metrics, talent, and returning production.
 
@@ -1545,7 +1662,7 @@ Create separate snapshots for:
 - Midweek.
 - Game day.
 
-### Stage 2: lock core baselines
+### 3.15.2. Stage 2: lock core baselines
 
 Create three initial models:
 
@@ -1555,7 +1672,7 @@ Create three initial models:
 
 Do not optimize candidate features until these baselines are versioned and reproducible.
 
-### Stage 3: screen six families
+### 3.15.3. Stage 3: screen six families
 
 Start with:
 
@@ -1568,7 +1685,7 @@ Start with:
 
 For each family, run add-one and drop-one tests against both football and market baselines.
 
-### Stage 4: decompose winners
+### 3.15.4. Stage 4: decompose winners
 
 If opponent-adjusted efficiency passes, compare:
 
@@ -1580,15 +1697,15 @@ If opponent-adjusted efficiency passes, compare:
 
 Advance the smallest representation that retains almost all stable improvement.
 
-### Stage 5: test interactions
+### 3.15.5. Stage 5: test interactions
 
 Run the predeclared set from [Interaction budget](#interaction-budget).
 
-### Stage 6: calibrate distributions
+### 3.15.6. Stage 6: calibrate distributions
 
 For spreads and totals, estimate residual scale as a function of mismatch, tempo, explosiveness, quarterback uncertainty, and weather. Evaluate interval coverage and probabilistic scores, not just mean RMSE.
 
-### Stage 7: freeze betting translation
+### 3.15.7. Stage 7: freeze betting translation
 
 After choosing the forecast model:
 
@@ -1599,41 +1716,41 @@ After choosing the forecast model:
 5. Evaluate on the untouched period.
 6. Continue with prospective logging.
 
-## Twelve-week build plan
+## 3.16. Twelve-week build plan
 
-### Weeks 1–2
+### 3.16.1. Weeks 1–2
 
 - Define margin, total, probability, and movement targets.
 - Choose one decision timestamp.
 - Build immutable CFBD ingestion.
 - Audit line history and timestamp semantics.
 
-### Weeks 3–4
+### 3.16.2. Weeks 3–4
 
 - Build game, team-game, drive, play, and quote grains.
 - Reconcile neutral sites and overtime.
 - Implement play exclusions and game-state labels.
 - Add data-quality tests.
 
-### Weeks 5–6
+### 3.16.3. Weeks 5–6
 
 - Build point-in-time team-week snapshots.
 - Implement sequential offense/defense ratings.
 - Add preseason priors and prior/current blending.
 
-### Weeks 7–8
+### 3.16.4. Weeks 7–8
 
 - Fit structural, football-only, and market baselines.
 - Implement probabilistic margin/total scoring.
 - Lock outer and inner folds.
 
-### Weeks 9–10
+### 3.16.5. Weeks 9–10
 
 - Test efficiency, success, explosiveness, pace, havoc, and roster families.
 - Add negative controls.
 - Produce paired intervals and redundancy analysis.
 
-### Weeks 11–12
+### 3.16.6. Weeks 11–12
 
 - Convert forecast distributions into betting probabilities.
 - Build de-vigged market comparisons.
@@ -1641,7 +1758,7 @@ After choosing the forecast model:
 - Evaluate CLV, ROI, drawdown, and execution assumptions.
 - Register survivors for prospective monitoring.
 
-## Implementation checklist
+## 3.17. Implementation checklist
 
 1. Define margin, total, and movement targets at one fixed weekly timestamp.
 2. Build point-in-time game snapshots with strict source-availability metadata.
@@ -1656,7 +1773,7 @@ After choosing the forecast model:
 11. Confirm on an untouched season, then prospective data.
 12. Promote only features with clear lineage, stable improvement, and a declared production role.
 
-## Definition of done
+## 3.18. Definition of done
 
 The system is operational when it can reproduce this chain:
 
