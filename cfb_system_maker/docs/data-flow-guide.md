@@ -30,6 +30,7 @@ PFF, odds ───┘                     ▲                  └─ research/
 | `data/processed/games.csv` | The flat game table the app and the totals model read | `refresh_cfbd.py` → `cli.rebuild_processed_games` | no |
 | `data/processed/features.json` | Registry-driven features for the app | `python -m cfb_system_maker enrich` | no |
 | `data/processed/{actionnetwork,pff,oddsapi,massey}/*.csv` | Flattened vendor tables the loader picks up | `scripts/*_flatten.py`, run by the refresh | no |
+| `data/processed/greenline/greenline_history.csv` | Master PFF Greenline history for analysis: one row per era × game × market (2020 archive, 2022-23 exports, 2026 captures) plus personal 2023-25 totals. Not loaded by the warehouse; column dictionary in the builder's docstring | `research/totals/scripts/build_greenline_history.py`, hand-run after each graded week | no |
 | `data/cfb.duckdb` | The warehouse. Local file is the source of truth | `refresh_cfbd.py` → `build_duckdb` + `build_core` | no |
 | `data/cfb.duckdb.lock` | Cross-process rebuild lock (a tiny DuckDB file, held open for the rebuild) | loader | no |
 | `data/audit/schema_*.json` | Schema snapshots the hygiene audit diffs against | `scripts/audit_data_hygiene.py` | no |
@@ -229,6 +230,7 @@ result-informed carries the `result_lookahead` tag.
 | Timing decay eval | `research/spread/scripts/eval_timing_decay.py` | `stg.an_history_tick`, `stg.an_scoreboard` | |
 | Spread version-B eval | `research/spread/scripts/eval_version_b.py` | `core.fact_game` (finals), read-only | |
 | Greenline grading | `research/totals/scripts/grade_greenline.py`; `greenline_season_review.py` imports its `warehouse_final(s)` | `core.fact_game` where PFF posts no score, read-only | |
+| Greenline master history | `research/totals/scripts/build_greenline_history.py` | `core.fact_game` (2026 CFBD game ids), `core.fact_game_line` REST closes, read-only | `processed/greenline/greenline_history.csv` |
 | SQLite mirror | `scripts/mirror_duckdb_to_sqlite.py` | `raw`, `stg`, `meta` → `cfb_mirror.sqlite` | nothing reads its output; deleted 2026-09-11 |
 | MotherDuck promote | `scripts/promote_to_motherduck.py` | all four schemas → `md:cfb` | hand-run only |
 
