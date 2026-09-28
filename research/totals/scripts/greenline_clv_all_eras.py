@@ -228,6 +228,11 @@ def report(gate: str = "span") -> str:
         if len(sub) > 1:
             per[era] = stats([r["clv"] for r in sub], [r["date"] for r in sub])
             L.append(row(era, per[era]))
+    # the 2026 row grows weekly; one week per row shows whether a move is new data or re-scored closes
+    for wk in sorted({r["week"] for r in scored if r["era"] == "2026 flags"}, key=int):
+        sub = [r for r in scored if r["era"] == "2026 flags" and r["week"] == wk]
+        if len(sub) > 1:
+            L.append(row(f"2026 week {wk}", stats([r["clv"] for r in sub], [r["date"] for r in sub])))
     a, b = per.get("2020 PFF_hist"), per.get("2026 flags")
     if a and b:
         d, se = b["mean"] - a["mean"], math.hypot(a["se"], b["se"])
