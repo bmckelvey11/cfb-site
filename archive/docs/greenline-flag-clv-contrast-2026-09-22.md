@@ -1,3 +1,5 @@
+**Superseded by** [greenline-flag-clv-contrast-2026-09-28.md](../../research/totals/docs/greenline-flag-clv-contrast-2026-09-28.md) — same test on REST-backed closes; this run's close carried GraphQL in-game totals.
+
 # Under list and stated edge against CLV, 2026-09-22
 
 Reproduce: `python research/totals/scripts/greenline_flag_clv_contrast.py --out research/totals/docs`.
