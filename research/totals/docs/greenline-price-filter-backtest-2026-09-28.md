@@ -81,7 +81,10 @@ Snapshots: odds-api `20260909T200531Z`, `20260916T180004Z`, `20260923T180008Z`; 
 | rejected by C | 114 | 61-53 | 53.5% | 44–62% | 52.2% | +2.4% (−16 to +19) | +3.6% | +0.36 ± 0.20 |
 | rejected by E | 115 | 61-54 | 53.0% | 44–62% | 52.2% | +1.5% (−17 to +18) | +3.6% | +0.38 ± 0.23 |
 
-By week — C: 2-0, 2-3, 1-4; E: 2-0, 2-2, 1-4. Sensitivity with the first Pinnacle snapshot
+By week — C: 2-0, 2-3, 1-4; E: 2-0, 2-2, 1-4; D: 13-7, 13-14, 10-18. The flags D rejects
+went 30-21 (+13.4%, −13 to +40). D is also what "≥ PFF projection and ≥ Pinnacle fair" with
+no margin reduces to (all 126 flags clear a zero margin); its bets sit a median 0.3 points
+above Pinnacle fair, and in week 5 it selects 28 of 49 flags. Sensitivity with the first Pinnacle snapshot
 after capture: C 6-7 (−13.8%), D 41-35 (+2.4%), E 6-6 (−6.6%).
 
 **Timing check, added after the first run.** The DK/FD numbers come from the odds snapshot
