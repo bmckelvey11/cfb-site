@@ -207,7 +207,7 @@ def uncaptured_weeks(pool: list[dict]) -> list[str]:
 def under_list_2026(pool: list[dict]) -> list[dict]:
     """The published under lists, as the nested subset of the 2026 flags that they are."""
     keep: set[tuple[str, str]] = set()
-    for week in ("2", "3"):
+    for week in sorted({r["week"] for r in pool if r["era"] == "2026 flags"}, key=int):
         p = IN_DIR / UNDERS_2026.format(week=week)
         if not p.exists():
             continue
@@ -252,9 +252,16 @@ def money_row(label: str, rows: list[dict], flat: bool = False) -> str:
             f"{units / len(priced) * 100:+.1f}% | {rlo * 100:+.1f} to {rhi * 100:+.1f} |")
 
 
+def roi(rows: list[dict]) -> float:
+    """As-priced ROI in percent over the price-bearing, non-push rows; money_row's point estimate."""
+    src = [r for r in rows if r["payout"] is not None and r["result"] != "push"]
+    return sum(r["payout"] if r["result"] == "win" else -1.0 for r in src) / len(src) * 100 if src else float("nan")
+
+
 def report(pool: list[dict]) -> str:
     eras = ["2020 PFF_hist", "2022-23 exports", "2026 flags"]
     by_era = {e: [r for r in pool if r["era"] == e] for e in eras}
+    unders = [r for r in pool if r["side"] == "under"]
     live = [r for r in pool if r["result"] != "push"]
     for r in live:
         r["win"] = r["result"] == "win"
@@ -296,7 +303,8 @@ def report(pool: list[dict]) -> str:
           f"percentage points at 80% power.** A p of {p:.2f} says the eras are consistent with one "
           "rate at that resolution; it does not say the true rates are within a point or two of "
           "each other. The pooled ROI is already era-dependent in a way this test could not have "
-          "seen: strip 2020 and the unders return moves from +4.0% to -0.2% (see Money, below).", "",
+          f"seen: strip 2020 and the unders return moves from {roi(unders):+.1f}% to "
+          f"{roi([r for r in unders if r['era'] != '2020 PFF_hist']):+.1f}% (see Money, below).", "",
           f"Pooled win rate SE is {iid * 100:.2f}pp iid and {cl * 100:.2f}pp clustered by game day "
           f"({g} distinct days); same-day games share weather and slate-wide shocks, so the "
           f"clustered figure is the honest one.", "",
@@ -319,7 +327,7 @@ def report(pool: list[dict]) -> str:
     d_mde = mde_diff(n_under, n_over)
     L += [f"Under vs over, chi-square {sstat:.2f} on {sdf} df, p {sp:.3f}. At {n_under} unders vs "
           f"{n_over} overs, this test detects a gap of about {d_mde * 100:.0f} percentage points at "
-          "80% power -- a p of 0.96 rules out a large gap, not a small one.", ""]
+          f"80% power -- a p of {sp:.2f} rules out a large gap, not a small one.", ""]
 
     # The 2023-25 book unders, as a fourth stratum -- compared, never pooled in.
     per = personal_unders()
@@ -358,15 +366,17 @@ def report(pool: list[dict]) -> str:
           "is the first direct measurement of an overlap that has been asserted without one.", ""]
 
     nested = under_list_2026(pool)
+    nested_weeks = sorted({r["week"] for r in nested}, key=int)
     L += ["## The published 2026 under lists (nested, not added)", "",
           "These picks are already counted in the 2026 flag row above. They are the subset PFF's "
           "positive-edge ranking published, so they answer the slate question rather than the "
           "board question, and they are shown separately for that reason only.", "",
           "| population | n | W-L | hit% | Wilson 95% | mde% | verdict |",
           "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
-          rec_row("weeks 2-3 under list", nested),
-          rec_row("week 2 under list", [r for r in nested if r["week"] == "2"]),
-          rec_row("week 3 under list", [r for r in nested if r["week"] == "3"]), ""]
+          rec_row(f"weeks {nested_weeks[0]}-{nested_weeks[-1]} under list" if nested_weeks
+                  else "under lists", nested),
+          *[rec_row(f"week {w} under list", [r for r in nested if r["week"] == w])
+            for w in nested_weeks], ""]
 
     priced = [r for r in pool if r["payout"] is not None]
     L += ["## Money, on the price-bearing rows only", "",
@@ -423,7 +433,7 @@ def self_check() -> None:
 
     exp = tally(archive_rows("export", "2022-23 exports"))
     assert (exp["w"], exp["l"], exp["push"]) == (46, 42, 2), exp  # greenline-export-picks-graded-2026-09-21
-    t26 = tally(rows_2026())
+    t26 = tally([r for r in rows_2026() if r["week"] in ("2", "3")])  # the season grows; its first weeks don't
     assert (t26["w"], t26["l"]) == (58, 48), t26
 
     pool = load()

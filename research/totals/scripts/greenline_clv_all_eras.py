@@ -231,9 +231,13 @@ def report(gate: str = "span") -> str:
     a, b = per.get("2020 PFF_hist"), per.get("2026 flags")
     if a and b:
         d, se = b["mean"] - a["mean"], math.hypot(a["se"], b["se"])
-        L += ["", f"**The pool mixes eras that disagree.** 2026 minus 2020: {d:+.2f} ± {Z95 * se:.2f} pts, "
-              f"two-sided p {math.erfc(abs(d) / se / math.sqrt(2)):.3f}. The pooled mean is an "
-              "average of an era with no CLV and an era with CLV, not one rate."]
+        p = math.erfc(abs(d) / se / math.sqrt(2))
+        L += ["", (f"**The pool mixes eras that disagree.** 2026 minus 2020: {d:+.2f} ± {Z95 * se:.2f} pts, "
+                   f"two-sided p {p:.3f}. The pooled mean is an average of an era with no CLV and an "
+                   "era with CLV, not one rate.") if p < 0.05 else
+              (f"**The eras are not distinguishable at this n.** 2026 minus 2020: {d:+.2f} ± "
+               f"{Z95 * se:.2f} pts, two-sided p {p:.3f}. That is a failure to separate them, not "
+               "evidence they match; the per-era rows above still differ in point estimate.")]
 
     L += ["", "## Secondary: picks against the market's own drift", "",
           "The unpicked rows are games PFF leaned on without making a pick, captured at the same "
@@ -276,7 +280,8 @@ def report(gate: str = "span") -> str:
 # The odds-api snapshot nearest each 2026 board capture: week 2's board CSV was written
 # 2026-09-09 23:11Z, week 3's dumps span 2026-09-16 16:02-18:26Z.
 CAPTURE_SNAPSHOTS = {"2": "odds_americanfootball_ncaaf_20260909T200531Z.json",
-                     "3": "odds_americanfootball_ncaaf_20260916T180004Z.json"}
+                     "3": "odds_americanfootball_ncaaf_20260916T180004Z.json",
+                     "4": "odds_americanfootball_ncaaf_20260923T180008Z.json"}  # latest before the 19:49Z capture
 
 
 def same_book_2026() -> list[str]:
