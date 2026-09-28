@@ -72,6 +72,14 @@ AMENDED 2026-09-28, committed before the rerun printed anything:
    minus PFF projection), positive-edge unders, weeks 2-3 -- the price-rule quantity. Never
    against book-minus-close, which shares the book total and is mechanical.
 
+LOOK 2, registered 2026-09-28 before it printed anything. On the valid close the stop rule
+is ~135 scored flags; weeks 2-4 hold ~160, so the scheduled look runs with `--weeks 2,3,4`,
+same specification (items 1-6, 9, 11). It is the second look at the same two contrasts, so
+read it against both corrections: Holm across the two contrasts, and a two-look sequence --
+a p that clears 0.05 on look 2 alone is not a finding. The exploratory gap slope (12) is
+re-fit on weeks 2-4 and, separately, on the weeks after the discovery sample (week 4 alone):
+that out-of-sample row is the only one that can confirm the weeks 2-3 hint.
+
 Run from repo root:
     python research/totals/scripts/greenline_flag_clv_contrast.py [--out research/totals/docs]
     python research/totals/scripts/greenline_flag_clv_contrast.py --self-check
@@ -221,7 +229,8 @@ def _fmt(label: str, s: dict, holm_p: bool = True) -> str:
             + (f"{s['p_holm']:.3f}" if holm_p else "not in family") + f" | {s['mde']:.2f} |")
 
 
-def render(res: dict, sizes: list[int], dec: dict, expl: dict) -> str:
+def render(res: dict, sizes: list[int], dec: dict, expl: dict, weeks: tuple[str, ...] = REGISTERED_WEEKS,
+           expl_new: dict | None = None) -> str:
     L = [f"# Under list and stated edge against CLV, {dt.date.today().isoformat()}", "",
          "Reproduce: `python research/totals/scripts/greenline_flag_clv_contrast.py "
          "--out research/totals/docs`.", "",
@@ -230,7 +239,7 @@ def render(res: dict, sizes: list[int], dec: dict, expl: dict) -> str:
          "edge* predict closing-line value? These are the two variables that vary inside the board,",
          "which the flag dummy in [line movement](pff-line-movement-2026-09-22.md) did not.", "",
          "## The answer is a bound, not a result", "",
-         f"- {res['n']} flags (weeks {', '.join(REGISTERED_WEEKS)}) with a REST-backed close. CLV SD "
+         f"- {res['n']} flags (weeks {', '.join(weeks)}) with a REST-backed close. CLV SD "
          f"{res['sd']:.2f} points, mean {res['mean']:+.3f}.",
          f"- Smallest effect this n detects 80% of the time: **{res['list']['mde']:.2f} points** for the "
          f"list contrast, **{res['value']['mde']:.2f} points per SD** for the edge slope.",
@@ -272,6 +281,9 @@ def render(res: dict, sizes: list[int], dec: dict, expl: dict) -> str:
           _fmt("list contrast, decoupled y", dec["list"], holm_p=False),
           _fmt("CLV per SD of `value`, decoupled y", dec["value"], holm_p=False),
           _fmt("exploratory: per SD of best DK/FD total − PFF projection", expl, holm_p=False)]
+    if expl_new is not None:
+        new = [w for w in weeks if w not in REGISTERED_WEEKS]
+        L.append(_fmt(f"exploratory, out of sample (week {', '.join(new)} only)", expl_new, holm_p=False))
     sig = [k for k, s in (("list", lst), ("value", val)) if s.get("ok") and s["p_holm"] < 0.05]
     L += ["", "## Reading", "",
           (f"- Surviving Holm: {', '.join(sig)}." if sig else
@@ -283,8 +295,11 @@ def render(res: dict, sizes: list[int], dec: dict, expl: dict) -> str:
           f"- Point estimates: list {lst.get('est', float('nan')):+.2f}, edge slope "
           f"{val.get('est', float('nan')):+.2f} (coupled) vs {dec['value'].get('est', float('nan')):+.2f} "
           "(decoupled). A slope that shrinks on the decoupled y was partly the shared market line.",
-          f"- **The next look is at ~{res['required_n']} scored flags** (the stop rule, recomputed on "
-          "this close's SD). Nothing is to be read before it.", "",
+          (f"- **The next look is at ~{res['required_n']} scored flags** (the stop rule, recomputed on "
+           "this close's SD). Nothing is to be read before it." if res["n"] < res["required_n"] else
+           f"- **This is the scheduled look** ({res['n']} flags against a ~{res['required_n']}-flag stop "
+           "rule). It is the second look at the same contrasts: a p that clears 0.05 here alone is "
+           "not a finding."), "",
           "## What this does not support", "",
           "- Any claim about win rate. This is a movement test; open question C owns the `value`",
           "  win-rate question and is embargoed until 56 prospective picks have graded.",
@@ -323,28 +338,37 @@ def self_check() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path, help="directory for the .md write-up")
+    ap.add_argument("--weeks", default=",".join(REGISTERED_WEEKS),
+                    help="comma list; the default is the registered look-1 population, 2,3,4 is look 2")
     ap.add_argument("--self-check", action="store_true")
     a = ap.parse_args()
     if a.self_check:
         self_check()
         return
+    weeks = tuple(a.weeks.split(","))
 
     import duckdb
 
     from cfb_paths import DB_PATH
-    rows, why = rest_scored([f for f in load_flags() if f["week"] in REGISTERED_WEEKS])
+    rows, why = rest_scored([f for f in load_flags() if f["week"] in weeks])
     listed = on_under_list()
-    cc = capture_consensus(REGISTERED_WEEKS)
+    cc = capture_consensus(weeks)
     dec_rows = [dict(r, clv=clv_points(r["side"], cc[r["pff_game_id"]], r["close"]))
                 for r in rows if r["pff_game_id"] in cc]
     dec = analyse(dec_rows, listed)
     # exploratory: the price-rule quantity against the decoupled y, positive-edge unders only
     from greenline_price_filter import build
     close_of = {r["pff_game_id"]: r["close"] for r in rows}
-    pf = [r for r in build()[0] if r["week"] in REGISTERED_WEEKS and r["proj_gap"] is not None
+    pf = [r for r in build()[0] if r["week"] in weeks and r["proj_gap"] is not None
           and r["game_id"] in close_of and r["game_id"] in cc]
-    expl = slope([r["proj_gap"] for r in pf],
-                 [clv_points("under", cc[r["game_id"]], close_of[r["game_id"]]) for r in pf])
+
+    def gap_fit(sub: list[dict]) -> dict:
+        return slope([r["proj_gap"] for r in sub],
+                     [clv_points("under", cc[r["game_id"]], close_of[r["game_id"]]) for r in sub])
+    expl = gap_fit(pf)
+    # the weeks after the discovery sample are the only out-of-sample test of the gap hint
+    expl_new = (gap_fit([r for r in pf if r["week"] not in REGISTERED_WEEKS])
+                if set(weeks) - set(REGISTERED_WEEKS) else None)
     con = duckdb.connect(str(DB_PATH), read_only=True)
     dates = {frozenset((str(h), str(aw))): str(d) for h, aw, d in con.execute(
         "select home_team_id, away_team_id, start_date::date from core.fact_game "
@@ -359,9 +383,11 @@ def main() -> None:
     print(f"scored {res['n']} flags, {sum(r['pff_game_id'] in listed for r in rows)} on an under list, "
           f"across {len(sizes)} slate dates {sizes}")
     print(f"close gate: {why}; decoupled y on {len(dec_rows)}; exploratory on {len(pf)}")
-    text = render(res, sizes, dec, expl)
+    text = render(res, sizes, dec, expl, weeks, expl_new)
     if a.out:
-        p = a.out / f"greenline-flag-clv-contrast-{dt.date.today().isoformat()}.md"
+        # a non-registered week set is a different look; never overwrite the look-1 record
+        tag = "" if weeks == REGISTERED_WEEKS else f"-w{weeks[0]}-{weeks[-1]}"
+        p = a.out / f"greenline-flag-clv-contrast-{dt.date.today().isoformat()}{tag}.md"
         p.write_text(text, encoding="utf-8")
         print(f"wrote {p}")
     else:
