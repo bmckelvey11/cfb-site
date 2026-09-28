@@ -56,7 +56,7 @@ SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
 
 IN_DIR = INGEST / "pff_scoreboard"
 BREAK_EVEN = 110 / 210
-RESULT_COLUMNS = ["source", "season", "week", "date", "game", "market", "side", "line", "price", "result",
+RESULT_COLUMNS = ["source", "season", "week", "pff_game_id", "date", "game", "market", "side", "line", "price", "result",
                   "p", "value", "clv", "p_market"]
 HISTORY = INGEST / "bet_history" / "history.csv"
 
