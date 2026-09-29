@@ -72,6 +72,7 @@ prior (09-21 version beside it). Regenerated, under the run date, by
 | [`../scripts/md_to_docx.py`](../scripts/md_to_docx.py) | Markdown to .docx through the officecli binary — headings, tables, images, bold, code. Exists because this machine has neither pandoc nor python-docx and the proposal has to be editable in Word |
 | [`../scripts/build_proposal_deliverables.py`](../scripts/build_proposal_deliverables.py) | The proposal's PDF, .docx and deck. `--no-pdf` / `--no-docx` to skip the slow steps |
 | [`../scripts/greenline_bet_log.py`](../scripts/greenline_bet_log.py) | **The ledger of which flags actually got bet.** Seed after each capture, mark before the games grade |
+| [`../scripts/bet_history_summary.py`](../scripts/bet_history_summary.py) | Hit rate / ROI table + cumulative-units graph from a book export (`--src`, `--by week\|month\|type`) |
 
 Every script takes `--self-check`. There is no pytest suite in this tree.
 
