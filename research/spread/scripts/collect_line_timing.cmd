@@ -36,5 +36,13 @@ echo ==== %DATE% %TIME% :: %* ====>> "%LOG%"
 "%PYTHON%" "%REPO%\research\spread\scripts\collect_line_timing.py" %*>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- exited %RC% ---->> "%LOG%"
+REM After a history pull, freeze any new DraftKings forward-log rows
+REM (docs/prereg-dk-opener-forward-log.md). Append-only and idempotent; its exit code
+REM is logged but never replaces the collector's, so it cannot fail this task.
+if /i "%1"=="history" (
+  echo ---- dk_opener_log log ---->> "%LOG%"
+  "%PYTHON%" "%REPO%\research\spread\scripts\dk_opener_log.py" log>> "%LOG%" 2>&1
+  if errorlevel 1 echo ---- dk_opener_log exited nonzero ---->> "%LOG%"
+)
 call "%REPO%\scripts\task_ledger.cmd" "line_timing_%1" "%START%" %RC%
 exit /b %RC%

@@ -81,7 +81,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `version_b_by_week.py` | The version B read cut by season-week cluster (same joins as `eval_version_b.py`; per-week SEs are HC1, informational only) | stdout |
 | `audit_version_b_methods.py` | `methods-review-2026-09-21.md` — anchor realization, regressor composition, tie handling, selection, B2 coverage, archive leakage, and the exploratory R/C decomposition. Grades nothing | stdout |
 | `eval_line_shopping.py` | `prereg-line-shopping.md` | `processed/line_shopping_sides.csv`, `line_shopping.json` |
-| `dk_opener_log.py log` \| `grade` | `prereg-dk-opener-forward-log.md`. `log` rebuilds decision-time rows from AN tick paths (reproducible any time before settlement data is lost); `grade` joins closes and scores, INTERIM before 2026-12-14 | `processed/dk_opener_log.csv`, `dk_opener_grade.json` |
+| `dk_opener_log.py log` \| `grade` | `prereg-dk-opener-forward-log.md` (amendment A1). `log` appends decision-time rows from AN tick paths, once per game and book, before kickoff, never rewritten; run by `collect_line_timing.cmd` after every `history` pull. `grade` reads the frozen file and joins closes and scores; INTERIM before 2026-12-14 | `processed/dk_opener_log.csv` (frozen, append-only), `dk_opener_grade.json` |
 | `check_pt_line_is_close.py` | `line-movement-results.md` § target, amendment A5 | `processed/pt_line_vs_an_close.json` |
 | `model_publish_times.py` | `line-movement-results.md` § when the constituents publish | `processed/model_publish_times.csv` |
 | `eval_phcover_calibration.py` | `phcover-accuracy-2026-09-17.md` | `processed/phcover_calibration.json` |
@@ -111,7 +111,7 @@ fitters, grids, 1-SE rule). Their `main()`s produce the archived margin-era tabl
 | `pt_rollover.py` | Exit 0 once PT's slate flips to a new week. Gates a wait loop; writes nothing. |
 | `migrate_book_set_version.py` | One-time, idempotent: stamps `book_set_version=1` on forward-log rows written before amendment S2 promoted the-odds-api books into `book_fair` |
 | `collect_line_timing.py history` | Mondays: Action Network tick histories → `raw/actionnetwork/history_event_<id>.json` (version B's closes) |
-| `collect_line_timing.cmd` | Scheduled-task wrapper; exits 3 if `CFB_DATA_ROOT` is unset. Runbook: `docs/line-timing-collector.md`. |
+| `collect_line_timing.cmd` | Scheduled-task wrapper; exits 3 if `CFB_DATA_ROOT` is unset. After a `history` pull it also runs `dk_opener_log.py log`, whose exit code never replaces the collector's. Runbook: `docs/line-timing-collector.md`. |
 | `scrape_dratings.py` | DRatings FBS power ratings (overall, SOS, standard, inference, Vegas + ranks) → `ingest/dratings/fbs_ratings_<updated>.csv`. Page is overwritten weekly with no history; runs Mondays from `collect_line_timing.py history`. Not wired into any model. |
 
 ## Data

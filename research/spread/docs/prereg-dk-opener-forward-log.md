@@ -4,6 +4,15 @@
 The script is `scripts/dk_opener_log.py`. Rows whose decision time falls before 2026-10-04
 12:00 ET are logged with `in_test = False` and graded by nothing.
 
+**Amendment 1, 2026-09-30 — made before the first included decision, so no included data had
+been seen.** Two changes:
+
+- **The log is frozen.** Rows are appended and never rewritten. Grading reads the frozen file.
+- **Stale lines are kept out of the fair.** The staleness rule now also applies to the books
+  that form the fair.
+
+Both are marked **(A1)** below.
+
 ## Question
 
 Is DraftKings' Sunday number worth taking when it sits at least 1 point better than the other
@@ -26,7 +35,7 @@ ranking signal.
 ## Data
 
 **Lines at decision time** come from Action Network tick paths in `stg.an_history_tick`,
-collected every 6 h by `CFB-AN-History`. Each pull returns the whole timestamped path, so a
+collected every 5 h by `CFB-AN-History`. Each pull returns the whole timestamped path, so a
 missed weekend pull does not lose Sunday's lines, as long as some pull lands before the event
 settles.
 
@@ -45,7 +54,7 @@ settles.
 
 **DraftKings close** is CFBD's REST payload, `stg.lines__lines` provider DraftKings. On 2026
 weeks 1–5 it matched AN's DraftKings line at kickoff on 90% of the 49 games whose AN path runs
-through kickoff (mean gap 0.09). AN's own path stops up to 6 h early on 86% of games, and there
+through kickoff (mean gap 0.09). AN's own path stops before kickoff on 86% of games, and there
 it agreed only 48% of the time. So AN is not the close.
 
 **Scores** come from `stg.games`.
@@ -67,6 +76,9 @@ the home team, away team and Eastern date.
   guard: a book more than 2.5 points from the all-books median is dropped, when at least 3
   books are posted and at least 2 remain. The guard never drops the book being bet.
   - At least 2 other books are required.
+  - **(A1)** Before the S1 guard, drop any other book whose last tick is more than 36 h before T.
+    BetRivers, like DraftKings, has no `unavailable` ticks, so a pulled BetRivers line would
+    otherwise feed the fair as if it were posted.
 - **Stale.** AN records no `unavailable` ticks for DraftKings, so a line DraftKings has pulled
   still looks posted. A bet-book line whose last tick is more than 36 h before T is flagged
   `stale`: it was last priced before the previous Saturday. The primary analysis excludes
@@ -119,6 +131,24 @@ it is registered here; any use of it is exploratory.
   not evidence against the idea.
 - **ATS.** The minimum detectable win rate (one-sided α .05, power .8, n = 60, against 0.5238)
   is about **0.68**. ATS is below floor this season whatever happens.
+
+## The log (A1)
+
+`dk_opener_log.py log` is append-only.
+
+- **When a row is written.** A (game, book) row is written once, and only if both hold:
+  - the game has not kicked off;
+  - the collector has cycled at least 6 h past the game's decision time, measured as the
+    latest AN tick in the warehouse being at least T + 6 h.
+- **After that,** the row is never rewritten. A row that was not written before kickoff never
+  is.
+- **When it runs.** `collect_line_timing.cmd` runs `log` after every `history` pull (the
+  `CFB-AN-History` task, every 5 h as registered on 2026-09-30). The warehouse the log reads is rebuilt daily at 05:00, so
+  a Sunday decision's rows are normally frozen by Monday morning. Games kicking off before then
+  can be missed. That is a coverage loss, not a bias from knowing outcomes.
+- **`grade` reads the frozen file.** Only closes and scores come from the warehouse at grade
+  time. So a later loss of AN tick paths, or a rebuild dropping `stg.an_scoreboard`, cannot
+  change which bets exist.
 
 ## Read and trial count
 

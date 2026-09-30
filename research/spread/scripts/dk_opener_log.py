@@ -4,14 +4,19 @@ Read the prereg first: decision time, book set, threshold and outcomes are fixed
 are not tuning knobs.
 
 Every Sunday at 12:00 ET, rebuild each Action Network book's spread as of that moment from
-the stored tick paths (CFB-AN-History pulls every 6 h; a Monday pull still carries Sunday's
+the stored tick paths (CFB-AN-History pulls every 5 h; a Monday pull still carries Sunday's
 ticks). Where DraftKings sits >= 1.0 point better than the median of the other real books,
 the log records a bet on that side at DraftKings' number. FanDuel is logged the same way as a
 secondary. Grading uses CFBD's REST DraftKings close, the only close that agrees with AN's
 DraftKings path on games whose path runs through kickoff (90% vs 48% when it stops early).
 
-    python research/spread/scripts/dk_opener_log.py log     # decision-time rows, no outcomes
-    python research/spread/scripts/dk_opener_log.py grade   # joins closes and scores
+    python research/spread/scripts/dk_opener_log.py log     # append decision-time rows
+    python research/spread/scripts/dk_opener_log.py grade   # frozen rows + closes and scores
+
+`log` is APPEND-ONLY. A (game, book) row is written once, before that game kicks off and once
+the collector has cycled at least 6 h past its decision time, and is never rewritten. Grading
+reads the frozen file, so a later loss of AN tick paths or a dropped warehouse table cannot
+change which bets exist. collect_line_timing.cmd runs `log` after every `history` pull.
 
 Writes $CFB_DATA_ROOT/processed/dk_opener_log.csv and dk_opener_grade.json. Never touches
 movement_forward_log.csv (version B's dataset).
@@ -144,10 +149,14 @@ def build_log(con) -> pd.DataFrame:
     tick = at.pivot(index="game_id", columns="book_id", values="ts")
     rows = []
     for gid, r in wide.iterrows():
-        books = {int(b): float(v) for b, v in r.items() if pd.notna(v)}
+        age_h = (games.loc[gid, "T"] - tick.loc[gid]) / pd.Timedelta(hours=1)
+        posted = {int(b): float(v) for b, v in r.items() if pd.notna(v)}
         for bb, name in BETTABLE.items():
-            if bb not in books:
+            if bb not in posted:
                 continue
+            # Other books last priced before the previous Saturday are off the fair: like
+            # DraftKings, BetRivers has no 'unavailable' ticks, so a pulled line looks posted.
+            books = {b: v for b, v in posted.items() if b == bb or age_h[b] <= STALE_HOURS}
             fair, n_other = fair_ex(books, bb)
             if np.isnan(fair):
                 continue
@@ -249,14 +258,42 @@ def grade_part(con, log: pd.DataFrame) -> dict:
     return out
 
 
+def append_log(con, path: Path) -> pd.DataFrame:
+    """Add rows not yet frozen; never rewrite one. See the module docstring for the gate."""
+    old = read_log(path)
+    new = build_log(con)
+    if new.empty:
+        return old
+    last_pull = con.execute("select max(timezone('America/New_York', updated_at)) "
+                            "from stg.an_history_tick").fetchone()[0]
+    now = pd.Timestamp.now(tz="America/New_York").tz_localize(None)
+    have = set(zip(old.game_id, old.book))
+    fresh = ~pd.Series(list(zip(new.game_id, new.book))).isin(have).to_numpy()
+    ready = (new.decision_et <= pd.Timestamp(last_pull) - pd.Timedelta(hours=6)) & (new.kick_et > now)
+    add = new[fresh & ready.to_numpy()].assign(written_et=now)
+    log = pd.concat([old, add], ignore_index=True) if len(old) else add
+    log.to_csv(path, index=False)
+    print(f"appended {len(add)} rows ({len(log)} frozen)")
+    return log
+
+
+def read_log(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame(columns=["game_id", "book"])
+    return pd.read_csv(path, parse_dates=["kick_et", "decision_et", "written_et", "edition"])
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("cmd", choices=["log", "grade"])
     a = ap.parse_args()
     con = duckdb.connect(str(cfb_paths.DATA_ROOT / "cfb.duckdb"), read_only=True)
-    log = build_log(con)
     out = cfb_paths.DATA_ROOT / "processed"
-    log.to_csv(out / "dk_opener_log.csv", index=False)
+    path = out / "dk_opener_log.csv"
+    log = append_log(con, path) if a.cmd == "log" else read_log(path)
+    if log.empty:
+        print("no frozen rows yet")
+        return 0
     trig = log[log.side != "none"]
     print(f"{len(log)} book-game rows, {log.game_id.nunique()} games; "
           f"triggers by week and book (decision-time data only):")
