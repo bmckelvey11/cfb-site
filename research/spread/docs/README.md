@@ -45,6 +45,7 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `line-movement-results.md` | results | A, A2, A3, A6, A4, A5; what PT's `line` is; when the constituents publish; B2 (capture buckets); version B reads. |
 | `prereg-line-shopping.md` | prereg | Book fair = median of books; the outlier book is the bet. |
 | `line-shopping-results.md` | results | Dispersion tail across 7 Action Network books, 2024–2025. |
+| `prereg-dk-opener-forward-log.md` | prereg | Forward test, 2026: bet DraftKings' Sunday-noon number when it sits ≥ 1 pt better than the other AN books' median; primary CLV to DK's REST close, one read on or after 2026-12-14. Likely underpowered this season. |
 | `combining-predictions.md` | review | How E4 and the book fair combine into one fair spread and one bet decision. |
 | `prediction-tracker.md` | dataset | Column dictionary for the joined panel. |
 | `review-2026-09-08-tree-audit.md` | review | Full-tree audit; each finding carries its resolution date. |
@@ -80,6 +81,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `version_b_by_week.py` | The version B read cut by season-week cluster (same joins as `eval_version_b.py`; per-week SEs are HC1, informational only) | stdout |
 | `audit_version_b_methods.py` | `methods-review-2026-09-21.md` — anchor realization, regressor composition, tie handling, selection, B2 coverage, archive leakage, and the exploratory R/C decomposition. Grades nothing | stdout |
 | `eval_line_shopping.py` | `prereg-line-shopping.md` | `processed/line_shopping_sides.csv`, `line_shopping.json` |
+| `dk_opener_log.py log` \| `grade` | `prereg-dk-opener-forward-log.md`. `log` rebuilds decision-time rows from AN tick paths (reproducible any time before settlement data is lost); `grade` joins closes and scores, INTERIM before 2026-12-14 | `processed/dk_opener_log.csv`, `dk_opener_grade.json` |
 | `check_pt_line_is_close.py` | `line-movement-results.md` § target, amendment A5 | `processed/pt_line_vs_an_close.json` |
 | `model_publish_times.py` | `line-movement-results.md` § when the constituents publish | `processed/model_publish_times.csv` |
 | `eval_phcover_calibration.py` | `phcover-accuracy-2026-09-17.md` | `processed/phcover_calibration.json` |
@@ -122,7 +124,7 @@ Never committed. `CFB_DATA_ROOT` is `C:\Users\mckel\dev\cfb\data`.
 | `ingest/prediction_tracker_lines.csv` | The joined panel. Regenerate, don't archive. |
 | `ingest/pt_snapshots/` | Forward collector: live slate + `.meta.json`, one pair per fetch. Irreplaceable. |
 | `raw/actionnetwork/history_event_*.json` | Per-book price paths; the close for version B. Backfillable. |
-| `processed/pt_movement*`, `version_b.json`, `movement_forward_log.csv`, `weekly_slate_*.csv`, `line_shopping*`, `pt_line_vs_an_close.json`, `model_publish_times.csv` | Every analysis output above. |
+| `processed/pt_movement*`, `version_b.json`, `movement_forward_log.csv`, `weekly_slate_*.csv`, `line_shopping*`, `pt_line_vs_an_close.json`, `model_publish_times.csv`, `dk_opener_log.csv`, `dk_opener_grade.json` | Every analysis output above. |
 
 `processed/pt_*` files not listed (leaderboards, sweeps, recency, neff, ats tail, season
 stability) are margin-era outputs; their scripts are archived and they are not regenerated.
