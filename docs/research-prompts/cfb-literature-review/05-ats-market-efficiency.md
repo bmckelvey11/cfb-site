@@ -71,7 +71,8 @@ Determine whether the FBS point-spread market is efficient, which biases have be
 Context from the developer's own backtest. It is their record, not a published study; use it only to steer the search:
 
 - A consensus of Prediction Tracker's computer ratings, combined by ten walk-forward rules, went 50.31% ATS on 12,560 bets against the closing spread (2001–2025). That is below the -110 break-even.
-- In games where the raw panel median disagreed with the line by 5 or more points, it went 53.9% ATS against the opening line (1,641 games) but 49.0% against the close.
+- In games where the raw panel median disagreed with the closing spread by 5 or more points, it went 53.9% ATS against the opening line (1,641 games) but 49.0% against the close.
+- Prediction Tracker publishes after the opener has already moved, so the opener figure is not a price that could have been bet. The open question is whether anything remains at a later, reachable price.
 
 Answer each sub-question:
 

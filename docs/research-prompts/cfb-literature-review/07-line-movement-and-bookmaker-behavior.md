@@ -73,6 +73,7 @@ Context from the developer's own backtest. It is their record, not a published s
 - A screened consensus of Prediction Tracker's computer ratings anticipated about 15% of the open-to-close spread move. The out-of-sample R² was 0.15 on 14,068 games (2006–2025), and it called the direction of the move correctly about 7 times in 10.
 - The standard deviation of close minus open was 2.48 points.
 - The opener was the only price at which this was measured.
+- Prediction Tracker publishes after the opener has already moved, so the opener figure is not a price that could have been bet. The open question is whether anything remains at a later, reachable price.
 
 Answer each sub-question:
 

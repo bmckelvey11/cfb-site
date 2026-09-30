@@ -72,6 +72,7 @@ Context from the developer's own backtest. It is their record, not a published s
 
 - Ten walk-forward rules for combining Prediction Tracker's panel of computer ratings, tested on 12,800–14,300 games from 2001–2025, went 50.31% ATS on 12,560 bets against the closing spread. That is below the -110 break-even.
 - In games where the raw panel median differed from the closing spread by 5 or more points, the panel went 49.0% ATS against the close, but 53.9% against the opening line (1,641 games).
+- Prediction Tracker publishes after the opener has already moved, so the opener figure is not a price that could have been bet. The open question is whether anything remains at a later, reachable price.
 
 Find literature that explains or contradicts this pattern.
 
