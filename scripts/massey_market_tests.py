@@ -36,7 +36,9 @@ Added after run 2 had been read (POST-HOC, exploratory, counted as extra trials)
   O4       DraftKings only: M ~ gap plus controls for DK converging to another book's open,
            for news since the previous edition, and for home field. See dk_controls().
 
-Runs: 1 aborted before any output (slow bootstrap), 2 read, 3 adds O4.
+Runs: 1 aborted before any output (slow bootstrap), 2 read, 3 adds O4. Run 4 (same day,
+correction): DraftKings open/close from CFBD REST only, and the 2026 timing check on AN book
+68 (DraftKings) instead of 15 (AN's consensus), after the loader's book labels proved wrong.
 
 Usage:  python scripts/massey_market_tests.py [--boot 2000]
 Writes: $CFB_DATA_ROOT/processed/massey_market_tests.json; prints the tables.
@@ -64,9 +66,15 @@ BOOKS = {"bovada": "bov", "draftkings": "dk", "espn bet": "espn"}
 PRIMARY = "bov"
 MARKET_WORDS = re.compile(r"wager|bookie|sharp|vegas|odds|spread|\bline\b|\bbet", re.I)
 
+# DraftKings comes from CFBD's REST payload only. core.fact_game_line's "draftkings" also
+# carries Action Network book 15, which AN's own book list says is its CONSENSUS (master's
+# loader mislabels it; the fix, ea9aedca, is on an unmerged branch). AN's DraftKings is 68.
 LINES_SQL = """
 select game_id, provider_key, spread_open, spread_close from core.fact_game_line
-where provider_key in ('bovada', 'draftkings', 'espn bet')
+where provider_key in ('bovada', 'espn bet')
+union all
+select gameId, 'draftkings', median(lines_spreadOpen), median(lines_spread)
+from stg.lines__lines where lines_provider in ('DraftKings', 'Draft Kings') group by 1
 """
 
 # Last-week surprise: each team's most recent earlier game (same season, any opponent) that
@@ -104,9 +112,10 @@ tk as (
    and cast(timezone('America/New_York', g.startDate) as date)
      = cast(timezone('America/New_York', ev.start_time) as date)
   join stg.an_history_tick t using (event_id)
-  where t.book_id = 15 and t.market_type = 'spread' and not t.is_live and t.period = 'event'
+  where t.book_id = 68 and t.market_type = 'spread' and not t.is_live and t.period = 'event'
     and t.side = 'home'),
-o as (select game_id, spread_open from core.fact_game_line where provider_key = 'draftkings')
+o as (select gameId as game_id, median(lines_spreadOpen) as spread_open from stg.lines__lines
+      where lines_provider in ('DraftKings', 'Draft Kings') group by 1)
 select tk.game_id,
        min(tk.ts) < cast(any_value(tk.gd) - dayofweek(any_value(tk.gd)) * interval 1 day
                          as timestamp) as lookahead

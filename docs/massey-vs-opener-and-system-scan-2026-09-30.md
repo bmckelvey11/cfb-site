@@ -40,15 +40,15 @@ docstring.
 - **Sample.** The replication's sample: FBS vs FBS, regular season, week ≥ 6. The latest Massey
   edition before the game's Eastern date. The same orientation flip, rank gaps
   $Q = 100\,(R_{away} - R_{home})/N$, and weeks clustered by edition.
-- **Lines.** Per book from `core.fact_game_line`.
+- **Lines.** Per book from `core.fact_game_line`, except DraftKings (see the correction below).
   - Opens exist only for 2021–2025, for three books: Bovada (2021–25, primary), DraftKings
     (2023–25) and ESPN Bet (2024–25).
   - Closes use the per-game median across books (the "close" family), or the same book's close
     (the movement tests).
 - **Timing of the open.** For 2026, Action Network ticks give the time each DraftKings line first
-  appeared. Matching CFBD's DK open to those ticks puts 48.2% of 309 matched games' opens before
-  the previous Sunday: posted Wednesday–Friday, before the previous weekend's games. The rest
-  were posted that Sunday, with a median hour of noon.
+  appeared. On AN book 68 (DraftKings), 48.4% of 335 matched games' opens were posted before the
+  previous Sunday: Wednesday–Friday, before the previous weekend's games. The rest were posted
+  that Sunday, with a median hour of noon.
   - Bovada and ESPN Bet have no ticks.
   - Massey editions are dated Sunday or Monday. So even a Sunday opener is at best simultaneous
     with the rankings.
@@ -59,8 +59,25 @@ docstring.
   - **O3:** movement with a surprise control.
   - **S1 / S2:** scans against the close and against Bovada's opener.
   - **Post-hoc, added after run 2 was read:** O4, the DraftKings controls.
-- **Trials.** Three runs. Run 1 was aborted before any output was seen. Run 2 fit 337
-  regressions. Run 3 added O4's 5 regressions: 342 in total.
+- **Trials.** Four runs. Run 1 was aborted before any output was seen. Run 2 fit 337
+  regressions. Run 3 added O4's 5 regressions: 342 in total. Run 4 is the correction below and
+  fits the same 342.
+
+**Correction, same day (run 4).** Master's warehouse loader mislabels Action Network books.
+AN's own book list says 15 is AN's consensus, 30 the consensus opener, 49 Caesars, 68
+DraftKings, 69 FanDuel, 71 BetRivers and 75 BetMGM. The loader joins 15 to DraftKings and
+names 30 "Circa"; the fix, `ea9aedca`, is on an unmerged branch. Three consequences:
+
+- **Timing check.** The first version timed DK's open on book 15, the consensus. On book 68,
+  DraftKings' own book, the look-ahead share is 48.4% of 335 games, previously 48.2% of 309.
+  CFBD's DK open equals book 68's first tick in 97.5% of games. The calibration rows below are
+  updated.
+- **DraftKings open and close.** These now come from CFBD's REST payload (`stg.lines__lines`)
+  only. Every DraftKings result is identical, because for these games the warehouse's
+  REST-first merge was already using REST values.
+- **Median close.** In 2024–25 the median close includes the mislabeled AN rows, among them the
+  consensus opener. Dropping the "circa" rows moves the median by 0.04–0.06 points on average
+  (at most 0.75), so nothing was rerun for it.
 
 The movement metric is the one `research/spread` uses:
 
@@ -88,8 +105,8 @@ toward the rankings.
 | Bovada | 2021–25 | 2,425 | 0.011 | 5.3 | .012 |
 | DraftKings | 2023–25 | 1,465 | 0.031 | 5.7 | .045 |
 | ESPN Bet | 2024–25 | 1,014 | 0.012 | 2.3 | .010 |
-| DK 2026, look-ahead opens | wk 2–5 | 71 | 0.112 | 8.0 | .476 |
-| DK 2026, Sunday opens | wk 2–5 | 113 | 0.028 | 3.4 | .093 |
+| DK 2026, look-ahead opens | wk 2–5 | 85 | 0.108 | 8.9 | .483 |
+| DK 2026, Sunday opens | wk 2–5 | 122 | 0.030 | 3.5 | .092 |
 
 - DraftKings' 2023–25 opens load on last week's surprise about as much as its 2026 Sunday opens
   do, not as much as its look-ahead opens. That is suggestive only: the 2026 calibration comes

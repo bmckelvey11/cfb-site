@@ -77,6 +77,10 @@ core-coverage cutoff and the regression-9 rule. Both are marked below, with thei
     combo − single is −0.004 [−0.049, +0.044]. Table 5 gives F = 1.85, p = .14.
 - **Closing line.** The per-game median of `core.fact_game_line.spread_close` across providers.
   Coverage is 98.4% of the 2013–25 Table 2 sample. No lines exist here before 2013.
+  - **Correction, same day.** In 2024–25 that median includes Action Network rows that master's
+    loader mislabels, among them AN's consensus opener, stored as "circa". Dropping those rows
+    moves the median by 0.04–0.06 points on average (at most 0.75). No result depends on it.
+    See [`massey-vs-opener-and-system-scan-2026-09-30.md`](massey-vs-opener-and-system-scan-2026-09-30.md).
 - **Regression 9.** Keep the systems whose edition-clustered |t| ≥ 1.96 in regression 8. This
   rule is **selection on the test set**. The walk-forward uses the full core instead.
   - **Set after a dry run.** The dry run used OLS |t| ≥ 2 instead.
