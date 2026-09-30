@@ -2,6 +2,8 @@ import json
 
 from cfb_system_maker.cli import main
 from cfb_system_maker.duckdb_load import (
+    _AN_BOOK_PROVIDER,
+    _AN_PROVIDER_NAMES,
     backfill_gamelines_from_actionnetwork,
     build_duckdb,
     explode_an_children,
@@ -927,7 +929,7 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     teams = json.dumps([{"id": 1, "location": "Alpha"}, {"id": 2, "location": "Beta"}])
     markets = json.dumps(
         {
-            "15": {
+            "68": {
                 "event": {
                     "spread": [
                         {
@@ -986,8 +988,8 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
     con.execute(
         """
         INSERT INTO stg.an_history VALUES
-          (100, 15, 'firsthalf', 'spread', 'home', 1, -3.5, -110, false, 'history.json'),
-          (100, 15, 'firsthalf', 'total', 'over', NULL, 24.5, -105, false, 'history.json')
+          (100, 68, 'firsthalf', 'spread', 'home', 1, -3.5, -110, false, 'history.json'),
+          (100, 68, 'firsthalf', 'total', 'over', NULL, 24.5, -105, false, 'history.json')
         """
     )
     explode_an_children(con)
@@ -1019,7 +1021,18 @@ def test_backfill_gamelines_fills_nulls_and_inserts_period_rows(tmp_path):
         row[0]
         for row in con.execute("SELECT name FROM stg.lines_provider").fetchall()
     }
-    assert "DraftKings" in names and "FanDuel" in names
+    assert "DraftKings" in names and "FanDuel" in names and "BetRivers" in names
+    assert "Pinnacle" not in names and "Bet365" not in names and "Circa" not in names
+
+
+def test_an_book_ids_follow_action_networks_own_book_list():
+    """Ids per GET /web/v1/books (2026-09-08): 15 Consensus, 30 Open, 49 Caesars,
+    68 DraftKings, 69 FanDuel, 71 BetRivers, 75 BetMGM. The old map sent the
+    consensus to DraftKings and BetRivers to Caesars."""
+    assert _AN_BOOK_PROVIDER == {68: 888888, 49: 38, 15: 1004}
+    assert _AN_PROVIDER_NAMES == {30: "Open", 69: "FanDuel", 71: "BetRivers", 75: "BetMGM"}
+    assert not set(_AN_BOOK_PROVIDER) & set(_AN_PROVIDER_NAMES)
+
 
 
 def test_the_backfill_reports_a_missing_actionnetwork_tape(tmp_path):
@@ -1355,13 +1368,13 @@ def test_tick_csv_is_skipped_with_the_rest_of_actionnetwork(tmp_path):
 
 
 def test_actionnetwork_book_ids_are_offset_out_of_cfbds_range():
-    """An AN book id used bare sits inside CFBD's live provider range (38-1004): FanDuel
-    68, BetMGM 69, Bet365 75 and Pinnacle 49 all collide with plausible future CFBD ids.
-    If CFBD issued 68 to a different book, the explode would rebuild stg.lines_provider
-    with that name, the AN insert would skip (the id exists), and ~5,300 FanDuel rows
-    would silently join to the wrong book.
+    """An AN book id used bare sits inside CFBD's live provider range (38-1004): Open 30,
+    FanDuel 69, BetRivers 71 and BetMGM 75 all collide with plausible future CFBD ids.
+    If CFBD issued 69 to a different book, the explode would rebuild stg.lines_provider
+    with that name, the AN insert would skip (the id exists), and every FanDuel row would
+    silently join to the wrong book.
 
-    The two ids in `_AN_BOOK_PROVIDER` are exempt because they are CFBD's own -- including
+    The ids in `_AN_BOOK_PROVIDER` are exempt because they are CFBD's own -- including
     888888, which CFBD really does use for a second DraftKings row alongside 100
     "Draft Kings". Nothing here invents an id for a book CFBD already knows.
     """

@@ -689,27 +689,31 @@ def explode_payloads(
 
 
 # Action Network book_id → CFBD linesProvider.id when the book already exists.
-# ActionNetwork book id -> the CFBD provider id for the same book. Both targets are
-# **CFBD's own** ids, including 888888: CFBD's `linesProvider` table really does carry
+# Ids per GET https://api.actionnetwork.com/web/v1/books (2026-09-08): 15 Consensus,
+# 30 Open (the consensus opener, not a sportsbook), 49 Caesars NV, 68 DraftKings NJ,
+# 69 FanDuel NJ, 71 BetRivers NJ, 75 BetMGM NJ. Confirmed 2026-09-30: CFBD's REST
+# DraftKings open equals AN book 68's first tick on 97.5% of 2026 games.
+#
+# ActionNetwork book id -> the CFBD provider id for the same book. Every target is
+# **CFBD's own** id, including 888888: CFBD's `linesProvider` table really does carry
 # DraftKings twice, as 100 "Draft Kings" and 888888 "DraftKings", which is the same vendor
 # duplicate its REST `lines` payload emits. `normalize.PROVIDER_ALIASES` reconciles the two
 # names downstream; nothing here invents an id.
-_AN_BOOK_PROVIDER = {15: 888888, 71: 38}  # DraftKings, Caesars
+_AN_BOOK_PROVIDER = {68: 888888, 49: 38, 15: 1004}  # DraftKings, Caesars, consensus
 
 # Books CFBD has no provider id for at all. Their ids are ours to mint, and an AN book id
-# used bare would sit inside CFBD's live range (38-1004): FanDuel 68, BetMGM 69, Bet365 75
-# and Pinnacle 49 all collide with plausible future CFBD ids. If CFBD ever issued 68 to a
+# used bare would sit inside CFBD's live range (38-1004): Open 30, FanDuel 69, BetRivers 71
+# and BetMGM 75 all collide with plausible future CFBD ids. If CFBD ever issued 69 to a
 # different book, the explode would rebuild `stg.lines_provider` with that name, the insert
-# below would skip (the id exists), and ~5,300 FanDuel rows would silently join to the
-# wrong book. So they are offset into a range CFBD cannot reach -- it already uses 999999,
-# hence seven digits rather than six.
+# below would skip (the id exists), and every FanDuel row would silently join to the wrong
+# book. So they are offset into a range CFBD cannot reach -- it already uses 999999, hence
+# seven digits rather than six.
 _AN_ID_OFFSET = 9_000_000
 _AN_PROVIDER_NAMES = {
-    30: "Circa",
-    49: "Pinnacle",
-    68: "FanDuel",
-    69: "BetMGM",
-    75: "Bet365",
+    30: "Open",
+    69: "FanDuel",
+    71: "BetRivers",
+    75: "BetMGM",
 }
 
 
