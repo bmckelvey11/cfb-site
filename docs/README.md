@@ -153,6 +153,7 @@ converted to `$`; equations have not been brought to the where-table standard.
 | [cross-domain-derived-metrics.md](cross-domain-derived-metrics.md) | 22 candidate derived metrics not in the current inventory, ranked by expected predictive lift per unit of effort |
 | [quantile-regression-methods.md](quantile-regression-methods.md) | Quantile regression for betting: pinball loss, and applications to NCAA basketball, Australian rules football, and golf |
 | [research-prompts/perplexity-prompting-guide.md](research-prompts/perplexity-prompting-guide.md) | How to write a Perplexity research prompt: retrieval-first, specific, and bound to an output format |
+| [research-prompts/cfb-literature-review/](research-prompts/cfb-literature-review/) | Nine Deep Research prompts surveying the academic literature on FBS prediction and descriptive stats, weighted to ATS and totals; run 01–08, then 09 synthesizes |
 | [alabama-georgia-2026-09-17.md](alabama-georgia-2026-09-17.md) | Alabama vs Georgia through week 2 of 2026, from a warehouse snapshot export |
 | [injury-news-2026-09-18.md](injury-news-2026-09-18.md) | Selective week 3 injury roundup, dated by publication; not an availability ledger |
 
