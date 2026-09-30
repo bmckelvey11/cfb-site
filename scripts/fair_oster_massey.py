@@ -47,9 +47,16 @@ CORE_COVERAGE = 0.90  # a system joins the Table 2 core if it ranks >= 90% of er
 TRIALS: list[str] = []  # every regression fit, for the trial count
 
 
-def load(con, lo: int, hi: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load(con, lo: int, hi: int, systems: list[str] | None = None
+         ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Games (one row per FBS-vs-FBS regular-season game, week >= 6, both teams ranked)
-    and the per-edition team table they were joined from."""
+    and the per-edition team table they were joined from.
+
+    `systems` defaults to the paper's nine; pass a list to load others. "CMP" is the Massey
+    composite rank itself. Column `flip` is the +-1 applied to every signed column, for
+    callers that add their own home-oriented columns.
+    """
+    systems = PAPER_SYSTEMS if systems is None else systems
     games = con.execute(
         """
         with g as (
@@ -71,10 +78,10 @@ def load(con, lo: int, hi: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     ranks = con.execute(
         "select date as edition, cfbd_team as team, system, rank from stg.massey_ranks "
         "where season between ? and ? and list_contains(?, system)",
-        [lo, hi, PAPER_SYSTEMS],
+        [lo, hi, systems],
     ).df().pivot_table(index=["edition", "team"], columns="system", values="rank")
     eds = con.execute(
-        "select date as edition, cfbd_team as team, wins, losses, "
+        "select date as edition, cfbd_team as team, wins, losses, cmp_rank as CMP, "
         "count(*) over (partition by date) as n_teams from stg.massey_editions "
         "where season between ? and ?",
         [lo, hi],
@@ -85,7 +92,7 @@ def load(con, lo: int, hi: int) -> tuple[pd.DataFrame, pd.DataFrame]:
         side.add_prefix("a_"), on=["edition", "away"])
     d = d[d.h_n_teams.notna() & d.a_n_teams.notna()].copy()
     n = d.h_n_teams
-    for s in PAPER_SYSTEMS:
+    for s in systems:
         d[s] = 100 * (d["a_" + s] - d["h_" + s]) / n if "h_" + s in d else np.nan
     d["REC"] = 100 * (d.h_wpct - d.a_wpct)
     lines = con.execute(
@@ -93,9 +100,9 @@ def load(con, lo: int, hi: int) -> tuple[pd.DataFrame, pd.DataFrame]:
         "where spread_close is not null group by 1").df()
     d = d.merge(lines, on="game_id", how="left")
     d["LV"] = -d.close  # spread_close < 0 means home favoured
-    flip = np.where(d.game_id % 2 == 0, 1.0, -1.0)
-    for c in ["y", "h", "LV", "REC", *PAPER_SYSTEMS]:
-        d[c] = d[c] * flip
+    d["flip"] = np.where(d.game_id % 2 == 0, 1.0, -1.0)
+    for c in ["y", "h", "LV", "REC", *systems]:
+        d[c] = d[c] * d.flip
     return d.reset_index(drop=True), side
 
 
