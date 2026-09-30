@@ -187,8 +187,9 @@ ERAS = ("2020 PFF_hist", "2022-23 exports", "2026 flags")
 
 def sensitivity(rows: list[dict]) -> list[str]:
     L = ["", "## Sensitivity: the close definition", "",
-         "`rest` is REST-backed books only (the primary); `all` adds the GraphQL-only books, "
-         "which carry in-game totals on some 2026 games. `span` drops a game whose books "
+         "`rest` is REST-backed books only (the primary); `all` adds the `gql`-only rows, which "
+         "are Action Network books (live lines filtered since dabec215; `open`, AN's opener, "
+         "excluded) and have never been validated as a close. `span` drops a game whose books "
          "disagree by more than 3 pts; `none` trusts every book; `trim` discards single books "
          "more than 1.5 pts off the game median and was added after the first run.", "",
          "| books | gate | split | n | mean CLV (pts, 95%) | p (one-sided) | upper 95% vs break-even 0.60 |",
