@@ -345,6 +345,8 @@ def test_the_five_actionnetwork_books_are_graded_at_all(graded):
     """The books the union added are the ones no code had ever checked. If they stop
     arriving, the two tests above pass vacuously for them."""
     have = {key for key, *_ in graded}
-    assert {"circa", "fanduel", "betmgm", "bet365", "pinnacle"} <= have, (
+    # AN ids 30, 49, 69, 71, 75 under AN's own names (merge 48ae034c); 68 now lands on
+    # CFBD's DraftKings row and 15 on its consensus row, so neither is a book of its own here.
+    assert {"open", "caesars", "fanduel", "betrivers", "betmgm"} <= have, (
         f"ActionNetwork books missing from the graded set: {have}"
     )
