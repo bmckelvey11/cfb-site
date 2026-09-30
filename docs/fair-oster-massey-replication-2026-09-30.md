@@ -59,7 +59,8 @@ Worked example: with the 2013–25 regression 9 weights, a team 20 percentile po
 Sagarin ($Q = 20$) is predicted to win by $0.408 \times 20 \approx 8.2$ points at a neutral
 site, before the COL and REC terms.
 
-**Choices, all fixed before looking at outcomes, except where marked:**
+**Choices.** Two of these were set after a dry run whose results had been seen: the
+core-coverage cutoff and the regression-9 rule. Both are marked below, with their effect.
 
 - **Rankings.** `stg.massey_ranks`. For each game we use the latest edition dated strictly before
   its US/Eastern kickoff date.
@@ -69,18 +70,31 @@ site, before the COL and REC terms.
   RTH, WOL, DUN. REC (win percentage) is built from the edition's W–L.
   - A system joins the Table 2 "core" if it ranks at least 90% of the era's games.
   - The rest enter Tables 3–4 on complete-case subsamples, as in the paper.
+  - **Set after a dry run.** The first run used a 97% cutoff. That left COL (95.6%) and DUN
+    (93.5%) out of the modern core. The cutoff was lowered to 90% to match the paper's
+    full-coverage set, which includes both.
+  - At 97% (modern core SAG, BIL, MAS, REC), the verdict does not change. Walk-forward
+    combo − single is −0.004 [−0.049, +0.044]. Table 5 gives F = 1.85, p = .14.
 - **Closing line.** The per-game median of `core.fact_game_line.spread_close` across providers.
   Coverage is 98.4% of the 2013–25 Table 2 sample. No lines exist here before 2013.
 - **Regression 9.** Keep the systems whose edition-clustered |t| ≥ 1.96 in regression 8. This
   rule is **selection on the test set**. The walk-forward uses the full core instead.
+  - **Set after a dry run.** The dry run used OLS |t| ≥ 2 instead.
 - **t-statistics.** Every coefficient reports two: OLS (the paper's) and clustered by edition,
-  because games in one week share a ranking snapshot. The two agree closely everywhere.
+  because games in one week share a ranking snapshot.
+  - The two agree closely on the main effects.
+  - They do not agree on which systems survive in the small paper-era subsamples. In Table 3,
+    BIL has OLS t 2.04 but clustered t 1.77. In Table 4, SAG has OLS t 2.46 but clustered t
+    1.92.
+  - With the OLS rule, BIL stays in Table 3 row 2, and SAG stays in Table 4 row 2 in place of
+    COL. Tables 2 and 5, and the walk-forward, are identical under either rule.
 - **Walk-forward.** For each season $s$, fit on all seasons before $s$ and score $s$.
   - The "best single" system is chosen by training-window SSR.
   - RMSE differences get a 95% interval from a bootstrap that resamples whole weekly editions
     (2,000 reps).
-- **Trial count.** 33 regressions across both eras. All of them are listed in the JSON
-  `trials`.
+- **Trial count.** The final run fits 33 regressions across both eras, all listed in the JSON
+  `trials`. Two earlier dry runs repeated the same specifications under the variants above
+  (97% cutoff; OLS-t rule). That makes **3 full passes, about 95 regressions**.
 
 ## Data
 
