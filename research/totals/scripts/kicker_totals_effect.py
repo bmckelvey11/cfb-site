@@ -10,10 +10,16 @@ Question. Two channels, tested separately:
 Both features are built from the PRIOR season only, so no information from the game
 being predicted enters the feature. That is the leakage gate.
 
-Market price. Closing total is the median `total_close` across REAL SPORTSBOOKS only.
-`core.fact_game_line` also carries teamrankings and numberfire, which are projection
-sites, not prices; including them would make this model-vs-model. `fact_game.selected_total`
-is NOT used for the same reason -- it resolves to teamrankings for 3,079 games.
+Market price. Closing total is the median `total_close` across REAL SPORTSBOOKS only,
+REST-backed rows only (`_source <> 'gql'`, the rule `greenline_clv_all_eras.book_closes`
+uses). Rows that exist only on the GraphQL/ActionNetwork side are dropped: some AN closes
+were live in-game totals before loader fix dabec215 (2026-09-23), and until merge 48ae034c
+AN books sat under the wrong names -- "circa" was AN's consensus OPENER (now `open`),
+"draftkings" AN's consensus. Every 2018-23 row is REST-backed; the filter only bites on
+2024-25. `--include-gql` keeps those rows as a sensitivity (still no `open`/`consensus`).
+Projection sites (teamrankings, numberfire) are not prices; including them would make this
+model-vs-model. `fact_game.selected_total` is NOT used -- it resolves to teamrankings for
+3,079 games.
 
 Features (prior season, per team):
   quality    Primary kicker's PAAR (CFBD points-above-average, distance/situation
@@ -34,6 +40,7 @@ DESCRIPTIVE -- thresholding throws away power; they are not the decision.
 
 Run from repo root:
     python research/totals/scripts/kicker_totals_effect.py
+    python research/totals/scripts/kicker_totals_effect.py --include-gql   # sensitivity
     python research/totals/scripts/kicker_totals_effect.py --self-check
 """
 from __future__ import annotations
@@ -45,13 +52,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import sys
-REPO = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO))
-from cfb_paths import DB_PATH  # noqa: E402
-
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
+from cfb_paths import DB_PATH  # noqa: E402
 
 SKILL = Path.home() / ".claude" / "skills" / "econometrics"
 if SKILL.exists():
@@ -59,13 +62,16 @@ if SKILL.exists():
 
 DB = DB_PATH
 
-# Real sportsbooks in core.dim_lines_provider. teamrankings and numberfire are
-# projection sites and are deliberately excluded. `consensus` is an aggregate whose
-# constituents are not recorded, so it is a sensitivity, not the primary price.
+# Real sportsbooks in core.dim_lines_provider, under the names they carry since the
+# 2026-09-30 rebuild. Excluded: teamrankings/numberfire (projection sites), `consensus`
+# (an aggregate whose constituents are not recorded) and `open` (AN's consensus opener,
+# not a close). Under the REST-only rule below just bovada, caesars, draftkings, espn bet,
+# william hill and the regional Caesars/SugarHouse books contribute in 2018-25; the
+# AN-only names matter for `--include-gql`.
 BOOKS = (
-    "bovada", "caesars", "draftkings", "fanduel", "betmgm", "circa", "pinnacle",
-    "bet365", "william hill (new jersey)", "espn bet",
-    "caesars sportsbook (colorado)", "caesars (pennsylvania)", "sugarhouse",
+    "bovada", "caesars", "draftkings", "fanduel", "betmgm", "betrivers", "espn bet",
+    "william hill (new jersey)", "caesars sportsbook (colorado)",
+    "caesars (pennsylvania)", "sugarhouse",
 )
 
 SEASON_MIN, SEASON_MAX = 2018, 2025  # book totals start 2018; PAAR starts 2016
@@ -78,9 +84,10 @@ def connect(db: Path = DB):
     return duckdb.connect(str(db), read_only=True)
 
 
-def load_games(con) -> pd.DataFrame:
+def load_games(con, rest_only: bool = True) -> pd.DataFrame:
     """One row per game: season, teams, realized points, median book closing total."""
     books = ",".join("'" + b + "'" for b in BOOKS)
+    source = "and l._source <> 'gql'" if rest_only else ""
     return con.execute(f"""
         select g.game_id, g.season, g.week, g.home_team, g.away_team,
                g.home_points + g.away_points as points,
@@ -88,7 +95,7 @@ def load_games(con) -> pd.DataFrame:
                count(*)                       as n_books
         from core.fact_game g
         join core.fact_game_line l on l.game_id = g.game_id
-        where l.provider_key in ({books})
+        where l.provider_key in ({books}) {source}
           and l.total_close is not null
           and g.season between {SEASON_MIN} and {SEASON_MAX}
           and g.home_points is not null and g.away_points is not null
@@ -382,26 +389,28 @@ def dispersion_ceiling(fg: pd.DataFrame, sd_resid: float, sd_v_sum: float,
 
 # ------------------------------------------------------------------------------ main
 
-def load_all(cache: Path | None):
+def load_all(cache: Path | None, rest_only: bool = True):
     """Load the three source frames, caching to parquet so a locked warehouse
-    (a concurrent `core` rebuild holds an exclusive handle) does not block a re-run."""
-    if cache and (cache / "games.parquet").exists():
+    (a concurrent `core` rebuild holds an exclusive handle) does not block a re-run.
+    The games cache is keyed on the book rule so `--include-gql` never reads a REST frame."""
+    names = ("games_rest" if rest_only else "games_all", "paar", "fg")
+    if cache and (cache / f"{names[0]}.parquet").exists():
         print(f"(reading cached frames from {cache})")
-        return tuple(pd.read_parquet(cache / f"{n}.parquet")
-                     for n in ("games", "paar", "fg"))
+        return tuple(pd.read_parquet(cache / f"{n}.parquet") for n in names)
     con = connect()
-    frames = (load_games(con), load_paar(con), load_fg_games(con))
+    frames = (load_games(con, rest_only), load_paar(con), load_fg_games(con))
     con.close()
     if cache:
         cache.mkdir(parents=True, exist_ok=True)
-        for n, f in zip(("games", "paar", "fg"), frames):
+        for n, f in zip(names, frames):
             f.to_parquet(cache / f"{n}.parquet")
         print(f"(cached frames to {cache})")
     return frames
 
 
 def run(args) -> int:
-    games, paar, fg = load_all(Path(args.cache) if args.cache else None)
+    rest_only = not args.include_gql
+    games, paar, fg = load_all(Path(args.cache) if args.cache else None, rest_only)
 
     feat = kicker_features(paar, fg)
     df = build_panel(games, feat)
@@ -411,7 +420,8 @@ def run(args) -> int:
     print("=" * 78)
     print(f"\nSample  seasons {SEASON_MIN}-{SEASON_MAX}   games {len(df):,}   "
           f"team-seasons {df['ts_home'].nunique():,}")
-    print(f"        market = median closing total across real books only "
+    print(f"        market = median closing total across real books only, "
+          f"{'REST-backed rows' if rest_only else 'REST + GraphQL/AN rows'} "
           f"(median {df['n_books'].median():.0f} books/game)")
     print(f"        residual (points - total): mean {df['resid'].mean():+.2f}, "
           f"SD {df['resid'].std():.2f}")
@@ -613,6 +623,8 @@ def main() -> int:
     ap.add_argument("--out", default=None, help="directory for the coefficient/tercile CSVs")
     ap.add_argument("--cache", default=None,
                     help="parquet cache dir for the loaded frames (survives a locked warehouse)")
+    ap.add_argument("--include-gql", action="store_true",
+                    help="sensitivity: also use GraphQL/ActionNetwork-only line rows")
     ap.add_argument("--self-check", action="store_true",
                     help="recover a known injected effect on synthetic data")
     args = ap.parse_args()
