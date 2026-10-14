@@ -4,7 +4,8 @@
     python research/totals/scripts/greenline_clv_all_eras.py --out doc.md
     python research/totals/scripts/greenline_clv_all_eras.py --self-check
 
-WHY. `greenline_clv.py` measures 2026 only (n=79 after its Pinnacle gate, mde 0.61 pts) and
+WHY. `greenline_clv.py` measures 2026 only (first run: n=79 behind a "Pinnacle" gate later
+found to be Caesars; it now reuses this script's close) and
 the 2020 archive carries CLV only against PFF's own board. This scores the pooled unders --
 the 2020 PFF_hist picks, the 2022-23 export picks and the 2026 flags, exactly the rows
 `pool_totals_record.load()` pools -- against ONE benchmark that exists for all three: the
@@ -23,6 +24,12 @@ ANALYSIS PLAN, fixed 2026-09-23 before any number was computed.
               some 2026 games (see `book_closes`), so they are not a close at all. The
               test and its decision rule did not change; the all-books runs stay in the
               sensitivity table.
+              REVISED 2026-09-30, labels only: the 2026 `_source = 'gql'` rows are Action
+              Network books that reach the warehouse through `stg.game_lines`, and until
+              48ae034c they carried the wrong names ("Pinnacle" was AN 49 Caesars, "Circa"
+              AN 30, the consensus OPENER). The excluded provider is now `open`, the
+              opener; the REST-only primary never saw either. The Pinnacle-gated 2026
+              cross-check below is removed: its "Pinnacle" was Caesars.
   Capture     the line the pick was graded at: 2020 `open_greenline` snapshot, 2022-23
               `export` snapshot, 2026 weekly capture.
   CLV         capture - close for an under, in points. Positive = the market moved toward
@@ -32,8 +39,9 @@ ANALYSIS PLAN, fixed 2026-09-23 before any number was computed.
               date (one Saturday's slate shares market-wide news). ONE primary test.
   Secondary   per era; pick minus unpicked-lean drift where the era has unpicked rows
               (2020, 2022-23; 2026 has none -- the whole board is flagged); 2020 CFBD close vs
-              PFF_hist's own close snapshot as a benchmark cross-check; 2026 against the
-              Pinnacle-gated close `greenline_clv.py` uses. Reported, not tested for a verdict.
+              PFF_hist's own close snapshot as a benchmark cross-check. (A 2026 cross-check
+              against a Pinnacle-gated close was dropped 2026-09-30: that close was Caesars.)
+              Reported, not tested for a verdict.
   Scale       at -110 an under needs 2.38 pp over a coin flip, which at 4 pp per point is
               BREAK_EVEN_CLV = 0.6 pts of CLV to pay for the vig on CLV alone.
 """
@@ -52,8 +60,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bankroll" / "scripts"))
 from cfb_paths import DB_PATH  # noqa: E402
 from greenline_clv import PP_PER_POINT, clv_mde, load_flags  # noqa: E402
-from greenline_clv import load_closes as load_closes_2026  # noqa: E402
-from greenline_clv import scored as scored_2026  # noqa: E402
 from greenline_season_review import wilson  # noqa: E402
 from pool_totals_record import ARCHIVE, load, num  # noqa: E402
 
@@ -66,10 +72,10 @@ Z95, Z_ONE = 1.96, 1.645
 def book_closes(seasons: tuple[int, ...], rest_only: bool = True) -> tuple[dict, dict]:
     """({cfbd game_id: [closes]}, {(season, frozenset(team ids)): [closes]}).
 
-    `rest_only` keeps rows CFBD's REST /lines feed backs (`_source` rest/both). Rows that
-    exist only in the GraphQL feed carry IN-GAME totals on some 2026 games -- Western
-    Kentucky at Georgia closes 52.5-56.0 at four REST-backed books and 78.0-82.5 at four
-    GQL-only ones -- so they are not a close. Every 2020-23 row is REST-backed."""
+    `rest_only` keeps rows CFBD's REST /lines feed backs (`_source` rest/both). The
+    `gql`-only rows are Action Network books; before dabec215 some held IN-GAME totals --
+    Western Kentucky at Georgia read 78.0-82.5 at four of them against a 55.5-56.0 REST
+    close -- so they were not a close. Every 2020-23 row is REST-backed."""
     import duckdb
 
     con = duckdb.connect(str(DB_PATH), read_only=True)
@@ -77,9 +83,9 @@ def book_closes(seasons: tuple[int, ...], rest_only: bool = True) -> tuple[dict,
         "select cast(g.game_id as varchar), g.season, cast(g.home_team_id as varchar), "
         "cast(g.away_team_id as varchar), l.total_close "
         "from core.fact_game g join core.fact_game_line l using(game_id) "
-        f"where g.season in ({','.join(map(str, seasons))}) and l.total_close is not null "
-        "and not isnan(l.total_close) and l.provider_key <> 'pinnacle'"
-        + (" and l._source <> 'gql'" if rest_only else "")).fetchall()
+        "where list_contains(?, g.season) and l.total_close is not null "
+        "and not isnan(l.total_close) and l.provider_key <> 'open' "  # AN 30: an opener, not a close
+        "and (not ? or l._source <> 'gql')", [list(seasons), rest_only]).fetchall()
     con.close()
     by_id, by_teams = {}, {}
     for gid, season, h, a, tc in rows:
@@ -183,8 +189,9 @@ ERAS = ("2020 PFF_hist", "2022-23 exports", "2026 flags")
 
 def sensitivity(rows: list[dict]) -> list[str]:
     L = ["", "## Sensitivity: the close definition", "",
-         "`rest` is REST-backed books only (the primary); `all` adds the GraphQL-only books, "
-         "which carry in-game totals on some 2026 games. `span` drops a game whose books "
+         "`rest` is REST-backed books only (the primary); `all` adds the `gql`-only rows, which "
+         "are Action Network books (live lines filtered since dabec215; `open`, AN's opener, "
+         "excluded) and have never been validated as a close. `span` drops a game whose books "
          "disagree by more than 3 pts; `none` trusts every book; `trim` discards single books "
          "more than 1.5 pts off the game median and was added after the first run.", "",
          "| books | gate | split | n | mean CLV (pts, 95%) | p (one-sided) | upper 95% vs break-even 0.60 |",
@@ -268,15 +275,6 @@ def report(gate: str = "span") -> str:
               f"- **2020, CFBD close vs PFF_hist's own close snapshot** ({len(both)} games): mean "
               f"difference {st.mean(diffs):+.2f} pts, {sum(abs(x) <= 0.5 for x in diffs)} within half a point. "
               f"The same picks scored against PFF's close: mean CLV {st.mean(pff_clv):+.2f} pts."]
-    flags26 = [f for f in load_flags() if f["side"] == "under"]
-    pin, _ = scored_2026(flags26, load_closes_2026(), "drop")
-    day = {r["game_id"]: r["date"] for r in rows if r["era"] == "2026 flags"}
-    if len(pin) > 1:
-        sp = stats([r["clv"] for r in pin], [day.get(r["pff_game_id"], "") for r in pin])
-        L.append(f"- **2026, Pinnacle-gated close** (`greenline_clv.py --close drop`, unders only): "
-                 f"n={sp['n']}, {sp['mean']:+.2f} ± {Z95 * sp['se']:.2f} pts. **Contaminated, not a "
-                 "cross-check:** Pinnacle and the books its gate compares against are GraphQL-only "
-                 "rows, which hold in-game totals on some games.")
     L += same_book_2026()
     L += sensitivity(rows)
     return "\n".join(L) + "\n"
