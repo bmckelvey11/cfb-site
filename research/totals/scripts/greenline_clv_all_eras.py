@@ -84,8 +84,8 @@ def book_closes(seasons: tuple[int, ...], rest_only: bool = True) -> tuple[dict,
         "cast(g.away_team_id as varchar), l.total_close "
         "from core.fact_game g join core.fact_game_line l using(game_id) "
         "where list_contains(?, g.season) and l.total_close is not null "
-        "and not isnan(l.total_close) and l.provider_key <> 'open'"  # AN 30: an opener, not a close
-        + (" and l._source <> 'gql'" if rest_only else ""), [list(seasons)]).fetchall()
+        "and not isnan(l.total_close) and l.provider_key <> 'open' "  # AN 30: an opener, not a close
+        "and (not ? or l._source <> 'gql')", [list(seasons), rest_only]).fetchall()
     con.close()
     by_id, by_teams = {}, {}
     for gid, season, h, a, tc in rows:
