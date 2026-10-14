@@ -4,7 +4,7 @@ REM
 REM Same shape as scripts/refresh_cfbd.cmd: one command for the task definition,
 REM every run appended to one log. Runs the slate, then rebuilds the site so
 REM site/dist matches the new board. Deploying that build stays a hand job --
-REM the sites remote needs your auth.
+REM the site is hosted on OpenAI Sites and deploys from Codex/ChatGPT (README).
 REM
 REM   over_zero_slate.cmd
 REM   over_zero_slate.cmd --days 3

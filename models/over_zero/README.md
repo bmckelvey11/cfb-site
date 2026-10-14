@@ -119,8 +119,12 @@ root. `v1/run_on_project_data.py` also accepts an explicit `--csv` path.
 
 `CFB-OverZero-Slate` (Windows Task Scheduler, registered 2026-09-09) runs
 `scripts/over_zero_slate.cmd` at 09:00 and 18:00, Mon–Fri. Each run scores the live
-slate, rewrites `site/lib/board.json`, and rebuilds `site/dist`. It does **not** deploy —
-the `sites` remote needs your auth, so pushing the board stays a hand step.
+slate, rewrites `site/lib/board.json`, and rebuilds `site/dist`. It does **not** deploy.
+`site/` is its own git repo (ignored by this one) with no remote. It is hosted on OpenAI
+Sites at <https://redpanda-overs.caerus11.chatgpt.site>, with the project id in
+`site/.openai/hosting.json`, and deploys go out from Codex/ChatGPT. To publish, commit
+`lib/board.json` in `site/`, then deploy that commit from there. Nothing in this repo can
+publish the site.
 
 Like the line-timing tasks, it only fires while `mckel` is logged on
 (root `docs/line-timing-collector.md` § Limitations). Every run appends to
