@@ -67,7 +67,8 @@ DB = DB_PATH
 # (an aggregate whose constituents are not recorded) and `open` (AN's consensus opener,
 # not a close). Under the REST-only rule below just bovada, caesars, draftkings, espn bet,
 # william hill and the regional Caesars/SugarHouse books contribute in 2018-25; the
-# AN-only names matter for `--include-gql`.
+# AN-only names matter for `--include-gql`. `pinnacle` is the reference price, not a
+# book (research/totals/CLAUDE.md), and is left out like `greenline_clv_all_eras.py` does.
 BOOKS = (
     "bovada", "caesars", "draftkings", "fanduel", "betmgm", "betrivers", "espn bet",
     "william hill (new jersey)", "caesars sportsbook (colorado)",
@@ -96,7 +97,7 @@ def load_games(con, rest_only: bool = True) -> pd.DataFrame:
         from core.fact_game g
         join core.fact_game_line l on l.game_id = g.game_id
         where l.provider_key in ({books}) {source}
-          and l.total_close is not null
+          and l.total_close is not null and not isnan(l.total_close)
           and g.season between {SEASON_MIN} and {SEASON_MAX}
           and g.home_points is not null and g.away_points is not null
         group by 1,2,3,4,5,6
@@ -392,8 +393,9 @@ def dispersion_ceiling(fg: pd.DataFrame, sd_resid: float, sd_v_sum: float,
 def load_all(cache: Path | None, rest_only: bool = True):
     """Load the three source frames, caching to parquet so a locked warehouse
     (a concurrent `core` rebuild holds an exclusive handle) does not block a re-run.
-    The games cache is keyed on the book rule so `--include-gql` never reads a REST frame."""
-    names = ("games_rest" if rest_only else "games_all", "paar", "fg")
+    Every frame is keyed on the book rule, so the two rules never mix cached snapshots."""
+    tag = "rest" if rest_only else "all"
+    names = tuple(f"{n}_{tag}" for n in ("games", "paar", "fg"))
     if cache and (cache / f"{names[0]}.parquet").exists():
         print(f"(reading cached frames from {cache})")
         return tuple(pd.read_parquet(cache / f"{n}.parquet") for n in names)
