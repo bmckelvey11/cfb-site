@@ -4,7 +4,8 @@
     python research/totals/scripts/greenline_clv_all_eras.py --out doc.md
     python research/totals/scripts/greenline_clv_all_eras.py --self-check
 
-WHY. `greenline_clv.py` measures 2026 only (n=79 after its Pinnacle gate, mde 0.61 pts) and
+WHY. `greenline_clv.py` measures 2026 only (first run: n=79 behind a "Pinnacle" gate later
+found to be Caesars; it now reuses this script's close) and
 the 2020 archive carries CLV only against PFF's own board. This scores the pooled unders --
 the 2020 PFF_hist picks, the 2022-23 export picks and the 2026 flags, exactly the rows
 `pool_totals_record.load()` pools -- against ONE benchmark that exists for all three: the
@@ -38,8 +39,9 @@ ANALYSIS PLAN, fixed 2026-09-23 before any number was computed.
               date (one Saturday's slate shares market-wide news). ONE primary test.
   Secondary   per era; pick minus unpicked-lean drift where the era has unpicked rows
               (2020, 2022-23; 2026 has none -- the whole board is flagged); 2020 CFBD close vs
-              PFF_hist's own close snapshot as a benchmark cross-check; 2026 against the
-              Pinnacle-gated close `greenline_clv.py` uses. Reported, not tested for a verdict.
+              PFF_hist's own close snapshot as a benchmark cross-check. (A 2026 cross-check
+              against a Pinnacle-gated close was dropped 2026-09-30: that close was Caesars.)
+              Reported, not tested for a verdict.
   Scale       at -110 an under needs 2.38 pp over a coin flip, which at 4 pp per point is
               BREAK_EVEN_CLV = 0.6 pts of CLV to pay for the vig on CLV alone.
 """
@@ -81,9 +83,9 @@ def book_closes(seasons: tuple[int, ...], rest_only: bool = True) -> tuple[dict,
         "select cast(g.game_id as varchar), g.season, cast(g.home_team_id as varchar), "
         "cast(g.away_team_id as varchar), l.total_close "
         "from core.fact_game g join core.fact_game_line l using(game_id) "
-        f"where g.season in ({','.join(map(str, seasons))}) and l.total_close is not null "
+        "where list_contains(?, g.season) and l.total_close is not null "
         "and not isnan(l.total_close) and l.provider_key <> 'open'"  # AN 30: an opener, not a close
-        + (" and l._source <> 'gql'" if rest_only else "")).fetchall()
+        + (" and l._source <> 'gql'" if rest_only else ""), [list(seasons)]).fetchall()
     con.close()
     by_id, by_teams = {}, {}
     for gid, season, h, a, tc in rows:
