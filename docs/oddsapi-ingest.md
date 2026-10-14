@@ -112,9 +112,11 @@ shows up in the unpriced list with books actually posted for it.
 ## Read by the over-zero board — the only feed ✅ 2026-09-11
 
 `models/over_zero/scripts/best_line_slate.py` takes its game list and every quote from the
-latest snapshot (`oa_games`); the Action Network scoreboard is not read. The fair spread and
-fair total are the median of the four regulated books — DraftKings, FanDuel, BetRivers, BetMGM,
-the previous set minus Caesars — and the offshore five keep their single-book views. School
+latest snapshot (`oa_games`); the Action Network scoreboard is not read. The market view uses
+only the four regulated books — DraftKings, FanDuel, BetRivers, BetMGM, the previous set minus
+Caesars — and the offshore five keep their single-book views. Its spread is the median of the
+four. Its gate reads the lowest of their totals priced at −120 or better; until 2026-10-14 it
+read their median total, which `--qualify fair` still runs. School
 names come from `oddsapi_flatten.school_of`, so the board prints CFBD spellings ("Miami",
 "James Madison") where it printed Action Network's ("Miami (FL)", "JMU").
 

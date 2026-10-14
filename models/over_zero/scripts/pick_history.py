@@ -122,12 +122,18 @@ def record_views(views, run_at, threshold, as_of, model='slate'):
     print(f'Pick history: added {added}; {total} qualified observations -> {default_path()}')
 
 
+def slate_model(view, qualify):
+    """Shopped-gated market rows are their own model; see best_line_slate's docstring."""
+    return 'slate-shopped' if view == 'Best lines' and qualify == 'shopped' else 'slate'
+
+
 def board_rows(board, source):
     for view, data in board['views'].items():
+        model = slate_model(view, data.get('qualify'))
         for p in data['picks']:
             local = datetime.strptime(f"{board['run_at'][:4]} {p['date']} {p['time'].removesuffix(' ET')}",
                                       '%Y %b %d %I:%M %p').replace(tzinfo=ZoneInfo('America/New_York'))
-            yield dict(model='slate', run_at=board['run_at'], lines_as_of=data.get('asOf'),
+            yield dict(model=model, run_at=board['run_at'], lines_as_of=data.get('asOf'),
                        view=view, game_date=local.date(), kickoff_utc=local.astimezone(timezone.utc).isoformat(),
                        home=p['home'], away=p['away'], spread=p['spread'], total=p['total'],
                        bias=p['bias'], p_over=p['probability'] / 100,
@@ -146,7 +152,8 @@ def backfill():
     rows = []
     for path in sorted(base.glob('best_line_slate_*.csv')):
         view = 'DraftKings' if 'draftkings' in path.stem else 'Best lines'
-        rows.extend(slate_rows(read_csv(path), view, path.name))
+        for r in read_csv(path):
+            rows.extend(slate_rows([r], view, path.name, model=slate_model(view, r.get('qualify'))))
     legacy = sorted((base / 'predictions').glob('*.csv'))
     if (base / 'predictions.csv').exists():
         legacy.append(base / 'predictions.csv')

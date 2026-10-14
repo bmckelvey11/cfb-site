@@ -35,7 +35,9 @@ assert market['scored'] == len(rows)
 assert len(market['picks']) == int((rows.pick == 'OVER').sum())
 for pick in market['picks']:
     row = rows[(rows.home == pick['home']) & (rows.away == pick['away'])].iloc[0]
-    assert pick['total'] == row.total_fair
+    # The signal total is whichever number the gate read.
+    assert pick['total'] == (row.best_total if row.qualify == 'shopped' else row.total_fair)
+    assert market['qualify'] == row.qualify
     assert pick['bias'] == round(row.bias_fair, 3)
     assert pick['bestTotal'] == row.best_total
     assert pick['bestOdds'] == row.best_odds

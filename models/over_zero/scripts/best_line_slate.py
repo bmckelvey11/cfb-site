@@ -1,34 +1,34 @@
 """Floor-bias over model across every real sportsbook, with the total shopped.
 
 The v1 model qualifies a game from ONE spread/total pair. Books disagree, so this
-script splits that into two jobs:
+script builds that pair from the four regulated books in the the-odds-api snapshot
+(FAIR_BOOKS, outlier-guarded):
 
-  qualify on the fair number -- median spread and median total across the four
-    regulated books in the the-odds-api snapshot (FAIR_BOOKS, outlier-guarded), the
-    closest live stand-in for the one-line-per-game distribution the 1.75 threshold
-    was calibrated against (v1 fits on games.csv)
-  execute at the best number -- among books pricing the over at -120 or better,
-    the lowest posted total, tie-broken on price
+  spread -- the median spread across those books
+  total  -- the best number: among books pricing the over at -120 or better, the
+    lowest posted total, tie-broken on price. The gate reads this total and the
+    bet goes in at it.
 
-Qualifying on the best number instead would manufacture picks: the min of N noisy
-totals sits below the market, which inflates the bias straight through the gate.
-The printed run reports both counts so that gap is visible.
+Until 2026-10-14 the gate read the median total instead (the "fair number"), the
+closest live stand-in for the one-line-per-game distribution the 1.75 threshold
+was calibrated against (v1 fits on games.csv). `--qualify fair` still runs that
+rule for comparison. The shopped gate is a superset of it -- bias_best >= bias_fair
+on every row -- and the extra picks clear on whichever book posted the lowest
+number, so the printed run counts how many picks the median total would not have
+qualified.
 
-`--qualify shopped` does exactly that on purpose, for answering "what would the
-shopped gate have picked". It is not the calibrated rule and the default stays
-`fair`. Because bias_best >= bias_fair on every row, it can only add picks, never
-drop one, and the extra picks clear on whichever book posted the lowest number.
-Its rows key into the pick history under `model='slate-shopped'`, so the two rules
-accumulate side by side rather than overwriting each other. It is refused with
-`--book`, where fair and best are the same number and the gate cannot differ.
+The two rules key into the pick history separately: shopped market-view rows under
+`model='slate-shopped'`, fair ones under `model='slate'`, so their records never
+mix. A single-book view (`--book`, and every per-book view on the board) has one
+total, so the rule cannot differ there and those rows stay `slate`.
 
     python models/over_zero/scripts/best_line_slate.py
     python models/over_zero/scripts/best_line_slate.py --days 3 --threshold 1.75
-    python models/over_zero/scripts/best_line_slate.py --qualify shopped
+    python models/over_zero/scripts/best_line_slate.py --qualify fair
 
-Caveat: shopping was never backtested for this model. The 64.5% headline is a
-single-line-source number; taking a better total can only help at an unchanged
-signal, but it is an execution improvement, not a re-validated edge.
+Caveat: the shopped gate was never backtested. The 64.5% headline is a
+single-line-source, fair-total number, and nothing the shopped rule records is
+comparable to it.
 """
 from __future__ import annotations
 
@@ -232,15 +232,17 @@ def fit_model(fit_csv: Path, fit_seasons):
 
 def score(games: pd.DataFrame, fit, fit_dog: np.ndarray, run_at: str, threshold: float,
           book: str | None = None, quiet: bool = False,
-          max_spread: float = np.inf, qualify: str = "fair") -> pd.DataFrame:
+          max_spread: float = np.inf, qualify: str = "shopped") -> pd.DataFrame:
     """One view of an already-fetched slate: shopped across books, or one book alone.
 
-    `qualify` picks which total the 1.75 gate reads. "fair" is the calibrated rule.
-    "shopped" gates on the best total instead, which can only add picks -- see the
-    module docstring for why that is selection on book noise, not a better signal.
-    Either way `bias_fair`/`p_over_fair` carry the number that gated, so every
-    consumer of those columns stays honest without knowing the mode.
+    `qualify` picks which total the 1.75 gate reads: "shopped" (the default) the best
+    total, "fair" the median total. Either way `bias_fair`/`p_over_fair` carry the
+    number that gated, so every consumer of those columns stays honest without
+    knowing the mode.
     """
+    if book:
+        # One book posts one total: fair and best are the same number, so the gate is too.
+        qualify = "fair"
     # One book means no shopping and no cross-book fair: that book IS both numbers.
     need = 1 if book else 2
 
@@ -277,7 +279,7 @@ def score(games: pd.DataFrame, fit, fit_dog: np.ndarray, run_at: str, threshold:
     t["qualify"] = qualify
     if qualify == "shopped":
         # The gate reads the shopped total. bias_best >= bias_fair on every row, so this
-        # is a superset of the calibrated picks, never a different set.
+        # is a superset of the fair-total picks, never a different set.
         t["bias_fair"] = t.bias_best
         t["p_over_fair"] = fit.probit.win_prob(t.bias_best.to_numpy())
     # Past max_spread the game is scored but never picked: the fit has 42 games in 13k
@@ -286,7 +288,8 @@ def score(games: pd.DataFrame, fit, fit_dog: np.ndarray, run_at: str, threshold:
                          "OVER", "")
     t["bet_to"] = bet_to_total(t.spread_fair.to_numpy(), fit, threshold)
     t["run_at"] = run_at
-    t["dog_implied"] = (t.total_fair - t.spread_fair.abs()) / 2
+    gate_total = t.best_total if qualify == "shopped" else t.total_fair
+    t["dog_implied"] = (gate_total - t.spread_fair.abs()) / 2
     # The picks live where the underdog is implied for a handful of points, and the fit
     # sample thins out fast down there. Print the support so p_over is read for what it
     # is: a parametric read at the edge of the calibrated region, not a local rate.
@@ -317,7 +320,7 @@ def export_json(views: dict[str, pd.DataFrame], path: Path, run_at: str,
     used; leaving them in UTC would move every Saturday night game to Sunday.
     """
     payload = {"run_at": run_at, "threshold": threshold, "min_odds": MIN_ODDS,
-               # The books that vote in the fair number, not every book with a view.
+               # The books that set the market view, not every book with a view.
                "books": list(FAIR_BOOKS), "views": {},
                "betToBySpread": [float(x) if np.isfinite(x) else None
                                  for x in bet_to_total(np.arange(201) / 2, fit, threshold)]}
@@ -330,14 +333,18 @@ def export_json(views: dict[str, pd.DataFrame], path: Path, run_at: str,
         # `scored` is how many games the view could price at all. A book that posts a total
         # but no spread scores nothing -- the model needs both -- and an empty board should
         # say that rather than imply the book had no qualifying games.
-        # Every price on the board is as of the snapshot, not this run.
+        # Every price on the board is as of the snapshot, not this run. `qualify` says which
+        # total gated the view, so a backfill from the board keys it to the right model.
         payload["views"][name] = {
             "scored": len(t),
             "asOf": oa_as_of or run_at,
+            "qualify": str(t.qualify.iloc[0]) if not t.empty else None,
             "picks": [
             {"date": r.kick.astimezone(ET).strftime("%b %d"),
              "time": et_clock(r.kick),
-             "away": r.away, "home": r.home, "total": r.total_fair, "spread": r.spread_fair,
+             # `total` is the signal total: whichever number the gate read.
+             "away": r.away, "home": r.home, "spread": r.spread_fair,
+             "total": r.best_total if r.qualify == "shopped" else r.total_fair,
              "marketSpread": market_spreads.get((r.away, r.home, r.kick)),
              "bias": round(r.bias_fair, 3), "probability": round(r.p_over_fair * 100, 2),
              "dogImplied": r.dog_implied, "bestTotal": r.best_total, "bestBook": r.best_book,
@@ -351,7 +358,7 @@ def export_json(views: dict[str, pd.DataFrame], path: Path, run_at: str,
 
 
 def report(t: pd.DataFrame, threshold: float, book: str | None = None,
-           max_spread: float = np.inf, qualify: str = "fair") -> None:
+           max_spread: float = np.inf, qualify: str = "shopped") -> None:
     if t.empty:
         print(f"No games with {book or 'two or more books'} quoting both markets.")
         return
@@ -378,15 +385,14 @@ def report(t: pd.DataFrame, threshold: float, book: str | None = None,
         print(f"Single-book run: no shopping, and {book}'s own number is the gate rather "
               f"than the market's -- one book's noise passes straight through it.")
     elif qualify == "shopped":
-        # bias_best >= bias_fair rowwise, so these picks are a superset of the fair rule's.
-        print(f"NOT THE CALIBRATED RULE: the gate read the shopped total, so the min of N "
-              f"noisy totals sets it, and that min sits below the market. These picks are a "
-              f"superset of the fair-total rule's, and the extra ones cleared on book noise "
-              f"rather than signal. Nothing here is comparable to the backtested 64.5%, "
-              f"which is a fair-total figure. Run without --qualify to see the gap.")
+        # Bias falls as the total rises and bet_to is the last half-point that clears, so a
+        # pick also clears on the median total exactly when total_fair <= bet_to.
+        shopped_only = int(((t.pick == "OVER") & ~(t.total_fair <= t.bet_to)).sum())
+        print(f"{shopped_only} of those clear only on the shopped total; the median total "
+              f"would not qualify them. The shopped gate is not backtested -- the 64.5% "
+              f"is a one-line-per-game figure. --qualify fair runs the median-total rule.")
     else:
-        print(f"{on_best} would clear if qualified on the shopped total instead -- that "
-              f"gap is selection on book noise, which is why the gate is the fair number.")
+        print(f"{on_best - on_fair} more would clear on the shopped total, the default rule.")
 
 
 def main() -> int:
@@ -404,18 +410,16 @@ def main() -> int:
     ap.add_argument("--book", choices=sorted(BOOKS),
                     help="score one book's own number instead of shopping across all of "
                          "them; the fair and best columns collapse onto that book")
-    ap.add_argument("--qualify", choices=("fair", "shopped"), default="fair",
-                    help="which total the bias gate reads. 'fair' is the calibrated rule. "
-                         "'shopped' gates on the best total instead: it only ever adds "
-                         "picks, because the min of N noisy totals sits below the market, "
-                         "and its record is not comparable to the backtested 64.5%%")
+    ap.add_argument("--qualify", choices=("fair", "shopped"), default="shopped",
+                    help="which total the bias gate reads in the market view. 'shopped' "
+                         "(default) gates on the best playable total; 'fair' on the median "
+                         "total, the rule before 2026-10-14. Shopped picks are a superset "
+                         "of fair ones, and neither record is the backtested 64.5%%. "
+                         "Ignored by single-book views, which have one total")
     ap.add_argument("--out-dir", default=str(OUT_DIR), help="'' to skip writing")
     ap.add_argument("--json", help="also write every view -- shopped plus each book on its "
                                    "own -- to this path, for the signal board to import")
     args = ap.parse_args()
-    if args.qualify == "shopped" and args.book:
-        ap.error("--qualify shopped needs a market to shop: with --book the fair and best "
-                 "totals are the same number, so the gate is unchanged")
 
     seasons = list(range(args.fit_from, args.season))
     fit, fit_dog = fit_model(Path(args.fit_csv), seasons)
@@ -433,7 +437,8 @@ def main() -> int:
     # Only the shopped view has two totals to choose between, so --qualify applies there
     # alone; a single-book view collapses fair and best onto that book's number.
     views = {"Best lines": t if not args.book else
-             score(games, fit, fit_dog, run_at, args.threshold, quiet=True, max_spread=cap)}
+             score(games, fit, fit_dog, run_at, args.threshold, quiet=True, max_spread=cap,
+                   qualify=args.qualify)}
     for name in BOOKS:
         views[name] = t if args.book == name else \
             score(games, fit, fit_dog, run_at, args.threshold, name, quiet=True, max_spread=cap)
@@ -496,6 +501,10 @@ def _check() -> None:
     # Spreads break the other way -- the smaller magnitude, which also lowers the bias.
     sp = pd.Series({"DraftKings": -45.5, "FanDuel": -44.5})
     assert conservative_median(sp.abs(), high=False) == 44.5
+    # report's shopped-only count leans on total <= bet_to <=> bias(total) > threshold.
+    bt = bet_to_total(spread, stub, mid)[0]
+    assert bt == 55.5, bt
+    assert bias_of(spread, np.array([bt]), stub)[0] > mid >= bias_of(spread, np.array([bt + .5]), stub)[0]
 
     # oa_games: one row per event in the window, schools in CFBD's spelling, the home side's
     # spread and the over's total per book, and the snapshot's own timestamp.
