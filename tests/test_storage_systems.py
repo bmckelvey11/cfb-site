@@ -3,7 +3,15 @@ import json
 import pytest
 
 from cfb_system_maker.models import FeatureFilter, SystemFilter
-from cfb_system_maker.storage import list_systems, load_saved_system, load_system, save_system
+from cfb_system_maker.storage import (
+    duplicate_name,
+    duplicate_system,
+    list_systems,
+    load_saved_system,
+    load_system,
+    rename_system,
+    save_system,
+)
 
 
 def test_save_load_list_system_round_trip(tmp_path):
@@ -187,3 +195,46 @@ def test_save_system_manual_flow_unaffected_by_new_provenance_kwargs(tmp_path):
     loaded = load_saved_system("plain-manual", tmp_path)
     assert loaded.source == "manual"
     assert loaded.search_candidates_tested is None
+
+
+def test_duplicate_name_skips_taken_copies_and_does_not_stack_suffixes():
+    assert duplicate_name("dogs", ["dogs"]) == "dogs-copy"
+    assert duplicate_name("dogs", ["dogs", "dogs-copy"]) == "dogs-copy-2"
+    assert duplicate_name("dogs-copy", ["dogs", "dogs-copy"]) == "dogs-copy-2"
+    assert duplicate_name("dogs-copy-2", ["dogs", "dogs-copy", "dogs-copy-2"]) == "dogs-copy-3"
+
+
+def test_duplicate_system_keeps_filters_and_theory(tmp_path):
+    save_system("dogs", SystemFilter(side="away", underdog=True), tmp_path, theory="Road dogs.")
+
+    new_name = duplicate_system("dogs", tmp_path)
+
+    assert new_name == "dogs-copy"
+    assert list_systems(tmp_path) == ["dogs", "dogs-copy"]
+    copy = load_saved_system("dogs-copy", tmp_path)
+    assert copy.name == "dogs-copy"
+    assert copy.system == load_system("dogs", tmp_path)
+    assert copy.theory == "Road dogs."
+
+
+def test_duplicate_system_rejects_missing_and_unsafe_names(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        duplicate_system("nope", tmp_path)
+    with pytest.raises(ValueError):
+        duplicate_system("../escape", tmp_path)
+
+
+def test_rename_system_refuses_to_overwrite(tmp_path):
+    save_system("keeper", SystemFilter(side="home"), tmp_path)
+    save_system("other", SystemFilter(side="away"), tmp_path)
+
+    with pytest.raises(FileExistsError):
+        rename_system("other", "keeper", tmp_path)
+
+    assert load_system("keeper", tmp_path).side == "home"
+    assert load_system("other", tmp_path).side == "away"
+
+
+def test_rename_system_rejects_unsafe_source_name(tmp_path):
+    with pytest.raises(ValueError):
+        rename_system("../escape", "fine", tmp_path)

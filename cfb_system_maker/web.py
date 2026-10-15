@@ -43,6 +43,7 @@ from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, Ga
 from cfb_system_maker.narration import NarrationError, narrate_run, write_theory
 from cfb_system_maker.storage import (
     delete_system,
+    duplicate_system,
     rename_system,
     slugify_system_name,
     EXAMPLES_DIR,
@@ -714,6 +715,17 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
             return redirect(url_for("dashboard", rename_error="name_taken"))
         except ValueError:
             return redirect(url_for("dashboard", rename_error="invalid_name"))
+        return redirect(url_for("dashboard"))
+
+    @app.post("/systems/<name>/duplicate")
+    def duplicate_saved_system(name: str):
+        try:
+            duplicate_system(name, app.config["DATA_DIR"])
+        except FileNotFoundError:
+            return redirect(url_for("dashboard", duplicate_error="not_found"))
+        except (ValueError, OSError, json.JSONDecodeError):
+            logger.exception("duplicate_system failed for %r", name)
+            return redirect(url_for("dashboard", duplicate_error="failed"))
         return redirect(url_for("dashboard"))
 
     @app.get("/compare")

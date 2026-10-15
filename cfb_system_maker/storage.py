@@ -121,6 +121,44 @@ def rename_system(old_name: str, new_name: str, data_dir: str | Path) -> str:
     return slug
 
 
+def duplicate_name(name: str, existing_names: list[str]) -> str:
+    """First free copy name for ``name``: ``<name>-copy``, then ``-copy-2``, ...
+
+    "<name> copy" slugified, since the name is also the file name. Duplicating a
+    copy does not stack suffixes: ``x-copy`` duplicates to ``x-copy-2``.
+    """
+    base = re.sub(r"-copy(?:-\d+)?$", "", _safe_system_name(name))
+    taken = set(existing_names)
+    candidate = slugify_system_name(f"{base} copy")
+    counter = 2
+    while candidate in taken:
+        candidate = slugify_system_name(f"{base} copy {counter}")
+        counter += 1
+    return candidate
+
+
+def duplicate_system(name: str, data_dir: str | Path) -> str:
+    """Copy a saved system under the next free copy name, returning that name.
+
+    The copy keeps the filters, theory and provenance but gets a fresh
+    ``saved_at`` so it sorts to the top of the dashboard next to its source.
+    Never overwrites: the name is chosen from what is already on disk.
+    """
+    systems = Path(data_dir) / "systems"
+    source = systems / f"{_safe_system_name(name)}.json"
+    if not source.exists():
+        raise FileNotFoundError(source)
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("system payload must be a JSON object")
+    new_name = duplicate_name(name, list_systems(data_dir))
+    payload["name"] = new_name
+    payload["saved_at"] = datetime.now(timezone.utc).isoformat()
+    target = systems / f"{new_name}.json"
+    target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return new_name
+
+
 def save_raw_json(data_dir: str | Path, name: str, season: int, rows: list[dict[str, Any]]) -> Path:
     path = Path(data_dir) / "raw" / f"{name}_{season}.json"
     path.parent.mkdir(parents=True, exist_ok=True)

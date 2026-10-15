@@ -53,7 +53,7 @@ Data flows acquire → build → enrich → consume. Each CLI command persists t
 3. **enrich** → `enrich.run_enrich` resolves `FEATURE_REGISTRY` per game → `data/processed/features.json`. Run after every `build`.
 4. **backtest / web / search** → `backtest.run_backtest` filters with `matches_system`, grades with `grade_bet`, aggregates into `BacktestResult`.
 
-`web.py` (`create_app`) skips fetch/build — it loads already-built `games.csv` (+ `features.json` if present). Missing data → `error="missing_data"`. Routes: `/` dashboard, `/system` editor, `/compare`, `/betlog`, `/filter-detail`, `/api/backtest`. Vanilla JS/CSS, no frontend framework. Waitress unless `--debug`.
+`web.py` (`create_app`) skips fetch/build — it loads already-built `games.csv` (+ `features.json` if present). Missing data → `error="missing_data"`. Routes: `/` dashboard, `/system` editor, `/compare`, `/betlog`, `/filter-detail`, `/api/backtest`; saved-system management is `POST /systems/<name>/{delete,rename,duplicate}` (storage `delete_system`/`rename_system`/`duplicate_system`; rename refuses to overwrite, duplicate picks `<name>-copy`, `-copy-2`, …; each redirects to `/` with `rename_error`/`duplicate_error` on refusal). Vanilla JS/CSS, no frontend framework. Waitress unless `--debug`.
 
 Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 

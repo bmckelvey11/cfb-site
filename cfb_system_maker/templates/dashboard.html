@@ -43,6 +43,23 @@
             {% endfor %}
           </nav>
 
+          {% set rename_error = request.args.get('rename_error') %}
+          {% if rename_error %}
+            <p class="banner banner-error">
+              {% if rename_error == 'name_taken' %}A system with that name already exists. Pick another name.
+              {% elif rename_error == 'not_found' %}That system no longer exists.
+              {% elif rename_error == 'missing_name' %}Enter a new name to rename the system.
+              {% else %}That name has no usable letters or digits. Pick another name.{% endif %}
+            </p>
+          {% endif %}
+          {% set duplicate_error = request.args.get('duplicate_error') %}
+          {% if duplicate_error %}
+            <p class="banner banner-error">
+              {% if duplicate_error == 'not_found' %}That system no longer exists, so it could not be duplicated.
+              {% else %}Could not duplicate the system. See the server log.{% endif %}
+            </p>
+          {% endif %}
+
           {% if tab == 'examples' %}
             {% if request.args.get('copy_error') %}
               <p class="banner banner-error">Could not copy the example system. See the server log.</p>
@@ -102,6 +119,9 @@
                             <form method="post" action="{{ url_for('rename_saved_system', name=row.name) }}" class="row-menu__form">
                               <input name="new_name" value="{{ row.name }}" aria-label="New name for {{ row.name }}" required>
                               <button type="submit">Rename</button>
+                            </form>
+                            <form method="post" action="{{ url_for('duplicate_saved_system', name=row.name) }}">
+                              <button type="submit" class="row-menu__duplicate">Duplicate</button>
                             </form>
                             <form method="post" action="{{ url_for('delete_saved_system', name=row.name) }}"
                                   onsubmit="return confirm('Delete {{ row.name }}? This cannot be undone.');">

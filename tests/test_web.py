@@ -2376,6 +2376,74 @@ def test_rename_onto_an_existing_name_is_refused(tmp_path):
     assert (tmp_path / "systems" / "other.json").exists()
 
 
+def test_rename_missing_system_does_not_500(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().post("/systems/never-existed/rename", data={"new_name": "anything"})
+
+    assert response.status_code == 302
+    assert "rename_error=not_found" in response.headers["Location"]
+
+
+def test_refused_rename_explains_itself_on_the_dashboard(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "keeper")
+    _save_a_system(client, "other")
+
+    response = client.post("/systems/other/rename", data={"new_name": "keeper"}, follow_redirects=True)
+
+    assert response.status_code == 200
+    assert "already exists" in response.get_data(as_text=True)
+
+
+def test_duplicate_system_copies_it_under_a_copy_name(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "original")
+    source = json.loads((tmp_path / "systems" / "original.json").read_text(encoding="utf-8"))
+
+    response = client.post("/systems/original/duplicate")
+
+    assert response.status_code == 302
+    assert (tmp_path / "systems" / "original.json").exists()
+    copy = json.loads((tmp_path / "systems" / "original-copy.json").read_text(encoding="utf-8"))
+    assert copy["name"] == "original-copy"
+    assert copy["system"] == source["system"]
+
+
+def test_duplicate_twice_numbers_the_second_copy(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "original")
+
+    client.post("/systems/original/duplicate")
+    client.post("/systems/original/duplicate")
+
+    assert (tmp_path / "systems" / "original-copy.json").exists()
+    assert (tmp_path / "systems" / "original-copy-2.json").exists()
+
+
+def test_duplicate_missing_system_does_not_500(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+
+    response = app.test_client().post("/systems/never-existed/duplicate")
+
+    assert response.status_code == 302
+    assert "duplicate_error=not_found" in response.headers["Location"]
+
+
+def test_dashboard_offers_duplicate_next_to_delete(tmp_path):
+    app, _ = _dashboard_app(tmp_path)
+    client = app.test_client()
+    _save_a_system(client, "listed")
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert 'action="/systems/listed/duplicate"' in html
+    assert 'action="/systems/listed/delete"' in html
+
+
 # --- Editor "This Week's Picks" panel ----------------------------------------
 
 

@@ -943,6 +943,11 @@ tbody tr:hover{background:var(--ink-50)}
   font-size: 13px;
 }
 
+.row-menu__duplicate {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+
 .row-menu__delete {
   width: 100%;
   background: transparent;
