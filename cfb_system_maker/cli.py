@@ -7,7 +7,7 @@ import sys
 from collections.abc import Iterable
 from pathlib import Path
 
-from cfb_paths import DATA_ROOT
+from cfb_paths import DATA_ROOT, current_season
 from cfb_system_maker.backtest import run_backtest, sign_consistency, split_holdout
 from cfb_system_maker.betlog import import_betlog
 from cfb_system_maker.cfbd_client import fetch_games_and_lines
@@ -39,6 +39,7 @@ from cfb_system_maker.storage import (
     save_system,
 )
 from cfb_system_maker.upcoming import build_upcoming
+from cfb_system_maker.weather_football import fetch_college, save_snapshot
 from cfb_system_maker.v1_model import fit_v1, save_v1_fit
 
 DATA_DIR_DEFAULT = str(DATA_ROOT)
@@ -78,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
         return _refit_v1(args)
     if args.command == "upcoming":
         return _upcoming(args)
+    if args.command == "weather-football":
+        return _weather_football(args)
     if args.command == "scrape":
         return _scrape(args)
     if args.command == "graphql":
@@ -194,7 +197,7 @@ def _refit_v1(args: argparse.Namespace) -> int:
 
 
 def _upcoming(args: argparse.Namespace) -> int:
-    result = build_upcoming(args.data_dir)
+    result = build_upcoming(args.data_dir, weather_fetch=fetch_college)
     meta = result.meta
     if meta["season"] is None:
         print("No upcoming data available: no week with games could be resolved.")
@@ -207,6 +210,16 @@ def _upcoming(args: argparse.Namespace) -> int:
             "No current week had data; fell back to the most recent week with games "
             f"({meta['season']} {meta['season_type']} week {meta['week']})."
         )
+    weather = meta.get("weather_football") or {}
+    print(f"weather.football: {weather.get('status')}, {weather.get('games', 0)} game(s) forecast.")
+    return 0
+
+
+def _weather_football(args: argparse.Namespace) -> int:
+    """Snapshot weather.football alone (no CFBD), so its history builds on a schedule."""
+    rows = fetch_college()
+    path = save_snapshot(args.data_dir, args.season or current_season(), rows)
+    print(f"weather.football: {len(rows)} game(s) -> {path}")
     return 0
 
 
@@ -779,6 +792,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     upcoming = subparsers.add_parser("upcoming")
     upcoming.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
+
+    weather_parser = subparsers.add_parser("weather-football")
+    weather_parser.add_argument("--data-dir", default=DATA_DIR_DEFAULT)
+    weather_parser.add_argument("--season", type=int, default=None)
 
     scrape_parser = subparsers.add_parser("scrape")
     scrape_parser.add_argument("--data-dir", default=DATA_DIR_DEFAULT)

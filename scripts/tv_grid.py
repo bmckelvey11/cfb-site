@@ -14,7 +14,8 @@ Run `scripts/tv_grid.cmd` instead to refresh weather + media first.
 Decisions (2026-09-17, see docs/tv-grid-2026-09-17.md): FBS-home games only; network
 from CFBD media (tv row; web-only games in a compact STREAMING band); line is the
 median across books (`normalize.median_line`); rank shows AP then Massey composite;
-weather is the CFBD forecast with the wind arrow pointing where the wind blows *to*.
+weather is the weather.football forecast where a fresh snapshot exists (else CFBD's),
+with the wind arrow pointing where the wind blows *to*.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ REPO = next(p for p in Path(__file__).resolve().parents if (p / "cfb_paths.py").
 sys.path.insert(0, str(REPO))
 import cfb_paths  # noqa: E402
 from cfb_system_maker.normalize import median_line  # noqa: E402
+from cfb_system_maker.weather_football import load_snapshot  # noqa: E402
 from cfb_system_maker.wind import cardinal8, derive, orientation_is_usable  # noqa: E402
 
 # ---------------------------------------------------------------- networks
@@ -225,12 +227,29 @@ def load_lines(con, ids: list[int]) -> dict[int, dict[str, Any] | None]:
     return {gid: median_line(rows) for gid, rows in by_game.items()}
 
 
+WEATHER_COLS = ["temperature", "precipitation", "windSpeed", "windDirection", "gameIndoors"]
+
+
 def load_weather(con, ids: list[int]) -> dict[int, dict[str, Any]]:
-    cols = ["temperature", "precipitation", "windSpeed", "windDirection", "gameIndoors"]
     rows = con.execute(
-        f"select gameId, {', '.join(cols)} from stg.weather where gameId in (select unnest(?))",
+        f"select gameId, {', '.join(WEATHER_COLS)} from stg.weather where gameId in (select unnest(?))",
         [ids]).fetchall()
-    return {r[0]: dict(zip(cols, r[1:])) for r in rows}
+    return {r[0]: dict(zip(WEATHER_COLS, r[1:])) for r in rows}
+
+
+def overlay_forecast(weather: dict[int, dict[str, Any]], forecast: dict[int, dict[str, Any]],
+                     ids: list[int]) -> int:
+    """Lay weather.football rows over CFBD's, field by field. Returns games covered."""
+    covered = 0
+    for gid in ids:
+        row = forecast.get(gid)
+        if not row:
+            continue
+        merged = dict(weather.get(gid) or {})
+        merged.update({c: row[c] for c in WEATHER_COLS if row.get(c) is not None})
+        weather[gid] = merged
+        covered += 1
+    return covered
 
 
 def load_poll(con, season: int, week: int, poll: str) -> dict[str, int]:
@@ -488,6 +507,13 @@ def render_html(season: int, week: int, games: list[dict[str, Any]], meta: str,
             f"{body}</body></html>")
 
 
+def _weather_source(n_forecast: int, n_games: int) -> str:
+    if n_forecast == 0:
+        return "CFBD forecast"
+    if n_forecast >= n_games:
+        return "weather.football forecast"
+    return f"weather.football forecast ({n_forecast}/{n_games}, rest CFBD)"
+
 # ---------------------------------------------------------------- main
 
 
@@ -500,6 +526,8 @@ def build(season: int, week: int | None, out_dir: Path) -> Path:
         raise SystemExit(f"no FBS games for {season} week {week}")
     ids = [g["gameId"] for g in games]
     media, lines, weather = load_media(con, ids), load_lines(con, ids), load_weather(con, ids)
+    forecast = load_snapshot(cfb_paths.DATA_ROOT, season, dt.datetime.now(dt.timezone.utc))
+    n_forecast = overlay_forecast(weather, forecast, ids)
     ap = load_poll(con, season, week, "AP Top 25")
     fcs = load_poll(con, season, week, "FCS Coaches Poll")
     massey, edition = load_massey(con, season, min(g["startDate"] for g in games))
@@ -544,7 +572,7 @@ def build(season: int, week: int | None, out_dir: Path) -> Path:
 
     meta = (f"{len(cards)} FBS games · line = median across books · rank = AP wk{week}"
             f"{' · Massey ' + edition.isoformat() if edition else ' · Massey n/a'}"
-            f" · weather = CFBD forecast · generated {dt.datetime.now():%Y-%m-%d %H:%M}")
+            f" · weather = {_weather_source(n_forecast, len(cards))} · generated {dt.datetime.now():%Y-%m-%d %H:%M}")
     out = out_dir / f"tv_grid_{season}_wk{week:02d}.html"
     net_logos = {n: cache_network_logo(n, logo_dir) for n in {c["network"] for c in cards}}
     net_logos = {n: p for n, p in net_logos.items() if p}

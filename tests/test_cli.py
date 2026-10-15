@@ -78,6 +78,7 @@ def _fake_cfbd():
 def test_upcoming_command_writes_upcoming_files_and_not_games_csv(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("cfb_system_maker.upcoming._load_cfbd_module", _fake_cfbd)
     monkeypatch.setattr("cfb_system_maker.upcoming.find_cfbd_token", lambda *a, **k: "test-token")
+    monkeypatch.setattr("cfb_system_maker.cli.fetch_college", lambda: [])
 
     exit_code = main(["upcoming", "--data-dir", str(tmp_path)])
 
@@ -533,3 +534,15 @@ def test_search_command_save_run_flag_persists_even_with_zero_finalists(tmp_path
     run = load_search_run("empty-run", tmp_path)
     assert run.finalists_graded == 0
     assert run.finalists == ()
+
+
+def test_weather_football_command_saves_a_snapshot(tmp_path, capsys, monkeypatch):
+    rows = [{"id": 1, "forecastGenerated": "2026-10-15T11:30:14+00:00", "wfi": 7}]
+    monkeypatch.setattr("cfb_system_maker.cli.fetch_college", lambda: rows)
+
+    exit_code = main(["weather-football", "--data-dir", str(tmp_path), "--season", "2026"])
+
+    assert exit_code == 0
+    assert (tmp_path / "ingest" / "weather_football" / "latest_2026.json").exists()
+    assert (tmp_path / "ingest" / "weather_football" / "history_2026.jsonl").exists()
+    assert "1 game(s)" in capsys.readouterr().out

@@ -9,10 +9,11 @@ does it, so the whole pipeline runs network-free under test.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from cfb_system_maker.cfbd_client import _load_cfbd_module, _to_dict, find_cfbd_token
 from cfb_system_maker.enrich import enrich_games, save_features_to, upcoming_features_path
@@ -24,6 +25,7 @@ from cfb_system_maker.storage import (
     save_upcoming_games,
     save_upcoming_meta,
 )
+from cfb_system_maker.weather_football import load_snapshot, save_snapshot
 
 # How many seasons back the offseason fallback may step before giving up.
 _MAX_SEASONS_BACK = 2
@@ -68,8 +70,14 @@ def build_upcoming(
     now: datetime | None = None,
     cfbd_module: Any = None,
     token: str | None = None,
+    weather_fetch: Callable[[], list[dict[str, Any]]] | None = None,
 ) -> UpcomingBuild:
-    """Resolve the target week, fetch it, normalize it, and persist everything."""
+    """Resolve the target week, fetch it, normalize it, and persist everything.
+
+    ``weather_fetch`` (the CLI passes ``weather_football.fetch_college``) pulls the
+    forecast that ``enrich_upcoming`` lays over CFBD weather. It is best effort: a
+    failure is logged and the week still builds on CFBD weather alone.
+    """
     now = now or datetime.now(timezone.utc)
     cfbd = cfbd_module or _load_cfbd_module()
     configuration = cfbd.Configuration(access_token=token or find_cfbd_token())
@@ -94,20 +102,34 @@ def build_upcoming(
     save_raw_json(data_dir, "games", season, games)
     save_raw_json(data_dir, "lines", season, lines)
 
+    weather_status = _refresh_weather(data_dir, season, weather_fetch) if weather_fetch else "not requested"
+
     target = [row for row in games if _week_key(row) == (resolution.season_type, resolution.week)]
     records = normalize_games(target, lines, provider="consensus")
     kickoffs = _kickoffs(target)
 
-    enrich_upcoming(data_dir, season, records)
-    return _persist(data_dir, records, kickoffs, resolution, now)
+    enrich_upcoming(data_dir, season, records, now=now)
+    weather = load_snapshot(data_dir, season, now)
+    extra = {
+        "weather_football": {
+            "status": weather_status,
+            "games": sum(1 for record in records if record.game_id in weather),
+        }
+    }
+    return _persist(data_dir, records, kickoffs, resolution, now, extra)
 
 
 def enrich_upcoming(
     data_dir: str | Path,
     season: int | None,
     records: list[GameRecord],
+    *,
+    now: datetime | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Enrich the target week, accumulating over that season's completed games (D-05).
+
+    Weather for the target week comes from the weather.football snapshot on disk
+    where one is fresh (``load_weather_override``), else CFBD's alone.
 
     ``compute_running_stats`` only yields entering-game values for games whose
     season-mates are in the same input list. ``games.csv`` carries none of the
@@ -124,11 +146,27 @@ def enrich_upcoming(
 
     # ``enrich_games`` falls back to loading games.csv when handed an empty list,
     # which would write 13k historical rows into the upcoming sidecar.
-    features = enrich_games(data_dir, union) if union else {}
+    weather = load_snapshot(data_dir, season, now or datetime.now(timezone.utc))
+    weather = {game_id: row for game_id, row in weather.items() if str(game_id) in target_ids}
+    features = enrich_games(data_dir, union, weather_override=weather) if union else {}
     features = {game_id: row for game_id, row in features.items() if game_id in target_ids}
 
     save_features_to(upcoming_features_path(data_dir), features)
     return features
+
+
+def _refresh_weather(
+    data_dir: str | Path,
+    season: int,
+    weather_fetch: Callable[[], list[dict[str, Any]]],
+) -> str:
+    try:
+        rows = weather_fetch()
+    except Exception as exc:  # network, JSON, or a feed shape change
+        print(f"weather.football fetch failed; using CFBD weather: {exc}", file=sys.stderr)
+        return f"failed: {type(exc).__name__}"
+    save_snapshot(data_dir, season, rows)
+    return "ok"
 
 
 def _accumulation_base(
@@ -227,6 +265,7 @@ def _persist(
     kickoffs: dict[int, dict[str, Any]],
     resolution: WeekResolution,
     now: datetime,
+    extra: dict[str, Any] | None = None,
 ) -> UpcomingBuild:
     meta = {
         "fetched_at": now.isoformat(),
@@ -235,6 +274,7 @@ def _persist(
         "season_type": resolution.season_type,
         "is_fallback": resolution.is_fallback,
         "row_count": len(records),
+        **(extra or {}),
     }
     save_upcoming_games(data_dir, records, kickoffs)
     save_upcoming_meta(data_dir, meta)
