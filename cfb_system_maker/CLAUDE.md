@@ -39,6 +39,7 @@ python -m cfb_system_maker refit-v1   # Arscott tobit cache → processed/v1_fit
 python -m cfb_system_maker backtest --side home --favorite --min-spread -14
 python -m cfb_system_maker backtest --bet-type total --total-side over
 python -m cfb_system_maker web --port 5000   # Flask UI at 127.0.0.1:5000 (waitress; --debug for reloader)
+python -m cfb_system_maker matchup           # team matchup page at 127.0.0.1:5050 (reads the warehouse)
 ```
 
 There is no compile step and no linter configured for our code. `requirements.lock` is the reproducible install; `requirements.txt` is the loose pins (Flask, waitress, duckdb, sklearn, pytest, plus `cfbd-python/requirements.txt`).
