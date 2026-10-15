@@ -13,6 +13,7 @@ investigations). This directory holds what is specific to *this* unit's code.
 | Doc | What it is |
 | --- | --- |
 | [data-flow-guide.md](data-flow-guide.md) | **Read this before touching `data/` or the loader.** Sources → warehouse → consumers, end to end. Explicitly a living document: when a step stops matching the code, fix one or the other in the same commit. Last verified 2026-09-11. |
+| [matchup-page.md](matchup-page.md) | How the local matchup page reads the warehouse: as-of cutoffs, the PFF week mapping, roll-ups and toggles, verdicts, what each section shows and what it leaves out. |
 
 ## Audits and incidents
 
