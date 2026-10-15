@@ -78,6 +78,7 @@ def _fake_cfbd():
 def test_upcoming_command_writes_upcoming_files_and_not_games_csv(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("cfb_system_maker.upcoming._load_cfbd_module", _fake_cfbd)
     monkeypatch.setattr("cfb_system_maker.upcoming.find_cfbd_token", lambda *a, **k: "test-token")
+    monkeypatch.setattr("cfb_system_maker.cli.fetch_college", lambda: [])
 
     exit_code = main(["upcoming", "--data-dir", str(tmp_path)])
 

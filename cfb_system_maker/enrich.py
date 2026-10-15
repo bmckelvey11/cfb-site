@@ -21,10 +21,22 @@ from cfb_system_maker.wind import derive as derive_wind
 from cfb_system_maker.wind import orientation_is_usable
 
 
-def enrich_games(data_dir: str | Path, games: list[GameRecord] | None = None) -> dict[str, dict[str, Any]]:
+def enrich_games(
+    data_dir: str | Path,
+    games: list[GameRecord] | None = None,
+    *,
+    weather_override: dict[int, dict[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Resolve every registry feature per game.
+
+    ``weather_override`` lays forecast rows (``weather_football.to_weather_rows``)
+    over CFBD's weather by game id, field by field: a non-null override value wins,
+    CFBD keeps the rest. Only ``upcoming`` passes it, so historical enrich and
+    backtests stay on CFBD weather alone.
+    """
     data_dir = Path(data_dir)
     games = games or load_processed_games(data_dir)
-    indexes = _build_indexes(data_dir, games)
+    indexes = _build_indexes(data_dir, games, weather_override)
 
     output: dict[str, dict[str, Any]] = {}
     for game in games:
@@ -247,7 +259,11 @@ def run_enrich(data_dir: str | Path) -> Path:
     return save_features(data_dir, features)
 
 
-def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
+def _build_indexes(
+    data_dir: Path,
+    games: list[GameRecord],
+    weather_override: dict[int, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     seasons = sorted({game.season for game in games})
     indexes: dict[str, Any] = {
         "raw_game": {},
@@ -291,6 +307,7 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
         _index_prior_team_season(indexes["raw_prior_team_season"], data_dir / "raw" / f"srs_expanded_{season - 1}.json", "srs_expanded", season)
         _index_conference_change(indexes["raw_conference_change"], data_dir / "raw" / f"conference_changes_{season}.json", season)
 
+    _overlay_weather(indexes["raw_weather"], weather_override or {})
     _index_raw_file(indexes["raw_venues"], data_dir / "raw" / "venues.json", "id")
     _index_conferences(indexes["raw_conferences"], data_dir / "raw" / "conferences.json")
 
@@ -307,6 +324,13 @@ def _build_indexes(data_dir: Path, games: list[GameRecord]) -> dict[str, Any]:
     indexes["computed_wind"] = _build_wind_index(data_dir, games, indexes["raw_weather"])
 
     return indexes
+
+
+def _overlay_weather(raw_weather: dict[int, dict[str, Any]], override: dict[int, dict[str, Any]]) -> None:
+    for game_id, row in override.items():
+        merged = dict(raw_weather.get(game_id) or {})
+        merged.update({key: value for key, value in row.items() if value is not None})
+        raw_weather[game_id] = merged
 
 
 def _build_wind_index(

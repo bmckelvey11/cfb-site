@@ -1,0 +1,59 @@
+{
+ "generated": "2026-10-15T11:30:14+00:00",
+ "run": "20261015T06:00Z",
+ "n_games": 2,
+ "games": [
+  {
+   "id": "401869950",
+   "kickoff": "2026-10-15T23:30:00",
+   "tbd": false,
+   "away": "Georgia Southern",
+   "home": "Old Dominion",
+   "venue_id": 3918,
+   "venue": "S.B. Ballard Stadium",
+   "dome": false,
+   "roof": "outdoors",
+   "wfi": 7,
+   "band": "negligible",
+   "rain_chance": {
+    "run": "20261015T00:00Z",
+    "pop": 4,
+    "p010": 0,
+    "p025": 0
+   },
+   "temp_f": 68.4,
+   "wind_mph": 8.0,
+   "gust_mph": 12.8,
+   "rh": 92.0,
+   "precip_in_hr": 0.0,
+   "snow_in_hr": null,
+   "slug": "georgia-southern-at-old-dominion-2026-10-15"
+  },
+  {
+   "id": "401858265",
+   "kickoff": "2026-10-17T23:30:00",
+   "tbd": false,
+   "away": "Louisville",
+   "home": "Syracuse",
+   "venue_id": 1964,
+   "venue": "JMA Wireless Dome",
+   "dome": true,
+   "roof": "dome",
+   "wfi": 0,
+   "band": "negligible",
+   "rain_chance": {
+    "run": "20261015T00:00Z",
+    "pop": 0,
+    "p010": 0,
+    "p025": 0
+   },
+   "temp_f": 38.8,
+   "wind_mph": 4.7,
+   "gust_mph": 7.4,
+   "rh": 65.0,
+   "precip_in_hr": 0.0,
+   "snow_in_hr": null,
+   "slug": "louisville-at-syracuse-2026-10-17"
+  }
+ ]
+}

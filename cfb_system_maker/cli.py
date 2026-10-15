@@ -39,6 +39,7 @@ from cfb_system_maker.storage import (
     save_system,
 )
 from cfb_system_maker.upcoming import build_upcoming
+from cfb_system_maker.weather_football import fetch_college
 from cfb_system_maker.v1_model import fit_v1, save_v1_fit
 
 DATA_DIR_DEFAULT = str(DATA_ROOT)
@@ -194,7 +195,7 @@ def _refit_v1(args: argparse.Namespace) -> int:
 
 
 def _upcoming(args: argparse.Namespace) -> int:
-    result = build_upcoming(args.data_dir)
+    result = build_upcoming(args.data_dir, weather_fetch=fetch_college)
     meta = result.meta
     if meta["season"] is None:
         print("No upcoming data available: no week with games could be resolved.")
@@ -207,6 +208,8 @@ def _upcoming(args: argparse.Namespace) -> int:
             "No current week had data; fell back to the most recent week with games "
             f"({meta['season']} {meta['season_type']} week {meta['week']})."
         )
+    weather = meta.get("weather_football") or {}
+    print(f"weather.football: {weather.get('status')}, {weather.get('games', 0)} game(s) forecast.")
     return 0
 
 

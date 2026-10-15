@@ -71,6 +71,15 @@ in `stg` under its bare name — optional `stg` explode / `--flatten-nested`). S
 
 `upcoming` writes `data/processed/upcoming.csv` (+ upcoming features sidecar) for the Current Matches panel. It never reads or writes `games.csv`.
 
+`upcoming` also pulls the weather.football forecast (`weather_football.py`: two static
+JSON feeds the site's own pages read, no API key, no stated terms) into
+`data/raw/weather_football_{season}.json`, then lays it over CFBD weather for the
+target week only, field by field: its temperature, wind, gust, humidity, precipitation
+and NDFD wind direction win; CFBD keeps dew point, pressure and condition. Ids are ESPN
+ids, the same as CFBD's, so there is no name matching. A failed fetch or a snapshot
+older than 36 h falls back to CFBD alone; `upcoming_meta.json` records which
+(`weather_football.status`, `.games`). Historical enrich and backtests never read it.
+
 ### Scraper conventions (`scrapers.py`)
 
 - **One `Endpoint` per CFBD method, tagged with a *mode*** that says how it's parameterized: `once` (no params, `{name}.json`), `season` (loop years, `{name}_{season}.json`), `season_week` (year×week, plays), `grid` (predicted-points down×distance), `per_game`/`per_player` (fan out over ids from already-scraped `games_*`/`roster_*` seeds), `on_demand` (live/key-lookup endpoints — scoreboard, matchup, search_players, live_plays — registered but skipped in bulk).
