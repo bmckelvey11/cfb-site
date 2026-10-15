@@ -32,6 +32,7 @@ python -m cfb_system_maker actionnetwork --season 2023   # period odds CFBD lack
 python -m cfb_system_maker build --season 2023 --provider consensus
 python -m cfb_system_maker enrich   # join registry features -> data/processed/features.json (run after build)
 python -m cfb_system_maker upcoming   # unplayed week → processed/upcoming.csv; never writes games.csv
+python -m cfb_system_maker weather-football   # weather.football snapshot → ingest/weather_football/
 python -m cfb_system_maker duckdb --explode --flatten-nested   # data/cfb.duckdb; serving still csv+features
 python -m cfb_system_maker search --holdout-season 2024
 python -m cfb_system_maker betlog import --csv path.csv
@@ -73,12 +74,16 @@ in `stg` under its bare name — optional `stg` explode / `--flatten-nested`). S
 
 `upcoming` also pulls the weather.football forecast (`weather_football.py`: two static
 JSON feeds the site's own pages read, no API key, no stated terms) into
-`data/raw/weather_football_{season}.json`, then lays it over CFBD weather for the
+`ingest/weather_football/latest_{season}.json` (appending every fetch to
+`history_{season}.jsonl`, so WFI and forecast drift build a history; `ingest/` keeps it
+out of the warehouse glob), then lays it over CFBD weather for the
 target week only, field by field: its temperature, wind, gust, humidity, precipitation
 and NDFD wind direction win; CFBD keeps dew point, pressure and condition. Ids are ESPN
 ids, the same as CFBD's, so there is no name matching. A failed fetch or a snapshot
 older than 36 h falls back to CFBD alone; `upcoming_meta.json` records which
 (`weather_football.status`, `.games`). Historical enrich and backtests never read it.
+`weather-football` takes the same snapshot without CFBD (for a schedule), and
+`scripts/tv_grid.py` uses a fresh snapshot over `stg.weather` the same way.
 
 ### Scraper conventions (`scrapers.py`)
 

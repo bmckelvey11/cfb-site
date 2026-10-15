@@ -11,8 +11,15 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from cfb_system_maker.enrich import load_features_from, upcoming_features_path
-from cfb_system_maker.upcoming import build_upcoming, load_weather_override
-from cfb_system_maker.weather_football import BASE_URL, fetch_college, to_weather_rows
+from cfb_system_maker.upcoming import build_upcoming
+from cfb_system_maker.weather_football import (
+    BASE_URL,
+    fetch_college,
+    history_path,
+    load_snapshot,
+    save_snapshot,
+    to_weather_rows,
+)
 from tests.test_upcoming import default_data, make_module
 
 FIXTURES = Path(__file__).parent / "fixtures" / "weather_football"
@@ -118,10 +125,24 @@ def test_upcoming_builds_on_cfbd_weather_when_the_fetch_fails(tmp_path):
 
 
 def test_a_stale_snapshot_is_ignored(tmp_path):
-    raw = tmp_path / "raw"
-    raw.mkdir()
     old = NOW - timedelta(hours=40)
-    (raw / "weather_football_2026.json").write_text(json.dumps([_weather_row(2001, generated=old)]), encoding="utf-8")
+    save_snapshot(tmp_path, 2026, [_weather_row(2001, generated=old)])
 
-    assert load_weather_override(tmp_path, 2026, NOW) == {}
-    assert 2001 in load_weather_override(tmp_path, 2026, old + timedelta(hours=1))
+    assert load_snapshot(tmp_path, 2026, NOW) == {}
+    assert 2001 in load_snapshot(tmp_path, 2026, old + timedelta(hours=1))
+
+
+def test_every_snapshot_is_appended_to_the_history(tmp_path):
+    save_snapshot(tmp_path, 2026, [_weather_row(2001, wfi=7)])
+    save_snapshot(tmp_path, 2026, [_weather_row(2001, wfi=12), _weather_row(2002, wfi=3)])
+
+    history = [json.loads(line) for line in history_path(tmp_path, 2026).read_text().splitlines()]
+
+    assert [(row["id"], row["wfi"]) for row in history] == [(2001, 7), (2001, 12), (2002, 3)]
+    assert set(load_snapshot(tmp_path, 2026, NOW)) == {2001, 2002}
+
+
+def test_snapshots_stay_out_of_the_warehouse_raw_glob(tmp_path):
+    save_snapshot(tmp_path, 2026, [_weather_row(2001)])
+
+    assert not (tmp_path / "raw").exists()

@@ -9,10 +9,9 @@ does it, so the whole pipeline runs network-free under test.
 
 from __future__ import annotations
 
-import json
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -26,11 +25,7 @@ from cfb_system_maker.storage import (
     save_upcoming_games,
     save_upcoming_meta,
 )
-
-# weather.football rebuilds hourly; a snapshot older than this is dropped so a
-# run whose fetch failed does not keep laying an old forecast over CFBD's.
-WEATHER_MAX_AGE = timedelta(hours=36)
-WEATHER_FILE = "weather_football"
+from cfb_system_maker.weather_football import load_snapshot, save_snapshot
 
 # How many seasons back the offseason fallback may step before giving up.
 _MAX_SEASONS_BACK = 2
@@ -114,7 +109,7 @@ def build_upcoming(
     kickoffs = _kickoffs(target)
 
     enrich_upcoming(data_dir, season, records, now=now)
-    weather = load_weather_override(data_dir, season, now)
+    weather = load_snapshot(data_dir, season, now)
     extra = {
         "weather_football": {
             "status": weather_status,
@@ -151,31 +146,13 @@ def enrich_upcoming(
 
     # ``enrich_games`` falls back to loading games.csv when handed an empty list,
     # which would write 13k historical rows into the upcoming sidecar.
-    weather = load_weather_override(data_dir, season, now or datetime.now(timezone.utc))
+    weather = load_snapshot(data_dir, season, now or datetime.now(timezone.utc))
     weather = {game_id: row for game_id, row in weather.items() if str(game_id) in target_ids}
     features = enrich_games(data_dir, union, weather_override=weather) if union else {}
     features = {game_id: row for game_id, row in features.items() if game_id in target_ids}
 
     save_features_to(upcoming_features_path(data_dir), features)
     return features
-
-
-def load_weather_override(data_dir: str | Path, season: int | None, now: datetime) -> dict[int, dict[str, Any]]:
-    """The saved weather.football rows by game id, or {} if missing or stale."""
-    if season is None:
-        return {}
-    path = Path(data_dir) / "raw" / f"{WEATHER_FILE}_{season}.json"
-    if not path.exists():
-        return {}
-    rows = json.loads(path.read_text(encoding="utf-8"))
-    generated = max((str(row.get("forecastGenerated") or "") for row in rows), default="")
-    try:
-        age = now - datetime.fromisoformat(generated)
-    except (TypeError, ValueError):
-        return {}
-    if age > WEATHER_MAX_AGE:
-        return {}
-    return {int(row["id"]): row for row in rows if row.get("id") is not None}
 
 
 def _refresh_weather(
@@ -188,7 +165,7 @@ def _refresh_weather(
     except Exception as exc:  # network, JSON, or a feed shape change
         print(f"weather.football fetch failed; using CFBD weather: {exc}", file=sys.stderr)
         return f"failed: {type(exc).__name__}"
-    save_raw_json(data_dir, WEATHER_FILE, season, rows)
+    save_snapshot(data_dir, season, rows)
     return "ok"
 
 

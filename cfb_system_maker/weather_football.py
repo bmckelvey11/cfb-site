@@ -29,12 +29,20 @@ from __future__ import annotations
 import json
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable
 
 BASE_URL = "https://weather.football/data/"
 THIS_WEEK = "cfb_this_week.json"
 STADIUM_FORECAST = "cfb_stadium_forecast.json"
 SOURCE = "weather.football"
+
+# The feed rebuilds hourly; a snapshot older than this is dropped so a run whose
+# fetch failed does not keep laying an old forecast over CFBD's.
+MAX_AGE = timedelta(hours=36)
+
+# Point-in-time snapshots belong in ingest/, which the warehouse loader does not glob.
+SUBDIR = Path("ingest") / "weather_football"
 
 # Direction is hourly near term and 3- to 6-hourly further out; past this gap
 # from kickoff the nearest reading says nothing about the game window.
@@ -58,6 +66,49 @@ def fetch_college(fetch_fn: FetchFn | None = None) -> list[dict[str, Any]]:
     this_week = fetch(BASE_URL + THIS_WEEK)
     stadiums = fetch(BASE_URL + STADIUM_FORECAST)
     return to_weather_rows(this_week, stadiums)
+
+
+def snapshot_path(data_dir: str | Path, season: int) -> Path:
+    return Path(data_dir) / SUBDIR / f"latest_{season}.json"
+
+
+def history_path(data_dir: str | Path, season: int) -> Path:
+    return Path(data_dir) / SUBDIR / f"history_{season}.jsonl"
+
+
+def save_snapshot(data_dir: str | Path, season: int, rows: list[dict[str, Any]]) -> Path:
+    """Replace the latest snapshot and append every row to the season's history.
+
+    The history keeps each fetch (one JSON row per game per fetch), so the WFI and
+    forecast drift can be studied later; nothing else on disk is ever replayed.
+    """
+    path = snapshot_path(data_dir, season)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(rows, indent=1, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+    with history_path(data_dir, season).open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+    return path
+
+
+def load_snapshot(data_dir: str | Path, season: int | None, now: datetime) -> dict[int, dict[str, Any]]:
+    """The latest saved rows by game id, or {} if missing or older than ``MAX_AGE``."""
+    if season is None:
+        return {}
+    path = snapshot_path(data_dir, season)
+    if not path.exists():
+        return {}
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    generated = max((str(row.get("forecastGenerated") or "") for row in rows), default="")
+    try:
+        age = now - datetime.fromisoformat(generated)
+    except (TypeError, ValueError):
+        return {}
+    if age > MAX_AGE:
+        return {}
+    return {int(row["id"]): row for row in rows if row.get("id") is not None}
 
 
 def to_weather_rows(this_week: dict[str, Any], stadiums: dict[str, Any] | None = None) -> list[dict[str, Any]]:

@@ -69,3 +69,17 @@ def test_weather_text_formats_forecast_and_dome():
     assert tv.weather_text(w, azimuth=None, indoors=False).endswith("</span>")
     assert tv.weather_text(w, azimuth=None, indoors=True) == "DOME"
     assert tv.weather_text(None, None, False) == ""
+
+
+def test_overlay_forecast_prefers_weather_football_and_keeps_cfbd_gaps():
+    weather = {1: {"temperature": 50.0, "windSpeed": 20.0, "windDirection": 90, "precipitation": 0.1},
+               2: {"temperature": 60.0}}
+    forecast = {1: {"temperature": 72.0, "windSpeed": 5.0, "windDirection": None, "wfi": 9},
+                3: {"temperature": 40.0, "gameIndoors": True}}
+
+    covered = tv.overlay_forecast(weather, forecast, [1, 2, 3])
+
+    assert covered == 2
+    assert weather[1] == {"temperature": 72.0, "windSpeed": 5.0, "windDirection": 90, "precipitation": 0.1}
+    assert weather[2] == {"temperature": 60.0}
+    assert weather[3] == {"temperature": 40.0, "gameIndoors": True}

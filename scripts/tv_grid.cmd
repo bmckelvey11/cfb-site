@@ -1,7 +1,7 @@
 @echo off
-REM Refresh CFBD weather + media (the two feeds the TV grid needs fresh), then
-REM render the week's grid. Same shape as pull_odds.cmd: one command, every run
-REM logged.
+REM Refresh CFBD weather + media and the weather.football forecast (the feeds the
+REM TV grid needs fresh), then render the week's grid. Same shape as pull_odds.cmd:
+REM one command, every run logged.
 REM
 REM   tv_grid.cmd
 REM   tv_grid.cmd --season 2026 --week 3
@@ -35,6 +35,8 @@ echo ==== %DATE% %TIME% :: %* ====>> "%LOG%"
 "%PYTHON_CFBD%" -u "%REPO%\scripts\refresh_cfbd.py" --only weather media>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- refresh exited %RC%; rendering from the existing warehouse ---->> "%LOG%"
+"%PYTHON%" -u -m cfb_system_maker weather-football --data-dir "%CFB_DATA_ROOT%">> "%LOG%" 2>&1
+if not "%ERRORLEVEL%"=="0" echo ---- weather.football fetch failed; grid uses CFBD weather ---->> "%LOG%"
 "%PYTHON%" -u "%REPO%\scripts\tv_grid.py" %*>> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 if not "%RC%"=="0" echo ---- exited %RC% ---->> "%LOG%"
