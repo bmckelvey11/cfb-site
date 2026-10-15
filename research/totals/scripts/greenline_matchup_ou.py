@@ -202,10 +202,80 @@ def market_ou(closes: pd.DataFrame, feat: str) -> dict:
     return slope(g.dropna(subset=[feat]), feat, "margin")
 
 
+def market_build() -> pd.DataFrame:
+    """Every FBS regular-season game, weeks 2-14 of 2015-2026, with a REST-backed close:
+    the same matchup cell and O/U features as the unders, against close - actual."""
+    import duckdb
+
+    con = duckdb.connect(str(DB_PATH), read_only=True)
+    seasons = list(range(2015, 2027))
+    closes = con.execute(CLOSE_SQL, [seasons]).df()
+    gw = con.execute(GRADE_SQL, [[s - 1 for s in seasons] + seasons] * 2).df().fillna(0.0)
+    con.close()
+    g = closes[(closes["week"] >= 2) & (closes["week"] <= LAST_REGULAR_WEEK)].copy()
+    by_season = {s: c for s, c in closes.groupby("season")}
+    feats = []
+    for r in g.itertuples():
+        s, w = int(r.season), int(r.week)
+        h, a = grade_profile(gw, int(r.home_team_id), s, w), grade_profile(gw, int(r.away_team_id), s, w)
+        oh = ou_to_date(by_season[s], int(r.home_team_id), s, w)
+        oa = ou_to_date(by_season[s], int(r.away_team_id), s, w)
+        feats.append({
+            "home_off": h[0] if h else np.nan, "home_def": h[1] if h else np.nan,
+            "away_off": a[0] if a else np.nan, "away_def": a[1] if a else np.nan,
+            "ou_resid": (oh[0] + oa[0]) / 2 if oh and oa else np.nan,
+            "ou_over": (oh[1] + oa[1]) / 2 if oh and oa else np.nan,
+        })
+    g = pd.concat([g.reset_index(drop=True), pd.DataFrame(feats)], axis=1)
+    g["margin"] = g["close"] - g["actual"]
+    g["era"] = g["season"].astype(str)
+    g = g[g["actual"] != g["close"]].copy()         # pushes carry no under/over result
+    g["win"] = (g["actual"] < g["close"]).astype(float)   # "win" = the under won
+    # Good = at or above that season's median over every team-game value in the sample.
+    for side in ("off", "def"):
+        vals = pd.concat([g[["era", f"home_{side}"]].rename(columns={f"home_{side}": "v"}),
+                          g[["era", f"away_{side}"]].rename(columns={f"away_{side}": "v"})])
+        m = g["era"].map(vals.groupby("era")["v"].median())
+        g[f"good_{side}"] = (g[f"home_{side}"] >= m).astype(float) + (g[f"away_{side}"] >= m).astype(float)
+        g.loc[g[f"home_{side}"].isna() | g[f"away_{side}"].isna(), f"good_{side}"] = np.nan
+    return g
+
+
+def market_main() -> None:
+    g = market_build()
+    print(f"FBS games 2015-26, weeks 2-14, REST-backed close, no push: {len(g)}; "
+          f"with both grade profiles: {g['good_off'].notna().sum()}; with both O/U histories: {g['ou_over'].notna().sum()}")
+    print("win = the UNDER won; margin = close - actual (+ favours under)\n")
+    early, late = g[g["season"] <= 2020], g[g["season"] >= 2021]
+    print("=== 1. good offenses x good defenses, every game ===")
+    for label, sub in [("2015-26", g), ("2015-20", early), ("2021-26", late)]:
+        F, p = cell_test(sub, n_perm=1000)
+        print(f"\n{label}: omnibus F = {F:.2f}, permutation p {p:.3f}")
+        print(grid(sub).to_string(index=False))
+    print("\n=== 2. over/under record to date, every game (weeks 3-14) ===")
+    for feat in ("ou_resid", "ou_over"):
+        sub = g.dropna(subset=[feat])
+        s_all, s_e, s_l = slope(sub, feat, "margin"), slope(sub[sub["season"] <= 2020], feat, "margin"), \
+            slope(sub[sub["season"] >= 2021], feat, "margin")
+        print(f"\n{feat}: n={s_all['n']} {s_all['b']:+.3f} pts/SD (SE {s_all['se']:.3f}, p {s_all['p']:.3f}); "
+              f"2015-20 {s_e['b']:+.3f} (SE {s_e['se']:.3f}, p {s_e['p']:.3f}); 2021-26 {s_l['b']:+.3f} (SE {s_l['se']:.3f}, p {s_l['p']:.3f})")
+        sub = sub.copy()
+        sub["fifth"] = sub.groupby("era")[feat].transform(
+            lambda x: pd.qcut(x.rank(method="first"), 5, labels=["1 low", "2", "3", "4", "5 high"]))
+        for label, part in [("all", sub), ("2015-20", sub[sub["season"] <= 2020]), ("2021-26", sub[sub["season"] >= 2021])]:
+            t = part.groupby("fifth", observed=True).agg(n=("win", "size"), under=("win", "mean"), margin=("margin", "mean"))
+            print(f"  {label}: " + "  ".join(f"{i}: {r.under * 100:.1f}% ({r.n})" for i, r in t.iterrows()))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--rows", type=Path, help="write the per-bet rows here")
+    ap.add_argument("--market", action="store_true",
+                    help="run both questions on every FBS game instead of the Greenline unders")
     a = ap.parse_args()
+    if a.market:
+        market_main()
+        return
 
     df, closes = build(greenline_unders())
     print(f"unders with a final: {len(df)}; with both grade profiles: {df['good_off'].notna().sum()}; "
