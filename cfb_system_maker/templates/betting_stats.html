@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Betting Stats — CFB System Maker</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    {% macro pct(value) %}{% if value is none %}&mdash;{% else %}{{ "%.1f%%"|format(value * 100) }}{% endif %}{% endmacro %}
+    {% macro num(value, signed=False) %}{% if value is none %}&mdash;{% elif signed %}{{ "%+.1f"|format(value) }}{% else %}{{ "%.1f"|format(value) }}{% endif %}{% endmacro %}
+    <div class="dash-shell">
+      <header class="dash-header">
+        <div class="brand">
+          <span class="brand-mark">CFB</span>
+          <div><h1>Betting Stats</h1></div>
+        </div>
+        <div class="dash-actions">
+          <a class="dash-cta" href="{{ url_for('betlog_page') }}">Bet Log</a>
+          <a class="dash-cta" href="{{ url_for('dashboard') }}">My Systems</a>
+        </div>
+      </header>
+
+      {% if error == "missing_data" %}
+        <div class="empty-state">
+          <h2>No processed data found</h2>
+          <p>Run <code>python -m cfb_system_maker build --season 2020 2021 2022 2023 2024 2025 --data-dir data</code>, then refresh.</p>
+        </div>
+      {% else %}
+        <nav class="tabs timeframe-tabs" aria-label="Season">
+          <a href="{{ url_for('betting_stats_page') }}" {% if season is none %}aria-current="page"{% endif %}>All Time</a>
+          {% for s in seasons %}
+            <a href="{{ url_for('betting_stats_page', season=s) }}" {% if season == s %}aria-current="page"{% endif %}>{{ s }}</a>
+          {% endfor %}
+        </nav>
+
+        <p class="examples-note">League-wide results against the closing line, completed games only. Covers and overs are graded by the backtest engine; cover and over rates leave pushes out, push rates are of all graded games.</p>
+
+        <div class="table-wrap">
+          <table class="betting-stats-table">
+            <thead>
+              <tr>
+                <th>Season</th>
+                <th>Spread games</th>
+                <th>Home cover</th>
+                <th>Favorite cover</th>
+                <th>Home dog cover</th>
+                <th>ATS push</th>
+                <th>Total games</th>
+                <th>Over</th>
+                <th>O/U push</th>
+                <th>Avg total</th>
+                <th>Avg points</th>
+                <th>Avg home spread</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+                <tr{% if row.season is none %} class="betting-stats-table__all"{% endif %}>
+                  <td>{{ row.label }}</td>
+                  <td>{{ row.spread_games }}</td>
+                  <td>{{ pct(row.home_cover_rate) }}</td>
+                  <td title="{{ row.favorite_games }} games with a favorite">{{ pct(row.favorite_cover_rate) }}</td>
+                  <td title="{{ row.home_dog_games }} home-underdog games">{{ pct(row.home_dog_cover_rate) }}</td>
+                  <td>{{ pct(row.ats_push_rate) }}</td>
+                  <td>{{ row.total_games }}</td>
+                  <td>{{ pct(row.over_rate) }}</td>
+                  <td>{{ pct(row.ou_push_rate) }}</td>
+                  <td>{{ num(row.avg_total) }}</td>
+                  <td>{{ num(row.avg_points) }}</td>
+                  <td>{{ num(row.avg_home_spread, signed=True) }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <dl class="betting-stats-defs">
+          <dt>Favorite cover</dt><dd>The side laying points (home when the home spread is negative, away when positive). Pick'em games have no favorite and are left out.</dd>
+          <dt>Home dog cover</dt><dd>Home teams getting points (home spread above zero).</dd>
+          <dt>Avg total vs avg points</dt><dd>Both over the same games with a closing total, so the gap is how far totals missed on average.</dd>
+          <dt>Avg home spread</dt><dd>Mean closing spread from the home team's side; negative means home teams were favored on average.</dd>
+        </dl>
+      {% endif %}
+    </div>
+    {% include "_footer.html" %}
+  </body>
+</html>

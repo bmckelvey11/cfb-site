@@ -41,6 +41,7 @@ from cfb_system_maker.features import (
 )
 from cfb_system_maker.models import BacktestResult, BetDetail, FeatureFilter, GameRecord, SavedSystem, SystemFilter
 from cfb_system_maker.narration import NarrationError, narrate_run, write_theory
+from cfb_system_maker.betting_stats import betting_stats_by_season
 from cfb_system_maker.storage import (
     delete_system,
     duplicate_system,
@@ -802,6 +803,23 @@ def create_app(data_dir: str | Path = DATA_ROOT) -> Flask:
             saved_system_meta=saved_system_meta,
             options=_options_from_games(games),
             holdout_seasons=holdout_seasons,
+        )
+
+    @app.get("/betting-stats")
+    def betting_stats_page():
+        try:
+            games, _ = _load_data_cached(app.config["DATA_DIR"])
+        except FileNotFoundError:
+            return render_template("betting_stats.html", error="missing_data", seasons=[], season=None, rows=[])
+        seasons = sorted({game.season for game in games}, reverse=True)
+        raw_season = request.args.get("season", "")
+        season = int(raw_season) if raw_season.isdigit() and int(raw_season) in seasons else None
+        return render_template(
+            "betting_stats.html",
+            error=None,
+            seasons=seasons,
+            season=season,
+            rows=betting_stats_by_season(games, season),
         )
 
     @app.get("/betlog")
