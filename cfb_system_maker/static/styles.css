@@ -943,6 +943,11 @@ tbody tr:hover{background:var(--ink-50)}
   font-size: 13px;
 }
 
+.row-menu__duplicate {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+
 .row-menu__delete {
   width: 100%;
   background: transparent;
@@ -1024,3 +1029,11 @@ summary { cursor: pointer; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 
+
+/* Betting stats page: league-wide rates per season, all-seasons row last. */
+.betting-stats-table td, .betting-stats-table th { white-space: nowrap; }
+.betting-stats-table__all td { font-weight: var(--weight-semibold); border-top: 2px solid var(--border); }
+.betting-stats-defs { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-4); margin: 0; color: var(--muted); font-size: var(--text-xs); line-height: var(--leading-normal); }
+.betting-stats-defs dt { font-weight: var(--weight-semibold); color: var(--text); }
+.betting-stats-defs dd { margin: 0; }
+@media (max-width: 640px) { .betting-stats-defs { grid-template-columns: 1fr; } .betting-stats-defs dd { margin-bottom: var(--space-2); } }
