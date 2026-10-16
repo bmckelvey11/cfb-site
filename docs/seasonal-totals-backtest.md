@@ -110,7 +110,7 @@ seasonal edge to harvest.
 
 ## What this changes
 
-- **Do not** build a Nov–Dec under system. Recommendation #2 from `under-bets-analysis.md` and
+- **Do not** build a Nov–Dec under system. Recommendation #2 from `under-bets-analysis.md` (since merged into `under-bets-summary.md` and archived) and
   #4 from `under-bets-summary.md` are withdrawn.
 - **Do not** size up on low totals late. That cell is 49.61% over 1,292 games.
 - The earlier docs' framing — "cut early-season unders, concentrate late" — was built on a

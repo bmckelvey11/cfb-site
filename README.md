@@ -9,7 +9,10 @@ way Sports Insights Bet Labs does.
 
 ## Quick start
 
-No CFBD token needed for this part — `sample` uses bundled sample data.
+No CFBD token needed for this part — `sample` uses bundled sample data. Every entry
+point imports `cfb_paths.py`, which refuses to run until `CFB_DATA_ROOT` points at a
+directory holding a `.cfb-data-root` marker (see [Initializing a data root](#initializing-a-data-root)),
+so create one first:
 
 ```powershell
 git clone <this-repo-url>
@@ -17,14 +20,21 @@ cd cfb
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.lock
+
+# One-time data root (any path outside the repo; data is never committed)
+New-Item -ItemType Directory -Force $HOME\cfb-data
+New-Item -ItemType File $HOME\cfb-data\.cfb-data-root
+$env:CFB_DATA_ROOT = "$HOME\cfb-data"   # this shell; see below to persist it
+
 python -m cfb_system_maker sample
 python -m cfb_system_maker web
 ```
 
 Open `http://127.0.0.1:5000`.
 
-`sample` writes bundled 2023 sample games/lines to `data/` and prints two example
-backtests to the console so you can sanity-check the pipeline without a token.
+`sample` writes bundled 2023 sample games/lines to `$CFB_DATA_ROOT` (`raw/` and
+`processed/games.csv`) and prints two example backtests to the console so you can
+sanity-check the pipeline without a token.
 
 ## Full data build (real CFBD data)
 
@@ -36,14 +46,18 @@ lines for):
 
 ```powershell
 python -m cfb_system_maker fetch --season (2013..2025) --provider consensus
-python -m cfb_system_maker build --season (2013..2025) --provider consensus
+python -m cfb_system_maker build --season (2013..2025)
 python -m cfb_system_maker enrich
 ```
 
-- `fetch` pulls games + betting lines per season from CFBD and writes raw JSON to `data/raw/`.
-- `build` joins games to lines and writes the processed table to `data/processed/games.csv`.
+- `fetch` pulls games + betting lines per season from CFBD and writes raw JSON to
+  `$CFB_DATA_ROOT/raw/`. `--provider` is passed to the CFBD lines query and keeps only that
+  book's lines; omit it to keep every book.
+- `build` joins games to lines and writes the processed table to
+  `$CFB_DATA_ROOT/processed/games.csv`. It grades against the median line across the books in
+  the raw file (`normalize.median_line`); its `--provider` flag is accepted and ignored.
 - `enrich` joins in running season-to-date features (and any `scrape`/`graphql`/`actionnetwork`
-  data present) to produce `data/processed/features.json`. Run it after every `build`.
+  data present) to produce the `$CFB_DATA_ROOT/processed/features.duckdb` sidecar. Run it after every `build`.
 
 ### Advanced: broader data sources
 
@@ -51,16 +65,16 @@ These are alternate/supplementary fetch paths — none of them feed `build`/`bac
 directly (only `fetch`'s `games`/`lines` files do), but `enrich` picks up what they write.
 
 ```powershell
-# Every CFBD REST endpoint the vendored client exposes, written to data/raw/
+# Every CFBD REST endpoint the vendored client exposes, written to $CFB_DATA_ROOT/raw/
 python -m cfb_system_maker scrape --season 2023 2024
 python -m cfb_system_maker scrape --season 2023 --only games lines sp
 python -m cfb_system_maker scrape --season 2023 --include-per-game --fbs-only
 
-# Bulk GraphQL pull (Patreon Tier 3 CFBD accounts only), written to data/graphql/
+# Bulk GraphQL pull (Patreon Tier 3 CFBD accounts only), written to $CFB_DATA_ROOT/graphql/
 python -m cfb_system_maker graphql --season 2023
 python -m cfb_system_maker graphql --season 2023 --game-player-stats
 
-# Action Network odds scrape, written to data/raw/actionnetwork/
+# Action Network odds scrape, written to $CFB_DATA_ROOT/raw/actionnetwork/
 python -m cfb_system_maker actionnetwork --season 2023
 ```
 
@@ -70,19 +84,19 @@ Bring the dataset current during the season:
 
 ```powershell
 python -m cfb_system_maker fetch --season 2026 --provider consensus
-python -m cfb_system_maker build --season 2026 --provider consensus
+python -m cfb_system_maker build --season 2026
 python -m cfb_system_maker enrich
 ```
 
 This re-pulls the current season's completed games/lines and refreshes
-`features.json`. To also see this week's *upcoming* (unplayed) games with
+the `features.duckdb` sidecar. To also see this week's *upcoming* (unplayed) games with
 posted lines on the dashboard's "Current Matches" panel, run:
 
 ```powershell
 python -m cfb_system_maker upcoming
 ```
 
-`upcoming` writes `data/processed/upcoming.csv` separately — it never touches
+`upcoming` writes `$CFB_DATA_ROOT/processed/upcoming.csv` separately — it never touches
 `games.csv`, so it doesn't replace the `fetch`/`build`/`enrich` refresh above.
 
 ## Backtest filters (CLI reference)
@@ -94,10 +108,11 @@ python -m cfb_system_maker backtest --bet-type total --total-side over
 ```
 
 Available filters: `--bet-type`, `--side`, `--total-side`, `--season`, `--week`, `--team`,
-`--conference`, `--provider`, `--favorite`, `--underdog`, `--home`, `--away`, `--fade`,
+`--conference`, `--provider` (built rows all carry provider `median`, so any other value
+matches nothing), `--favorite`, `--underdog`, `--home`, `--away`, `--fade`,
 `--min-spread`, `--max-spread`, `--min-total`, `--max-total`, and `--holdout-season`
 (prints an in-sample/holdout split instead of a single result). Use `--save <name>` /
-`--load <name>` to persist systems to `data/systems/` (`<name>` must match
+`--load <name>` to persist systems to `$CFB_DATA_ROOT/systems/` (`<name>` must match
 `[A-Za-z0-9_-]+` — letters, digits, underscore, hyphen only).
 
 ## Configuration
@@ -169,9 +184,9 @@ playwright install chromium
 python -m pytest -m slow tests/test_browser_smoke.py
 ```
 
-The browser smoke test requires a built `data/` directory (`python -m cfb_system_maker
-sample --data-dir data` is enough) — it skips itself if `data/processed/games.csv` is
-missing.
+The browser smoke test requires built data under `CFB_DATA_ROOT` (`python -m
+cfb_system_maker sample` is enough) — it skips itself if
+`$CFB_DATA_ROOT/processed/games.csv` is missing.
 
 ## over_zero
 

@@ -206,7 +206,7 @@ agreement test 8 (rebuild identity / `meta.warehouse_version`).
 | `dim_athlete`, `dim_coach`, `bridge_athlete_team_history`, `bridge_coach_team_staff_history`, `bridge_recruit_school_history`, `bridge_game_athlete_availability`, `fact_draft_pick`, `fact_recruit`, `fact_coach_season` | Deferred, with named intent | No current consumer — but coach/athlete work is near-term intent (Phase 3+). Still behind Phase 0/1 and REST/GQL dedup. |
 | `fact_drive`, `fact_play`, `bridge_play_athlete_participation`, `fact_roster_snapshot`, `fact_transfer_portal_entry` | Deferred (plan's own Phase 3), with named intent | Largest volume in `raw`; nothing consumes it yet. |
 | `fact_team_week` | **Cut from Phase 1** | Wrong grain for this repo — see `## Corrected grains`. Week rollup is a later mart only after bye / multi-game / postseason rules are written. |
-| `app` schema and app-facing views | Deferred | Flask today reads `games.csv`/`features.json`. First concrete driver: coach/athlete site pages (Phase 3+). Hosted path sketched as Flask + `md:cfb`. |
+| `app` schema and app-facing views | Deferred | Flask today reads `games.csv` and the `features.duckdb` sidecar. First concrete driver: coach/athlete site pages (Phase 3+). Hosted path sketched as Flask + `md:cfb`. |
 
 ## Corrected grains
 
@@ -298,16 +298,16 @@ Runbook (write before Phase 2 Flask+MotherDuck):
    that would push, pushes nothing.
 3. `python scripts/promote_to_motherduck.py --yes` — attaches `md:cfb` (requires
    `motherduck_token` / `MOTHERDUCK_TOKEN` env var, or an interactive login on first
-   use), CTAS-replaces each table per schema (`raw`, `stg`, `stg_gql`, `core`, `meta`
+   use), CTAS-replaces each table per schema (`raw`, `stg`, `core`, `meta`
    by default; `--schemas` to override), verifies row counts match, and stamps
    `meta.warehouse_version` (git sha + `promoted_at`) on **both** local and `md:cfb`.
 4. Never use loader `--only` as "refresh one table" — it is a **destructive full-file
    replace**. Never assume `--explode-only` updates `meta.load_report`.
 5. The promote only `CREATE OR REPLACE`s tables that exist locally; it never drops a
-   remote table with no local counterpart. After the first promote following the
-   `stg` → `stg_gql` migration (`scripts/migrate_gql_stg_names.py`), the stale
-   `md.stg.gql_*` tables are not produced locally anymore and are left behind on
-   `md:cfb` — manually drop them.
+   remote table with no local counterpart. `stg_gql` was collapsed back into `stg`
+   (ADR-0003, `scripts/collapse_stg_gql.py`) and dropped from `DEFAULT_SCHEMAS`, so the
+   promote neither overwrites nor removes `md:cfb`'s leftover `stg_gql` schema — drop it
+   by hand (TODO `#motherduck-drop-stale-stg-gql`).
 
 ## Revised phase plan
 

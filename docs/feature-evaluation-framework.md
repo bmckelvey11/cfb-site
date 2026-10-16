@@ -6,7 +6,6 @@
   - [2.2. Separate four questions](#22-separate-four-questions)
   - [2.3. Choose targets first](#23-choose-targets-first)
     - [2.3.1. Spread and margin](#231-spread-and-margin)
-    - [](#)
     - [2.3.3. Totals](#233-totals)
     - [2.3.4. Win and cover probabilities](#234-win-and-cover-probabilities)
     - [2.3.5. Line movement](#235-line-movement)

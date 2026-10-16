@@ -23,7 +23,7 @@ orientation and goes stale; the tracked queue is [`TODO.md`](TODO.md).*
 
 ### System maker
 
-*`cfb_system_maker/` — CLI + Flask backtester. Open: delete saved systems from the web UI (`#system-maker-delete-saved-systems`).*
+*`cfb_system_maker/` — CLI + Flask backtester.*
 
 - add the general betting stats and figures page
 -
@@ -94,7 +94,6 @@ orientation and goes stale; the tracked queue is [`TODO.md`](TODO.md).*
   (direct call skips the AN tick flatten, leaves the CSV stale).
 - Run from the **main checkout** `.venv` python with `CFBD_API_KEY` exported —
   system python has the wrong pydantic.
-- Held run: `gamePlayerStat` GraphQL pull — see [`docs/reminders.md`](docs/reminders.md).
 
 ## Tasks (quick, un-triaged)
 
@@ -136,7 +135,8 @@ orientation and goes stale; the tracked queue is [`TODO.md`](TODO.md).*
 | Doc → queue | `python scripts/todo_sweep.py sweep --apply` |
 
 **Units:** `cfb_system_maker/` (app, scrapers, warehouse) · `models/middle/` ·
-`models/over_zero/` · `research/spread/` — each has its own `CLAUDE.md`.
+`models/over_zero/` · `research/spread/` · `research/totals/` · `research/bankroll/` — each
+has its own `CLAUDE.md`.
 
 **Standing rules worth not re-learning:** no lookahead in pre-game features
 (`result_lookahead` tag + UI quarantine); data never committed; don't touch

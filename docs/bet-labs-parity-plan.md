@@ -5,7 +5,7 @@ Steps to make `cfb_system_maker` function like Sports Insights Bet Labs, based o
 and its 34 screenshots (`C:/Users/mckel/Documents/Codex/2026-07-16/how/outputs/sports-insights-systems/`).
 
 Written 2026-07-16. Companion to
-[superpowers/plans/2026-07-16-next-steps-roadmap.md](superpowers/plans/2026-07-16-next-steps-roadmap.md) —
+[2026-07-16-next-steps-roadmap.md](../archive/docs/superpowers/plans/2026-07-16-next-steps-roadmap.md) (archived) —
 data download (roadmap item 1) is a prerequisite for everything here.
 
 ---

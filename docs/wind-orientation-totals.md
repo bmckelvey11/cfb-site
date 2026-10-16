@@ -2,7 +2,7 @@
 
 - **Date:** 2026-09-08
 - **Author:** bmckelvey11
-- **Status:** approved
+- **Status:** executed 2026-09-08 — verdict below (no filter)
 
 Does a high wind's *orientation relative to the field* matter to scoring, and if
 so does the market already price it? Motivated by the `wind_cross_mph` /
@@ -102,7 +102,7 @@ No repeated looks: one fit, one report.
 
 ## 6. Pre-run power / MDE
 
-`power_calc.py --sd 16.34 --n 9927 --cluster-size 47.3 --icc 0.002`
+`power_calc.py` (an external tool, not in this repo) `--sd 16.34 --n 9927 --cluster-size 47.3 --icc 0.002`
 gives design effect 1.09 and MDE 0.480 points on the mean scale. Converting to
 the coefficient scale by SD(`wind_cross_mph`) = 4.20 mph:
 

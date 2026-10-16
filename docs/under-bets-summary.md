@@ -2,6 +2,15 @@
 
 **203 bets · 115-88 (56.7%) · +18.9u on 212u risked · +8.9% ROI · 2023-08 → 2025-12**
 
+> **Late-season recommendations withdrawn.** [`seasonal-totals-backtest.md`](seasonal-totals-backtest.md)
+> tested the Nov–Jan under effect on the full 13k-game set and found none: low totals late go
+> over 49.61% of the time on 1,292 games. §4's "timing dominates" reading and actions 1, 3 and
+> 4 in §8 do not stand; the +8.9% came from which games were picked, not when. The pattern
+> tables below remain as the record of what the 203 bets show in-sample.
+>
+> This file absorbed `under-bets-analysis.md` on 2026-10-16 (archived at
+> [`archive/docs/under-bets-analysis.md`](../archive/docs/under-bets-analysis.md)).
+
 Unders are 40% of your NCAAF volume and **87% of all your totals bets**. You are structurally an
 under bettor, not a totals bettor who happens to land on unders.
 
@@ -111,6 +120,7 @@ number rather than hunting key numbers. 64% of bets at exactly -110.
 
 | hypothesis | finding |
 |---|---|
+| Targets a total-line range | Bands alternate +21/-12/+25/-5/+13/+9%, no monotonic trend |
 | Team-specific reads | 114 distinct teams / 203 bets, max 9 on any team |
 | Conference or level filter | G5 +7.0%, mixed +6.5%, P5-P5 +11.8% — flat |
 | Line shopping / price sensitivity | 64% at exactly -110, mean -109 |
@@ -119,7 +129,21 @@ number rather than hunting key numbers. 64% of bets at exactly -110.
 
 ---
 
-## 6. Statistical honesty
+## 6. The 2023 → 2024-25 shift is not a selection change
+
+| era | n | mean total | mean odds | bets/day | win% | ROI |
+|---|---|---|---|---|---|---|
+| 2023 | 79 | 56.5 | -110.0 | 2.5 | 53.2% | **+1.2%** |
+| 2024-25 | 124 | 58.0 | -108.4 | 2.8 | 58.9% | **+13.4%** |
+
+Every measurable *input* is nearly identical — same line range, same juice, same volume, same
+under-share. Only the hit rate moved. Either the qualitative read behind the picks improved in a
+way the CSV cannot capture, or 2024-25 is partly variance. **The data cannot distinguish these.**
+2024-25 unders alone: p=0.087 — not significant.
+
+---
+
+## 7. Statistical honesty
 
 - Late unders (p=0.047) and sub-50 unders (p=0.037) are nominally significant but do **not**
   survive correction for the ~20 hypotheses tested here (Bonferroni alpha ≈0.0025).
@@ -131,13 +155,16 @@ number rather than hunting key numbers. 64% of bets at exactly -110.
 
 ---
 
-## 7. Actionable
+## 8. Actionable
 
-1. **Cut early-season unders.** 128 bets returning +2.1% is not worth the variance. Concentrating
+1. *(Withdrawn — see the note at the top.)* **Cut early-season unders.** 128 bets returning +2.1% is not worth the variance. Concentrating
    the same bankroll into Nov–Jan is the single highest-value change available.
 2. **Trim the 60–64.5 band.** 60 bets, 30-30, -1.4%. Your biggest block of dead volume.
-3. **Lean into low totals late.** <50 in Nov–Jan is 13-3. Small sample — size accordingly, but
+3. *(Withdrawn — that cell is 49.61% over 1,292 games.)* **Lean into low totals late.** <50 in Nov–Jan is 13-3. Small sample — size accordingly, but
    it is the sharpest cell in the data.
-4. **Forward-test on 2026** before sizing up. Paper-trade "Nov–Jan unders, total ≤60."
+4. *(Withdrawn.)* **Forward-test on 2026** before sizing up. Paper-trade "Nov–Jan unders, total ≤60."
 5. **Backtest the seasonal totals effect in `cfb_system_maker`** against the full 13k-game set —
-   that has the sample to settle in one run what 203 bets cannot.
+   that has the sample to settle in one run what 203 bets cannot. *Done:*
+   [`seasonal-totals-backtest.md`](seasonal-totals-backtest.md) — no seasonal edge.
+6. Overs are +30% ROI in both windows on 31 bets. Too small to act on, but worth tracking rather
+   than dismissing given the 87% under bias may be leaving over spots unplayed.

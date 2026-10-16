@@ -30,7 +30,7 @@ to adopt and the sample is your own money.
 | moneyline | yes | no |
 | team totals (`core_bet_type_6_team_score`) | yes | no |
 
-Every conclusion in `research/spread/docs/prediction-tracker-findings.md` is about the first row only. Totals,
+Every conclusion in `archive/spread-margin-era/prediction-tracker-findings.md` (archived with the spread-margin era) is about the first row only. Totals,
 moneylines and team totals are untested here, and your bet history says totals is where the
 profit was.
 

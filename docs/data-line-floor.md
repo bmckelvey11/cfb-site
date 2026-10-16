@@ -4,17 +4,11 @@
 endpoint returns usable spread/total data. This is the practical history floor for the
 backtester (DATA-01, D-01/D-02).
 
-## Evidence (on-disk, verified 2026-06-13)
-
-| Season | Games on disk | Line rows | Rows w/ any provider line | Usable consensus rows |
-|--------|---------------|-----------|---------------------------|-----------------------|
-| 2012   | 805           | 805       | **0**                     | **0**                 |
-| 2013   | 813           | 813       | 813                       | 806 (consensus, numberfire, teamrankings) |
-
-- The built `data/processed/games.csv` already spans **2013–2025 (12,964 games)**;
-  `features.json` `_meta` reports 12,964 games. Verified on-disk.
-- Games exist much earlier (1992, 1998, 2001–2004, 2007–2025), but the `lines_*.json`
-  set starts at 2012 and 2012 is empty of actual line children.
+The evidence — an API probe plus the warehouse, with which book posted each era — is the
+dated record [`cfbd-lines-coverage-2026-09-17.md`](cfbd-lines-coverage-2026-09-17.md),
+which supersedes the 2026-06-13 on-disk snapshot this doc used to carry. What fills lines
+before 2013 is [`pre-2013-lines-sources-2026-09-17.md`](pre-2013-lines-sources-2026-09-17.md).
+This doc keeps only the living part: how the code treats a season without usable lines.
 
 ## The binding constraint is line coverage, not game coverage
 
@@ -24,8 +18,9 @@ effective history floor equals the line-coverage floor (2013), not the game-cove
 
 ## D-02: require a usable line
 
-`normalize._select_line` returns `None` when a game's `lines` list is empty or when no
-line carries a spread or over/under. Such games are dropped — they produce 0 GameRecords.
+`normalize.median_line` returns `None` when a game's `lines` list is empty or when no
+line carries a spread or over/under (`_select_line` now serves only `duckdb_core`'s per-book
+selection). Such games are dropped — they produce 0 GameRecords.
 This keeps backtests clean and is why pre-floor seasons (e.g. 2012) cleanly contribute 0 rows.
 
 This behavior is locked by tests in `tests/test_normalize.py`

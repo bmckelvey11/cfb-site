@@ -497,9 +497,9 @@ A closing caution ties the whole catalog together: build the pre-game/market div
 
 23. [mathematics](https://pdfs.semanticscholar.org/18aa/7ac4ea0518a29926f2a26df529eb3578a998.pdf)
 
-24. [fbs-totals-frontier-models.md](fbs-totals-frontier-models.md)
+24. [fbs-totals-frontier-models.md](../research/totals/docs/fbs-totals-frontier-models.md)
 
-25. [FBS College Football Pregame Totals Betting System  Research Report.md](FBS College Football Pregame Totals Betting System  Research Report.md)
+25. [fbs-totals-system-research-report.md](../research/totals/docs/fbs-totals-system-research-report.md)
 
 26. [Chapter 13: Pace and Play Calling | NFL Analytics | DataField.Dev](https://datafield.dev/nfl-football-analytics/part-03/chapter-13/) - Understanding tempo, play selection, and situational decision-making
 

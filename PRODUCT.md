@@ -14,7 +14,7 @@ Small group (the owner plus a few others) backtesting college football betting s
 
 ## Brand Personality
 
-Modeled explicitly on Sports Insights Bet Labs and terminal-style trading tools: dense, numbers-first, no-nonsense. Tabular-nums, compact stat chips, a sidebar filter panel, a single restrained accent color (teal) used only for signal (positive/active state), not decoration. Confidence through density and precision, not whitespace or polish-for-its-own-sake.
+Modeled explicitly on Sports Insights Bet Labs and terminal-style trading tools: dense, numbers-first, no-nonsense. Tabular-nums, compact stat chips, a sidebar filter panel, a single restrained accent color (steel slate blue, the Signal palette) used only for signal (positive/active state), not decoration. Confidence through density and precision, not whitespace or polish-for-its-own-sake.
 
 ## Anti-references
 
