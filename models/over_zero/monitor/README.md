@@ -152,7 +152,7 @@ the stake ledger (`threshold`, `passes_filter`, `flat_units_risked`,
 `flat_units_pnl`, `kelly_units`, `kelly_units_pnl`).
 
 **Both stake ledgers are live only where `passes_filter == 1`.** On the other
-9,000-odd rows they are the counterfactual — what the rule *would* have
+~7,600 rows they are the counterfactual — what the rule *would* have
 staked — not money wagered. Summing `kelly_units_pnl` across a bias bin that
 was never bet gives a number the strategy never earned.
 
@@ -169,16 +169,16 @@ record, flat ROI and Kelly ROI equal the in-memory headline before reporting
 success.
 
 **Plan on the lower bound, not the point estimate.** The 1.75 threshold was
-chosen partly on this data, so +23% is inflated by selection; +11% is the
-number to stake against. At −130 the planning bound is +3.0%, which is why
+chosen partly on this data, so the +23% ROI at −120 is inflated by selection; +11% at −120
+is the number to stake against. At −130 the planning bound is +3.0%, which is why
 the operational rule caps the price at −120.
 
 Two things the figure deliberately puts in front of the reader:
 
-- **2025 is the largest sample and the flattest result**: 27–24, +1.07% ROI
-  on n=51, against a pooled +23%. Its own CI is [−24.5%, +25.9%] — wide
+- **2025 is the largest sample and the flattest result**: 27–20, +9.67% ROI
+  on n=47, against a pooled +28.18%. Its own CI is [−17.4%, +34.6%] — wide
   enough to contain both the pooled estimate and breakeven, so it is not
   evidence of decay on its own. `run_monitor.py` is the test that measures
   decay directly, and as of the last run it finds none.
-- **The sample is back-loaded**: 2–51 bets per season, with 68% of all bets
-  coming from 2022 onward. The pooled figure is mostly recent data.
+- **The sample is back-loaded**: 4–47 bets per season, with 69% of all bets
+  coming from 2023 onward. The pooled figure is mostly recent data.

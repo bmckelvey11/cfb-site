@@ -35,6 +35,7 @@ semi-strong **inefficient**.
 | `censoring_bias.py`     | All 10 models as pure functions over numpy arrays. |
 | `demo_reproduce.py`     | Synthetic data calibrated to paper params; validates the chain. |
 | `run_on_project_data.py`| Runs the same models on this repo's `data/processed/games.csv`. |
+| `predict_week.py`       | Fits the pipeline on historical seasons and scores a future week's lines (no scores yet); `--fetch` pulls live lines. |
 
 ## Models recreated (paper equation → function)
 

@@ -1,7 +1,7 @@
 # B6 — ">66 totals line → bet the under" lead: NULL
 
 Tests the under-side lead surfaced during the floor-bias work
-(`docs/floor_bias_1h_chat_history.md:980-987`: >66 line → 54.15% under, N=977).
+(`archive/docs/over_zero/floor_bias_1h_chat_history.md:982-989`: >66 line → 54.15% under, N=977).
 
 Run: `python research/b6_high_total_under/test_high_total_under.py`
 Data: `data/raw/lines_{2013..2025}.json`, 12,493 usable games / 12,372 after pushes.

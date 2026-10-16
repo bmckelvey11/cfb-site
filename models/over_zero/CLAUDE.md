@@ -8,5 +8,6 @@ archive, and no-lookahead rules live in root `CLAUDE.md`.
 - First-half builders live in this unit's `scripts/` directory. Their inputs come from
   local DuckDB Action Network tables; outputs go under
   `$CFB_DATA_ROOT/processed/over_zero/`.
-- This unit has no dedicated pytest suite. Verify changed scripts end to end against local
-  data and inspect generated row counts/files.
+- Only `scripts/pick_history.py` has pytest coverage (`tests/test_over_zero_pick_history.py`).
+  Verify other changed scripts end to end against local data and inspect generated row
+  counts/files.

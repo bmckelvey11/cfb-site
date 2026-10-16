@@ -1,5 +1,5 @@
 """Test the ">66 totals line -> bet the under" lead surfaced during the
-floor-bias work (docs/floor_bias_1h_chat_history.md:980-987, 54.15% / N=977).
+floor-bias work (archive/docs/over_zero/floor_bias_1h_chat_history.md:982-989, 54.15% / N=977).
 
 The lead came from eyeballing a 4-bin scan on the same data that produced the
 floor-bias result, so the bin edge is not independent evidence. This tests the

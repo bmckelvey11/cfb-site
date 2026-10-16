@@ -8,7 +8,7 @@ the code or this page in the same commit.
 from, what runs on a schedule, what is hand-run, and which files under `data/` matter.
 
 ```
-CFBD REST ──┐                                        ┌─ Flask system maker (games.csv, features.json)
+CFBD REST ──┐                                        ┌─ Flask system maker (games.csv, features.duckdb)
 CFBD GraphQL ├─► data/raw, data/graphql ─► cfb.duckdb ─┤─ models/middle (games.csv)
 Action Net. ─┤   data/ingest ─► data/processed        ├─ models/over_zero (raw.an_*, ingest/oddsapi)
 PFF, odds ───┘                     ▲                  └─ research/spread (stg.game, an_history_tick)
@@ -28,7 +28,8 @@ PFF, odds ───┘                     ▲                  └─ research/
 | `data/ingest/snapshots/` | Point-in-time REST line snapshots. Not globbed by the loader on purpose | hand | no |
 | `data/ingest/massey/`, `ingest/prediction_tracker/` | Massey ranks, Prediction Tracker captures | `CFB-Massey-Weekly` task (`scripts/pull_massey.cmd`); `CFB-PT-Snapshot` task | no |
 | `data/processed/games.csv` | The flat game table the app and the totals model read | `refresh_cfbd.py` → `cli.rebuild_processed_games` | no |
-| `data/processed/features.json` | Registry-driven features for the app | `python -m cfb_system_maker enrich` | no |
+| `data/processed/features.duckdb` | Registry-driven features for the app (tables `features` + `meta`; legacy `features.json` is read only if this is absent) | `python -m cfb_system_maker enrich` | no |
+| `data/ingest/weather_football/` | weather.football forecast snapshots: `latest_{season}.json` plus an append-only `history_{season}.jsonl`. Outside the warehouse glob | `python -m cfb_system_maker upcoming` and `weather-football` | no |
 | `data/processed/{actionnetwork,pff,oddsapi,massey}/*.csv` | Flattened vendor tables the loader picks up | `scripts/*_flatten.py`, run by the refresh | no |
 | `data/processed/greenline/greenline_history.csv` | Master PFF Greenline history for analysis: one row per era × game × market (2020 archive, 2022-23 exports, 2026 captures) plus personal 2023-25 totals. Not loaded by the warehouse; column dictionary in the builder's docstring | `research/totals/scripts/build_greenline_history.py`, hand-run after each graded week | no |
 | `data/cfb.duckdb` | The warehouse. Local file is the source of truth | `refresh_cfbd.py` → `build_duckdb` + `build_core` | no |
@@ -48,7 +49,7 @@ second source because `excludeGarbageTime` changes the aggregates. Shapes: `once
 (`name.json`), `season` (`name_2024.json`), `season_week`, `grid`, `per_game`/`per_player`
 (fan out over ids already on disk, opt-in), `on_demand` (registered, skipped in bulk). A full
 sweep is hand-run; the daily refresh force-rescrapes only `games lines calendar conferences
-venues` for the current season. Empty `[]` files for early seasons are documented floors,
+venues drives` for the current season. Empty `[]` files for early seasons are documented floors,
 not failures ([data-coverage.md](../../docs/data-coverage.md)). Re-check registry vs disk
 with `scripts/audit_coverage.py`, registry vs live spec with `scripts/audit_endpoints.py`.
 
@@ -100,7 +101,7 @@ via `scripts/task_ledger.cmd`):
 
 In order. A step marked non-fatal prints its failure and the run continues.
 
-1. **Scrape** the current season's `games lines calendar conferences venues`, overwriting.
+1. **Scrape** the current season's `games lines calendar conferences venues drives`, overwriting.
    Fatal: a dead REST pull stops the run before anything else is spent.
 2. **Pull GraphQL** `game` and `gameLines`, staged, swapped only if ≥95 % of the previous
    row count came back. Non-fatal.
@@ -111,11 +112,22 @@ In order. A step marked non-fatal prints its failure and the run continues.
    explode failures print as `LOAD ERROR schema.name: ...` and `build_core` still runs.
 6. **Pin check** `stg.an_history_tick` against `_AN_TICK_COLUMNS`. A drift is exit 1.
 
+After `refresh_cfbd.py` returns, the `refresh_cfbd.cmd` wrapper runs two more steps. Neither
+changes the exit code:
+
+7. **Weekly rankings** — `python -m scripts.weekly_rankings` (offense/defense/pace from the
+   games and drives now on disk).
+8. **Tuning-lab shadow tick** — `python -m models.tuning shadow tick --spec
+   models\tuning\specs\shadow_2026_w05_08.json`, run with the main `.venv` from the pinned
+   `..\cfb-shadow-pin` worktree; skipped if that worktree or `.venv` is missing.
+
 Not touched: Massey, the PFF and odds pulls themselves, the 48 hand-pulled GraphQL dumps,
-in-season per-week REST endpoints (`plays`, `drives`, `game_team_stats`, … stop at 2025 until
+in-season per-week REST endpoints (`plays`, `game_team_stats`, … stop at 2025 until
 someone runs `scrape --season 2026 --only …`), MotherDuck.
 
-Run it by hand with the repo `.venv` python and `CFBD_API_KEY` in the environment:
+Run it by hand with `CFBD_API_KEY` in the environment. The wrapper uses `.venv-cfbd` (built by
+`scripts/make_fetch_venv.cmd`) and falls back to `.venv` if that is missing; set `PYTHON` to
+override:
 
 ```bash
 scripts\refresh_cfbd.cmd
@@ -221,7 +233,7 @@ result-informed carries the `result_lookahead` tag.
 
 | Consumer | Entry point | Reads | Does not read |
 |---|---|---|---|
-| Flask system maker (filters, systems, dashboard) | `cfb_system_maker/web.py`, `features.py`, `enrich.py`, `prior_game_stats.py` | `processed/games.csv`, `processed/features.json`, raw JSON indexed in-process | the warehouse, at all |
+| Flask system maker (filters, systems, dashboard) | `cfb_system_maker/web.py`, `features.py`, `enrich.py`, `prior_game_stats.py` | `processed/games.csv`, `processed/features.duckdb`, raw JSON indexed in-process | the warehouse, at all |
 | Matchup page (local, 127.0.0.1:5050) | `cfb_system_maker/matchup/` (`python -m cfb_system_maker matchup`) | `core` and `stg`, opened `read_only=True` per request and closed before responding; the newest `ingest/oddsapi/*.json` for current DK/FD lines | `raw`; it never writes |
 | Totals model | `models/middle/data.py` | `processed/games.csv` | the warehouse |
 | Over-zero board | `models/over_zero/scripts/build_1h_games.py`, `build_1h_lines.py` | `raw.an_scoreboard`, `raw.an_history` (read-only, the only consumer on `raw`) | |
@@ -239,7 +251,7 @@ The consequence: a bug in `build_core` cannot reach the app or the totals model 
 reach research — `core.fact_game` supplies finals to the version-B spread eval and to
 Greenline grading, so `build_core` is not a dead end. It also reaches the matchup page,
 which reads `fact_game_line` and `fact_game_odds` for the game card. `fact_game_team` and
-`fact_game_historical` had no reader as of 2026-09-16; they are kept, not retired. A bug in `games.csv` or `features.json` reaches the app and the totals model
+`fact_game_historical` had no reader as of 2026-09-16; they are kept, not retired. A bug in `games.csv` or `features.duckdb` reaches the app and the totals model
 both.
 
 Every warehouse reader above opens `read_only=True` and exits. Keep it that way: a

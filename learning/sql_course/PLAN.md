@@ -2,6 +2,8 @@
 
 _Locked via claudex-loop — by Claude + mckel_
 
+**Status: Phases 1–5 done** (verified in the tree 2026-10-16: `course_parse.py`, `build_slides.py` + 22 slides, `course.py list/show/run/progress`, 20 `solutions/*.sql`, `sandbox.main.course_progress`, `tests/test_sql_course.py`).
+
 ## Goal
 
 Turn `cfb_sql_course.md` into a runnable learning program: slides per module, a CLI
@@ -444,7 +446,7 @@ static reveal.js slides) do not fit this task and are not loaded.
 ## Detailed phase plans
 
 See the phase-by-phase file lists, interfaces, checkbox steps, and check gates
-in the original plan document: [`docs/sql-course-program-plan-2026-09-16.md`](../../docs/sql-course-program-plan-2026-09-16.md).
+in the original plan document: [`archive/docs/sql-course-program-plan-2026-09-16.md`](../../archive/docs/sql-course-program-plan-2026-09-16.md).
 The corrections above (grading modes, isolation, check-gate wording, grader
 rounding, parser mapping, title slide source, `why_betting`, Part D boundary,
 `Block` fields) supersede the corresponding text in that document; everything

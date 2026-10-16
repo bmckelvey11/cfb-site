@@ -23,3 +23,12 @@ positive-process/negative-result, one deviation-adjusted null).
 - Every task went through implementer → task-reviewer (spec compliance +
   code quality) gates per `superpowers:subagent-driven-development`; two
   tasks (B4.1, B3) required one fix round each before approval.
+
+## Later studies (outside Track B)
+
+| Study | Verdict | Link |
+|---|---|---|
+| B6 — >66 totals line → bet the under | NULL: the 54.15% under rate replicates but is not a bettable edge. | [b6_high_total_under/](b6_high_total_under/RESULTS.md) |
+| B7 — 55–65 totals line → bet the under | NULL, conclusive for the band; `spread 7–14` inside it is reported as a lead, not an edge. | [b7_mid_total_under/](b7_mid_total_under/RESULTS.md) |
+| Win-probability onset timing vs. bet outcome (2026-08-31) | NULL as a bench-timing explanation of the weak 2025 season. | [2026-08-31_win_prob_onset/](2026-08-31_win_prob_onset/RESULTS.md) |
+| Spread magnitude vs. bet outcome (2026-09-10) | The edge is a dog-floor edge that stops near spread 50; recommends capping the rule at \|spread\| ≤ 50 and leaving total alone. Pre-committed plan in `PLAN.md`, 2D follow-up in `RESULTS-2D.md`. | [2026-09-10_spread_magnitude/](2026-09-10_spread_magnitude/RESULTS.md) |

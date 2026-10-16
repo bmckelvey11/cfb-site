@@ -30,7 +30,7 @@ python -m cfb_system_maker scrape --season 2023 --include-per-game --fbs-only   
 python -m cfb_system_maker graphql --season 2023   # bulk-pull GraphQL tables to data/graphql/ (Tier 3)
 python -m cfb_system_maker actionnetwork --season 2023   # period odds CFBD lacks → data/raw/actionnetwork/
 python -m cfb_system_maker build --season 2023 --provider consensus
-python -m cfb_system_maker enrich   # join registry features -> data/processed/features.json (run after build)
+python -m cfb_system_maker enrich   # join registry features -> data/processed/features.duckdb (run after build)
 python -m cfb_system_maker upcoming   # unplayed week → processed/upcoming.csv; never writes games.csv
 python -m cfb_system_maker weather-football   # weather.football snapshot → ingest/weather_football/
 python -m cfb_system_maker duckdb --explode --flatten-nested   # data/cfb.duckdb; serving still csv+features
@@ -43,6 +43,8 @@ python -m cfb_system_maker web --port 5000   # Flask UI at 127.0.0.1:5000 (waitr
 python -m cfb_system_maker matchup           # team matchup page at 127.0.0.1:5050 (reads the warehouse)
 ```
 
+The CFBD network commands (`fetch`, `scrape`, `graphql`) must run under `.venv-cfbd`, built by `scripts/make_fetch_venv.cmd`: the main `.venv` resolves pydantic 2 for `anthropic`, and the vendored client cannot import under it (`docs/fetch-venv-2026-09-17.md`).
+
 There is no compile step and no linter configured for our code. `requirements.lock` is the reproducible install; `requirements.txt` is the loose pins (Flask, waitress, duckdb, sklearn, pytest, plus `cfbd-python/requirements.txt`).
 
 ## Pipeline & architecture
@@ -51,14 +53,14 @@ Data flows acquire → build → enrich → consume. Each CLI command persists t
 
 1. **fetch** → `cfbd_client.fetch_games_and_lines` calls `GamesApi.get_games` + `BettingApi.get_lines`, dumps each model `.dict(by_alias=True)`, writes `data/raw/{games,lines}_{season}.json` (`storage.save_raw_json`). This is the only input `build` reads.
 2. **build** → `normalize.normalize_games` joins games to lines by game id, picks one line per game (`_select_line`: preferred provider, else first usable), emits frozen `GameRecord`s → `data/processed/games.csv` (`storage.save_processed_games`).
-3. **enrich** → `enrich.run_enrich` resolves `FEATURE_REGISTRY` per game → `data/processed/features.json`. Run after every `build`.
+3. **enrich** → `enrich.run_enrich` resolves `FEATURE_REGISTRY` per game → `data/processed/features.duckdb` (tables `features` + `meta`). Run after every `build`.
 4. **backtest / web / search** → `backtest.run_backtest` filters with `matches_system`, grades with `grade_bet`, aggregates into `BacktestResult`.
 
-`web.py` (`create_app`) skips fetch/build — it loads already-built `games.csv` (+ `features.json` if present). Missing data → `error="missing_data"`. Routes: `/` dashboard, `/system` editor, `/compare`, `/betlog`, `/filter-detail`, `/api/backtest`. Vanilla JS/CSS, no frontend framework. Waitress unless `--debug`.
+`web.py` (`create_app`) skips fetch/build — it loads already-built `games.csv` (+ `features.duckdb` if present). Missing data → `error="missing_data"`. Routes: `/` dashboard, `/system` editor, `/compare`, `/betlog`, `/filter-detail`, `/api/backtest`. Vanilla JS/CSS, no frontend framework. Waitress unless `--debug`.
 
 Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 
-`scrapers.py` is a parallel REST sweep: registry `ENDPOINTS` (82 entries = unique vendored-client methods plus 9 `*_ngt` garbage-time variants). Unique live spec paths: 74; 73 methods registered, `/info/usage` is account metering (deliberately unregistered). `*_ngt` is a **second source** — `excludeGarbageTime` changes aggregates and cannot be derived from the unfiltered dump. (Vendored client bumped `034cd17` → `52f2bbf` on 2026-08-28 for CFP, core ratings, expanded SRS, coach profile/seasons/tenures, conference affiliations/changes.) Re-check with `python scripts/audit_coverage.py` (registry vs disk) and `python scripts/audit_endpoints.py` (live spec vs registry); `docs/data-coverage.md` records why absent endpoints are absent and why empty `[]` files are data floors, not failures. Writes `data/raw/` only — does not feed `build`/`backtest`.
+`scrapers.py` is a parallel REST sweep: registry `ENDPOINTS` (90 entries = 81 unique vendored-client `(api, method)` pairs plus 9 `*_ngt` garbage-time variants; the live-spec path count was last audited as 74 — re-run `scripts/audit_endpoints.py`), `/info/usage` is account metering (deliberately unregistered). `*_ngt` is a **second source** — `excludeGarbageTime` changes aggregates and cannot be derived from the unfiltered dump. (Vendored client bumped `034cd17` → `52f2bbf` on 2026-08-28 for CFP, core ratings, expanded SRS, coach profile/seasons/tenures, conference affiliations/changes.) Re-check with `python scripts/audit_coverage.py` (registry vs disk) and `python scripts/audit_endpoints.py` (live spec vs registry); `docs/data-coverage.md` records why absent endpoints are absent and why empty `[]` files are data floors, not failures. Writes `data/raw/` only — does not feed `build`/`backtest`.
 
 `graphql_client.py` is a third fetch path over CFBD GraphQL (Hasura) — **Patreon Tier 3 only**. Introspects once, then for each root table in `GQL_DEFAULT_TABLES` (34 tables; `GQL_EXCLUDED` is three: `gamePlayerStat` size, `scoreboard` live-only, `gameMedia` no join key; `scripts/audit_endpoints.py` partitions the 37 introspected tables against both) auto-selects scalar columns (skips relations), picks a sort key (`id` else first scalar), paginates with `limit`/`offset`. Writes `data/graphql/{table}.json` (shapes differ from REST). Root fields advertise their own args, so tables lacking `limit`/`offset` are fetched in one shot, and `where:{season:{_in:[…]}}` is only added when the table has a season/year column **and** a `where` arg. Hasura sort arg is **`orderBy`** with an **uppercase** enum (`orderBy: {id: ASC}`) — `order_by`/`asc` are rejected, and unsorted `limit`/`offset` has no stable row order. HTTP poster must send a non-default `User-Agent` (Cloudflare 403s urllib's default); `post_fn` is injectable for tests.
 
@@ -66,7 +68,7 @@ Explicit `--data-dir` wins over `CFB_DATA_ROOT` where a command supports it.
 
 `duckdb` loads `data/raw/` + `data/graphql/` into `data/cfb.duckdb` (one file; REST lands in
 `raw`/`stg` under its endpoint names, GraphQL lands in `raw` under a `gql_`-prefixed name and
-in `stg` under its bare name — optional `stg` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.json`.
+in `stg` under its bare name — optional `stg` explode / `--flatten-nested`). Serving and backtests still use `games.csv` + `features.duckdb`.
 
 **MotherDuck (`md:cfb`) is a manual mirror, local file is source of truth.** Never write to `md:cfb` directly — rebuild and verify local first (`python -m pytest -m slow tests/test_core_agreement.py`), then promote with `python scripts/promote_to_motherduck.py --dry-run` (lists tables/rows, pushes nothing) followed by `--yes` (CTAS-replaces each table, stamps `meta.warehouse_version` on both sides). See `docs/duckdb-warehouse-plan.md` (`## MotherDuck promote`) for the full runbook.
 
@@ -160,17 +162,17 @@ older than 36 h falls back to CFBD alone; `upcoming_meta.json` records which
 - **Spread sign convention:** `GameRecord.spread` is always the **home** spread. `_side_spread` negates it for away. A bet covers when `team_points + side_spread - opponent_points > 0`. Preserve this when touching grading.
 - **Two bet types share one path:** `SystemFilter.bet_type` is `"spread"` (uses `side` home/away) or `"total"` (uses `total_side` over/under). `matches_system` and `grade_bet` branch on it; `_grade_total_bet` handles totals separately. CLI and web both expose spread and total (`--bet-type` / form). `fade` flips the graded side only.
 - **CFBD field names are inconsistent** (camelCase vs snake_case across API versions). `normalize._first(row, *keys, fallback=...)` tries multiple key spellings — extend the key list rather than assuming one casing.
-- **All domain types are frozen dataclasses** (`models.py`). `GameRecord` field order is the CSV schema — changing it changes `storage` read/write. New game-level data goes in `features.json`, not new CSV columns. `storage._row_to_game` parses CSV strings back, treating `""` as `None`. `SavedSystem` JSON: new fields must default for old saves.
+- **All domain types are frozen dataclasses** (`models.py`). `GameRecord` field order is the CSV schema — changing it changes `storage` read/write. New game-level data goes in the features sidecar (`features.duckdb`), not new CSV columns. `storage._row_to_game` parses CSV strings back, treating `""` as `None`. `SavedSystem` JSON: new fields must default for old saves.
 - **API token resolution** (`cfbd_client.find_cfbd_token`): env vars `CFBD_API_KEY`, `CFBD-API`, `BEARER_TOKEN`, then `env.env` file. `env.env` holds the real key (gitignored-style secret) — never commit or echo its value.
 - **Running season-to-date stats** (`running_stats.py`, source kind `computed_running`): values are entering-game — computed from that team's strictly-prior games in the same season, ordered by raw `startDate` (fallback: week). First game of a season → `games_played=0`, percentages/averages `None` (which fail closed as filters).
-- **Coach playstyle labels** (`coach_style_cluster`): read `data/processed/pregame_coach_styles.json`, generated separately for each target season with training seasons strictly before that season. Assign the previous season's principal coach; this can differ from the current coach after a coaching change. Regenerate with `python -m scripts.rebuild_pregame_features --data-dir data`. Legacy `coach_style.py` career labels are not used for pregame filters. See `docs/pregame-filter-migration-2026-09-10.md` for definitions and limits.
-- **Sidecar `_meta`**: `features.json` is `{"_meta": {registry_version, game_count, generated_at}, "games": {...}}`. `features.registry_version()` hashes full feature definitions; the UI warns on older registries. Legacy flat snapshots load, but migrated postgame fields are suppressed until rebuilt. Snapshots are replaced atomically. Attendance is excluded from loaded features.
+- **Coach playstyle labels** (`coach_style_cluster`): read `data/processed/pregame_coach_styles.json`, generated separately for each target season with training seasons strictly before that season. Assign the previous season's principal coach; this can differ from the current coach after a coaching change. Regenerate with `python -m scripts.rebuild_pregame_features --data-dir data`. Legacy `coach_style.py` career labels are not used for pregame filters. See `cfb_system_maker/docs/pregame-filter-migration-2026-09-10.md` for definitions and limits.
+- **Sidecar meta**: `enrich` writes `<stem>.duckdb` (table `features`, one row per `game_id`, and table `meta` with `registry_version`, `game_count`, `generated_at`); JSON sidecars are no longer written, and readers fall back to a legacy `features.json` only when the DuckDB file is absent. `features.registry_version()` hashes full feature definitions; the UI warns on older registries. Legacy flat snapshots load, but migrated postgame fields are suppressed until rebuilt. Regeneration is an in-place `CREATE OR REPLACE TABLE`, not an atomic file swap (`cfb_system_maker/docs/feature-store-duckdb-2026-09-18.md`). Attendance is excluded from loaded features.
 - **Design system (`docs/design-system.md`)**: the UI runs on Saturday Signal tokens. `static/styles.css` consumes them via `var(--*)` only — put color/type/space values in `static/tokens/{colors,typography,spacing}.css`, never inline hex in `styles.css`. Three rules that bite: Instrument Serif is for 48px+ and appears nowhere in this app; JetBrains Mono is stat values and chart axes only, never tables; tables use Instrument Sans with `font-variant-numeric: tabular-nums`. CTA labels are sentence case. Radii are tight (2px controls, 8px panels).
 
 ## Tests
 
-`tests/` mirrors modules (~32 files). Default `python -m pytest` is `-m "not slow"` (`test_browser_smoke`, `test_search_benchmark` need `-m slow` plus Playwright + built `data/`). CLI smoke test is network-free over bundled `sample_data.py`. New backtest/normalize logic: construct `GameRecord`/`SystemFilter` directly, assert on result fields.
+`tests/` mirrors modules (~109 `test_*.py` files). Default `python -m pytest` is `-m "not slow"` (`test_browser_smoke`, `test_search_benchmark` need `-m slow` plus Playwright + built `data/`). CLI smoke test is network-free over bundled `sample_data.py`. New backtest/normalize logic: construct `GameRecord`/`SystemFilter` directly, assert on result fields.
 
 ## Design reference
 
-`docs/superpowers/specs/2026-06-12-cfb-system-maker-design.md` describes original v1 intent (CLI-first). Bet Labs UI + later pipeline live in code; prefer this file and `.planning/PROJECT.md`. Archived project maps are historical only.
+`archive/docs/superpowers/specs/2026-06-12-cfb-system-maker-design.md` describes original v1 intent (CLI-first). Bet Labs UI + later pipeline live in code; prefer this file and `.planning/PROJECT.md`. Archived project maps are historical only.

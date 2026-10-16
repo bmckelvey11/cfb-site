@@ -10,7 +10,9 @@ python v2/run_v2.py --season 2024 2025     # subset
 ```
 
 Files: `models_v2.py` (analytic-SE Tobit, statsmodels probit, correlation +
-bivariate MC), `run_v2.py` (driver).
+bivariate MC), `run_v2.py` (driver), `warehouse_source.py` (loads the same per-season
+arrays from `core.fact_game_line` in `cfb.duckdb`; the default source for
+`../monitor/monitor.py` and `../monitor/roi_report.py`).
 
 ---
 
