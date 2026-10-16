@@ -12,7 +12,7 @@ investigations). This directory holds what is specific to *this* unit's code.
 
 | Doc | What it is |
 | --- | --- |
-| [data-flow-guide.md](data-flow-guide.md) | **Read this before touching `data/` or the loader.** Sources → warehouse → consumers, end to end. Explicitly a living document: when a step stops matching the code, fix one or the other in the same commit. Last verified 2026-09-11. |
+| [data-flow-guide.md](data-flow-guide.md) | **Read this before touching `data/` or the loader.** Sources → warehouse → consumers, end to end. Explicitly a living document: when a step stops matching the code, fix one or the other in the same commit. Last verified 2026-09-18; refresh steps and sidecar updated 2026-10-16. |
 | [matchup-page.md](matchup-page.md) | How the local matchup page reads the warehouse: as-of cutoffs, the PFF week mapping, roll-ups and toggles, verdicts, what each section shows and what it leaves out. |
 
 ## Audits and incidents
@@ -37,8 +37,8 @@ investigations). This directory holds what is specific to *this* unit's code.
 
 ## Note
 
-`../CLAUDE.md` cites root `docs/` in nine places and this directory in one
-(`pregame-filter-migration-2026-09-10.md`). Pointing it at this index instead of at
+`../CLAUDE.md` cites root `docs/` in seven places and this directory in two
+(`pregame-filter-migration-2026-09-10.md`, `feature-store-duckdb-2026-09-18.md`), as of 2026-10-16. Pointing it at this index instead of at
 individual files is the obvious follow-up; not done here, because that file is the unit's
 instruction surface and editing it is a separate decision.
 

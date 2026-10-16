@@ -1,11 +1,12 @@
 # Floor Bias / over-zero
 
-Merged into the shared CFB repo from the `over-zero` repo on 2026-08-28. Run commands from
-repository root using paths under `models/over_zero/`. The CFBD
+Merged into the shared CFB repo from the `over-zero` repo on 2026-08-28. The commands in
+this README run from `models/over_zero/` (the `monitor/` scripts write figures relative to
+the cwd; see [docs/README.md](docs/README.md)). The CFBD
 token comes from `CFBD_API_KEY` (or `CFBD-API` / `BEARER_TOKEN`); do not add a
 second `env.env` here.
 
-# paper_models — Arscott (2022) censoring-bias recreation
+## Arscott (2022) censoring-bias recreation
 
 Recreation of *"Market efficiency and censoring bias in college football
 gambling"* (SSRN 4197428): the over/under line ignores that team scores are
@@ -30,19 +31,26 @@ correct for this; the model computes the size of the effect — the "bias
 number", in points — directly from the spread and total on the board.
 
 **The rule.** Bet the **over** on the full-game total when the bias number
-exceeds **1.75**, at −120 or better. Quick screen: `(total − spread) / 2 ≤
+exceeds **1.75** and |spread| ≤ 50, at −120 or better (the 50-point cap is in
+the scheduled slate, `best_line_slate.py --max-spread 50`; see
+[spread-cap-revisit-2026-09-23.md](docs/spread-cap-revisit-2026-09-23.md)). Quick screen: `(total − spread) / 2 ≤
 ~7.5` — the underdog's implied score. In practice: MAC paycheck road games,
 FCS mismatches, service-academy matchups. About 2% of games qualify, ~30–50
 bets a season.
 
 **The evidence, honestly stated.** Walk-forward backtest (each season bet by
-a model trained only on earlier seasons, 2016–2025): **64.5% win rate over
-234 bets**, 95% range 58.2–70.4, against a 52.38% break-even. Plan on the
-~58% lower bound — the threshold was partly chosen on this data, and the
-point estimate is inflated by that selection. The band just below (bias
-1.00–1.75) shows no demonstrable edge and is excluded. Nine of ten test
-seasons profitable; no decay detected through 2025; the mirror-image "under"
-edge was tested and refuted. Full audit trail — including the negative
+a model trained only on earlier seasons; book-quoted lines from the warehouse's
+`core.fact_game_line`, bet seasons 2020–2026): **67.1% win rate over 210 bets**
+(141–69), 95% range 60.5–73.1, against a 52.38% break-even; +28.18% ROI at
+−110 (95% range +15.6 to +39.6). Not comparable with the older 234- and
+275-bet figures, which came from a different line source
+([warehouse-as-model-source-2026-09-22.md](docs/warehouse-as-model-source-2026-09-22.md);
+current table in [ROI_HITRATE.md](docs/ROI_HITRATE.md)). Plan on the ~60%
+lower bound — the threshold was partly chosen on this data, and the point
+estimate is inflated by that selection. The band just below (bias
+1.00–1.75) shows no demonstrable edge and is excluded. Seven of seven test
+seasons profitable on the point estimate (2026 partial); `run_monitor.py`
+detects no decay; the mirror-image "under" edge was tested and refuted. Full audit trail — including the negative
 results — is in the guide and `monitor/`.
 
 **Try it:**

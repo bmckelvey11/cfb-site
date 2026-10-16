@@ -1,5 +1,5 @@
 """Action Network bet-history CSV import: parsing, filtering, and matching
-bets to CFBD games. See docs/superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md.
+bets to CFBD games. See archive/docs/superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md.
 """
 
 from __future__ import annotations

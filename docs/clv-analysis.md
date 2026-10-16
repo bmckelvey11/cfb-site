@@ -94,7 +94,7 @@ gradient** — disagreeing with this document's own **+0.318 on 154 spreads**, w
 weaker, non-significant half of the headline above (p=0.0577, versus p=0.012 for unders). Both
 draw from the same `history.csv` export and the same 2023–2025 seasons, but the joins behind them
 are not comparable: this document matches bets to CFBD games through the 114-entry AN→CFBD
-abbreviation map that `docs/superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md` itself
+abbreviation map that `archive/docs/superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md` itself
 calls "throwaway, never-committed," and that match was never checked against final scores — it
 landed on 154 of what is presumably the same underlying ~250-bet spread population. Its closing
 line also comes from a six-book preference cascade over `data/raw/lines_*.json` (consensus →

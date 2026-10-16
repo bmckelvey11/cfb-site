@@ -1,6 +1,6 @@
 """CLV (closing-line value) computation. Pure functions, heavily tested --
 matches the style of backtest.py's stats functions. See
-docs/superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md.
+archive/docs/superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md.
 """
 
 from __future__ import annotations

@@ -2,7 +2,8 @@
 
 Repo-wide visual rules for the Flask UI. Tokens ship at `cfb_system_maker/static/tokens/{colors,typography,spacing}.css`; the stylesheet that
 consumes them is `cfb_system_maker/static/styles.css`. Change a value here, change it
-in the token files — `styles.css` defines no raw hex of its own except `#fff`.
+in the token files — `styles.css` defines no raw hex of its own except `#fff` and the
+lookahead amber `#b45309` (with its `rgba(180, 83, 9, 0.05)` tint) on `.feature-group.lookahead`.
 
 Originally delivered as a design handoff; the sections below are that document,
 with paths updated to where the files actually live.
@@ -53,7 +54,7 @@ If you re-run this exercise after another design pass, the check is: every class
 Two caveats on the content, not the styling:
 
 - All numbers, team names, system names and dates in the HTML files are **realistic placeholders**, not real backtest output. Do not treat any figure as a target value.
-- The screens render one representative state each. Empty states, error banners, the `missing_data` state and the filter modal are styled in `cfb.css` but not shown in the HTML files. Their class names are documented below.
+- The screens render one representative state each. Empty states, error banners, the `missing_data` state and the filter modal are styled in `styles.css` but not shown in the HTML files. Their class names are documented below.
 
 ## Design tokens
 
@@ -240,7 +241,7 @@ Maps to `templates/search_run.html`. A finalist table (index, filters text, hold
 
 Behavior is entirely unchanged; the restyle adds no new interactions. For completeness:
 
-- **Filter launchers** open `<dialog id="filter-modal">`, driven by `static/filter_modal.js`, which reads the `data-candidate-id` / `data-control` / `data-perspective` / `data-description` attributes off the button. `cfb.css` does not restyle the modal internals — see Known issues.
+- **Filter launchers** open `<dialog id="filter-modal">`, driven by `static/filter_modal.js`, which reads the `data-candidate-id` / `data-control` / `data-perspective` / `data-description` attributes off the button. The modal internals are on the tokens — see Known issues #4.
 - **Every filter control submits `#filters-form` by GET**; system state lives entirely in the query string. The Fade System checkbox sits in the workspace but binds back via `form="filters-form"`.
 - **Sorting, pagination and tab switching are all server round-trips.** No client-side table state.
 - **Hover:** buttons darken to `--signal-600`; unselected controls take an `--ink-300` border; table rows take an `--ink-50` background; CTAs invert to a signal fill. All at 150ms ease-out.
@@ -270,9 +271,9 @@ next reader does not redo them:
 These were real defects in the source design system, not things to reproduce faithfully.
 Numbers 1-3 still stand; 4 is closed:
 
-1. **`--signal-50` and `--ink-50` are the same value** (`#EEF2F8`). Anything tinted with the accent-light token is invisible against the page background, which is why selected controls in `cfb.css` use `--signal-100` instead. If you fix the token, `--signal-100` usages can move back down a step.
+1. **`--signal-50` and `--ink-50` are the same value** (`#EEF2F8`). Anything tinted with the accent-light token is invisible against the page background, which is why selected controls in `styles.css` use `--signal-100` instead. If you fix the token, `--signal-100` usages can move back down a step.
 2. **The shadow stack is still warm-tinted** — `--shadow-xs` through `--shadow-2xl` use `rgba(28, 21, 16, …)`, a brown left over from an earlier palette. They are barely used in these screens, but they are wrong against slate. `rgba(17, 19, 24, …)` is the correct tint.
-3. **The design system's `Button` component force-uppercases every label**, which contradicts the sentence-case CTA rule in its own writing guidelines. `cfb.css` follows the guidelines, not the component. If you adopt the shared component library, expect this conflict.
+3. **The design system's `Button` component force-uppercases every label**, which contradicts the sentence-case CTA rule in its own writing guidelines. `styles.css` follows the guidelines, not the component. If you adopt the shared component library, expect this conflict.
 4. ~~The filter modal is unstyled by this pass.~~ **Done** — the modal is on the tokens now: chips inherit the `.metrics` treatment (18px mono over a 9px uppercase label) instead of overriding it, the value table takes the app's `--ink-800` sticky header, the seven secondary buttons collapse into one rule whose pressed state is the `--signal-100` fill used by `.segmented` / `.check`, and the shell is `--radius-lg`. The block carries no raw hex. `filter_modal.js` still builds the controls, so its hooks — inline `left`/`width` on the dual-range fill, inline opacity on the chips, and the `.is-active` / `.is-selected` / `.positive` / `.negative` classes — are preserved deliberately.
 
 ## Files

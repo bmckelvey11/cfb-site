@@ -3,7 +3,7 @@
 Walk-forward backtest harness for college-football totals. Predicts combined
 points, then bets the side the market disagrees with. This package used to live
 in a sibling repo (`cfb-totals-model`); it now lives in this hub. Data is
-`data/` in this checkout (override with `--data-root`).
+`CFB_DATA_ROOT`, resolved by `cfb_paths.py` (override with `--data-root`).
 
 After dropping leaked this-game features (havoc, attendance, post-game
 winProb), the **citable** 2022–25 prior-season book hits **49.69%** (week-clustered
@@ -14,17 +14,17 @@ invalid.
 ```powershell
 python -m models.middle backtest --line ou_open --permute
 python -m models.middle importance --line ou_open --top 15
-python research/spread/scripts/compare_lines.py
+python models/middle/compare_lines.py
 ```
 
 `--line ou_open` grades against the opening total. Default `--seasons` is
 2021–25; the headline table is 2022–25 prior-season folds. `|edge| ≥ 0` is the
 citable row.
 
-Required under `data/`: `processed/games.csv`, `processed/features.json`,
+Required under `CFB_DATA_ROOT`: `processed/games.csv`, `processed/features.json`,
 `raw/games_*.json`, `raw/lines_*.json`, `raw/advanced_game_stats_*.json`.
 
-The CLV ledger is `ledgers/totals_clv_ledger.jsonl` (not under gitignored `data/`).
+The CLV ledger is `ledgers/totals_clv_ledger.jsonl` (in the repo, not under `CFB_DATA_ROOT`).
 
 ---
 
@@ -74,7 +74,7 @@ but it also means there is no evidence these are good values.
 
 Havoc rates, reported attendance, and team-scoped `pregame_win_prob` were
 removed. Those columns are this-game (or post-game) results, not entering-game
-features. `tests/test_model.py::test_registry_excludes_result_lookahead_features`
+features. `tests/test_totals_model.py::test_registry_excludes_result_lookahead_features`
 fails if they come back.
 
 ### Why mismatch is computed, not averaged
@@ -111,7 +111,7 @@ season has no prior data and is dropped, as are games where either team has
 fewer than three prior games (default `--min-prior-games 3`), because two-game
 averages are too noisy to be worth the rows.
 
-`tests/test_model.py::test_entering_game_stats_exclude_current_game` asserts
+`tests/test_totals_model.py::test_entering_game_stats_exclude_current_game` asserts
 this directly on a hand-built three-game sequence.
 
 ## Validation

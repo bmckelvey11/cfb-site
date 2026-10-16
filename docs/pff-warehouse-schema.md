@@ -6,7 +6,10 @@ with a script, not read off the OpenAPI document. Companion docs:
 [`pff-cli.md`](pff-cli.md) (pull mechanics) and
 [`pff-endpoint-reference.md`](pff-endpoint-reference.md) (parameters).
 
-This is a schema proposal. No loader code exists for it yet; §5 says what would have to.
+This began as a schema proposal and is now implemented: `cfb_system_maker/pff_schema.py`
+(`PFF_TABLES`, 21 tables as of 2026-10-16), `scripts/pff_flatten.py`, and the PFF block in
+`cfb_system_maker/duckdb_load.py` load it into `stg` (see [`pff-ingest-plan.md`](pff-ingest-plan.md)
+S3 and S5, done 2026-09-08/09). §5 is kept as the history of what had to exist.
 
 ## 1. What is on disk
 
@@ -244,7 +247,7 @@ CREATE TABLE stg.pff_passing (
 `week = 0` rather than NULL because DuckDB enforces NOT NULL on every primary-key column
 (`Constraint Error: NOT NULL constraint failed`, tested on 1.x).
 
-## 5. What has to exist for this to load
+## 5. What had to exist for this to load (history — built)
 
 1. **`scripts/pff_flatten.py`** — reads `data/raw/pff/*`, writes one CSV per table above
    to `data/processed/pff/`. The split unpivot is one regex per family:

@@ -2,7 +2,7 @@
 
 **Living doc — undated on purpose.** The dated docs in this folder are records of what was
 known on their day and are never rewritten. This one is the current state of the question,
-kept in sync with them, so nobody has to read fourteen files to find out where things stand.
+kept in sync with them, so nobody has to read every dated record to find out where things stand.
 Every claim points at the dated record that establishes it; if the two disagree, the dated
 record is right and this file is stale. The exception is a row marked "rerun <date>": its
 numbers are newer than its record and come from the named script, which is their authority;
@@ -13,7 +13,8 @@ the record still establishes the verdict.
 ## The one-paragraph answer
 
 PFF Greenline's totals board wins **202-180 (52.9%)** over every era we have graded (through
-2026 week 4), against a 52.38% break-even — down from 175-149 (54.0%) at week 3, and the
+2026 week 4 — the last pooled-board rerun; later records grade 2026 weeks 2-7 unders only,
+see row 15), against a 52.38% break-even — down from 175-149 (54.0%) at week 3, and the
 posterior probability it beats break-even from 72% to **58%**. The eras are statistically one
 thing (p 0.89), the money interval still contains zero, and **no filter on it survives
 testing** — not bands, not edge thresholds, not situational splits, not Pinnacle agreement,
@@ -46,8 +47,8 @@ game: PFF's followers betting its flags would move lines the same way (row 13).
 | 12 | **The archive's CFBD joins are clean** after one repaired transposition and a matcher fix. `is_greenline_pick` is copied onto all three snapshots — a known trap. | [join audit](greenline-archive-join-audit-2026-09-21.md) |
 | 13 | **Pooled unders beat the close; the eras no longer separate.** +0.25 ± 0.18 pts against REST-backed book closes, n=313, one-sided p 0.003 (through 2026 week 4). 2020 +0.05 ± 0.38 (also ~0 against PFF_hist's own close), 2022-23 +0.46 ± 0.35, 2026 +0.34 ± 0.22; 2026 minus 2020 p 0.195, down from 0.047 at week 3 — a failure to separate, not agreement. The 2026 move holds at one book, DraftKings at capture vs its own close, unders +0.35 ± 0.26 on 127, all flags +0.29 ± 0.28 on 154; by week 2026 reads +0.42, +0.53, +0.10. Three weeks, eight kickoff dates; every upper bound (pooled +0.44, 2026 +0.57) is below the ~0.60 break-even CLV. **Follower caveat:** positive CLV here is not proof of forecasting skill. If PFF subscribers bet the flags, their money can move the line toward PFF's side with no outcome information behind it; a published pick service's flags can lead the market by being followed. These data cannot separate the two — every FBS game is flagged, so there is no unflagged control at the same time — and outcome skill is tested separately (row 16: about the vig, a bound). **Unchanged after the 2026-09-30 AN relabel** (row 14): the REST-only close never held those rows. `greenline_clv.py`, re-pointed to the same close that day, adds the overs: all 164 flags +0.29 ± 0.16, the 28 overs +0.04 ± 0.39 (iid SE; cite the date-clustered all-eras rows for inference). Flags that beat the close won 36-45 and flags that lost to it won 27-20. That runs the wrong way for skill, but Fisher p is 0.20 and the split was not registered. | [clv through week 4](greenline-clv-through-week4-2026-09-28.md), superseding the numbers in [clv all eras](greenline-clv-all-eras-2026-09-23.md); rerun 2026-09-30 with `greenline_clv.py` |
 | 14 | **`gql`-only closes were not closes — and they were Action Network, not CFBD.** Every 2026 row in `core.fact_game_line` with `_source = 'gql'` is an Action Network book that reaches the warehouse through `stg.game_lines`; CFBD itself carries only Bovada and DraftKings for 2026. Until merge 48ae034c the loader gave them the wrong names. The six the 09-23 record calls Pinnacle, Caesars, FanDuel, BetMGM, bet365 and Circa were really AN's Caesars, BetRivers, DraftKings, FanDuel and BetMGM, plus its consensus **opener** (AN 30). Some held live in-game totals, because a collector pull during a game added a live offering: WKU @ UGA closes 55.5–56.0 at the two REST books and 78.0–82.5 at four AN ones. The loader has kept live lines out since dabec215 (2026-09-23). The "corrupt Pinnacle rows" of 2026-09-22 were these, and a median of the other books cannot catch them when live rows are the majority, so that doc's +0.06 is withdrawn and the flag-CLV contrast (row D) reused the same close. "Circa off by more than 3 pts on 65 games" was the opener sitting in a close field; as `open` it still is (median 2.0 pts off, 107 games), and `greenline_clv_all_eras.py` excludes it from every book set. Keep scoring against REST-backed rows (`_source` ≠ `gql`); every 2020-23 row is one. Whether AN closes are usable as a close since dabec215 is untested. | [clv all eras](greenline-clv-all-eras-2026-09-23.md); relabel 2026-09-30 (merge 48ae034c, rebuild 4212a8c4) |
-| 16 | **PFF's projection is worth about the vig, and that is a bound.** Share of PFF's disagreement with its market line that turns out real: b = 0.63 (−0.72 to +1.98) over 516 games (2020 plus 2026 weeks 2-3), about 0.56 points or 2.2 pp of win probability per game against 2.38 needed at −110; upper bound 1.76 points, 7.0 pp. 2020 alone b = 0.42 with a Brier worse than 0.5 at the line; the 2026 weeks 2-3 b of 2.95 rests on 5 dates and the discovery sample. PFF's 2026 average shade (−0.92) ran against where games landed (+0.52). | [projection skill](pff-projection-skill-2026-09-28.md) |
 | 15 | **Team-level PFF stats do not filter the unders — at a coarse resolution.** Five features registered 2026-09-22 (pass rush, run-heavy, no-deep, weak QB, coverage), both teams on the under side of the FBS median, built from the 2025 full season. The power gate opened at n=136 (2026 weeks 2-4); nothing survives Holm, smallest adjusted p 0.337 (`run_heavy`, pointing the wrong way). Per-feature floors 72–75%, so only very large effects are ruled out. Was open question F. **Rerun 2026-10-15 on weeks 2-7 (n=230): still null**, smallest Holm 0.239 (`run_heavy` 22-36, still the wrong way). **A wider screen agrees.** Nineteen team stats were tested on all three eras (PFF now reaches 2014, n=402), with discovery on 2020 + 2022-23 and holdout on 2026. None passes discovery BH q < 0.10. The best lead is offensive yards after contact, which is −2.1 pts of under margin per SD pooled (q 0.11) and is not mispriced market-wide (+0.06 ± 0.21 on 6,056 games). It is a candidate for prospective registration, not a filter. **Matchups and O/U history are null too:** neither the good/bad offense x defense grid (permutation p 0.118, cells flip between eras) nor teams' over/under record to date (p 0.98, 0.71) separates the unders. On every FBS game 2015-26, one matchup cell holds in both halves: two good offenses vs two bad defenses go under 56.9% (141-107). That is a market lead, not a Greenline filter. | [pff under filters](greenline-pff-under-filters-2026-09-28.md); rerun 2026-10-15; [pff under screen](greenline-pff-under-screen-2026-10-15.md); [matchup and O/U](greenline-matchup-ou-2026-10-15.md) |
+| 16 | **PFF's projection is worth about the vig, and that is a bound.** Share of PFF's disagreement with its market line that turns out real: b = 0.63 (−0.72 to +1.98) over 516 games (2020 plus 2026 weeks 2-3), about 0.56 points or 2.2 pp of win probability per game against 2.38 needed at −110; upper bound 1.76 points, 7.0 pp. 2020 alone b = 0.42 with a Brier worse than 0.5 at the line; the 2026 weeks 2-3 b of 2.95 rests on 5 dates and the discovery sample. PFF's 2026 average shade (−0.92) ran against where games landed (+0.52). | [projection skill](pff-projection-skill-2026-09-28.md) |
 
 ## Open
 
@@ -64,7 +65,12 @@ game: PFF's followers betting its flags would move lines the same way (row 13).
 First carried here from the two 2026-09-16 season reviews when they were archived, because
 it is the only place these numbers live. **Weeks 2–4**, regenerated 2026-09-28 with
 `greenline_season_review.py` (no `--out`; prints only). Rerun it after each Monday's
-schedule refresh and replace these tables.
+schedule refresh and replace these tables. **Not rerun since:** these tables, row 1 and
+row 2 stop at week 4. The 2026-10-15 records grade weeks 2-7, but only the unders, and
+report no all-market or pooled-board record
+([pff under screen](greenline-pff-under-screen-2026-10-15.md),
+[matchup and O/U](greenline-matchup-ou-2026-10-15.md)); extend them by rerunning
+`greenline_season_review.py` and `pool_totals_record.py`, not from those records.
 
 | market | record | win% | 95% CI | units | ROI | MDE |
 | --- | --- | ---: | --- | ---: | ---: | ---: |
@@ -79,8 +85,8 @@ totals for that reason. Week 2 alone read totals 27-22 (+5.2%); weeks 3–4 went
 
 **CLV against PFF's own board close** — totals +0.31 ± 0.16 pts (n=152), spreads +0.30 ± 0.34
 (n=152). Positive means the number moved toward PFF's side after capture. This measures
-whether PFF's flags lead *PFF's own displayed market*, not a real one, which is why open
-question A exists.
+whether PFF's flags lead *PFF's own displayed market*, not a real one; for CLV against real
+book closes see rows 13–14.
 
 **Calibration of PFF's stated probabilities** (Brier, against a market baseline of 0.25 for
 spreads and totals and the de-vigged price for moneylines):
@@ -173,12 +179,16 @@ the source rather than worked around here.
 
 ## What this implies for money
 
-`research/bankroll/` owns staking. The current recommendation there is to cut the Greenline
-unit from 1% to 0.6% of bankroll and to swap the planning prior for the Greenline-only
-history, because the live prior is 259 picks of which 201 are our own bets and it had never
-seen the 212 pre-2026 vendor picks —
-[greenline-prior-revision-2026-09-22.md](../../bankroll/docs/greenline-prior-revision-2026-09-22.md).
-That recommendation is not yet adopted.
+`research/bankroll/` owns staking; its current unit is in the "short version" of
+[`research/bankroll/docs/README.md`](../../bankroll/docs/README.md). On the week-4 prior
+([sweep 09-28](../../bankroll/docs/bankroll-config-sweep-2026-09-28.md)) quarter Kelly binds
+below the 3% drawdown cap: **Greenline 0.83%**, over-zero 1%.
+
+Separately, and not adopted:
+[greenline-prior-revision-2026-09-22.md](../../bankroll/docs/greenline-prior-revision-2026-09-22.md)
+recommends a 0.6% unit and swapping the planning prior for the Greenline-only history,
+because the prior then in use was 259 picks of which 201 are our own bets and had never seen
+the 212 pre-2026 vendor picks.
 
 ## Keeping this file honest
 

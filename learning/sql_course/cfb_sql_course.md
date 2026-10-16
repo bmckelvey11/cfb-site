@@ -1,10 +1,10 @@
 # The CFB Warehouse SQL Course
 
-A self-paced path from SQL beginner to advanced betting analyst, built entirely against your own college-football warehouse on MotherDuck (`md:cfb`, DuckDB engine). Twenty modules in four parts. Part A is portable SQL that runs unchanged in PostgreSQL, SQLite, and DuckDB. Part B layers on the DuckDB dialect. Part C is statistics and modelling in SQL. Part D is a best-practices reference.
+A self-paced path from SQL beginner to advanced betting analyst, built entirely against your own college-football warehouse (DuckDB engine). The runner (`scripts/sql_sandbox.py`, `course.py`) opens the local `cfb.duckdb` by default — the source of truth; pass `--md` to use the MotherDuck mirror `md:cfb` instead. Twenty modules in four parts. Part A is portable SQL that runs unchanged in PostgreSQL, SQLite, and DuckDB. Part B layers on the DuckDB dialect. Part C is statistics and modelling in SQL. Part D is a best-practices reference.
 
 **How the sandbox is wired.** The warehouse is attached READ ONLY as catalog `cfb`, and the course runs `USE cfb`, so `stg.games` and `core.fact_game` resolve unqualified. A writable scratch catalog `sandbox` exists for anything you create. **Every table, view, or macro you build goes to `sandbox.main.<name>`. Never write to `cfb`.** Inside `CREATE VIEW`/`CREATE MACRO` in `sandbox`, qualify warehouse tables as `cfb.core.…`.
 
-**Every fenced block is labelled** on line 1 with `-- standard` or `-- duckdb`. Every worked solution was executed live against `md:cfb`; line 2 carries `-- rows: N` with the real returned count.
+**Every fenced block is labelled** on line 1 with `-- standard` or `-- duckdb`. Every worked solution was executed live against `md:cfb` when the course was written; line 2 carries `-- rows: N` with the real returned count. The local file can differ from the mirror, so a count may not match exactly.
 
 **Verified warehouse facts** (from `information_schema` and live counts): `core.fact_game` spans seasons **2012–2026**; betting lines in `core.fact_game_line` floor at **2013** (`min(season) where has_line`); `core.fact_game_odds` (the-odds-api) has 86,640 rows; `stg.an_history_tick` (Action Network ticks) has 410,845 rows. There are 138 FBS teams in `core.dim_team`. `core.dim_week` holds exactly **one `postseason` row per season** (15 rows across 15 seasons) — the postseason join trap. In 2024 alone, 44 away teams in `fact_game` have no row in `dim_team` — the LEFT JOIN trap.
 
@@ -12,7 +12,7 @@ A self-paced path from SQL beginner to advanced betting analyst, built entirely 
 
 ## How to use this course
 
-Work top to bottom; each module assumes the ones before it. For every module: read the concepts, run the worked solution yourself (it is copy-paste runnable against `md:cfb`), confirm you get the stated row count, then attempt the other exercises using only the one-line hints. When an exercise says "write a table/view/macro", create it in `sandbox.main` and drop it when done. Treat the "check yourself" line as a unit test: if your number disagrees, your query is wrong, not the warehouse.
+Work top to bottom; each module assumes the ones before it. For every module: read the concepts, run the worked solution yourself (it is copy-paste runnable against the local warehouse or `md:cfb`), confirm you get the stated row count, then attempt the other exercises using only the one-line hints. When an exercise says "write a table/view/macro", create it in `sandbox.main` and drop it when done. Treat the "check yourself" line as a unit test: if your number disagrees, your query is wrong, not the warehouse.
 
 A discipline to keep from day one: **before you reference any column, confirm it exists** with `information_schema.columns` (Part A1) or `DESCRIBE` (Part B1). Every column used in this course was pulled from the live catalog; you should hold your own queries to the same bar.
 

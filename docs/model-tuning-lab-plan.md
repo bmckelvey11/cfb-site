@@ -2549,7 +2549,7 @@ Defer deep neural sequence models, normalizing flows, GNNs, player embeddings, H
 **Status (2026-09-23):** built; go/no-go met.
 
 - Design: [`superpowers/specs/2026-09-23-tuning-lab-release-c-design.md`](superpowers/specs/2026-09-23-tuning-lab-release-c-design.md).
-- Build order: [`superpowers/plans/2026-09-23-tuning-lab-release-c-PLAN.md`](superpowers/plans/2026-09-23-tuning-lab-release-c-PLAN.md).
+- Build order: [`2026-09-23-tuning-lab-release-c-PLAN.md`](../archive/docs/superpowers/plans/2026-09-23-tuning-lab-release-c-PLAN.md) (archived, done).
 - Code: `models/tuning/`.
 - **Reproducibility:** the committed run `models/tuning/specs/total_ratings_v1.json` was run into two clean roots in separate processes. Both gave `run-de1927346ab0` with byte-identical predictions.
 - **Crash safety:** a worker killed mid-trial resumes with its completed trials unchanged (`tests/test_tuning_worker.py`).

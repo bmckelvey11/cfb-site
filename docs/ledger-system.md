@@ -132,7 +132,7 @@ totals-CLV suites, all passing).
 `spread_home`/`spread_away`/`over`/`under` at full-game period, and matches to CFBD games
 through `team_abbreviations.resolve_team`. Driven by `python -m cfb_system_maker.cli betlog
 import --csv <path>`; rendered at the Flask app's `/betlog` page. Design spec:
-[`superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md`](superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md).
+[`2026-08-27-clv-betlog-ingestion-design.md`](../archive/docs/superpowers/specs/2026-08-27-clv-betlog-ingestion-design.md) (archived, implemented).
 Analysis built on this export lives in [`clv-analysis.md`](clv-analysis.md) and
 [`bet-history-analysis-2023-2025.md`](bet-history-analysis-2023-2025.md) — note the standing
 caution that those unders are mostly Greenline flags, not independent picks.
@@ -188,7 +188,7 @@ Stating this plainly, because the code reads as though all five are in use:
   `2026-08-27T04:36:04Z`, **zero closes filled and zero graded**. A `snapshot` today would
   create a fresh empty ledger elsewhere and never touch them. Not fixed here — fixing it is
   a decision about which path is canonical, not a doc edit.
-- **`ledgers/bankroll.py` is not part of this system.** Untracked, hardcoded (20k bankroll,
+- **`ledgers/bankroll.py` is not part of this system.** Tracked (committed), hardcoded (20k bankroll,
   5% edge, 10 weeks), calls `plt.show()`, and overlaps `research/bankroll/` — which owns
   staking and projection per root `CLAUDE.md`. Left in place.
 

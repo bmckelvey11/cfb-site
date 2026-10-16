@@ -6,6 +6,17 @@ background. Every number comes from 12,493 real college football games,
 2013–2025, produced by the code in this repo (figures rebuilt 2026-07-30; bet
 threshold revised to 1.75 on 2026-08-11).*
 
+> **Current record (updated 2026-10-16).** Since 2026-09-22 the model reads book-quoted
+> lines from the warehouse (`core.fact_game_line`). On that source the rule's walk-forward
+> record is **210 bets, bet seasons 2020–2026, 141–69, 67.14%** (95% range 60.53–73.14),
+> **+28.18% ROI at −110** (95% range +15.56 to +39.63) — see [ROI_HITRATE.md](ROI_HITRATE.md)
+> and [warehouse-as-model-source-2026-09-22.md](warehouse-as-model-source-2026-09-22.md).
+> The **234 bets / 64.5% / 58.2% planning number** figures quoted below, and the sizing and
+> variance figures derived from them, come from the earlier raw-JSON source over 2016–2025
+> and are not directly comparable. The deployed slate also caps the rule at **|spread| ≤ 50**
+> ([site-refresh-cap50-2026-09-16.md](site-refresh-cap50-2026-09-16.md),
+> [spread-cap-revisit-2026-09-23.md](spread-cap-revisit-2026-09-23.md)).
+
 > **What this is:** a research finding that one specific, rare type of bet
 > has historically won more often than it should. It is **not** a money
 > printer: even if everything here is exactly right, you only get a few dozen
@@ -395,6 +406,7 @@ qualified 6.6% of games, about 68 a season.
 | 2 | **Price −120 or better on the over** | At −120 you need 54.55% to break even; even the conservative 58.2% leaves +3.7 points of cushion |
 | 3 | **Full-game combined totals only** | That's the validated market. Team totals: untested (open question 3). First-half overs: theoretically stronger but unvalidated ([floor_bias_1h/](../floor_bias_1h/)). Unders: refuted |
 | 4 | **Not a pick'em** (spread ≠ 0) | No favorite/underdog → outside the model's definition |
+| 4a | **\|spread\| ≤ 50** | Above 50 the edge was not found in the backtest; the scheduled slate runs `best_line_slate.py --max-spread 50` ([spread-cap-revisit-2026-09-23.md](spread-cap-revisit-2026-09-23.md) keeps the cap on watch) |
 | 5 | **Line from a major book or the market consensus** | Validated on those; consensus-only was actually *stronger* (58.2%) |
 | 6 | **Recompute if the line moves** | The bias is computed from the current numbers; a total dropping 3 points or a spread moving 4 can change the verdict |
 
@@ -571,13 +583,13 @@ Data comes from required `CFB_DATA_ROOT`
 |---|---|
 | Bet | CFB **game totals** (combined over/under), **over only** — never team totals |
 | Signal | The bias number: how many points the floor-at-zero effect inflates this matchup's true total |
-| Threshold | **> 1.75** (changed 2026-08-11 from > 1.0; 1.00–1.75 can't be shown to beat break-even) |
+| Threshold | **> 1.75** (changed 2026-08-11 from > 1.0; 1.00–1.75 can't be shown to beat break-even), and \|spread\| ≤ 50 |
 | Price | −120 or better; never worse than −125 |
 | Number | lowest total on the board; 0.5 pt ≈ 5 cents of juice; never buy the hook |
 | Timing | best number as soon as the game qualifies; the close is the benchmark, not the entry — log your CLV |
 | Sizing | flat 1%, or quarter-Kelly **off the 58.2% planning number ≈ 3%** — not the 6.4% the headline implies |
 | Volume | ~30–50 bets/season recently (2.3% of lined games; 10-season mean 23) |
-| Validated edge | 64.5% (95% range 58.2–70.4), honest protocol, 2016–2025 |
+| Validated edge | 67.14% (95% range 60.53–73.14) on 210 bets, honest protocol, warehouse lines 2020–2026 ([ROI_HITRATE.md](ROI_HITRATE.md)); earlier raw-JSON source: 64.5% (58.2–70.4), 2016–2025 |
 | Kill switch | trailing 3-season relationship flat AND win rate at/below break-even |
 
 ## 8. Failure modes & limits
@@ -1005,4 +1017,4 @@ quantity. Code: `fit_train` ([monitor/run_walkforward.py](../monitor/run_walkfor
 censoring?), [saturation_bias](../saturation_bias/) (under-side negative
 result), [floor_bias_1h](../floor_bias_1h/) (first-half extension, awaiting
 real 1H lines), [monitor](../monitor/) (decay + walk-forward). Review and
-audit: [REVIEW.md](../REVIEW.md).*
+audit: [REVIEW.md](../../../archive/docs/over_zero/REVIEW.md) (archived).*

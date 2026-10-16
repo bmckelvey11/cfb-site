@@ -2,11 +2,11 @@
 
 Source: live introspection of both CFBD access paths — the REST client via the vendored
 `cfbd-python` pydantic models (walked through `AdjustedMetricsApi`, `GamesApi`, ... per
-`cfb_system_maker/scrapers.py`'s `ENDPOINTS` registry, 61 endpoints), and
+`cfb_system_maker/scrapers.py`'s `ENDPOINTS` registry, 61 endpoints at the time of the introspection; 90 as of 2026-10-16), and
 `https://graphql.collegefootballdata.com/v1/graphql` (documented at
 `graphqldocs.collegefootballdata.com`) via a full-depth `__schema` introspection query run
 through `cfb_system_maker/graphql_client.py`'s poster. Cross-checked against pulled samples in
-`data/raw/*.json` (REST) and `data/graphql/*.json` (GraphQL, 24 tables via `GQL_DEFAULT_TABLES`).
+`data/raw/*.json` (REST) and `data/graphql/*.json` (GraphQL, 24 tables via `GQL_DEFAULT_TABLES` at the time; 34 as of 2026-10-16).
 
 ## Access paths — REST is canonical here
 

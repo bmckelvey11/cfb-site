@@ -1,8 +1,9 @@
 # the-odds-api.com ingest
 
-Status: **pulling on a schedule, not wired to the warehouse.** Snapshots go to
-`data/ingest/oddsapi/`, which `cfb_paths` does not glob. Flatten and loader
-wiring are deliberately deferred — see *Before this loads* below.
+Status: **pulling on a schedule and loaded** (2026-09-10). Snapshots go to
+`data/ingest/oddsapi/`, which `cfb_paths` does not glob; `scripts/oddsapi_flatten.py`
+flattens them and the load lands `stg.oa_odds_tick`, `stg.oa_snapshot` and
+`core.fact_game_odds` — see *It loads* below.
 
 - Client: `cfb_system_maker/oddsapi_client.py`
 - Pull: `scripts/pull_odds.py`
@@ -156,7 +157,7 @@ distinguishable from "not observed". Revisit if volume bites.
 An unresolved team name leaves `game_id` NULL rather than guessing, and the
 flatten exits 1 so a scheduled run surfaces it.
 
-## Before this loads into the warehouse: the join key
+## The join key (history: written before the load was wired)
 
 Odds API events carry their own `id`, `commence_time` (UTC ISO8601), and team
 names **including the mascot** — `"Miami Hurricanes"`, `"Florida A&M Rattlers"`.

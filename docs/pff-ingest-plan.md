@@ -5,7 +5,7 @@ to `done` with a date, and the worklog at the bottom gets an entry saying what w
 actually found. Nothing is deleted — a step that turns out to be wrong is struck with the
 reason, so the next pass does not re-open it.
 
-**Status 2026-09-21: S1–S5, S7 and S8 done. S6 is half done — `PFF_API` was rotated, the go
+**Status 2026-09-22: S1–S5, S7 and S8 done. S6 is half done — `PFF_API` was rotated, the go
 was given, and 2019–2024 and 2026 are pulled and audit clean. 2014–2018 remain,
 at ~900 reads + 3,045 exports, ~4.7 h at the observed pace.** 2025 stays the reference season: the process was proven
 and trimmed against it before any backfill call, because a backfill pays every inefficiency
