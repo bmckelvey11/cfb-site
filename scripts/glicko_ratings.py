@@ -32,7 +32,18 @@ FROZEN_V1 = {"sigma": 13, "tau": 0.75, "w": 0.9, "delta": 6, "cap": float("inf")
 # conference-mean offseason target is used.
 FROZEN_P1 = {"sigma": 15, "tau": 1.5, "w": 0.7, "delta": 6, "cap": float("inf"),
             "hfa": 2, "u0": 14}
+# P1's forecast SD for intervals and win probabilities (docs/glicko-p2-2026-10-15.md). sigma
+# = 15 does double duty in P1: it sets the Kalman gain and the predictive spread, and its
+# intervals came out wide (68% coverage 72.3% on 2021-25). The gain keeps sigma = 15; only the
+# predictive SD uses 13.5, tuned by CRPS on 2014-2019. Means, ranks, and P1's sealed
+# confirmation fingerprint (which reads S) are unchanged.
+SIGMA_PRED_P1 = 13.5
 _EPOCH = pd.Timestamp("1970-01-01", tz="UTC")
+
+
+def predictive_sd(rd2: float, sigma_pred: float = SIGMA_PRED_P1) -> float:
+    """Forecast SD of a margin from the two teams' summed variance rd2 (GlickoMargin's rd2)."""
+    return math.sqrt(rd2 + sigma_pred ** 2)
 
 
 def to_home_margin(spread: float) -> float:

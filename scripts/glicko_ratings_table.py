@@ -20,15 +20,20 @@ import math
 import pandas as pd
 
 from scripts.glicko_pool_eval import fcs_seed_pool, load_pool_games
-from scripts.glicko_ratings import FBS, FROZEN_P1, VERSION, GlickoMargin, events, run
+from scripts.glicko_ratings import _EPOCH, FBS, FROZEN_P1, VERSION, GlickoMargin, events, run
 
 
-def ratings_table(m: GlickoMargin, season: int) -> pd.DataFrame:
+def ratings_table(m: GlickoMargin, season: int, as_of: pd.Timestamp | None = None) -> pd.DataFrame:
     """Teams that played `season`, centred on this season's FBS mean, ranked within subdivision.
 
-    ponytail: RD is as of each team's last game; an idle week would add tau^2 (2.25 points^2).
+    With `as_of`, each team's variance first grows by tau^2 per week idle since its last game,
+    so RD is as of that instant (the forecast's own rule), not as of the team's last kickoff.
     """
     teams = [k for k in m.r if m.last.get(k) == season]
+    if as_of is not None:
+        t = (as_of - _EPOCH).total_seconds() / 86_400.0
+        for k in teams:
+            m._advance(k, t)
     t = pd.DataFrame({"team": teams, "subdivision": [m.div[k] for k in teams],
                       "rating": [m.r[k] for k in teams],
                       "rd": [math.sqrt(m.u2[k]) for k in teams],
@@ -49,8 +54,8 @@ def main(argv: list[str] | None = None) -> int:
     g, drops = load_pool_games(DATA_ROOT, args.season, [])
     m = GlickoMargin(**FROZEN_P1, m0=fcs_seed_pool(g))
     run(m, g, events(g))
-    t = ratings_table(m, args.season)
     as_of = g.loc[g["season"] == args.season, "kickoff"].max()
+    t = ratings_table(m, args.season, as_of)
 
     out = PROCESSED / "ratings" / f"glicko_ratings_{args.season}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
