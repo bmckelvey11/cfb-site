@@ -17,7 +17,7 @@ PFF showed, and accumulate until the sample can answer.
 
 | Doc | What it reports |
 | --- | --- |
-| **[greenline-findings.md](greenline-findings.md)** | **Start here.** Living summary — the twelve settled findings with a pointer to the record that establishes each, the four open questions and which one is worth the next hour, the standing cautions, and what it all implies for staking. Undated because it must stay current; if it disagrees with a dated record, the record wins |
+| **[greenline-findings.md](greenline-findings.md)** | **Start here.** Living summary — the settled findings (rows 1–16) with a pointer to the record that establishes each, the open questions (B, C, D, G; E closed) and which one is worth the next hour, the standing cautions, and what it all implies for staking. Undated because it must stay current; if it disagrees with a dated record, the record wins |
 | [greenline-under-filters-2026-09-22.md](greenline-under-filters-2026-09-22.md) | Six pre-registered situational filters, rerun on the 270 Greenline-only unders across all three eras (2020, 2022-23, 2026), stratified by era via CMH — supersedes the 09-17 run, which pooled the 2023-25 personal unders on a premise since found false. Nothing survives Holm; `big_fav`, the previous best candidate, weakens from Holm 0.256 to 0.906 |
 | [greenline-pinnacle-shade-2026-09-17.md](greenline-pinnacle-shade-2026-09-17.md) | Does Pinnacle's position at capture (juice lean, line vs PFF's, distance from PFF's projection, limit) predict which unders win? n=38, nothing survives Holm; "Pinnacle already below PFF's line" is 9-2 raw |
 | [greenline-w2-grade-2026-09-15.md](greenline-w2-grade-2026-09-15.md) | Week 2's 36 positive-edge unders graded, including the six flags that needed a score or line fallback |
@@ -76,6 +76,7 @@ they silently read a stale capture.
 | 5i | [`../scripts/greenline_price_filter.py`](../scripts/greenline_price_filter.py) | The bet rule (E: ≥ PFF projection + 2.0 and ≥ Pinnacle fair) and four registered variants, with the PFF market line and PFF projection named apart, backtested with DK/FD and Pinnacle rebuilt from the snapshots at each capture: record, ROI bootstrap, MDE, CLV, by-week folds, and a Pinnacle-timing sensitivity. `best_book` and `passes` are the rule itself, for reuse by a weekly bet list |
 | — | [`../scripts/build_greenline_history.py`](../scripts/build_greenline_history.py) | **The master analysis table**: `$CFB_DATA_ROOT/processed/greenline/greenline_history.csv`, one row per era × game × market for every Greenline source (picks and non-picks, `is_pick`), plus personal 2023-25 totals as `source=personal`. Normalizes spread sign conventions across eras, names each close and CLV by its source, joins decision-time book/Pinnacle prices, the price rules, and the ledger. Asserts the known records on every build. Column dictionary and embargo notes in its docstring; rebuild after each graded week |
 | 5j | [`../scripts/pff_projection_skill.py`](../scripts/pff_projection_skill.py) | PFF's projection as a forecast against the market line PFF displayed at the same moment: level (shade vs where games land), date-clustered slope of (actual − line) on (projection − line) converted to points and win probability, MAE, hit rate, Brier and log loss. 2020 open-Greenline snapshot one row per game; 2026 slope held to weeks 2-3 while question C is embargoed |
+| — | [`../scripts/band_significance.py`](../scripts/band_significance.py) | **Archived record.** Reproduces `archive/docs/greenline-band-significance-2026-09-17.md` (band split: chi-square, Fisher, best-of-k, out-of-sample AUC). Closed question; `--out` defaults to `archive/docs/`, and a rerun is a confirmation that updates `greenline-findings.md` |
 | — | [`../scripts/greenline_pricing.py`](../scripts/greenline_pricing.py) | Side analysis: reverse-engineers the arithmetic behind PFF's displayed numbers |
 | — | [`../scripts/parse_greenline_history.py`](../scripts/parse_greenline_history.py) | Off-pipeline: parses the pre-2026 OneDrive archives (`PFF_hist.xlsx`, `ncaa-best-bets*.csv`) into one long-form CSV. Derives the pick from the opening Greenline snapshot, never the close |
 | — | [`../scripts/greenline_archive_review.py`](../scripts/greenline_archive_review.py) | Grades that archive — break-even from the quoted price per market, ROI, and MDE per split |
@@ -89,32 +90,13 @@ they silently read a stale capture.
 | — | [`../../bankroll/scripts/greenline_bet_log.py`](../../bankroll/scripts/greenline_bet_log.py) *(in `research/bankroll/`)* | **The ledger of which flags actually got bet.** Reads these captures; seed after every one |
 | — | [`../../bankroll/scripts/under_selection_profile.py`](../../bankroll/scripts/under_selection_profile.py) *(in `research/bankroll/`)* | Profiles the 2023-25 bet unders against the slate they were picked from |
 
-Every script takes `--self-check`.
+Every script takes `--self-check` except `greenline_matchup_ou.py` (only `--rows` and `--market`).
 
 ### The weekly habit — owned by `research/bankroll/`
 
-Capture is automated; **marking is not, and an unmarked week is lost data.** The ledger
-distinguishes `y`, `n`, and blank, and blank means *not yet marked* — coverage refuses to
-compute on a week that still has blanks, because defaulting them to "no" manufactures the
-very number the ledger exists to measure.
-
-```
-python research/bankroll/scripts/greenline_bet_log.py --seed          # after each capture
-python research/bankroll/scripts/greenline_bet_log.py --import-book   # after a book re-export
-python research/bankroll/scripts/greenline_bet_log.py --show 4        # review the week
-python research/bankroll/scripts/greenline_bet_log.py --mark 4 31190   # or --none 4
-python research/bankroll/scripts/greenline_bet_log.py --coverage
-```
-
-`--import-book` is the low-effort path: re-export the book to
-`data/ingest/bet_history/history.csv` and it marks a whole week in one pass — `y` for
-flags it finds a matching total on, `n` for the rest of that day's flags. It resolves
-both sides to CFBD team ids first, because PFF and the book disagree on 32 of 137
-abbreviations, and it only touches days the export actually covers.
-
-This is the only thing that can answer whether the personal under record transfers to
-Greenline's flags: no work on 2023-25 can, because no flag archive for those seasons
-exists.
+Marking which flags got bet is the one manual step, and an unmarked week is lost data. The
+commands and the `--import-book` path live in
+[`research/bankroll/docs/README.md`](../../bankroll/docs/README.md) § "The weekly habit".
 
 ### Figures
 
@@ -133,8 +115,8 @@ Anything that gets built and backtested belongs in `models/middle/`.
 | --- | --- |
 | **[totals-modeling-guide.md](totals-modeling-guide.md)** | **Start here.** Living guide that merges the two reports below with the starter framework and the regression/priors conversation notes, then checks each claim against this repo's records: what to predict ($r^{\text{final}}$, $r^{\text{move}}$), which line eras can support ROI or CLV, opponent-adjusted points per possession and pace, previous-season priors fit as one prior-centered ridge, the step from a predictive distribution to EV at the offered price, the model ladder, a validation calendar, and eight open items. Adds no numbers of its own |
 | [fbs-totals-frontier-models.md](fbs-totals-frontier-models.md) | Survey of frontier modeling approaches for FBS totals (+ [`.pdf`](fbs-totals-frontier-models.pdf)) |
-| [fbs-totals-system-research-report.md](fbs-totals-system-research-report.md) | Long-form research report on a pregame totals betting system |
-| [opponent-adjustment-priors-model-comparison.md](opponent-adjustment-priors-model-comparison.md) | Opponent adjustment (iterative, ridge, crossed random effects, Bayesian hierarchy, Elo), preseason priors and their decay, transfer-era roster features, and a head-to-head comparison of the methods for totals and line movement. Every equation has a where-table and a worked example |
+| [fbs-totals-system-research-report.md](fbs-totals-system-research-report.md) | Long-form research report on a pregame totals betting system (+ [`.pdf`](fbs-totals-system-research-report.pdf)) |
+| [opponent-adjustment-priors-model-comparison.md](opponent-adjustment-priors-model-comparison.md) | Opponent adjustment (iterative, ridge, crossed random effects, Bayesian hierarchy, Elo), preseason priors and their decay, transfer-era roster features, and a head-to-head comparison of the methods for totals and line movement. Every equation has a where-table and a worked example (+ [`.pdf`](opponent-adjustment-priors-model-comparison.pdf)) |
 | [research-prompts/fbs-totals/](research-prompts/fbs-totals/) | 15 numbered research prompts plus a README — odds-data audit, market-implied score distributions, price discovery, error anatomy, cold starts, joint spread/total modeling, uncertainty decomposition, abstention, staking, drift monitoring, governance, synthesis |
 
 ---

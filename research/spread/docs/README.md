@@ -41,9 +41,9 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 
 | Document | Kind | What it holds |
 |---|---|---|
-| `prereg-line-movement.md` | prereg | Retarget the panel at line movement. Version A, amendments A2 (rest of the library), A3 (decontamination), B1 (the version B read), the amendment ledger, A6 (walk-forward screen), B3 (stopping rule), A5 (post-capture move), A4 (finer ridge grid). |
-| `line-movement-results.md` | results | A, A2, A3, A6, A4, A5; what PT's `line` is; when the constituents publish; B2 (capture buckets); version B reads. |
-| `prereg-line-shopping.md` | prereg | Book fair = median of books; the outlier book is the bet. |
+| `prereg-line-movement.md` | prereg | Retarget the panel at line movement. Version A, amendments A2 (rest of the library), A3 (decontamination), B1 (the version B read), the amendment ledger, A6 (walk-forward screen), B3 (stopping rule), A5 (post-capture move), A4 (finer ridge grid), A7 (ridge grid wide enough to be decisive; retired E6 from the served slate), T1 (late-opening subgroup). |
+| `line-movement-results.md` | results | A, A2, A3, A6, A4, A5, A7; what PT's `line` is; when the constituents publish; B2 (capture buckets); version B reads. |
+| `prereg-line-shopping.md` | prereg | Book fair = median of books; the outlier book is the bet. Amendments S1 (outlier guard, price-adjusted value), S2–S4 (live fair book set; S4 = the-odds-api + Pinnacle only, governs the live fair). |
 | `line-shopping-results.md` | results | Dispersion tail across 7 Action Network books, 2024–2025. |
 | `prereg-dk-opener-forward-log.md` | prereg | Forward test, 2026: bet DraftKings' Sunday-noon number when it sits ≥ 1 pt better than the other AN books' median; primary CLV to DK's REST close, one read on or after 2026-12-14. Likely underpowered this season. |
 | `combining-predictions.md` | review | How E4 and the book fair combine into one fair spread and one bet decision. |
@@ -51,12 +51,10 @@ confirmatory inference needs ≥ 8 week clusters. Every number above lives in
 | `review-2026-09-08-tree-audit.md` | review | Full-tree audit; each finding carries its resolution date. |
 | `methods-review-2026-09-21.md` | review | Audit of the live serving and version B grading paths on 147 graded games. Leakage and selection clean; the graded "Monday line" is a Tuesday line for 62% of games, B4's regressor spends 71% of its variance on the revert-to-opener component, and `beat_close` counts a line that never moved as a loss. No verdict. |
 | `objective-review-2026-09-23.md` | review | Is the pred-tracker-model what the user asked for (fair spread, bet where it disagrees with the books, judged ATS at the number bet)? Reframed: the 2026-09-02 pivot to movement/CLV was user-endorsed, the served `edge` is the market's move sign-flipped, and no grader measures ATS at the printed number. No version B verdict. |
-| **`plan-2026-09-08-master.md`** | **plan of record** | **Start here for the plan.** What is true, what is decided, what must change, and the execution waves. Absorbs the hardened plan, the review log and the audit's open items. |
-| `plan-2026-09-08-hardened.md` | absorbed | Contract the master absorbed; audit history of the claudex-loop. |
-| `plan-review-log-2026-09-08.md` | absorbed | The three-round adversarial argument (claudex-loop) that produced the hardened plan. |
+| **`plan-2026-09-08-master.md`** | **plan of record** | **Start here for the plan.** What is true, what is decided, what must change, and the execution waves. Absorbs the hardened plan, the review log (both now in `archive/docs/`) and the audit's open items. |
 | `build-brief-2026-09-08.md` | appendix | Parallel execution of the hardened plan: waves, file ownership, per-agent acceptance checks. |
 | `actionable-picks-2026-09-17.md` | review | Can the slate be bet today? No — the anchor holds ~0.7 pt of move total, and beat-close inverts with edge. Points at the results doc. |
-| **`pt-findings-summary-2026-09-17.md`** | **index** | **Start here for the 2026-09-17 PT studies.** Connects all six, the mechanism they share, and what is still open. Restates no numbers. |
+| **`pt-findings-summary-2026-09-17.md`** | **index** | **Start here for the 2026-09-17 PT studies.** Connects five of the day's studies in six rows (actionable-picks §0 and §1–3, phcover, linestd, phwin-accuracy, model-columns-ats; not phwin-moneyline, panel-vs-line, panel-ats or tick-anchored-model-infeasible), the mechanism they share, and what is still open. Restates no numbers. |
 | `tick-anchored-model-infeasible-2026-09-17.md` | review | Why the current-line anchor cannot be built: the archive's only line IS the target, an_market has no timestamp, the 275 tick paths are all inside the forward-test period, and AN does not retain settled paths. |
 | `phcover-accuracy-2026-09-17.md` | review | EXPLORATORY: PT's published P(home covers). AUC 0.489, Brier skill negative, and 99.45% a transform of `lineavg - line`. No signal. |
 | `linestd-confidence-2026-09-17.md` | review | EXPLORATORY: PT's panel dispersion. No volatility content; no quintile rescues the panel signal, which goes 0.4943 ATS over 2003-2025. |
@@ -93,6 +91,11 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_model_columns_ats.py` | `model-columns-ats-2026-09-17.md` | `processed/model_columns_ats.json` |
 | `edge_vs_market_move.py` | `actionable-picks-2026-09-17.md` § 0: regresses the served `edge` on the move since the opener | stdout |
 | `version_b_ceiling.py` | `line-movement-results.md` § version B read of 2026-09-17: E\|close − anchor\| (the CLV ceiling) and each week's anchor ET weekday | stdout |
+| `eval_ridge_curve.py` | `prereg-line-movement.md` amendment A7 (is E6's ridge penalty identified?); read in `line-movement-results.md` § A7 | `processed/pt_ridge_curve_a7.json` |
+| `eval_timing_decay.py` [`--book`] | DESCRIPTIVE: share of the open→close move already done at each moment before kickoff, from AN tick paths; the motivation for amendment T1 | `processed/an_timing_decay.json` |
+| `eval_ats_vs_breakeven.py` | `line-movement-results.md`: every method's opener ATS record against the −110 break-even, from the A2/A6 walk-forward run | `processed/pt_ats_vs_breakeven.json` |
+| `eval_accuracy_weighted.py` [`--from`] [`--fitted`] [`--per-model`] | EXPLORATORY: panel weighted by recent margin accuracy, graded ATS/ROI against the close; cited by root `docs/models-organization-2026-09-16.md` | `processed/pt_accuracy_weighted.json`, `pt_fitted_weights.json`, `pt_per_model_vs_close.json` |
+| `eval_by_spread_bucket.py` [`--version-b`] | EXPLORATORY: the A6 movement result cut by \|opening spread\| bucket; cited by root `docs/models-organization-2026-09-16.md` | `processed/pt_movement_by_spread.json`, `version_b_by_spread.json` |
 | `analyze_line_movement_distribution.py` [`--start`] [`--end`] [`--book`] | `line-movement-distribution-2026-09-18.md` | `research/spread/docs/img/line-movement-distribution.png`, `research/spread/docs/data/line-movement-frequency.csv` |
 
 Estimator core, imported by all of the above and not run on its own for live work:
@@ -107,7 +110,8 @@ fitters, grids, 1-SE rule). Their `main()`s produce the archived margin-era tabl
 |---|---|
 | `collect_line_timing.py snapshot` | Fetch PT's rolling CSV to `ingest/pt_snapshots/`, then invoke the two below on the new file. |
 | `predict_upcoming.py` | E4 / E14 against the line at capture → `processed/pt_upcoming_predictions.csv` |
-| `weekly_slate.py` | Every movement model + live book fair over 10 books (Action Network + the-odds-api, deduped — amendment S2) + the side to take → `processed/weekly_slate_<stamp>.csv` and `weekly_slate_latest.csv`; appends `movement_forward_log.csv` (version B's dataset) unless the slate is stale |
+| `weekly_slate.py` | Every movement model + live book fair over the nine the-odds-api books plus Pinnacle from oddspapi (amendment S4, `book_set_version` 4; Action Network no longer prices the fair) + the side to take → `processed/weekly_slate_<stamp>.csv` and `weekly_slate_latest.csv`; appends `movement_forward_log.csv` (version B's dataset) unless the slate is stale |
+| `collector_health.py` | Exit 1 if the newest PT snapshot is more than 12 h old in season (Aug 25 – Dec 15). One-line health check for the Monday routine; writes nothing. |
 | `pt_rollover.py` | Exit 0 once PT's slate flips to a new week. Gates a wait loop; writes nothing. |
 | `migrate_book_set_version.py` | One-time, idempotent: stamps `book_set_version=1` on forward-log rows written before amendment S2 promoted the-odds-api books into `book_fair` |
 | `collect_line_timing.py history` | Mondays: Action Network tick histories → `raw/actionnetwork/history_event_<id>.json` (version B's closes) |

@@ -74,7 +74,8 @@ back near 0.07, drop it and the pipeline is line shopping alone.
 
 Against the *margin-vs-close* target, averaging E4 and E14, adding a raw-median term, or fitting a
 new weight vector each has a recorded null or failure. Those nulls do not carry to the movement
-target (`line-movement-results.md`), where ridge was the best method; the weight vector that
+target (`line-movement-results.md`), where E4 is the best method (the ridge's apparent lead was a
+grid-bound artifact, withdrawn by amendment A7, and E6 is retired from the served slate); the weight vector that
 fails at forecasting the game may be the right one for forecasting the line.
 
 ## 3. The bet decision

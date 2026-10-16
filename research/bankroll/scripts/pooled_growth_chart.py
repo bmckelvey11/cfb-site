@@ -7,7 +7,7 @@
 The unit rule is to bracket both priors. This chart deliberately does not: it was
 asked for as "the pooled edge, charted", so it conditions on the planning prior
 (`mc_combined_totals.planning_p_gl`) and shows three configs side by side. The n58 reading is
-in mc-combined-totals-2026-09-17.md and bankroll-config-sweep-2026-09-21.md.
+in mc-combined-totals-2026-09-17.md and archive/docs/bankroll-config-sweep-2026-09-21.md.
 """
 
 from __future__ import annotations
