@@ -57,6 +57,13 @@ from σ_pred, re-tuned per bundle on 11.0–16.0 in steps of 0.5.
 through 2025. Its results may **drop** a component from a bundle before the bundle is built,
 and the drop is recorded here. They may not add a component or widen a grid.
 
+**Run 2026-10-16 on 2014–2025 (2020 skipped): nothing dropped.** Overtime games are
+over-covered (85.5% at 68%) and postseason under-covered (65.8%), which supports C(2) and C(3).
+Home teams beat the forecast by about +0.5 points a season on average (9 of 11 seasons
+positive), which supports C(1). Conference switchers show no clear miss (+0.19
+[−0.47, 0.87], 142 team-seasons). Not in any bundle, so not testable here: FBS-vs-FCS
+forecasts are too extreme (residual slope −0.149 [−0.204, −0.096]). That needs its own plan.
+
 ## Trial accounting
 
 Grids above: A 3, B 27, C 3 × 3 × 3 × 3 × 3 = 243, plus 11 σ_pred values per bundle. Each
