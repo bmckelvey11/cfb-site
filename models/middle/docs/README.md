@@ -4,5 +4,6 @@ Index for `models/middle/docs/`. One row per doc: what question it answers.
 
 | Doc | Answers |
 | --- | --- |
+| [middle-anchor-fix-2026-10-16.md](middle-anchor-fix-2026-10-16.md) | Was the live middle calculator's distribution anchoring correct — why sliding the histogram onto the live number put mass below the current score and mis-priced the Under, and how re-weighting replaced it. |
 | [middle-probability-2026-09-21.md](middle-probability-2026-09-21.md) | Given a pregame totals bet and a live total, how likely is the middle and what is it worth — why the probability comes from drive starts rather than live-line history, why the distribution is anchored on its median, why the numbers are conservative rather than flattering, and how the live stake is solved for rather than chosen. |
 | [middle-research-prompt-2026-09-18.md](middle-research-prompt-2026-09-18.md) | What is still unknown about live totals middling, as a Perplexity deep-research prompt: does real in-play line data exist, how do books price live totals, and how wrong is the conditioning-bias assumption. |

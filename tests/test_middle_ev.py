@@ -253,3 +253,44 @@ def test_growth_refuses_a_stake_that_could_bust_the_bankroll():
     # Whatever it picks must itself be survivable.
     assert eval_js(b, SIZING_DIST,
                    "Number.isFinite(growth(bet, dist, 200, kellyStake(bet, dist, 200)))") is True
+
+
+# --- anchoring the distribution on the live number ---------------------------
+
+# Late-game shape: most often nobody scores again, otherwise a field goal or a
+# touchdown. Remaining points is lumpy, which is what broke the old sideways
+# shift.
+LUMPY_CELL = {"lo": 0, "p": [0.70, 0, 0, 0.12, 0, 0, 0.02, 0.10, 0, 0, 0.04, 0, 0, 0, 0.02]}
+
+
+def tilt(anchor: float) -> dict[int, float]:
+    out = eval_js(bet(), {}, f"tiltToMarket({json.dumps(LUMPY_CELL)}, {anchor})")
+    return {int(k): v for k, v in out.items()}
+
+
+@pytest.mark.parametrize("anchor", [0.5, 2.5, 4.5, 8.5, 3.0, 7.0])
+def test_live_number_is_a_coin_flip(anchor):
+    """Matched prices on both sides mean P(under) = P(over), exactly, including
+    on lumpy late-game distributions and on integer lines with push mass."""
+    q = tilt(anchor)
+    under = sum(p for r, p in q.items() if r < anchor)
+    over = sum(p for r, p in q.items() if r > anchor)
+    assert under == pytest.approx(over, abs=1e-6)
+    assert sum(q.values()) == pytest.approx(1.0, abs=1e-9)
+
+
+def test_anchoring_never_takes_points_off_the_board():
+    """Remaining points cannot be negative, and only scores the history
+    contains get mass -- 1, 2, 4, 5 points left stay impossible. The old shift
+    put 42% of the mass below the current score at 55 points, 6:00 left."""
+    for anchor in [0.5, 4.5, 8.5]:
+        q = tilt(anchor)
+        assert min(q) >= 0
+        assert set(q) <= {r for r, p in enumerate(LUMPY_CELL["p"]) if p > 0}
+
+
+def test_nobody_scoring_again_stays_on_the_current_score():
+    """With the live number half a point above the score, the 50% under side is
+    all 'no more points'. The old shift moved that mass up to the live number."""
+    q = tilt(0.5)
+    assert q[0] == pytest.approx(0.5, abs=1e-6)

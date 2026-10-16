@@ -13,7 +13,8 @@ The live total is the market's estimate of the final total, so
 the calculator needs on top of that is the *spread* of remaining points around
 that estimate, which is what this table stores: per (minutes remaining, expected
 remaining) cell, the integer histogram of points actually scored from there on,
-plus the cell mean so the histogram can be recentred on the user's number.
+plus the cell mean. The page re-weights the histogram so the user's live number is
+its median (see `tiltToMarket`).
 
 Output is written straight into `middle_calculator.html` as a JS object literal
 between the MIDDLE_TABLE markers -- the page makes no network requests.
