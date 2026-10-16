@@ -149,6 +149,7 @@ footer p{margin:0 0 var(--space-2)}
       <div class="grid">
         <label class="field"><span>Live total</span><input type="number" id="liveNum" step="0.5" value="58.5"></label>
         <label class="field"><span>Price</span><input type="number" id="livePrice" step="5" value="-110"></label>
+        <label class="field"><span>Your stake $</span><input type="number" id="liveStake" step="10" min="0" value="100"></label>
         <label class="field"><span>Bankroll $</span><input type="number" id="bankroll" step="100" min="1" value="10000"></label>
       </div>
     </fieldset>
@@ -168,9 +169,9 @@ footer p{margin:0 0 var(--space-2)}
     <p class="panel-heading">Result</p>
     <p class="legs" id="legs"></p>
     <div class="chips">
-      <div class="chip"><div class="lbl">Stake the live leg</div><div class="val" id="stake">—</div><div class="chip-note" id="stakeNote"></div></div>
+      <div class="chip"><div class="lbl">Growth-optimal live stake</div><div class="val" id="stake">—</div><div class="chip-note" id="stakeNote"></div></div>
       <div class="chip"><div class="lbl">Middle hits</div><div class="val" id="pMid">—</div></div>
-      <div class="chip"><div class="lbl">Live leg EV</div><div class="val" id="liveEv">—</div><div class="chip-note">what the hedge costs — pregame stake is sunk</div></div>
+      <div class="chip"><div class="lbl">Live leg EV</div><div class="val" id="liveEv">—</div><div class="chip-note">at your stake — pregame stake is sunk</div></div>
       <div class="chip"><div class="lbl">Whole position EV</div><div class="val" id="ev">—</div><div class="chip-note" id="evPctNote"></div></div>
     </div>
   </div>
@@ -186,7 +187,7 @@ footer p{margin:0 0 var(--space-2)}
   </div>
 
   <div class="panel">
-    <p class="panel-heading">Every outcome</p>
+    <p class="panel-heading">Every outcome at your stake</p>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Final total</th><th>Pregame</th><th>Live</th><th style="text-align:right">Prob</th><th style="text-align:right">Net $</th></tr></thead>
@@ -337,9 +338,47 @@ function evaluate(bet, dist) {
   };
 }
 
+/* Re-weight a cell's remaining-points histogram so the live number is its
+   median: P(rem < anchor) = P(rem > anchor), the coin flip a two-way market at
+   matched prices implies.
+
+   Each probability is scaled by exp(theta * rem) and renormalised, with theta
+   found by bisection. That is the smallest change to the historical shape that
+   meets the market (minimum KL divergence), and it only re-weights outcomes the
+   history already contains. The earlier version slid the whole histogram
+   sideways instead, which broke both of those: it moved "nobody scores again"
+   onto totals above the current score, and could move mass BELOW the current
+   score -- points that have already been scored cannot come off the board.
+
+   Remaining points is lumpy (0, 3, 6, 7, 10, ...), so "the median" has to be
+   met exactly at the line rather than interpolated inside a bin; interpolating
+   left the half-point line 70/30 instead of 50/50 late in games. */
+function tiltToMarket(cell, anchor) {
+  const weights = theta => cell.p.map((p, i) => p * Math.exp(theta * (cell.lo + i - anchor)));
+  const gap = theta => {
+    let under = 0, over = 0, z = 0;
+    weights(theta).forEach((w, i) => {
+      const r = cell.lo + i;
+      if (r < anchor) under += w; else if (r > anchor) over += w;
+      z += w;
+    });
+    return (under - over) / z;          // falls as theta rises
+  };
+  let lo = -2, hi = 2;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (gap(mid) > 0) lo = mid; else hi = mid;
+  }
+  const w = weights((lo + hi) / 2);
+  const z = w.reduce((s, x) => s + x, 0);
+  const out = {};
+  w.forEach((x, i) => { if (x > 0) out[cell.lo + i] = x / z; });
+  return out;
+}
+
 if (typeof module !== 'undefined') {
   module.exports = { decimalProfit, legOutcome, legNet, legEv, branches, evaluate,
-                     wealth, growth, kellyStake, equalizingStake };
+                     wealth, growth, kellyStake, equalizingStake, tiltToMarket };
 }
 
 /* ---- EV_MATH:END ---- */
@@ -365,52 +404,23 @@ function findCell(tb, eb) {
   return null;
 }
 
-/* The cell's median remaining points, interpolated where the CDF crosses 0.5
-   rather than snapped to an integer, so the shift below stays smooth. */
-function cellMedian(cell) {
-  let cum = 0;
-  for (let i = 0; i < cell.p.length; i++) {
-    const next = cum + cell.p[i];
-    if (next >= 0.5) return cell.lo + i + (0.5 - cum) / cell.p[i];
-    cum = next;
-  }
-  return cell.lo + cell.p.length - 1;
-}
+/* P(final total) = current score + P(remaining points), with the cell's
+   histogram re-weighted so the live number is a coin flip.
 
-/* P(final total) = P(current score + remaining points), with the cell's
-   histogram shifted onto the live number.
-
-   Anchor the MEDIAN, not the mean. A book posting the same price on both sides
-   is posting the number it thinks is a coin flip -- the 50th percentile of its
-   distribution. Remaining points is right-skewed (a handful of points is
-   typical, a shootout or overtime is the tail), so its mean sits above its
-   median, and the gap widens as the clock runs down. Anchoring the mean would
-   push half the distribution below the live number and then some, which made
-   the live Under look free late in games: at 55 points with 2:00 left it
-   reported P(final < 59) = 0.73 and a +41% edge that is an artifact of the
-   anchor, not a read on the market.
-
-   The shift is split across the two neighbouring integers so it adds no
-   rounding bias -- half a point is the push-versus-win boundary. */
+   A book posting the same price on both sides is posting the number it thinks
+   is the 50th percentile, so the distribution has to put as much mass over the
+   live number as under it. See tiltToMarket for why this re-weights the cell
+   instead of sliding it sideways. */
 function finalTotalDist(score, remAnchor, minRem) {
   const tb = minRemBucket(minRem);
   if (tb === null) return null;
   const hit = findCell(tb, Math.floor(remAnchor / MIDDLE_TABLE.expRemBin));
   if (!hit) return null;
 
-  const { cell } = hit;
-  const shift = remAnchor - cellMedian(cell);
-  const kLo = Math.floor(shift);
-  const w = shift - kLo;
-
+  const rem = tiltToMarket(hit.cell, remAnchor);
   const dist = {};
-  const add = (total, p) => { if (p > 0) dist[total] = (dist[total] || 0) + p; };
-  for (let i = 0; i < cell.p.length; i++) {
-    const rem = cell.lo + i;
-    add(score + rem + kLo, cell.p[i] * (1 - w));
-    add(score + rem + kLo + 1, cell.p[i] * w);
-  }
-  return { dist, n: cell.n, distance: hit.distance };
+  for (const r of Object.keys(rem)) dist[score + Number(r)] = rem[r];
+  return { dist, n: hit.cell.n, distance: hit.distance };
 }
 
 /* ---------- UI ---------- */
@@ -428,7 +438,7 @@ function render() {
     preStake: +$('preStake').value,
     liveNum: +$('liveNum').value,
     livePrice: +$('livePrice').value,
-    liveStake: 0,                       // solved for below
+    liveStake: +$('liveStake').value,   // what the user bets; the growth-optimal stake is solved for separately
   };
   const score = +$('score').value;
   const minRem = +$('minRem').value;
@@ -443,6 +453,7 @@ function render() {
   // `min`/`max` on a number input only bind the spinner, so a typed value still needs checking.
   if (!(minRem >= 0 && minRem <= 60)) return fail('Minutes remaining must be between 0 and 60. Overtime counts as 0.');
   if (!(bankroll > 0)) return fail('Bankroll must be greater than zero — the stake is sized against it.');
+  if (!(bet.liveStake >= 0)) return fail('Your live stake must be zero or more.');
   if (bet.preStake >= bankroll) return fail('The pregame stake is your whole bankroll or more. There is nothing left to hedge with.');
 
   const windowOpen = (bet.preSide === 'over' && bet.liveNum > bet.preNum)
@@ -457,12 +468,11 @@ function render() {
 
   const kelly = kellyStake(bet, res.dist, bankroll);
   const equal = equalizingStake(bet);
-  bet.liveStake = kelly;
   const out = evaluate(bet, res.dist);
 
   $('legs').innerHTML = `<strong>${bet.preSide === 'over' ? 'Over' : 'Under'} ${bet.preNum}</strong> `
     + `at ${bet.prePrice > 0 ? '+' : ''}${bet.prePrice} for ${money(bet.preStake)}, hedged with `
-    + `<strong>${bet.liveSide === 'over' ? 'Over' : 'Under'} ${bet.liveNum} for ${money(kelly)}</strong> `
+    + `<strong>${bet.liveSide === 'over' ? 'Over' : 'Under'} ${bet.liveNum} for ${money(bet.liveStake)}</strong> `
     + `at ${bet.livePrice > 0 ? '+' : ''}${bet.livePrice}.`;
 
   $('stake').textContent = money(kelly);
@@ -497,6 +507,7 @@ function render() {
     { label: 'No hedge', y: 0 },
     { label: 'Growth-optimal', y: kelly, mark: true },
     { label: 'Flatten the outsides', y: equal },
+    { label: 'Your stake', y: bet.liveStake },
   ].filter((r, i, a) => i === 0 || a.findIndex(o => Math.abs(o.y - r.y) < 0.005) === i);
   /* Growth is reported as the GAIN over not hedging, in basis points. The
      absolute growth rates differ in the fourth decimal and read as identical;
