@@ -62,7 +62,7 @@ def load_pool_games(root: Path, last: int, sources: list[Path]) -> tuple[pd.Data
                         "neutral": bool(g.get("neutralSite")), "margin": hp - ap})
         non_d1[s], unplayed[s] = n_non_d1, n_unplayed
     g = pd.DataFrame(rows)
-    g["kickoff"] = pd.to_datetime(g["kickoff"], utc=True, errors="coerce")
+    g["kickoff"] = pd.to_datetime(g["kickoff"], utc=True, errors="coerce", format="ISO8601")
     g = g.sort_values(["kickoff", "game_id"]).reset_index(drop=True)
     return g, {"non_d1_by_season": non_d1, "unplayed_by_season": unplayed}
 

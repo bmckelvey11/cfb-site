@@ -32,3 +32,19 @@ def test_drops_non_d1_and_unplayed_games_and_counts_them(tmp_path):
     assert drops["non_d1_by_season"][2013] == 2
     assert drops["unplayed_by_season"][2013] == 1
     assert set(g["home_div"]) <= {"fbs", "fcs"} and set(g["away_div"]) <= {"fbs", "fcs"}
+
+
+def test_parses_kickoffs_when_seasons_mix_date_formats(tmp_path):
+    # CFBD's 2026 file writes "2026-08-27 22:00:00+00:00"; earlier seasons use "...T...Z".
+    # Without format="ISO8601", pandas infers one format and coerces the other to NaT.
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    old, new = _game(1, "fbs", "fbs"), _game(2, "fbs", "fbs")
+    old["startDate"], new["startDate"] = "2013-08-29T22:00:00.000Z", "2014-08-28 22:00:00+00:00"
+    (raw / "games_2013.json").write_text(json.dumps([old]), encoding="utf-8")
+    (raw / "games_2014.json").write_text(json.dumps([new]), encoding="utf-8")
+
+    g, _ = load_pool_games(tmp_path, 2014, [])
+
+    assert g["kickoff"].notna().all()
+    assert list(g["game_id"]) == [1, 2]
