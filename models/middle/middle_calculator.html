@@ -149,6 +149,7 @@ footer p{margin:0 0 var(--space-2)}
       <div class="grid">
         <label class="field"><span>Live total</span><input type="number" id="liveNum" step="0.5" value="58.5"></label>
         <label class="field"><span>Price</span><input type="number" id="livePrice" step="5" value="-110"></label>
+        <label class="field"><span>Your stake $</span><input type="number" id="liveStake" step="10" min="0" value="100"></label>
         <label class="field"><span>Bankroll $</span><input type="number" id="bankroll" step="100" min="1" value="10000"></label>
       </div>
     </fieldset>
@@ -168,9 +169,9 @@ footer p{margin:0 0 var(--space-2)}
     <p class="panel-heading">Result</p>
     <p class="legs" id="legs"></p>
     <div class="chips">
-      <div class="chip"><div class="lbl">Stake the live leg</div><div class="val" id="stake">—</div><div class="chip-note" id="stakeNote"></div></div>
+      <div class="chip"><div class="lbl">Growth-optimal live stake</div><div class="val" id="stake">—</div><div class="chip-note" id="stakeNote"></div></div>
       <div class="chip"><div class="lbl">Middle hits</div><div class="val" id="pMid">—</div></div>
-      <div class="chip"><div class="lbl">Live leg EV</div><div class="val" id="liveEv">—</div><div class="chip-note">what the hedge costs — pregame stake is sunk</div></div>
+      <div class="chip"><div class="lbl">Live leg EV</div><div class="val" id="liveEv">—</div><div class="chip-note">at your stake — pregame stake is sunk</div></div>
       <div class="chip"><div class="lbl">Whole position EV</div><div class="val" id="ev">—</div><div class="chip-note" id="evPctNote"></div></div>
     </div>
   </div>
@@ -186,7 +187,7 @@ footer p{margin:0 0 var(--space-2)}
   </div>
 
   <div class="panel">
-    <p class="panel-heading">Every outcome</p>
+    <p class="panel-heading">Every outcome at your stake</p>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Final total</th><th>Pregame</th><th>Live</th><th style="text-align:right">Prob</th><th style="text-align:right">Net $</th></tr></thead>
@@ -437,7 +438,7 @@ function render() {
     preStake: +$('preStake').value,
     liveNum: +$('liveNum').value,
     livePrice: +$('livePrice').value,
-    liveStake: 0,                       // solved for below
+    liveStake: +$('liveStake').value,   // what the user bets; the growth-optimal stake is solved for separately
   };
   const score = +$('score').value;
   const minRem = +$('minRem').value;
@@ -452,6 +453,7 @@ function render() {
   // `min`/`max` on a number input only bind the spinner, so a typed value still needs checking.
   if (!(minRem >= 0 && minRem <= 60)) return fail('Minutes remaining must be between 0 and 60. Overtime counts as 0.');
   if (!(bankroll > 0)) return fail('Bankroll must be greater than zero — the stake is sized against it.');
+  if (!(bet.liveStake >= 0)) return fail('Your live stake must be zero or more.');
   if (bet.preStake >= bankroll) return fail('The pregame stake is your whole bankroll or more. There is nothing left to hedge with.');
 
   const windowOpen = (bet.preSide === 'over' && bet.liveNum > bet.preNum)
@@ -466,12 +468,11 @@ function render() {
 
   const kelly = kellyStake(bet, res.dist, bankroll);
   const equal = equalizingStake(bet);
-  bet.liveStake = kelly;
   const out = evaluate(bet, res.dist);
 
   $('legs').innerHTML = `<strong>${bet.preSide === 'over' ? 'Over' : 'Under'} ${bet.preNum}</strong> `
     + `at ${bet.prePrice > 0 ? '+' : ''}${bet.prePrice} for ${money(bet.preStake)}, hedged with `
-    + `<strong>${bet.liveSide === 'over' ? 'Over' : 'Under'} ${bet.liveNum} for ${money(kelly)}</strong> `
+    + `<strong>${bet.liveSide === 'over' ? 'Over' : 'Under'} ${bet.liveNum} for ${money(bet.liveStake)}</strong> `
     + `at ${bet.livePrice > 0 ? '+' : ''}${bet.livePrice}.`;
 
   $('stake').textContent = money(kelly);
@@ -506,6 +507,7 @@ function render() {
     { label: 'No hedge', y: 0 },
     { label: 'Growth-optimal', y: kelly, mark: true },
     { label: 'Flatten the outsides', y: equal },
+    { label: 'Your stake', y: bet.liveStake },
   ].filter((r, i, a) => i === 0 || a.findIndex(o => Math.abs(o.y - r.y) < 0.005) === i);
   /* Growth is reported as the GAIN over not hedging, in basis points. The
      absolute growth rates differ in the fourth decimal and read as identical;
