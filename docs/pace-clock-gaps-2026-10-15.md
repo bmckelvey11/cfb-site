@@ -100,3 +100,25 @@ game-clock delta. Wallclock-only games use the wallclock delta minus the season'
 carries `clock_source`. Seasons before 2025 gain almost nothing, because wallclock is stale
 in the same games as the game clock there. The five blowout-heavy teams still need
 shrinkage toward last season's tempo, as `prior_v1` does for the possession ratings.
+
+## Breaking ties
+
+`tempo_s` is a median of whole-second deltas, so 120 of 133 rated 2026 teams share a value
+with another team (29 distinct values). `scripts/pace_tiebreak.py` compares tie-free
+alternatives on 2014–2026 team-seasons (`python -m scripts.pace_tiebreak <out_dir>`).
+
+| Stat | Split-half r | Full-season r | YoY r | Distinct 2026 | Teams tied 2026 |
+| --- | --- | --- | --- | --- | --- |
+| median (`tempo_s`) | 0.776 | 0.874 | 0.666 | 29 | 120 |
+| interpolated median | 0.781 | 0.877 | 0.668 | 99 | 61 |
+| mean of deltas ≤ 90 s | 0.803 | 0.891 | 0.689 | 127 | 12 |
+| IQM | 0.788 | 0.881 | 0.677 | 129 | 8 |
+| Hodges-Lehmann | 0.807 | 0.893 | 0.688 | 29 | 126 |
+| mean of game medians | 0.764 | 0.866 | 0.664 | 118 | 27 |
+
+The trimmed mean is slightly more reliable, but it reads wallclock-heavy teams fast (about
+0.6 s on average, 2–2.7 s for Ohio State, Penn State and Michigan State), because the
+wallclock shift is calibrated on the median and the two clocks' tails differ. Re-shifting by
+the mean gap (`--mean-calibrated`) does not remove it. The interpolated median shows no such
+bias, so the rank uses it, with the trimmed mean breaking its remaining ties: 133 distinct
+ranks. The reliability gain over `tempo_s` is small; this fixes ties, not noise.
