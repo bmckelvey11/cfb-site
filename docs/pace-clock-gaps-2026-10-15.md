@@ -92,9 +92,11 @@ The five blowout-heavy teams stay at 19–29 either way.
   stadium or late in the season.
 - Nothing here is scored against totals or spreads.
 
-## Next
+## Fix
 
-A wallclock fallback in `pace_stats.PAIRS_SQL`, shifted by the season's median offset, would
-rate the 17 clock-gap teams. The 5 blowout-heavy teams need shrinkage toward last season's
-tempo, as `prior_v1` does for the possession ratings. Until then, the rankings page leaves
-pace out.
+`scripts/pace_stats.py` now keeps games that pass either clock. Game-clock games use the
+game-clock delta. Wallclock-only games use the wallclock delta minus the season's median
+(wallclock - game clock) gap, measured on pairs from games where both pass. Each pair
+carries `clock_source`. Seasons before 2025 gain almost nothing, because wallclock is stale
+in the same games as the game clock there. The five blowout-heavy teams still need
+shrinkage toward last season's tempo, as `prior_v1` does for the possession ratings.

@@ -8,9 +8,14 @@ play duration plus huddle-to-snap time; play duration is roughly constant across
 so the differences between teams are tempo.
 
 CFBD's per-play clock is stale in whole games: in 2015-2023, most FBS games repeat the
-clock across most consecutive snaps. Only games with `core.fact_game_clock_quality.clock_ok`
-are kept. Wallclock (2018+) is stale in the same games through 2024 and is not used; from
-2025 it covers games the clock misses (v2 path).
+clock across most consecutive snaps. A game is kept when `core.fact_game_clock_quality`
+passes it on the game clock (`clock_ok`) or on wallclock (`wallclock_ok`). Game-clock games
+use the game-clock delta. Wallclock-only games use the wallclock delta minus that season's
+median (wallclock - game clock) gap, measured on pairs from games where both clocks pass;
+a season with no such pairs gets no wallclock fallback. Wallclock (2018+) is stale in the
+same games as the clock through 2024, so the fallback adds games only from 2025
+(docs/pace-clock-gaps-2026-10-15.md). In a wallclock-only game `secs_left` is the stuck
+game clock, so the end-of-half filter there is approximate.
 
 Stats per team-season (lower seconds = faster):
   tempo_s        median neutral seconds per snap, offense
@@ -42,8 +47,9 @@ MIN_TRAIL = 15    # pairs a team-season needs before trail_delta_s is reported
 
 PAIRS_SQL = f"""
 with fbs as (
-  select g.gameId from stg.games g
-  join core.fact_game_clock_quality q on q.game_id = g.gameId and q.clock_ok
+  select g.gameId, q.clock_ok, q.wallclock_ok from stg.games g
+  join core.fact_game_clock_quality q on q.game_id = g.gameId
+    and (q.clock_ok or q.wallclock_ok)
   where g.homeClassification = 'fbs' and g.awayClassification = 'fbs'
     and g.seasonType = 'regular'
 ),
@@ -52,16 +58,21 @@ p as (
          pl.period, pl.yardsGained, pl.distance,
          cast(pl.offenseScore as int) - cast(pl.defenseScore as int) as margin,
          cast(pl.clock_minutes * 60 + pl.clock_seconds as int) as secs_left,
+         try_cast(pl.wallclock as timestamptz) as wall,
+         fbs.clock_ok, fbs.wallclock_ok,
          lead(pl.playType) over w as nxt_type,
          lead(pl.offense)  over w as nxt_offense,
          lead(pl.period)   over w as nxt_period,
-         lead(cast(pl.clock_minutes * 60 + pl.clock_seconds as int)) over w as nxt_secs
+         lead(cast(pl.clock_minutes * 60 + pl.clock_seconds as int)) over w as nxt_secs,
+         lead(try_cast(pl.wallclock as timestamptz)) over w as nxt_wall
   from stg.plays pl join fbs using (gameId)
   window w as (partition by pl.driveId order by pl.playNumber, pl.playId)
 )
 select gameId as game_id, season, week, offense, defense, period, secs_left, margin,
        yardsGained >= distance as first_down,
-       secs_left - nxt_secs as dclk
+       clock_ok, wallclock_ok,
+       secs_left - nxt_secs as dclk,
+       epoch(nxt_wall) - epoch(wall) as dwall
 from p
 where playType = 'Rush' and period <= 4
   and nxt_offense = offense and nxt_period = period
@@ -90,10 +101,25 @@ select * from plays join poss using (game_id, offense)
 """
 
 
+def wallclock_offsets(p: pd.DataFrame) -> pd.Series:
+    """Per season, median (wallclock - game clock) seconds on pairs where both clocks pass."""
+    both = p[p["clock_ok"] & p["wallclock_ok"]]
+    return (both["dwall"] - both["dclk"]).groupby(both["season"]).median()
+
+
 def load_pairs(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    """Post-rush snap pairs in clean-clock games, clock-running rushes only."""
+    """Post-rush snap pairs in clean-clock games, clock-running rushes only.
+
+    `dclk` is the game-clock delta, or the offset-corrected wallclock delta in games whose
+    game clock fails; `clock_source` says which.
+    """
     p = con.execute(PAIRS_SQL).df()
-    return p[~p["first_down"]].reset_index(drop=True)
+    p = p[~p["first_down"]].reset_index(drop=True)
+    wall_only = ~p["clock_ok"]
+    offset = p["season"].map(wallclock_offsets(p))
+    p["dclk"] = p["dclk"].where(~wall_only, p["dwall"] - offset)
+    p["clock_source"] = np.where(wall_only, "wallclock", "clock")
+    return p.dropna(subset=["dclk"]).reset_index(drop=True)
 
 
 def late_half(p: pd.DataFrame) -> pd.Series:
@@ -178,7 +204,9 @@ def main() -> None:
     team_game(p, volume).to_csv(out / "pace_team_game.csv", index=False)
     season.to_csv(out / "pace_team_season.csv")
 
-    print(f"pairs {len(p):,} in {p['game_id'].nunique():,} clean-clock games")
+    print(f"pairs {len(p):,} in {p['game_id'].nunique():,} clean-clock games "
+          f"({p.loc[p['clock_source'] == 'wallclock', 'game_id'].nunique():,} on wallclock)")
+    print("wallclock offset s by season\n", wallclock_offsets(p).round(2).to_string())
     print(p[neutral_mask(p)].groupby("season")["dclk"].median().rename("league_tempo_s").to_string())
     print("\nreliability\n", reliability(p, season).round(3).to_string())
     # Within-season correlation, so the league-wide tempo drift does not inflate it.

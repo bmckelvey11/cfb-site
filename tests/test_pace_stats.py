@@ -45,3 +45,38 @@ def test_load_pairs_keeps_only_clock_running_rush_pairs_in_clean_fbs_games():
     p = load_pairs(con)
 
     assert p[["game_id", "secs_left", "dclk"]].values.tolist() == [[1, 600, 30]]
+
+
+def _warehouse(plays, games):
+    con = duckdb.connect()
+    con.execute("create schema stg")
+    con.execute("create schema core")
+    con.register("plays_df", plays)
+    con.register("games_df", games)
+    con.execute("create table stg.plays as select * from plays_df")
+    con.execute("create table stg.games as select * from games_df")
+    _build_fact_game_clock_quality(con)
+    return con
+
+
+def test_load_pairs_falls_back_to_offset_wallclock_when_the_game_clock_is_stuck():
+    def timed(game, n, mm, ss, wall_s):
+        row = _play(game, 1, n, "A", "Rush", 1, mm, ss)
+        row["wallclock"] = f"2025-09-06T18:{wall_s // 60:02d}:{wall_s % 60:02d}Z"
+        return row
+
+    plays = pd.DataFrame([
+        timed(1, 1, 10, 0, 0),    # both clocks pass: clock 30 s, wallclock 32 s
+        timed(1, 2, 9, 30, 32),
+        timed(1, 3, 9, 0, 64),
+        timed(2, 1, 12, 0, 0),    # stuck clock, wallclock 42 s apart
+        timed(2, 2, 12, 0, 42),
+        timed(2, 3, 12, 0, 84),
+    ])
+    games = pd.DataFrame({"gameId": [1, 2], "seasonType": "regular",
+                          "homeClassification": "fbs", "awayClassification": "fbs"})
+
+    p = load_pairs(_warehouse(plays, games))
+
+    assert p[["game_id", "clock_source", "dclk"]].values.tolist() == [
+        [1, "clock", 30], [1, "clock", 30], [2, "wallclock", 40], [2, "wallclock", 40]]
