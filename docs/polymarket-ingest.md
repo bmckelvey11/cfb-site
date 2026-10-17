@@ -71,7 +71,7 @@ exits 1 and lists any name that does not match a CFBD school; add it to `ALIASES
 
 ## Live odds page
 
-`python -m cfb_system_maker live` serves <http://127.0.0.1:5060>: every game in progress with
+`python -m cfb_system_maker live` serves <http://127.0.0.1:5070>: every game in progress with
 its score, clock, win chance, and main live spread and total, plus games kicking off in the
 next 3 hours. Code: `cfb_system_maker/live/` (`board.py` holds the rules), tests:
 `tests/test_live_odds.py`. Run it on the Mac; the cloud gets 403 from Gamma.

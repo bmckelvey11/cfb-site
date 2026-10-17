@@ -1017,8 +1017,9 @@ def _build_parser() -> argparse.ArgumentParser:
     matchup.add_argument("--port", type=int, default=int(os.environ.get("PORT") or 5050))
     matchup.add_argument("--debug", action="store_true")
 
+    # Not 5060/5061: Chrome refuses them (ERR_UNSAFE_PORT, reserved for SIP).
     live = subparsers.add_parser("live", help="live in-game Polymarket odds page at 127.0.0.1")
-    live.add_argument("--port", type=int, default=int(os.environ.get("PORT") or 5060))
+    live.add_argument("--port", type=int, default=int(os.environ.get("PORT") or 5070))
     live.add_argument("--debug", action="store_true")
 
     return parser

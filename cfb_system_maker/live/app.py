@@ -1,6 +1,6 @@
 """The live odds page: a standalone local Flask app, like `matchup`.
 
-Run: `python -m cfb_system_maker live --port 5060` (bound to 127.0.0.1). The page asks
+Run: `python -m cfb_system_maker live --port 5070` (bound to 127.0.0.1). The page asks
 `/api/live` every 30 seconds. The game list comes from `/events/keyset`, which Polymarket serves
 from a cache a few minutes behind, so it is re-read only every `LIST_SECONDS`; the games in play
 are then re-read every `CACHE_SECONDS` through `/events?slug=`, which is current. Several open
