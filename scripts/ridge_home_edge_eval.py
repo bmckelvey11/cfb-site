@@ -184,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
         "trial_count": {"variants": len(VARIANTS), "sd_grid_points": len(SD_GRID)},
     }
     out = PROCESSED / "ratings" / "ridge_home_edge.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps({k: report[k] for k in ("sd", "pick", "adopt", "season_end_h_ppp")}, indent=1))
     print(f"wrote {out}")

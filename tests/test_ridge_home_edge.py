@@ -10,11 +10,20 @@ from scripts.weekly_ratings import fit_ridge
 from tests.test_weekly_ratings import H_ADV, _round_robin
 
 
+# fit_ridge(_round_robin(), 20, 2) computed on feat/glicko-ratings before h_fixed existed.
+FROZEN_V1 = {"h": 0.05, "mu": 2.1003645338,
+             "O": {"A": 0.5269836943, "B": 0.2495035555, "C": 0.0933556906,
+                   "D": -0.1854665593, "E": -0.2547680236, "F": -0.4296083576},
+             "D": {"A": -0.3675129464, "B": 0.1635798369, "C": -0.0882885487,
+                   "D": 0.4393168914, "E": 0.0083955762, "F": -0.1554908094}}
+
+
 def test_free_is_ridge_v1_unchanged():
-    g = _round_robin()
-    a, b = fit_ridge(g, 20, 2), fit_ridge(g, 20, 2, h_fixed=None)
-    assert a.h == b.h
-    pd.testing.assert_frame_equal(a.table, b.table)
+    r = fit_ridge(_round_robin(), 20, 2)
+    assert r.h == pytest.approx(FROZEN_V1["h"], abs=1e-9)
+    assert r.mu == pytest.approx(FROZEN_V1["mu"], abs=1e-9)
+    for col in ("O", "D"):
+        assert r.table[col].to_dict() == pytest.approx(FROZEN_V1[col], abs=1e-9)
 
 
 def test_fixed_h_is_held_exactly_and_refits_the_teams():
