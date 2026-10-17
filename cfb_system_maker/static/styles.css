@@ -1,14 +1,14 @@
-/* CFB System Maker — restyled onto Saturday Signal tokens.
- * Class names match the Flask app's static/styles.css, so this file is a
- * drop-in replacement for it. Structure is unchanged; type, color, spacing,
- * radius and density come from the design system.
+/* CFB System Maker — Minimalist Modern.
+ * Type, color, spacing, radius, shadow and motion come from the three token
+ * files; this file consumes them through var(--*) only. Rules and the reasons
+ * behind them: docs/design-system.md.
  */
 @import url('tokens/typography.css');
 @import url('tokens/colors.css');
 @import url('tokens/spacing.css');
 
 :root{color-scheme:light;
-  --bg:var(--ink-50);--panel:var(--ink-0);--panel-strong:var(--ink-100);
+  --bg:var(--canvas);--panel:var(--ink-0);--panel-strong:var(--ink-100);
   --text:var(--ink-900);--muted:var(--ink-500);--border:var(--ink-200);
   --accent:var(--signal-500);--accent-dark:var(--signal-600);
   --win:var(--success-500);--loss:var(--error-500);
@@ -17,8 +17,8 @@
 *{box-sizing:border-box}
 body{margin:0;min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:var(--text-sm);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
 h1,h2,h3,p{margin:0}
-h1{font:var(--type-heading-md);letter-spacing:var(--tracking-tight)}
-h2{font:var(--type-heading-lg);letter-spacing:var(--tracking-tight)}
+h1{font:var(--weight-regular) var(--text-xl)/1.2 var(--font-display);letter-spacing:var(--tracking-normal)}
+h2{font:var(--type-title-md);letter-spacing:var(--tracking-normal)}
 h3{font:var(--type-heading-sm)}
 a{color:var(--signal-500);text-decoration:none}
 a:hover{color:var(--signal-600);text-decoration:underline}
@@ -34,14 +34,14 @@ code{font-family:var(--font-mono);font-size:0.8125rem;background:var(--ink-100);
 
 /* ── Brand & header ─────────────────────────────────── */
 .brand{display:flex;gap:var(--space-3);align-items:center;margin-bottom:var(--space-5)}
-.brand-mark{display:grid;place-items:center;width:38px;height:38px;flex-shrink:0;border-radius:var(--radius-md);background:var(--signal-500);color:var(--ink-0);font-family:var(--font-mono);font-size:11px;font-weight:500;letter-spacing:var(--tracking-wide)}
+.brand-mark{display:grid;place-items:center;width:38px;height:38px;flex-shrink:0;border-radius:var(--radius-md);background:var(--gradient-accent-diag);box-shadow:var(--shadow-accent);color:var(--ink-0);font-family:var(--font-mono);font-size:11px;font-weight:500;letter-spacing:var(--tracking-wide)}
 .brand p,.workspace-header p{color:var(--muted);font-size:var(--text-xs);margin-top:2px}
 .brand p:has(.dash-cta){margin-top:var(--space-2)}
 .dash-header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);padding-bottom:var(--space-4);border-bottom:1px solid var(--border)}
 .dash-header .brand{margin-bottom:0}
 .dash-actions{display:flex;gap:var(--space-2)}
-.dash-cta{display:inline-flex;align-items:center;min-height:34px;padding:0 var(--space-4);border:1.5px solid var(--signal-500);border-radius:var(--radius-sm);background:transparent;color:var(--signal-500);font-size:var(--text-xs);font-weight:var(--weight-medium);text-decoration:none;transition:var(--transition-fast)}
-.dash-cta:hover{background:var(--signal-500);color:var(--ink-0);text-decoration:none}
+.dash-cta{display:inline-flex;align-items:center;min-height:40px;padding:0 var(--space-4);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);color:var(--text);font-size:var(--text-sm);font-weight:var(--weight-medium);text-decoration:none;box-shadow:var(--shadow-xs);transition:var(--transition-lift)}
+.dash-cta:hover{background:var(--ink-100);border-color:color-mix(in srgb,var(--signal-500) 30%,transparent);color:var(--text);text-decoration:none;box-shadow:var(--shadow-sm);transform:translateY(-1px)}
 .workspace-header{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--space-4)}
 
 /* ── Filter form ────────────────────────────────────── */
@@ -50,7 +50,7 @@ fieldset{border:0;padding:0;margin:0}
 .fieldset-inactive{opacity:.4}
 legend,label{color:var(--muted);font-size:10px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-widest);text-transform:uppercase}
 .segmented{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-top:var(--space-2)}
-.segmented label,.check{display:flex;align-items:center;gap:var(--space-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;background:var(--panel);color:var(--text);min-height:34px;font-size:var(--text-xs);font-weight:var(--weight-regular);letter-spacing:0;text-transform:none;cursor:pointer;transition:var(--transition-fast)}
+.segmented label,.check{display:flex;align-items:center;gap:var(--space-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 12px;background:var(--panel);color:var(--text);min-height:40px;font-size:var(--text-xs);font-weight:var(--weight-regular);letter-spacing:0;text-transform:none;cursor:pointer;transition:var(--transition-fast)}
 .segmented label:hover,.check:hover{border-color:var(--ink-300)}
 .check{margin-top:var(--space-2)}
 .check-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-top:var(--space-2)}
@@ -58,12 +58,13 @@ legend,label{color:var(--muted);font-size:10px;font-weight:var(--weight-semibold
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);min-width:0}
 .field-grid .full-width{grid-column:1/-1}
 .field-grid label{display:grid;gap:5px}
-input,select,textarea{width:100%;min-height:34px;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;color:var(--text);background:var(--panel);font-family:var(--font-body);font-size:var(--text-xs);outline:none;transition:var(--transition-fast)}
+input,select,textarea{width:100%;min-height:40px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;color:var(--text);background:var(--panel);font-family:var(--font-body);font-size:var(--text-sm);outline:none;transition:var(--transition-fast)}
 input:focus,select:focus,textarea:focus{border-color:var(--signal-500);box-shadow:var(--shadow-focus)}
 input[type="radio"],input[type="checkbox"]{width:14px;min-height:14px;height:14px;flex:0 0 14px;accent-color:var(--signal-500);padding:0;box-shadow:none}
-.segmented label:has(input:checked),.check:has(input:checked){border-color:var(--signal-500);background:var(--signal-100);color:var(--signal-700);font-weight:var(--weight-medium)}
-button{min-height:36px;border:1.5px solid var(--signal-500);border-radius:var(--radius-sm);background:var(--signal-500);color:var(--ink-0);font-family:var(--font-body);font-size:var(--text-xs);font-weight:var(--weight-medium);cursor:pointer;transition:var(--transition-fast)}
-button:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
+.segmented label:has(input:checked),.check:has(input:checked){border-color:var(--signal-500);background:var(--signal-50);color:var(--signal-700);font-weight:var(--weight-medium)}
+button{min-height:40px;border:1px solid transparent;border-radius:var(--radius-sm);background:var(--gradient-accent);color:var(--ink-0);font-family:var(--font-body);font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;box-shadow:var(--shadow-sm);transition:transform var(--transition-lift),box-shadow var(--transition-lift),filter var(--transition-lift),background-color var(--transition-fast),border-color var(--transition-fast),color var(--transition-fast)}
+button:hover{filter:brightness(1.1);box-shadow:var(--shadow-accent);transform:translateY(-1px)}
+button:active{transform:scale(.98);box-shadow:var(--shadow-sm)}
 .theory-field{display:grid;gap:5px}
 .theory-field textarea{min-height:72px;resize:vertical;line-height:var(--leading-normal)}
 /* The label used to wrap the textarea; it is now a sibling, so it carries the same
@@ -88,9 +89,9 @@ button:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
 .range-row{margin:5px 0 var(--space-3)}
 .range-row span{color:var(--muted);font-size:var(--text-xs);text-transform:none;letter-spacing:0}
 .filter-launch-row{display:grid;gap:5px;min-width:0}
-.filter-launcher{width:100%;min-width:0;justify-content:flex-start;text-align:left;padding:0 10px;background:var(--panel);color:var(--text);border:1.5px solid var(--border);font-weight:var(--weight-regular);min-height:34px;display:inline-flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.filter-launcher{width:100%;min-width:0;justify-content:flex-start;text-align:left;padding:0 10px;background:var(--panel);color:var(--text);border:1px solid var(--border);font-weight:var(--weight-regular);min-height:40px;display:inline-flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .filter-launcher:hover{background:var(--ink-50);border-color:var(--ink-300);color:var(--text)}
-.filter-launcher[data-has-filter]{border-color:var(--signal-500);background:var(--signal-100);color:var(--signal-700);font-weight:var(--weight-medium)}
+.filter-launcher[data-has-filter]{border-color:var(--signal-500);background:var(--signal-50);color:var(--signal-700);font-weight:var(--weight-medium)}
 .stat-row{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
 .stat-row__label{font-size:var(--text-xs);color:var(--text)}
 .stat-row__sides{display:flex;gap:5px}
@@ -106,7 +107,7 @@ button:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:var(--space-2)}
 .metrics.stat-chips{grid-template-columns:repeat(auto-fit,minmax(158px,1fr))}
 .metrics.stats-panel{grid-template-columns:repeat(auto-fit,minmax(126px,1fr))}
-.metrics article{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);min-width:0}
+.metrics article{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);min-width:0;box-shadow:var(--shadow-xs);transition:transform var(--transition-lift),box-shadow var(--transition-lift)}
 .metrics span{display:block;color:var(--ink-400);font-size:9px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-widest);text-transform:uppercase;margin-bottom:var(--space-2)}
 .metrics strong{display:block;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:var(--weight-medium);line-height:1.15;letter-spacing:var(--tracking-tightest);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .metrics.stats-panel strong{font-size:var(--text-sm)}
@@ -119,8 +120,7 @@ button:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
 .negative{color:var(--error-500)}
 
 /* ── Panels ─────────────────────────────────────────── */
-.theory-panel,.active-filters-panel,.stats-verdict,.coverage,.chart-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4)}
-.theory-panel h3,.coverage h3,.chart-card h3{font-size:9px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-widest);text-transform:uppercase;color:var(--ink-400);margin-bottom:var(--space-2)}
+.theory-panel,.active-filters-panel,.stats-verdict,.coverage,.chart-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-5);box-shadow:var(--shadow-sm)}
 .theory-panel p{font-size:var(--text-sm);line-height:var(--leading-relaxed);color:var(--ink-700);max-width:var(--content-narrow)}
 .stats-verdict{color:var(--ink-600);font-size:var(--text-sm);line-height:var(--leading-relaxed)}
 .coverage ul{margin:0;padding-left:var(--space-4);display:grid;gap:5px;color:var(--muted);font-size:var(--text-xs);line-height:var(--leading-normal)}
@@ -143,18 +143,17 @@ button:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
 .tabs a[aria-current="page"]{color:var(--signal-500);border-bottom-color:var(--signal-500)}
 .timeframe-tabs{border-bottom:0;flex-wrap:wrap;gap:2px}
 .timeframe-tabs a{padding:4px 10px;font-family:var(--font-mono);font-size:11px;border-bottom:0;border-radius:var(--radius-full)}
-.timeframe-tabs a[aria-current="page"]{background:var(--signal-500);color:var(--ink-0)}
+.timeframe-tabs a[aria-current="page"]{background:var(--gradient-accent);color:var(--ink-0);box-shadow:var(--shadow-accent)}
 
 /* ── Tables ─────────────────────────────────────────── */
-.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:auto}
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:auto;box-shadow:var(--shadow-sm)}
 table{width:100%;border-collapse:collapse;font-family:var(--font-body);font-size:12px;font-variant-numeric:tabular-nums}
-thead th{position:sticky;top:0;background:var(--ink-800);color:var(--ink-100);text-align:left;padding:8px 10px;font-size:9px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-wider);text-transform:uppercase;white-space:nowrap}
-tbody td{padding:8px 10px;border-top:1px solid var(--ink-100);vertical-align:top;white-space:nowrap}
+thead th{position:sticky;top:0;background:var(--ink-50);color:var(--ink-500);box-shadow:inset 0 -1px 0 var(--border);text-align:left;padding:10px 12px;font-size:10px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-wider);text-transform:uppercase;white-space:nowrap}
+tbody td{padding:10px 12px;border-top:1px solid var(--ink-100);vertical-align:top;white-space:nowrap}
 .systems-table tbody td,.finalist-table tbody td{white-space:normal}
 tbody tr:hover{background:var(--ink-50)}
 .no-results{text-align:center;color:var(--muted);padding:var(--space-8)!important}
 .season-breakdown{padding:var(--space-4);display:grid;gap:var(--space-2)}
-.season-breakdown h3{font-size:9px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-widest);text-transform:uppercase;color:var(--ink-400)}
 .season-breakdown>p{color:var(--muted);font-size:var(--text-xs)}
 .season-breakdown table{border:1px solid var(--ink-100);border-radius:var(--radius-sm);overflow:hidden}
 .pill{display:inline-flex;align-items:center;min-height:19px;padding:0 7px;border-radius:var(--radius-sm);font-family:var(--font-body);font-size:10px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-wide);text-transform:uppercase}
@@ -162,8 +161,8 @@ tbody tr:hover{background:var(--ink-50)}
 .pill.loss{background:var(--loss-bg);color:var(--error-700)}
 .pill.push{background:var(--push-bg);color:var(--ink-600)}
 .compare-table td:first-child,.compare-table th:first-child{position:sticky;left:0;background:var(--panel);color:var(--muted);font-weight:var(--weight-medium)}
-.compare-table thead th:first-child{background:var(--ink-800)}
-.compare-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-2);align-items:end;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4)}
+.compare-table thead th:first-child{background:var(--ink-50)}
+.compare-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-2);align-items:end;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-5);box-shadow:var(--shadow-sm)}
 .compare-picker .check{margin-top:0}
 .compare-picker>label{display:grid;gap:5px}
 .compare-subhead{margin:0 0 var(--space-2);font-family:var(--font-body);font-size:var(--text-sm);font-weight:var(--weight-semibold)}
@@ -183,7 +182,7 @@ tbody tr:hover{background:var(--ink-50)}
 .cluster-bar.positive{fill:var(--success-500)}
 .cluster-bar.negative{fill:var(--error-500)}
 .chart-note{color:var(--muted);font-size:var(--text-xs);margin:var(--space-2) 0 0}
-.picks-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4)}
+.picks-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);box-shadow:var(--shadow-sm)}
 .picks-heading{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3)}
 .picks-timestamp,.picks-none{color:var(--muted);font-size:var(--text-xs)}
 .picks-none{margin:var(--space-2) 0 0}
@@ -216,12 +215,11 @@ tbody tr:hover{background:var(--ink-50)}
 .row-menu summary{list-style:none;cursor:pointer;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:var(--radius-sm);color:var(--ink-400);font-size:15px;line-height:1}
 .row-menu summary::-webkit-details-marker{display:none}
 .row-menu summary:hover{background:var(--ink-100);color:var(--text)}
-.dash-side{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);display:grid;gap:var(--space-2);position:sticky;top:var(--space-4)}
-.cm-heading{font-size:9px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-widest);text-transform:uppercase;color:var(--ink-400)}
+.dash-side{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:var(--space-5);display:grid;gap:var(--space-2);position:sticky;top:var(--space-4)}
 .cm-timestamp{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
 .cm-caveat,.cm-none,.cm-fallback-label{color:var(--muted);font-size:11px}
 .matches-list{list-style:none;margin:var(--space-2) 0 0;padding:0;display:grid;gap:var(--space-2)}
-.match-row{border:1px solid var(--ink-200);border-radius:var(--radius-sm);padding:10px var(--space-3);display:grid;gap:3px;background:var(--ink-50)}
+.match-row{border:1px solid var(--ink-200);border-left:3px solid var(--signal-500);border-radius:var(--radius-sm);padding:10px var(--space-3);display:grid;gap:3px;background:var(--ink-50)}
 .cm-top{display:flex;justify-content:space-between;gap:var(--space-2);font-family:var(--font-mono);font-size:10px;color:var(--muted)}
 .cm-play{font-size:var(--text-sm);font-weight:var(--weight-medium);font-family:var(--font-mono)}
 .cm-matchup{font-size:11px;color:var(--ink-600)}
@@ -268,12 +266,12 @@ tbody tr:hover{background:var(--ink-50)}
 }
 
 .feature-group.lookahead {
-  border: 1px solid #b45309;
-  background: rgba(180, 83, 9, 0.05);
+  border: 1px solid var(--warning-500);
+  background: var(--warning-50);
 }
 
 .feature-group.lookahead > legend .lookahead-warning {
-  color: #b45309;
+  color: var(--warning-700);
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -285,9 +283,9 @@ tbody tr:hover{background:var(--ink-50)}
   display: inline-block;
   margin-left: 0.5rem;
   padding: 1px 7px;
-  border-radius: 10px;
-  background: var(--accent);
-  color: #fff;
+  border-radius: var(--radius-full);
+  background: var(--gradient-accent);
+  color: var(--ink-0);
   font-size: 0.7rem;
   font-weight: 700;
 }
@@ -304,7 +302,7 @@ tbody tr:hover{background:var(--ink-50)}
   padding: 0;
   background: none;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--text);
   font-size: 14px;
   font-weight: 700;
@@ -327,12 +325,10 @@ tbody tr:hover{background:var(--ink-50)}
  *   22px bold sans instead of 18px mono.
  * - Seven near-identical secondary buttons (retry, cancel, clear, max ROI, and
  *   the three toggle groups) collapse into one shared rule. Pressed toggles take
- *   the same --signal-100 fill as .segmented / .check, not a solid accent, so a
+ *   the same --signal-50 fill as .segmented / .check, not a solid accent, so a
  *   selected control reads the same everywhere in the app.
- * - Radius is --radius-lg, matching panels and table wrappers. spacing.css
- *   nominates --radius-xl for modals, but that is the generic design-system
- *   default; the product spec tops out at lg, and 12px reads bubbly against 2px
- *   controls.
+ * - Radius is --radius-xl (16px), one step above panels, so the dialog reads
+ *   as the top layer.
  * - filter_modal.js writes inline left/width on the dual-range fill and opacity
  *   on the chips, and toggles .is-active / .is-selected / .positive /
  *   .negative. Those hooks are preserved.
@@ -350,9 +346,10 @@ tbody tr:hover{background:var(--ink-50)}
   max-width: 960px;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: var(--panel);
   color: var(--text);
+  box-shadow: var(--shadow-2xl);
 }
 
 .filter-modal::backdrop {
@@ -400,7 +397,7 @@ tbody tr:hover{background:var(--ink-50)}
   line-height: var(--leading-normal);
 }
 
-/* Secondary button: quiet by default, --signal-100 when pressed, matching the
+/* Secondary button: quiet by default, --signal-50 when pressed, matching the
    .segmented / .check selected state in the sidebar. */
 .filter-modal__retry,
 .filter-modal__cancel,
@@ -409,9 +406,9 @@ tbody tr:hover{background:var(--ink-50)}
 .filter-modal__view-toggle button,
 .filter-modal__exclude-group button,
 .filter-modal__perspective button {
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1.5px solid var(--border);
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--muted);
@@ -436,7 +433,7 @@ tbody tr:hover{background:var(--ink-50)}
 .filter-modal__perspective button.is-active,
 .filter-modal__perspective button[aria-pressed="true"] {
   border-color: var(--signal-500);
-  background: var(--signal-100);
+  background: var(--signal-50);
   color: var(--signal-700);
   font-weight: var(--weight-medium);
 }
@@ -579,9 +576,10 @@ tbody tr:hover{background:var(--ink-50)}
 .filter-modal__table th {
   position: sticky;
   top: 0;
-  background: var(--ink-800);
-  color: var(--ink-100);
-  font-size: 9px;
+  background: var(--ink-50);
+  color: var(--ink-500);
+  box-shadow: inset 0 -1px 0 var(--border);
+  font-size: 10px;
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
@@ -605,7 +603,7 @@ tbody tr:hover{background:var(--ink-50)}
   background: var(--signal-100);
 }
 
-/* Lives inside the dark th, so it inherits that type rather than setting its own. */
+/* Lives inside the th, so it inherits that type rather than setting its own. */
 .filter-modal__sort {
   min-height: auto;
   padding: 0;
@@ -869,7 +867,7 @@ tbody tr:hover{background:var(--ink-50)}
   background: var(--panel-strong);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .cm-fallback {
@@ -902,7 +900,8 @@ tbody tr:hover{background:var(--ink-50)}
   padding: 32px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
   text-align: center;
 }
 
@@ -925,8 +924,8 @@ tbody tr:hover{background:var(--ink-50)}
   padding: 10px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
   text-align: left;
   white-space: normal;
 }
@@ -953,7 +952,7 @@ tbody tr:hover{background:var(--ink-50)}
 
 .row-menu__delete:hover {
   background: var(--loss);
-  color: #fff;
+  color: var(--ink-0);
 }
 
 /* The restyle keeps the 46ch cap but drops the old two-line clamp, which turned
@@ -995,7 +994,7 @@ summary { cursor: pointer; }
 .metric-help dd { margin: 0; max-width: 75ch; }
 .example-description { max-width: 46ch; line-height: 1.5; }
 .example-description p { margin-top: var(--space-2); overflow-wrap: anywhere; }
-.metrics span, .chart-axis, .cm-heading, .season-breakdown h3, .chart-card h3 { color: var(--ink-500); }
+.metrics span, .chart-axis { color: var(--ink-500); }
 .metrics strong { white-space: normal; overflow-wrap: anywhere; }
 .form-actions { padding: var(--space-3) 0; background: var(--panel); }
 .system-summary-heading { align-items: center; flex-wrap: wrap; }
@@ -1020,6 +1019,180 @@ summary { cursor: pointer; }
   .metric-help dd { margin-bottom: var(--space-2); }
   .site-footer { padding: var(--space-4); }
 }
+/* ── Minimalist Modern: signature elements ──────────────────────────────
+ * The landing-page parts of the system (hero graphic, rotating rings, floating
+ * cards, gradient headline text) are deliberately left out: they would compete
+ * with the numbers. What carries over is below.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+/* Section label: mono pill with an accent dot. Replaces the old 9px grey
+   uppercase panel headings. */
+.section-label,
+.theory-panel h3,
+.coverage h3,
+.chart-card h3,
+.season-breakdown h3,
+.picks-heading h3,
+.system-summary-heading h3,
+.cm-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  width: fit-content;
+  padding: 6px var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--signal-500) 30%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--signal-500) 5%, transparent);
+  color: var(--signal-500);
+  font: var(--type-section-label);
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+  margin-bottom: var(--space-3);
+}
+
+.section-label::before,
+.theory-panel h3::before,
+.coverage h3::before,
+.chart-card h3::before,
+.season-breakdown h3::before,
+.picks-heading h3::before,
+.system-summary-heading h3::before,
+.cm-heading::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-accent);
+}
+
+.system-summary-heading h3,
+.picks-heading h3 { margin-bottom: 0; }
+
+/* Live picks get the pulsing dot: something is actually happening this week. */
+.picks-panel.is-live .picks-heading h3::before {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+/* Inverted stats band: the headline numbers on deep slate with a faint dot
+   grid and an accent glow in the corner. Custom properties are re-pointed
+   inside the band so .positive/.negative and the graded colors stay legible
+   on dark without new rules for each. */
+.metrics.stat-band {
+  --text: var(--ink-0);
+  --border: rgba(255, 255, 255, 0.08);
+  --success-500: var(--success-on-dark);
+  --error-500: var(--error-on-dark);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  gap: 0;
+  padding: var(--space-5) var(--space-2);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--signal-500) 28%, transparent), transparent 45%),
+    var(--ink-900);
+  color: var(--text);
+  box-shadow: var(--shadow-xl);
+}
+
+.metrics.stat-band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.9) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.04;
+}
+
+.metrics.stat-band article,
+.metrics.stat-band article.graded,
+.metrics.stat-band article.warning {
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--space-1) var(--space-5);
+}
+
+.metrics.stat-band article:first-child { border-left: 0; }
+.metrics.stat-band span { color: var(--ink-400); }
+.metrics.stat-band strong { font-size: var(--text-2xl); letter-spacing: var(--tracking-tight); }
+.metrics.stat-band article.warning strong { color: var(--warning-100); }
+
+/* Light metric cards lift on hover; the dark band does not (it is one unit). */
+.metrics:not(.stat-band) article:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Secondary and inline buttons keep the hover lift but not the blue glow or
+   the brightness bump, which belong to the primary gradient button. */
+:is(.edit-filter, .example-copy__button, #theory-suggest, .filter-launcher,
+    .stat-row__side, .feature-group__toggle, .row-menu__delete, .filter-modal__sort,
+    .filter-modal__retry, .filter-modal__cancel, .filter-modal__clear,
+    .filter-modal__max-roi, .filter-modal__view-toggle button,
+    .filter-modal__exclude-group button, .filter-modal__perspective button):hover {
+  filter: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-modal__sort:hover { transform: none; box-shadow: none; }
+
+/* Entrance: panels fade up once on load, staggered. Disabled by the
+   reduced-motion rule below. */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+.workspace > *,
+.dash-main > *,
+.dash-side {
+  animation: fade-up 0.7s var(--ease-out-expo) both;
+}
+
+.workspace > :nth-child(2), .dash-main > :nth-child(2) { animation-delay: 0.05s; }
+.workspace > :nth-child(3), .dash-main > :nth-child(3), .dash-side { animation-delay: 0.1s; }
+.workspace > :nth-child(4), .dash-main > :nth-child(4) { animation-delay: 0.15s; }
+.workspace > :nth-child(5), .dash-main > :nth-child(5) { animation-delay: 0.2s; }
+.workspace > :nth-child(n+6), .dash-main > :nth-child(n+6) { animation-delay: 0.25s; }
+
+/* The sticky "Current system" panel must not animate a transform: it would
+   create a containing block mid-scroll. Fade only. */
+.workspace > .active-filters-panel { animation-name: fade-in; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 900px) {
+  .metrics.stat-band { padding: var(--space-3) 0; }
+  .metrics.stat-band article { padding: var(--space-3) var(--space-4); }
+  .metrics.stat-band article:nth-child(odd) { border-left: 0; }
+}
+
+/* One gradient button per area: in the sidebar that is Run. The save buttons
+   are secondary, so the eye lands on Run first. */
+.form-actions button[formaction] {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+
+.form-actions button[formaction]:hover {
+  filter: none;
+  background: var(--ink-100);
+  border-color: color-mix(in srgb, var(--signal-500) 30%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }

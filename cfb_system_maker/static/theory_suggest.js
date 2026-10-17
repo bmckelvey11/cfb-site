@@ -11,7 +11,7 @@
 
   const MESSAGES = {
     rate_limited: "Just a moment -- try again in half a minute.",
-    theory_unavailable: "AI drafting is unavailable. Check ANTHROPIC_API_KEY.",
+    theory_unavailable: "AI drafting is unavailable. Check OPENAI_API_KEY.",
     missing_data: "No processed games found; run a build first.",
   };
 

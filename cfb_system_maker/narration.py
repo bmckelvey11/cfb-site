@@ -6,7 +6,9 @@ from pathlib import Path
 from cfb_system_maker.describe import describe
 from cfb_system_maker.models import BacktestResult, SearchRun, SystemFilter
 
-_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+# OpenAI's cheapest text model as of 2026-10 ($0.05 in / $0.40 out per 1M tokens).
+# OPENAI_MODEL overrides it without a code change if OpenAI retires or reprices it.
+_DEFAULT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5-nano")
 _DEFAULT_TIMEOUT = 20.0
 
 
@@ -14,9 +16,13 @@ class NarrationError(Exception):
     """Raised whenever narration cannot be produced -- missing key, API error, timeout."""
 
 
-def find_anthropic_key(env_path: str | Path = "env.env") -> str:
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return os.environ["ANTHROPIC_API_KEY"]
+_KEY_NAMES = ("OPENAI_API_KEY", "OPENAI_API")  # OPENAI_API is the name in Blake's env.env
+
+
+def find_openai_key(env_path: str | Path = "env.env") -> str:
+    for name in _KEY_NAMES:
+        if os.environ.get(name):
+            return os.environ[name]
 
     path = Path(env_path)
     if path.exists():
@@ -24,10 +30,10 @@ def find_anthropic_key(env_path: str | Path = "env.env") -> str:
             if "=" not in line:
                 continue
             key, value = line.split("=", 1)
-            if key.strip() == "ANTHROPIC_API_KEY":
+            if key.strip() in _KEY_NAMES:
                 return value.strip()
 
-    raise RuntimeError("ANTHROPIC_API_KEY not found in env or env.env")
+    raise RuntimeError("OPENAI_API_KEY not found in env or env.env")
 
 
 def build_prompt(run: SearchRun) -> str:
@@ -83,20 +89,23 @@ def _complete(
 ) -> str:
     if client is None:
         try:
-            import anthropic  # noqa: PLC0415
+            import openai  # noqa: PLC0415
 
-            key = api_key or find_anthropic_key()
-            client = anthropic.Anthropic(api_key=key, timeout=timeout)
+            key = api_key or find_openai_key()
+            client = openai.OpenAI(api_key=key, timeout=timeout)
         except Exception as exc:
-            raise NarrationError(f"could not create Anthropic client: {exc}") from exc
+            raise NarrationError(f"could not create OpenAI client: {exc}") from exc
 
     try:
-        message = client.messages.create(
+        # gpt-5-nano is a reasoning model: max_completion_tokens covers the hidden
+        # reasoning too, so "minimal" effort keeps the budget for the visible answer.
+        response = client.chat.completions.create(
             model=model,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
+            reasoning_effort="minimal",
             messages=[{"role": "user", "content": prompt}],
         )
-        text = "".join(block.text for block in message.content if hasattr(block, "text"))
+        text = response.choices[0].message.content or ""
     except Exception as exc:
         raise NarrationError(f"narration call failed: {exc}") from exc
 

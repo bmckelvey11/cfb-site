@@ -78,7 +78,7 @@ def create_app(db_path: Path | None = None, odds_dir: Path | None = None,
 
     @app.get("/tokens/<name>.css")
     def tokens(name: str):
-        # The unit's Saturday Signal tokens, shared with web.py rather than copied.
+        # The unit's design tokens, shared with web.py rather than copied.
         return send_from_directory(TOKENS, f"{name}.css")
 
     @app.get("/api/slate")
