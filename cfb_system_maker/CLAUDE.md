@@ -42,6 +42,7 @@ python -m cfb_system_maker backtest --side home --favorite --min-spread -14
 python -m cfb_system_maker backtest --bet-type total --total-side over
 python -m cfb_system_maker web --port 5000   # Flask UI at 127.0.0.1:5000 (waitress; --debug for reloader)
 python -m cfb_system_maker matchup           # team matchup page at 127.0.0.1:5050 (reads the warehouse)
+python -m cfb_system_maker live              # live in-game Polymarket odds at 127.0.0.1:5070 (no warehouse; stores nothing)
 ```
 
 There is no compile step and no linter configured for our code. `requirements.lock` is the reproducible install; `requirements.txt` is the loose pins (Flask, waitress, duckdb, sklearn, pytest, plus `cfbd-python/requirements.txt`).

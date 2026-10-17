@@ -68,3 +68,38 @@ A live pull at 10:31Z the same day listed 218 upcoming games (two weekends' wort
 Polymarket names teams by school (`teams[].alias`: "Georgia State", "James Madison"), so
 the rule is `norm()` plus `polymarket_schema.ALIASES`, with no mascot strip. The flatten
 exits 1 and lists any name that does not match a CFBD school; add it to `ALIASES`.
+
+## Live odds page
+
+`python -m cfb_system_maker live` serves <http://127.0.0.1:5070>: every game in progress with
+its score, clock, win chance, and main live spread and total, plus games kicking off in the
+next 3 hours. Code: `cfb_system_maker/live/` (`board.py` holds the rules), tests:
+`tests/test_live_odds.py`. Run it on the Mac; the cloud gets 403 from Gamma.
+
+- **Stores nothing.** These are in-play prices; keeping them out of `ingest/` keeps them out of
+  anything that joins a "line". `polymarket_client.is_upcoming_game` still drops started games
+  from snapshots.
+- **Refresh:** the page polls every 30 s. `/events/keyset` is served from a cache a few
+  minutes behind (measured 2026-10-17: at 19:02Z it held Clemson at Q4 7:52, updated 18:58Z,
+  while `/events?slug=` had 6:42, updated 19:01Z), so the server walks it (~4 pages) only every
+  2 minutes for the game list, and re-reads live and just-started games every 20 s through
+  `/events?slug=a&slug=b...` in batches of 20. Each card shows its event's `updatedAt`. Gamma
+  needs no key and has no quota we have hit.
+- **Just kicked off:** a game past its `startTime` with no `live`/`ended` flag yet is listed
+  with the live games as "Kicking off" (up to 4 hours), not dropped.
+- **Game state** is on the event (measured 2026-10-17): `live`, `ended`, `score` as
+  "away-home" in `teams[].ordering` order, `period` (`Q1`..`Q4`, `End Q2`, `End Q3`, `VFT`
+  final, `CAN` cancelled) and `elapsed` (mm:ss, empty at a break). A game not yet started has
+  none of these keys.
+- **Main line** is the same filter-then-pick rule as above, tighter for live books: both a bid
+  and an ask, at most 10 cents apart, at least $100 liquidity, priced 15-85%, then nearest 50%.
+  The 15-85% band matters in blowouts, where the only tight book can be a decided rung (Army
+  -2.5 at 98.6% while up 49-24, measured 2026-10-17). The moneyline skips the width and band
+  rules and is greyed when its book is wider than 10 cents. A wide book's
+  `outcomePrices` is stale (one live O/U 35.5 showed 0.5275 against a 0.055/1.0 book), so the
+  page shows the bid/ask midpoint, never `outcomePrices`. With no rung passing, the card shows
+  a dash: blowouts often have no live spread at all.
+- **FBS only** (on by default, remembered per browser) keeps games with at least one FBS
+  team, so Clemson vs Charleston Southern stays and Idaho vs Montana goes. The FBS list is
+  CFBD's `raw/fbs_teams_{season}.json` (last season's if this season's is not scraped yet),
+  matched through `polymarket_schema.school_key`. With neither file, the toggle is hidden.
