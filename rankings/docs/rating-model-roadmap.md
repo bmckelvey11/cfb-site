@@ -125,9 +125,14 @@ model.market_snapshot
 - data_quality_flag
 ```
 
-**Status:** not built. Bovada's `spreadOpen` from CFBD has no observed-at timestamp, so
-"available before decision time" is assumed, not checked. The totals research flags the
-same gap.
+**Status:** audit done for the CFBD Bovada open
+([`odds-provenance-audit-2026-10-17.md`](odds-provenance-audit-2026-10-17.md)); snapshot table
+not built. CFBD carries no timestamp in any season, and no open before 2021. For 2026 the open
+is checked on a sample: 156 games held the same open in CFBD pulls made before kickoff, and it
+matches the-odds-api's Bovada and Action Network's market path at rates an early-week line
+should. For 2021–2025 it is assumed, since CFBD stores the first number and never rewrites
+it, but no pre-kickoff pull exists to prove it. Coverage is 99.5% with no duplicate rows.
+CFBD's `spread` is not a verified close. The totals research flags the same timestamp gap.
 
 ## 6. Build sequence
 
@@ -135,9 +140,9 @@ same gap.
 
 | Step | Status |
 | --- | --- |
-| Market-data provenance audit (§5) | Not started |
+| Market-data provenance audit (§5) | CFBD Bovada open audited 2026-10-17: checked on a 2026 sample, assumed for 2021–25 ([record](odds-provenance-audit-2026-10-17.md)). `model.market_snapshot` not built |
 | Freeze the game, possession, venue and market schemas | Games: raw CFBD files. Possessions, venues, market: not frozen |
-| Fixed baselines: market-only, Elo, carry-forward, ridge O/D, simple pace | Elo, ridge O/D and pace built; market-only and implied-score not built |
+| Fixed baselines: market-only, Elo, carry-forward, ridge O/D, simple pace | Elo, ridge O/D, pace and the market-implied score built; market-only not built |
 | One walk-forward scoring harness for every model | Separate per family (Glicko, totals harness) |
 | Season reports: forecast, calibration, CLV and vig-adjusted return | Forecast and calibration for Glicko; CLV and return not for ratings |
 
@@ -230,3 +235,8 @@ It beats `ridge_v1` by 0.46 CRPS per side on 2023–2025, so a second Kalman att
 concrete bar. Its home and away errors are nearly uncorrelated (0.04), which lowers the
 expected gain from modelling the two scores jointly. Its numbers stay provisional until step 2,
 the odds provenance audit, says the open was known before kickoff.
+
+Step 2 is done for the CFBD Bovada open
+([`odds-provenance-audit-2026-10-17.md`](odds-provenance-audit-2026-10-17.md)). The open is
+checked as pre-kickoff on a 156-game 2026 sample and assumed for 2021–2025, where no
+pre-kickoff pull exists. Results scored on 2021–2025 opens stay provisional on that one point.
