@@ -91,6 +91,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_panel_vs_line.py` [`--min-n`] | `panel-vs-line-2026-09-17.md` | `processed/panel_vs_line.json` |
 | `eval_panel_ats.py` [`--min-bets`] | `panel-ats-2026-09-17.md` | `processed/panel_ats.json` |
 | `eval_model_columns_ats.py` | `model-columns-ats-2026-09-17.md` | `processed/model_columns_ats.json` |
+| `spread_picks_ledger.py` | `log` a day's spread leans at the best available price; `grade` fills the close (last odds snapshot before kickoff), CLV, and result at the logged and consensus lines | ledger CSV |
 | `pt_model_accuracy.py` | Ranks PT model columns by MAE against final margins, paired with the same games' last-line MAE (picks the "accurate panel" for the daily board). 2022–25: no model beats the line | `--out` CSV |
 | `daily_spread_breakdown.py` | One day's board: market median spread (the-odds-api snapshot) vs Glicko P1 and the PT consensus, per FBS game. Display only, not a bet signal | `--out` CSV |
 | `edge_vs_market_move.py` | `actionable-picks-2026-09-17.md` § 0: regresses the served `edge` on the move since the opener | stdout |
