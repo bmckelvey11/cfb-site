@@ -64,6 +64,50 @@ positive), which supports C(1). Conference switchers show no clear miss (+0.19
 [−0.47, 0.87], 142 team-seasons). Not in any bundle, so not testable here: FBS-vs-FCS
 forecasts are too extreme (residual slope −0.149 [−0.204, −0.096]). That needs its own plan.
 
+## Build record — 2026-10-17
+
+Built in [`scripts/glicko_p3.py`](../../../scripts/glicko_p3.py) and frozen by
+`python -m scripts.glicko_p3_eval --freeze`. Picks, σ_pred and forecast fingerprints are in
+[`scripts/glicko_p3_frozen.json`](../../../scripts/glicko_p3_frozen.json). The freeze read no
+game after 2025. `glicko_ratings.py` is unchanged, each bundle's defaults reproduce P1
+(`tests/test_glicko_p3.py`), and P1's sealed fingerprint still matches (3,718 games).
+
+| Bundle | Pick | σ_pred | Tuning CRPS (P1 9.1934) | Grid edge |
+| --- | --- | --- | --- | --- |
+| A | σ 15 | 13.5 | 9.1750 | none |
+| B | c 0, h 0.3, w 0.6 | 13.5 | 9.1867 | c low, h high, w low |
+| C | H₂₀₁₃ 2.75, slope −0.05, H₂₀₂₀ 1.0, k 1.5, tz 0.5 | 13.5 | 9.1890 | tz high |
+
+- **Grids were not widened**, although B and C picks sit on edges. Widening now would be a
+  new trial chosen after seeing the tuning result.
+- **B(2) half credit is not applied.** CFBD player PPA covers FBS players only, so a transfer
+  from below FBS has no production row and adds nothing. Portal transfers into FBS matched to
+  a prior-season PPA row: 171 of 816 (2021), 257 of 1,092, 359 of 1,418, 466 of 2,066,
+  564 of 2,905 (2025). Tuning set c = 0, so returning production has no effect in the frozen
+  B; its gain comes from the new-conference target and the history term.
+- **H₂₀₂₀ is not identifiable** on 2014–2019 (no 2020 games), so every value ties; it is
+  frozen at the grid midpoint, 1.0.
+- **C's data.** Campus coordinates and time zones come from `teams_<season>.json` (no team
+  missing). `venues.json` lacks coordinates for 75 neutral-site games, which get no
+  near-campus edge. 6 games lack line scores and are read as regulation finishes. tz
+  multiplies home UTC offset minus away UTC offset, so a team travelling east gives up
+  points. k also scales σ_pred² for postseason and FBS-vs-FCS games.
+
+**2021–2025, descriptive only** (3,730 FBS-vs-FBS regular-season games), each bundle minus P1
+at σ_pred 13.5. Negative is better. This window decides nothing.
+
+| Bundle | CRPS diff | 95% CI | MAE diff | 95% CI | Weeks 1–3 CRPS | Later CRPS |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | −0.023 | [−0.044, −0.002] | −0.042 | [−0.078, −0.006] | −0.026 | −0.022 |
+| B | −0.011 | [−0.022, 0.000] | −0.019 | [−0.038, 0.000] | −0.036 | −0.005 |
+| C | −0.009 | [−0.021, 0.004] | −0.022 | [−0.045, 0.001] | +0.010 | −0.013 |
+
+A is lower in all five seasons. 68% coverage: P1 68.9%, A 69.1%, B 68.9%, C 69.2%.
+
+**Trials:** 3,003 fits (33 + 297 + 2,673), so the family count goes from 18,622 to 21,625.
+`--look interim` refuses to run before 2027-01-20 or while any 2026 D-I game is incomplete;
+`--look final` refuses before 2028-01-20.
+
 ## Trial accounting
 
 Grids above: A 3, B 27, C 3 × 3 × 3 × 3 × 3 = 243, plus 11 σ_pred values per bundle. Each
