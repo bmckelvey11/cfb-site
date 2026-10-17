@@ -78,7 +78,7 @@ The review asks for it as a hard pipeline rule, not an analyst habit.
 | Spread | Market spread at decision time; the close as a diagnostic | Bovada open used throughout |
 | Game total | Market total at decision time | Bovada open, totals harness |
 | Team total | Market team total at decision time | Over-zero unit |
-| Margin or score | Home-edge mean, Elo, ridge O/D, market-implied score | Elo and home-edge mean built; implied score not built |
+| Margin or score | Home-edge mean, Elo, ridge O/D, market-implied score | All built. Implied score (2021–25 opens only): 2023–25 CRPS 6.21 per side, ahead of `ridge_v1` by 0.46 ([record](market-implied-score-baseline-2026-10-17.md)) |
 | Pace | Season mean, team trailing average, opponent-adjusted ridge | `ridge_v1` pace |
 | Early season | Prior-year carryover plus market | Glicko's offseason step is the carryover |
 | Betting return | No bet, and market-only prediction | Per the evaluation standard |
@@ -86,6 +86,11 @@ The review asks for it as a hard pipeline rule, not an analyst habit.
 The market-implied home and away scores are $(T \pm M)/2$ (theory §11). They should be the
 first score baseline built, since they encode the market's joint view of strength and
 scoring.
+Built 2026-10-17
+([`market-implied-score-baseline-2026-10-17.md`](market-implied-score-baseline-2026-10-17.md)).
+Any score or O/D model now has to beat a pooled CRPS of 6.213 on 2023–2025 (SD 11.0 fixed
+from 2021–2022) on the same games. CFBD has no open before 2021, so the baseline cannot be
+scored earlier.
 
 ## 5. Market data as first-class data
 
@@ -217,4 +222,11 @@ already failed here (`kalman_v1`). Two cheaper steps would de-risk a second atte
 1. **The market-implied score baseline** (§4), which every score model must beat.
 2. **The odds provenance audit** (§5), without which no market-overlay result can count.
 
-Both are prerequisites in the review's own Phase 1, and neither has been started.
+Both are prerequisites in the review's own Phase 1.
+
+**Status, 2026-10-17:** step 1 is built
+([`market-implied-score-baseline-2026-10-17.md`](market-implied-score-baseline-2026-10-17.md)).
+It beats `ridge_v1` by 0.46 CRPS per side on 2023–2025, so a second Kalman attempt has a
+concrete bar. Its home and away errors are nearly uncorrelated (0.04), which lowers the
+expected gain from modelling the two scores jointly. Its numbers stay provisional until step 2,
+the odds provenance audit, says the open was known before kickoff.
