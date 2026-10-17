@@ -39,6 +39,22 @@ includes overtime, so the baseline is scored on final scores.
 Glicko forecasts margins only, so it enters as a margin comparator: `implied`'s margin is the
 open spread itself, already scored against Glicko in the v1 and P1 records.
 
+## Amendment, 2026-10-17, before any scoring
+
+The build found that `raw/lines_<season>.json` holds no `spreadOpen` or `overUnderOpen` from
+any provider before 2021. Bovada opens run 2021 onward (open-spread rows: 2021 878, 2022 852,
+2023 852, 2024 801, 2025 934). 2013–2020 has only current lines, mostly consensus. So the
+2014–2019 window below cannot be built for `implied`. Nothing had been scored when this was
+found. The windows change to:
+
+- **Fit:** each model's forecast SD on 2021–2022.
+- **Report:** 2023–2025 as the descriptive window, with the SD held fixed.
+- **Also shown:** 2021–2025 pooled, flagged as in-sample for the SD.
+
+Consensus current lines for 2014–2019 are not used: they are not opens, and mixing line types
+inside one baseline would make it two baselines. Everything else below stands. Where the text
+below says 2014–2019 or 2021–2025 for fitting or reporting, this amendment governs.
+
 ## Games and seasons
 
 - FBS-vs-FBS games, regular season and postseason, with a Bovada `spreadOpen` and
