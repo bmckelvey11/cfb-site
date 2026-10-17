@@ -27,6 +27,7 @@ from cfb_system_maker.graphql_client import (
 )
 from cfb_system_maker.pff_schema import PFF_TABLES, column_types as pff_column_types
 from cfb_system_maker.oddsapi_schema import OA_TABLES, column_types as oa_column_types
+from cfb_system_maker.polymarket_schema import PM_TABLES, column_types as pm_column_types
 
 # Skip account-metering telemetry (docs/data-coverage.md).
 _SKIP_STEMS = frozenset({"user_info"})
@@ -2292,6 +2293,27 @@ def _plan_loads(
                     "paths": [path],
                     "format": "csv",
                     "columns": oa_column_types(header),
+                }
+            )
+
+    # Polymarket, the same shape as the-odds-api: `scripts/polymarket_flatten.py` turns the
+    # snapshots in `data/ingest/polymarket/` into two CSVs. Types pinned for the same reason
+    # (`line` is empty on every moneyline row).
+    pm_dir = data_dir / "processed" / "polymarket"
+    if pm_dir.is_dir():
+        for name in PM_TABLES:
+            path = pm_dir / f"{name}.csv"
+            if not path.exists() or (only is not None and name not in only):
+                continue
+            with path.open(encoding="utf-8", newline="") as handle:
+                header = next(csv.reader(handle), [])
+            jobs.append(
+                {
+                    "schema": "stg",
+                    "name": name,
+                    "paths": [path],
+                    "format": "csv",
+                    "columns": pm_column_types(header),
                 }
             )
 

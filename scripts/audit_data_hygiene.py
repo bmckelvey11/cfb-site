@@ -510,6 +510,8 @@ def check_folder(rep: Report, root: Path, now: datetime, stale_days: int,
                       for p in an.glob("*.json") if _mtime(p) > loaded_at]
         for rel in ("processed/actionnetwork/an_history_tick.csv",
                     "processed/oddsapi/oa_odds_tick.csv", "processed/oddsapi/oa_snapshot.csv",
+                    "processed/polymarket/pm_market_tick.csv",
+                    "processed/polymarket/pm_snapshot.csv",
                     "processed/massey/massey_ranks.csv"):
             p = root / rel
             if p.exists() and _mtime(p) > loaded_at:

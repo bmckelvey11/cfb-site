@@ -33,6 +33,7 @@ python -m cfb_system_maker build --season 2023 --provider consensus
 python -m cfb_system_maker enrich   # join registry features -> data/processed/features.json (run after build)
 python -m cfb_system_maker upcoming   # unplayed week → processed/upcoming.csv; never writes games.csv
 python -m cfb_system_maker weather-football   # weather.football snapshot → ingest/weather_football/
+python scripts/pull_polymarket.py   # Polymarket CFB prices (read-only, no key) → ingest/polymarket/
 python -m cfb_system_maker duckdb --explode --flatten-nested   # data/cfb.duckdb; serving still csv+features
 python -m cfb_system_maker search --holdout-season 2024
 python -m cfb_system_maker betlog import --csv path.csv

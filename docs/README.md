@@ -64,6 +64,7 @@ Each answers one question against the live warehouse; keep for provenance.
 | [oddsapi-ingest.md](oddsapi-ingest.md) | the-odds-api.com ingest (the runbook) |
 | [oddsapi-game-join-2026-09-10.md](oddsapi-game-join-2026-09-10.md) | Do events land on exactly one `stg.games` row? |
 | [oddsapi-team-name-join-2026-09-10.md](oddsapi-team-name-join-2026-09-10.md) | Can the-odds-api names join the warehouse? |
+| [polymarket-ingest.md](polymarket-ingest.md) | Polymarket CFB game prices ingest (the runbook) |
 | [oddspapi-security-check-2026-09-16.md](oddspapi-security-check-2026-09-16.md) | oddspapi.io integration security check |
 | [odds-sources-an-vs-apis-2026-09-11.md](odds-sources-an-vs-apis-2026-09-11.md) | Do we still need the Action Network scrape? |
 | [lines-provider-key-split-2026-09-10.md](lines-provider-key-split-2026-09-10.md) | One book, two names: the DraftKings key split |
