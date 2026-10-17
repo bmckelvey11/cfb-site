@@ -16,9 +16,13 @@ class NarrationError(Exception):
     """Raised whenever narration cannot be produced -- missing key, API error, timeout."""
 
 
+_KEY_NAMES = ("OPENAI_API_KEY", "OPENAI_API")  # OPENAI_API is the name in Blake's env.env
+
+
 def find_openai_key(env_path: str | Path = "env.env") -> str:
-    if os.environ.get("OPENAI_API_KEY"):
-        return os.environ["OPENAI_API_KEY"]
+    for name in _KEY_NAMES:
+        if os.environ.get(name):
+            return os.environ[name]
 
     path = Path(env_path)
     if path.exists():
@@ -26,7 +30,7 @@ def find_openai_key(env_path: str | Path = "env.env") -> str:
             if "=" not in line:
                 continue
             key, value = line.split("=", 1)
-            if key.strip() == "OPENAI_API_KEY":
+            if key.strip() in _KEY_NAMES:
                 return value.strip()
 
     raise RuntimeError("OPENAI_API_KEY not found in env or env.env")

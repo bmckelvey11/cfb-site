@@ -15,6 +15,7 @@ formulaic==1.2.2
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
+httpx2==2.13.0
 idna==3.19
 iniconfig==2.3.0
 interface_meta==2.0.1
@@ -27,7 +28,7 @@ MarkupSafe==3.0.3
 matplotlib==3.11.1
 narwhals==2.25.0
 numpy==2.5.2
-openai==1.109.1
+openai==3.33.0
 packaging==26.3
 pandas==3.0.5
 patsy==1.0.2

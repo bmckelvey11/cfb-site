@@ -50,8 +50,17 @@ def test_find_openai_key_from_env_var(monkeypatch, tmp_path):
     assert find_openai_key(tmp_path / "env.env") == "test-key-123"
 
 
+def test_find_openai_key_reads_openai_api_from_env_file(monkeypatch, tmp_path):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API", raising=False)
+    env_file = tmp_path / "env.env"
+    env_file.write_text("CFBD_API_KEY=x\nOPENAI_API=sk-from-file\n", encoding="utf-8")
+    assert find_openai_key(env_file) == "sk-from-file"
+
+
 def test_find_openai_key_missing_raises(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API", raising=False)
     with pytest.raises(RuntimeError):
         find_openai_key(tmp_path / "env.env")
 
@@ -108,6 +117,7 @@ def test_narrate_run_raises_narration_error_on_empty_text():
 
 def test_narrate_run_raises_narration_error_when_no_key_and_no_client(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API", raising=False)
     monkeypatch.chdir(tmp_path)
     with pytest.raises(NarrationError):
         narrate_run(_sample_run())
