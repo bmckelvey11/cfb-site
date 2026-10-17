@@ -3,7 +3,7 @@
     python -m scripts.glicko_p1_confirm freeze                    # run once, now
     python -m scripts.glicko_p1_confirm confirm --season 2026     # interim until the season ends
 
-P1's G2 pass (docs/glicko-pool-2026-09-24.md) was a second look at 2021-2025, already scored
+P1's G2 pass (rankings/docs/glicko-pool-2026-09-24.md) was a second look at 2021-2025, already scored
 once for v1. This freezes the exact adopted configuration -- and a fingerprint of the exact
 forecasts it produces on P1's own 2021-2025 primary population -- so later edits to the pool
 or model code cannot silently change what "the frozen candidate" means. It then reads the
@@ -15,7 +15,7 @@ verdict. The fingerprint carries no 2021-2025 outcome -- game_id, forecast mean,
 
 Writes data/processed/ratings/glicko_p1_confirm_<season>_interim_<date>.json for an interim
 look, or glicko_p1_confirm_<season>_final.json once, for the final one.
-See docs/superpowers/specs/2026-09-24-glicko-p1-2026-confirmation-design.md.
+See rankings/docs/specs/2026-09-24-glicko-p1-2026-confirmation-design.md.
 """
 from __future__ import annotations
 
@@ -73,8 +73,8 @@ def run_freeze() -> tuple[dict, Path]:
     frozen = {
         "candidate": "glicko_p1", "variant": "pool_conf",
         "frozen_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "design": "docs/superpowers/specs/2026-09-24-glicko-p1-2026-confirmation-design.md",
-        "source_scoring_run": "docs/glicko-pool-2026-09-24.md",
+        "design": "rankings/docs/specs/2026-09-24-glicko-p1-2026-confirmation-design.md",
+        "source_scoring_run": "rankings/docs/glicko-pool-2026-09-24.md",
         "source_commits": SOURCE_COMMITS,
         "params": FROZEN_P1, "glicko_ratings_version": VERSION,
         "primary_forecast_fingerprint": fp_hash, "primary_forecast_n": fp_n,
@@ -125,7 +125,7 @@ def confirm(season: int, frozen_path: Path = FROZEN) -> dict:
     primary = d[d["fbs_fbs"] & d["open"].notna()].copy()
     primary["glk"], primary["glk_sd"] = primary["f"], primary["f_sd"]
     # The open's sd for CRPS: its own in-sample RMSE on this population -- its best case, the
-    # same convention P1's own scoring used (docs/glicko-pool-2026-09-24.md's market note).
+    # same convention P1's own scoring used (rankings/docs/glicko-pool-2026-09-24.md's market note).
     if len(primary):
         primary["open_sd"] = float(((primary["open"] - primary["margin"]) ** 2).mean() ** 0.5)
 

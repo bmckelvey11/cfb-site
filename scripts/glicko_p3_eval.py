@@ -4,7 +4,7 @@
     python -m scripts.glicko_p3_eval --look interim     # after the 2026 postseason, once
     python -m scripts.glicko_p3_eval --look final       # after the 2027 postseason, once
 
-Declared in docs/superpowers/specs/2026-10-16-glicko-p3-bundles-design.md. Each bundle is
+Declared in rankings/docs/specs/2026-10-16-glicko-p3-bundles-design.md. Each bundle is
 tuned on its own against P1 by mean CRPS on FBS-vs-FBS regular-season games 2014-2019 (2013
 burn-in), jointly with sigma_pred on 11.0-16.0 step 0.5. --freeze replays only seasons through
 2025 and never reads a 2026 or 2027 game. 2021-2025 is reported descriptively (it has been
@@ -245,7 +245,7 @@ def freeze(root: Path, force: bool = False) -> dict:
     for b, r in tuned.items():
         r["fingerprint"], r["fingerprint_n"] = fingerprint(d, b, r["pick"], r["sigma_pred"])
     frozen = {
-        "spec": "docs/superpowers/specs/2026-10-16-glicko-p3-bundles-design.md",
+        "spec": "rankings/docs/specs/2026-10-16-glicko-p3-bundles-design.md",
         "frozen_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "base": {"FROZEN_P1": FROZEN_P1, "sigma_pred": SIGMA_PRED_P1},
         "tune_seasons": TUNE, "bundles": tuned,

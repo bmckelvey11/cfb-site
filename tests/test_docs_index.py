@@ -16,6 +16,7 @@ DOCS_DIRS = [
     "research/spread/docs",
     "research/totals/docs",
     "research/bankroll/docs",
+    "rankings/docs",
 ]
 
 

@@ -11,7 +11,7 @@ and compares it to v1 on v1's exact 3,718-game primary population plus its 580-g
 FBS-vs-FCS population. v1 itself is reproduced from its own frozen manifest, not re-tuned.
 
 Writes data/processed/ratings/glicko_pool_eval.json.
-See docs/superpowers/specs/2026-09-24-glicko-pool-design.md.
+See rankings/docs/specs/2026-09-24-glicko-pool-design.md.
 """
 from __future__ import annotations
 

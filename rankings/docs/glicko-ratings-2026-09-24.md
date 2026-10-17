@@ -16,17 +16,17 @@
 **Question.** Does a rating that carries each team's strength *and* its uncertainty from game
 to game give a fair home margin that holds information the Bovada open lacks? It is a
 candidate "new information source for the fair spread"
-([`objective-review-2026-09-23.md`](../research/spread/docs/objective-review-2026-09-23.md),
+([`objective-review-2026-09-23.md`](../../research/spread/docs/objective-review-2026-09-23.md),
 item 3).
 
 **Design, gates, and grids:**
-[`superpowers/specs/2026-09-24-glicko-ratings-design.md`](superpowers/specs/2026-09-24-glicko-ratings-design.md).
+[`superpowers/specs/2026-09-24-glicko-ratings-design.md`](specs/2026-09-24-glicko-ratings-design.md).
 The design was declared and approved before any code ran.
 
 **Reproduce:**
 `python -m scripts.glicko_ratings_eval --tune-seasons 2014-2019 --score-seasons 2021-2025`
-([`scripts/glicko_ratings_eval.py`](../scripts/glicko_ratings_eval.py), model in
-[`scripts/glicko_ratings.py`](../scripts/glicko_ratings.py)). It writes
+([`scripts/glicko_ratings_eval.py`](../../scripts/glicko_ratings_eval.py), model in
+[`scripts/glicko_ratings.py`](../../scripts/glicko_ratings.py)). It writes
 `data/processed/ratings/glicko_eval.json`, which holds every number below, and
 `glicko_snapshots.csv`. This was the one scoring run: `VERSION` 1.0, code at `be9d5692`. No
 bug was found after scoring.
@@ -91,11 +91,11 @@ other axis, minus the overall best (9.2745). Zero marks the pick.
 - **Carry is the strong signal.** Keeping 90% of last season's rating beats keeping 50% by
   0.16 CRPS, and full carry (1.0) is close behind. That is consistent with the totals finding
   that priors should carry all of last season
-  ([`prior-scale-2026-09-23.md`](prior-scale-2026-09-23.md)).
+  ([`prior-scale-2026-09-23.md`](../../docs/prior-scale-2026-09-23.md)).
 - **Capping hurts.** A 24-point cap costs 0.16, so blowouts carry information.
 - **The dynamics question is unresolved.** τ = 0 is within 0.001 of the pick, so this
   surface cannot say whether within-season drift helps margins. For totals it did not
-  ([`dynamic-ratings-2026-09-23.md`](dynamic-ratings-2026-09-23.md)).
+  ([`dynamic-ratings-2026-09-23.md`](../../docs/dynamic-ratings-2026-09-23.md)).
 - **Reproduce:** run every point of `GRIDS["glicko_margin"]` through `run(GlickoMargin(...))`
   on 2013–2019, as `tune()` does. Score CRPS on the 2014–2019 regular-season FBS-vs-FBS
   mask, then take the minimum per axis value.
@@ -282,7 +282,7 @@ after scoring.
 2. **Preseason prior.** The weeks 1–3 gap (+1.08 MAE to the open, against +0.22 late) is the
    one opening. Blend returning production, talent, and coaching or quarterback continuity
    into the offseason step. It needs its own declared rule, and it must be read next to
-   [`weekly-priors-2026-09-23.md`](weekly-priors-2026-09-23.md), whose priors failed their
+   [`weekly-priors-2026-09-23.md`](../../docs/weekly-priors-2026-09-23.md), whose priors failed their
    stress rule for totals.
 3. **Glicko-2 volatility and an offense/defense split.** These are deferred. Neither is
    likely to move G2 if the preseason state is the weakness.

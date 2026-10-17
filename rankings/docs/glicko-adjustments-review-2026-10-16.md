@@ -101,4 +101,4 @@ The two-sigma question is worth more than it looks. If one joint likelihood fit 
 - **CFBD's returning production ignores incoming transfers**, and its national average swung from 76.7% returning in 2021 to 53.7% in 2025. Together these explain why the P2 prior broke ([`glicko-p2-2026-10-15.md`](glicko-p2-2026-10-15.md)).
 - **Smaller items:** score overtime games as a tie at the end of regulation, and weight bowl games and FBS-vs-FCS games less.
 
-Diagnostics on already-scored seasons: [`scripts/glicko_diagnostics.py`](../scripts/glicko_diagnostics.py). The three test bundles are declared in [`superpowers/specs/2026-10-16-glicko-p3-bundles-design.md`](superpowers/specs/2026-10-16-glicko-p3-bundles-design.md).
+Diagnostics on already-scored seasons: [`scripts/glicko_diagnostics.py`](../../scripts/glicko_diagnostics.py). The three test bundles are declared in [`superpowers/specs/2026-10-16-glicko-p3-bundles-design.md`](specs/2026-10-16-glicko-p3-bundles-design.md).

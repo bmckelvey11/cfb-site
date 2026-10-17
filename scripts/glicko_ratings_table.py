@@ -8,7 +8,7 @@ share ratings (they differ only in forecast SD), so both write glicko_ratings_<s
 any other version writes glicko_ratings_<season>_<version>.csv. The version column carries
 the registry stamp, so `--version P1` reproduces the pre-registry file exactly.
 
-Descriptive only (spec status, docs/superpowers/specs/2026-09-24-glicko-pool-design.md): a
+Descriptive only (spec status, rankings/docs/specs/2026-09-24-glicko-pool-design.md): a
 power rating and its RD, never an edge on a line. Uses rung P1 (glicko-pool-2026-09-24.md,
 ADOPTED), which rates every completed Division I game from the raw CFBD files -- not just
 games.csv's lined ones -- and pulls each team toward its conference mean at the offseason.

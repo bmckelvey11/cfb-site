@@ -6,13 +6,13 @@ was regenerated once, same day, to switch from a code-hash seal to a forecast-fi
 hands. The confirmation itself waits for the season; the first interim check ran clean
 (`fingerprint_ok=True`, β = 0.011 [−0.25, 0.31] on 3 of ~15 weeks, no verdict).
 **Builds on:** [`2026-09-24-glicko-pool-design.md`](2026-09-24-glicko-pool-design.md) (rung P1,
-adopted) and its result [`../../glicko-pool-2026-09-24.md`](../../glicko-pool-2026-09-24.md):
+adopted) and its result [`../../glicko-pool-2026-09-24.md`](../glicko-pool-2026-09-24.md):
 G2 (encompassing β vs the Bovada open) passed at β = 0.193 [0.052, 0.329] on 2021–2025 — the
 **second** time those seasons were scored on this family, so the declared rule there treats it
 as a second-look pass, not a GO. This spec is the "declared 2026 confirmation" that rule
 requires before a GO is possible.
 **Follows the pattern of:**
-[`2026-09-23-prior-scale-2026-confirmation-design.md`](2026-09-23-prior-scale-2026-confirmation-design.md)
+[`2026-09-23-prior-scale-2026-confirmation-design.md`](../../../docs/superpowers/specs/2026-09-23-prior-scale-2026-confirmation-design.md)
 (`prior_v3`) — a frozen candidate, one confirmatory look after the season is final, interim
 runs descriptive only. `season_look` and `write_freeze` are imported from
 `scripts/weekly_prior_scale.py` unchanged.
@@ -55,7 +55,7 @@ the one and only time the freeze is regenerated — `write_freeze` refuses from 
 ## Confirmation
 
 - **Data:** 2026 regular season, FBS vs FBS, completed games, Bovada open present. Same
-  primary-population rule as P1's own scoring (`docs/glicko-pool-2026-09-24.md`).
+  primary-population rule as P1's own scoring (`rankings/docs/glicko-pool-2026-09-24.md`).
 - **Declared comparison:** the encompassing slope β of P1's forecast against the open
   (`glicko_ratings_eval.encompassing`, reused unchanged), with the same season-week cluster
   bootstrap. 2026 is one season, so this is roughly one cluster per week — about 14–15

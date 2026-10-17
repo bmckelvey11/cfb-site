@@ -24,10 +24,10 @@ pulled toward their conference's mean instead of one FCS-wide mean — forecast 
 v1 (`glicko_margin_v1`), which saw only games that had a betting line?
 
 **Design:**
-[`superpowers/specs/2026-09-24-glicko-pool-design.md`](superpowers/specs/2026-09-24-glicko-pool-design.md).
+[`superpowers/specs/2026-09-24-glicko-pool-design.md`](specs/2026-09-24-glicko-pool-design.md).
 **Builds on:** [`glicko-ratings-2026-09-24.md`](glicko-ratings-2026-09-24.md) (v1, NO-GO on
 G2). **Reproduce:** `python -m scripts.glicko_pool_eval`
-([`scripts/glicko_pool_eval.py`](../scripts/glicko_pool_eval.py)). It writes
+([`scripts/glicko_pool_eval.py`](../../scripts/glicko_pool_eval.py)). It writes
 `data/processed/ratings/glicko_pool_eval.json`, which holds every number below. This was the
 one scoring run: code at `c28745e8`, no bug found after scoring.
 
@@ -187,7 +187,7 @@ they predate 2026 and are not lined games waiting to be played.
 
 1. **Register a 2026 confirmation spec before more of the season plays out**, following the
    pattern `prior_v3`'s sealed confirmation used in
-   [`dynamic-ratings-2026-09-23.md`](dynamic-ratings-2026-09-23.md): freeze P1's pick now,
+   [`dynamic-ratings-2026-09-23.md`](../../docs/dynamic-ratings-2026-09-23.md): freeze P1's pick now,
    read the encompassing slope exactly once, only after no 2026 regular-season game remains
    scheduled. If it confirms, **that** is when an ATS amendment becomes worth registering —
    not before.

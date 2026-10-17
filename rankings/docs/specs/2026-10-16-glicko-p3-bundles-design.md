@@ -2,8 +2,8 @@
 
 **Status:** declared 2026-10-16, before any bundle is built or scored. Nothing in 2026 after
 2026-10-16 or in 2027 has been read by any Glicko work.
-**Builds on:** [`../../glicko-p2-2026-10-15.md`](../../glicko-p2-2026-10-15.md) (P2 not adopted,
-σ_pred 13.5 adopted) and [`../../glicko-adjustments-review-2026-10-16.md`](../../glicko-adjustments-review-2026-10-16.md)
+**Builds on:** [`../../glicko-p2-2026-10-15.md`](../glicko-p2-2026-10-15.md) (P2 not adopted,
+σ_pred 13.5 adopted) and [`../../glicko-adjustments-review-2026-10-16.md`](../glicko-adjustments-review-2026-10-16.md)
 (which adjustments strong systems make that P1 lacks).
 **Leaves alone:** P1's sealed 2026 confirmation
 ([`2026-09-24-glicko-p1-2026-confirmation-design.md`](2026-09-24-glicko-p1-2026-confirmation-design.md)).

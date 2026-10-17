@@ -44,6 +44,7 @@ human-facing product intent. None should duplicate another file's rules.
 | Spread forecast research | `research/spread/` | `research/spread/CLAUDE.md` |
 | Totals research not yet in the harness (Greenline evaluation, modeling reading) | `research/totals/` | `research/totals/CLAUDE.md` |
 | Bankroll, staking, and combined-strategy projection | `research/bankroll/` | `research/bankroll/CLAUDE.md` |
+| Team ratings: Glicko theory, plans, method, versions, results | `rankings/` | `rankings/CLAUDE.md` |
 
 ## Shared rules
 

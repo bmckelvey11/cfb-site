@@ -5,7 +5,7 @@
 Each check reads the residual e = margin - P1 forecast (home minus away, points) and the
 z-score e / sd, with sd from SIGMA_PRED_P1. Nothing is tuned, so this spends no holdout.
 2026 is excluded by default: it belongs to P1's sealed confirmation and to the bundle
-holdout declared in docs/superpowers/specs/2026-10-16-glicko-p3-bundles-design.md.
+holdout declared in rankings/docs/specs/2026-10-16-glicko-p3-bundles-design.md.
 
   D1 scale      slope of e on the forecast; != 0 means ratings are too spread or too compressed
   D2 fcs_gap    mean e in FBS-vs-FCS games, FBS side, by season (does the FBS-FCS gap drift?)

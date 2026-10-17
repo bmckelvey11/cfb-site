@@ -9,7 +9,7 @@ game set it rates. `CURRENT` is what the ratings table publishes by default. Fro
 carry the fingerprint their freeze recorded, sha256 over (game_id, forecast mean, forecast SD)
 on a fixed game set, so `--check` proves the code still reproduces the frozen model. Parameters
 of the P3 bundles are read from their frozen files, never copied here. The changelog that
-explains each version is docs/glicko-versions.md.
+explains each version is rankings/docs/glicko-versions.md.
 
 Status: adopted (in use), current (the published default), candidate (built and frozen,
 waiting for its holdout), declared (specified, not frozen yet), rejected, retired.
@@ -27,7 +27,7 @@ SCRIPTS = Path(__file__).parent
 P3_FROZEN = SCRIPTS / "glicko_p3_frozen.json"
 P3D_FROZEN = SCRIPTS / "glicko_p3d_frozen.json"
 P1_FROZEN = SCRIPTS / "glicko_p1_frozen.json"
-P2_PICK = {"b_rp": 3.0, "b_rec": 1.5, "c": 0.0, "w": 0.7, "clip": 2.5}   # docs/glicko-p2-2026-10-15.md
+P2_PICK = {"b_rp": 3.0, "b_rec": 1.5, "c": 0.0, "w": 0.7, "clip": 2.5}   # rankings/docs/glicko-p2-2026-10-15.md
 
 
 @dataclass(frozen=True)
@@ -69,23 +69,23 @@ def registry() -> dict[str, Version]:
     d = _p3d()
     vs = [
         Version("v1", "retired", "2026-09-24", "GlickoMargin", dict(FROZEN_V1), None, "lined",
-                "docs/glicko-ratings-2026-09-24.md", None,
+                "rankings/docs/glicko-ratings-2026-09-24.md", None,
                 "Rated only games with a betting line (games.csv). Superseded by P1."),
         Version("P1", "adopted", "2026-09-24", "GlickoMargin", dict(FROZEN_P1), None, "pool",
-                "docs/glicko-pool-2026-09-24.md", "scripts/glicko_p1_frozen.json",
+                "rankings/docs/glicko-pool-2026-09-24.md", "scripts/glicko_p1_frozen.json",
                 "Every completed D-I game; offseason pull to the conference mean. Sealed 2026 "
                 "confirmation reads its encompassing slope once."),
         Version("P1.1", "current", "2026-10-15", "GlickoMargin", dict(FROZEN_P1), SIGMA_PRED_P1, "pool",
-                "docs/glicko-p2-2026-10-15.md", None,
+                "rankings/docs/glicko-p2-2026-10-15.md", None,
                 "P1's ratings and ranks unchanged; forecast SD uses sigma_pred 13.5 (gain keeps 15)."),
         Version("P2", "rejected", "2026-10-15", "GlickoPrior", dict(P2_PICK), None, "pool",
-                "docs/glicko-p2-2026-10-15.md", None,
+                "rankings/docs/glicko-p2-2026-10-15.md", None,
                 "Returning production + recruiting prior and innovation clip; worse on 2021-25 and "
                 "2026 wk 1-7."),
         *[Version(f"P3-{b}", "candidate" if p3[b] else "declared", "2026-10-17",
                   {"A": "GlickoFull", "B": "GlickoStart", "C": "GlickoContext"}[b],
                   p3[b].get("params", {}), p3[b].get("sigma_pred"), "pool",
-                  "docs/superpowers/specs/2026-10-16-glicko-p3-bundles-design.md",
+                  "rankings/docs/specs/2026-10-16-glicko-p3-bundles-design.md",
                   "scripts/glicko_p3_frozen.json" if p3[b] else None,
                   {"A": "Carries team covariance within a season (schedule strength).",
                    "B": "New-conference target, 3-season history, transfer-aware returning production.",
@@ -93,7 +93,7 @@ def registry() -> dict[str, Version]:
                         "proximity, time zones."}[b]) for b in "ABC"],
         Version("P3-D", d.get("status", "declared"), d.get("date", "2026-10-17"), "GlickoShrinkX",
                 d.get("params", {}), d.get("sigma_pred"), "pool",
-                "docs/superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md",
+                "rankings/docs/specs/2026-10-17-glicko-p3d-fcs-design.md",
                 "scripts/glicko_p3d_frozen.json" if d else None,
                 "FBS-vs-FCS expected margin shrunk by (1 - lam)."),
     ]

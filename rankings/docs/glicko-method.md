@@ -8,12 +8,12 @@ When the code changes, this doc changes in the same commit.
 
 - **Current version:** P1.1 is P1's frozen parameters plus a separate forecast SD of 13.5.
   Every version is listed in [`glicko-versions.md`](glicko-versions.md), and the registry is
-  [`scripts/glicko_versions.py`](../scripts/glicko_versions.py).
+  [`scripts/glicko_versions.py`](../../scripts/glicko_versions.py).
 - **Code:**
-  - [`scripts/glicko_ratings.py`](../scripts/glicko_ratings.py) holds the model and the clock.
-  - [`scripts/glicko_pool_eval.py`](../scripts/glicko_pool_eval.py) holds the game set and the
+  - [`scripts/glicko_ratings.py`](../../scripts/glicko_ratings.py) holds the model and the clock.
+  - [`scripts/glicko_pool_eval.py`](../../scripts/glicko_pool_eval.py) holds the game set and the
     FCS seed.
-  - [`scripts/glicko_ratings_table.py`](../scripts/glicko_ratings_table.py) builds the table.
+  - [`scripts/glicko_ratings_table.py`](../../scripts/glicko_ratings_table.py) builds the table.
 - **Records behind each choice:**
   - [`glicko-ratings-2026-09-24.md`](glicko-ratings-2026-09-24.md): v1 and the clock.
   - [`glicko-pool-2026-09-24.md`](glicko-pool-2026-09-24.md): P1, the game pool and the
@@ -404,7 +404,7 @@ has to be read against that count.
 
 These are built and frozen but are **not** used by the table, except as clearly labelled
 experimental columns. They are declared in
-[`superpowers/specs/2026-10-16-glicko-p3-bundles-design.md`](superpowers/specs/2026-10-16-glicko-p3-bundles-design.md),
+[`superpowers/specs/2026-10-16-glicko-p3-bundles-design.md`](specs/2026-10-16-glicko-p3-bundles-design.md),
 and the code is in `scripts/glicko_p3.py`.
 
 **A. Schedule strength (`GlickoFull`).** One joint filter over all teams, carrying the
@@ -456,7 +456,7 @@ games are unchanged.
 
 - **Frozen pick:** $\lambda = 0.05$, so a 30-point forecast becomes 28.5, with σ_pred 12.5.
 - **Its plan:**
-  [`superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md`](superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md).
+  [`superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md`](specs/2026-10-17-glicko-p3d-fcs-design.md).
 - **2021–25, descriptive only:** it improves FBS-vs-FCS CRPS by 0.050, but the slope only
   moves from −0.149 to −0.110. A flat shrink fixes about a quarter of the problem.
 - **Caveat:** its single σ_pred of 12.5, tuned on FCS games, makes its FBS-vs-FBS intervals a

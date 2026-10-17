@@ -1,4 +1,4 @@
-"""Glicko P3 bundles (docs/superpowers/specs/2026-10-16-glicko-p3-bundles-design.md).
+"""Glicko P3 bundles (rankings/docs/specs/2026-10-16-glicko-p3-bundles-design.md).
 
 Each bundle is its own class on top of P1's `GlickoMargin`; with default settings each one
 reproduces P1's forecasts exactly (tests/test_glicko_p3.py), and `glicko_ratings.py` is not
@@ -25,7 +25,7 @@ C. `GlickoContext` -- game context, read per game through `run_ctx`:
    noise      observation variance x k for postseason games and FBS-vs-FCS games; the
               forecast SD uses the same multiplier on sigma_pred^2
    Defaults (H2013 = H2020 = P1's 2, slope 0, tz 0, k 1, ot/near off) are P1.
-D. `GlickoShrinkX` -- FBS-vs-FCS (docs/superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md).
+D. `GlickoShrinkX` -- FBS-vs-FCS (rankings/docs/specs/2026-10-17-glicko-p3d-fcs-design.md).
    A cross-subdivision game's expected margin is (1 - lam) * P1's, in the forecast and in the
    update's innovation; gains and variances are P1's. lam = 0 is P1.
 """

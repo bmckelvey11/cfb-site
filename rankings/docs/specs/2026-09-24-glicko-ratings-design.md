@@ -5,7 +5,7 @@ approved the same day. The model and tests are in `de4104f5` and the eval in `0c
 pre-score boundary step ran on 2014–2019 only, and its final grids are recorded below before
 the scoring run. **Scored once (`be9d5692`): NO-GO.** G1 and G3 pass, G2 fails, and the
 verdicts are stable under stress. Result:
-[`../../glicko-ratings-2026-09-24.md`](../../glicko-ratings-2026-09-24.md).
+[`../../glicko-ratings-2026-09-24.md`](../glicko-ratings-2026-09-24.md).
 **Cleared for descriptive use** (user decision, 2026-09-24):
 - Glicko-margin may be shown as a team power rating with its RD, and as a pregame win
   probability. G1 and G3 support that: it ranks teams better than Elo, and its uncertainty is
@@ -22,10 +22,10 @@ candidate "new information source for the fair spread" for
 **Builds on:**
 - Release B's harness: `load_pool`/`snapshot` from `scripts/pregame_replay_audit.py`, and
   `_cluster_boot`/`classify_verdict` from `scripts/weekly_ratings_eval.py`.
-- Its results: [`../../weekly-ratings-2026-09-23.md`](../../weekly-ratings-2026-09-23.md) and
-  [`../../weekly-priors-2026-09-23.md`](../../weekly-priors-2026-09-23.md). Previous-season
+- Its results: [`../../weekly-ratings-2026-09-23.md`](../../../docs/weekly-ratings-2026-09-23.md) and
+  [`../../weekly-priors-2026-09-23.md`](../../../docs/weekly-priors-2026-09-23.md). Previous-season
   priors failed their declared stress rule for totals.
-- [`../../dynamic-ratings-2026-09-23.md`](../../dynamic-ratings-2026-09-23.md): week-to-week
+- [`../../dynamic-ratings-2026-09-23.md`](../../../docs/dynamic-ratings-2026-09-23.md): week-to-week
   drift *lost* to a static ridge for totals (+0.08 MAE). That result is why τ = 0 is on the
   grid below. A pick of τ = 0 means dynamics add nothing for margins either.
 
@@ -440,7 +440,7 @@ runs, and the eval refuses to write results if any sign disagrees.
 3. `feat(ratings)`: `glicko_ratings_eval.py`.
 4. `docs(ratings)`: the final grids from the pre-score boundary step, recorded in this spec.
    Then comes the one scoring run.
-5. `docs(ratings)`: `docs/glicko-ratings-2026-09-24.md` and its `docs/README.md` row.
+5. `docs(ratings)`: `rankings/docs/glicko-ratings-2026-09-24.md` and its `docs/README.md` row.
 
 ## Departures from the build prompt, for approval
 

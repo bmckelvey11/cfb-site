@@ -11,7 +11,7 @@ an encompassing slope against the Bovada open, and the declared gates G1-G3 with
 one-step parameter stress. Forecast skill only: no wager is graded.
 
 Writes data/processed/ratings/{glicko_snapshots.csv, glicko_eval.json}.
-See docs/superpowers/specs/2026-09-24-glicko-ratings-design.md.
+See rankings/docs/specs/2026-09-24-glicko-ratings-design.md.
 """
 from __future__ import annotations
 

@@ -4,7 +4,7 @@
     python -m scripts.glicko_p3d_eval --look interim     # after the 2026 postseason, once
     python -m scripts.glicko_p3d_eval --look final       # after the 2027 postseason, once
 
-Declared in docs/superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md. lam is tuned jointly
+Declared in rankings/docs/specs/2026-10-17-glicko-p3d-fcs-design.md. lam is tuned jointly
 with sigma_pred by mean CRPS on FBS-vs-FCS regular-season games 2014-2019 (2013 burn-in).
 --freeze replays only seasons through 2025. 2021-2025 is described on FBS-vs-FCS and FBS-vs-FBS
 games, with the FBS-vs-FCS residual slope (diagnostic D1) under P1 and D; it decides nothing.
@@ -29,7 +29,7 @@ from scripts.glicko_pool_eval import fcs_seed_pool, load_pool_games
 from scripts.glicko_ratings import FROZEN_P1, SIGMA_PRED_P1, GlickoMargin, events, run
 
 FROZEN = Path(__file__).with_name("glicko_p3d_frozen.json")
-SPEC = "docs/superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md"
+SPEC = "rankings/docs/specs/2026-10-17-glicko-p3d-fcs-design.md"
 TUNE = list(range(2014, 2020))
 DESCRIBE = [2021, 2022, 2023, 2024, 2025]
 LAMS = (0.0, 0.05, 0.10, 0.15, 0.20, 0.25)

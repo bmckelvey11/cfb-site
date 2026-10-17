@@ -11,7 +11,7 @@ Clock: every game is forecast at its week's cutoff (the week's earliest kickoff)
 games that kicked off strictly before it, and its result updates the state at its own
 kickoff -- Release B's rule, stricter than per-game, and close to the open's information.
 
-See docs/superpowers/specs/2026-09-24-glicko-ratings-design.md.
+See rankings/docs/specs/2026-09-24-glicko-ratings-design.md.
 """
 from __future__ import annotations
 
@@ -21,18 +21,18 @@ import pandas as pd
 
 VERSION = "1.0"
 FBS, FCS = "fbs", "fcs"
-# Picks frozen by the one scoring run (docs/glicko-ratings-2026-09-24.md). The FCS seed m0 is
+# Picks frozen by the one scoring run (rankings/docs/glicko-ratings-2026-09-24.md). The FCS seed m0 is
 # not frozen here: glicko_ratings_eval.fcs_seed recomputes it from the 2013 burn-in games.
 FROZEN_V1 = {"sigma": 13, "tau": 0.75, "w": 0.9, "delta": 6, "cap": float("inf"),
              "hfa": 2.75, "u0": 14}
-# P1 (docs/glicko-pool-2026-09-24.md): adopted variant `pool_conf`, frozen by its one scoring
+# P1 (rankings/docs/glicko-pool-2026-09-24.md): adopted variant `pool_conf`, frozen by its one scoring
 # run. Superseded v1 as the descriptive/weekly-table base. Its game set is glicko_pool_eval's
 # load_pool_games (every completed D-I game, not just games.csv's lined ones), and its FCS
 # seed comes from glicko_pool_eval.fcs_seed_pool, run with home_conf/away_conf present so the
 # conference-mean offseason target is used.
 FROZEN_P1 = {"sigma": 15, "tau": 1.5, "w": 0.7, "delta": 6, "cap": float("inf"),
             "hfa": 2, "u0": 14}
-# P1's forecast SD for intervals and win probabilities (docs/glicko-p2-2026-10-15.md). sigma
+# P1's forecast SD for intervals and win probabilities (rankings/docs/glicko-p2-2026-10-15.md). sigma
 # = 15 does double duty in P1: it sets the Kalman gain and the predictive spread, and its
 # intervals came out wide (68% coverage 72.3% on 2021-25). The gain keeps sigma = 15; only the
 # predictive SD uses 13.5, tuned by CRPS on 2014-2019. Means, ranks, and P1's sealed
