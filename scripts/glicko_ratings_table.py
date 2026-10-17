@@ -1,6 +1,12 @@
 """Current Glicko-margin ratings: the frozen P1 pool pick replayed through the latest scores.
 
-    python -m scripts.glicko_ratings_table --season 2026
+    python -m scripts.glicko_ratings_table --season 2026                    # CURRENT version
+    python -m scripts.glicko_ratings_table --season 2026 --version P3-A     # any pool version
+
+`--version` names an entry in scripts/glicko_versions.py (default CURRENT, P1.1). P1 and P1.1
+share ratings (they differ only in forecast SD), so both write glicko_ratings_<season>.csv;
+any other version writes glicko_ratings_<season>_<version>.csv. The version column carries
+the registry stamp, so `--version P1` reproduces the pre-registry file exactly.
 
 Descriptive only (spec status, docs/superpowers/specs/2026-09-24-glicko-pool-design.md): a
 power rating and its RD, never an edge on a line. Uses rung P1 (glicko-pool-2026-09-24.md,
@@ -20,7 +26,17 @@ import math
 import pandas as pd
 
 from scripts.glicko_pool_eval import fcs_seed_pool, load_pool_games
-from scripts.glicko_ratings import _EPOCH, FBS, FROZEN_P1, VERSION, GlickoMargin, events, run
+from scripts.glicko_ratings import _EPOCH, FBS, GlickoMargin, events
+from scripts.glicko_versions import CURRENT
+from scripts.glicko_versions import build as build_version
+from scripts.glicko_versions import get as get_version
+
+SAME_RATINGS_AS_P1 = ("P1", "P1.1")
+
+
+def output_name(season: int, version: str) -> str:
+    return (f"glicko_ratings_{season}.csv" if version in SAME_RATINGS_AS_P1
+            else f"glicko_ratings_{season}_{version}.csv")
 
 
 def ratings_table(m: GlickoMargin, season: int, as_of: pd.Timestamp | None = None) -> pd.DataFrame:
@@ -47,19 +63,27 @@ def ratings_table(m: GlickoMargin, season: int, as_of: pd.Timestamp | None = Non
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--season", type=int, required=True)
+    ap.add_argument("--version", default=CURRENT, help=f"registry name (default {CURRENT})")
     args = ap.parse_args(argv)
 
     from cfb_paths import DATA_ROOT, PROCESSED
 
+    v = get_version(args.version)
     g, drops = load_pool_games(DATA_ROOT, args.season, [])
-    m = GlickoMargin(**FROZEN_P1, m0=fcs_seed_pool(g))
-    run(m, g, events(g))
+    g = g[g["season"] <= args.season].reset_index(drop=True)
+    data = None
+    if v.model in ("GlickoStart", "GlickoContext"):
+        from scripts.glicko_p3_eval import load
+        data = load(DATA_ROOT, args.season)
+        g = data["g"]
+    m, runner = build_version(args.version, fcs_seed_pool(g), data)
+    runner(m, g, events(g))
     as_of = g.loc[g["season"] == args.season, "kickoff"].max()
     t = ratings_table(m, args.season, as_of)
 
-    out = PROCESSED / "ratings" / f"glicko_ratings_{args.season}.csv"
+    out = PROCESSED / "ratings" / output_name(args.season, args.version)
     out.parent.mkdir(parents=True, exist_ok=True)
-    body = t.round({"rating": 1, "rd": 1}).assign(as_of=as_of.isoformat(), version=f"P1/{VERSION}")
+    body = t.round({"rating": 1, "rd": 1}).assign(as_of=as_of.isoformat(), version=v.stamp)
     try:
         body.to_csv(out, index=False)
     except PermissionError:

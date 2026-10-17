@@ -7,7 +7,8 @@ how the table is built, and how the rating is scored. It describes the code as i
 When the code changes, this doc changes in the same commit.
 
 - **Current version:** P1.1 is P1's frozen parameters plus a separate forecast SD of 13.5.
-  The version registry and its history are being added alongside this doc.
+  Every version is listed in [`glicko-versions.md`](glicko-versions.md), and the registry is
+  [`scripts/glicko_versions.py`](../scripts/glicko_versions.py).
 - **Code:**
   - [`scripts/glicko_ratings.py`](../scripts/glicko_ratings.py) holds the model and the clock.
   - [`scripts/glicko_pool_eval.py`](../scripts/glicko_pool_eval.py) holds the game set and the
@@ -22,7 +23,8 @@ When the code changes, this doc changes in the same commit.
   - [`glicko-adjustments-review-2026-10-16.md`](glicko-adjustments-review-2026-10-16.md): what
     the rating does not adjust for.
 - **Rebuild the table:**
-  `CFB_DATA_ROOT=... python -m scripts.glicko_ratings_table --season 2026`.
+  `CFB_DATA_ROOT=... python -m scripts.glicko_ratings_table --season 2026`. Add
+  `--version <name>` to build any other version.
 
 ## 1. What the rating is
 
@@ -382,7 +384,7 @@ Saturday are not treated as independent.
   cannot decide anything.
 - Anything after 2026-10-16 belongs to sealed holdouts (§11).
 
-**Trials:** 21,625 fits have been run on this family through the P3 freeze. Any new result
+**Trials:** 21,691 fits have been run on this family through the P3-D freeze. Any new result
 has to be read against that count.
 
 ## 11. What is sealed
@@ -395,6 +397,8 @@ has to be read against that count.
 - **P3 bundle holdout:** games kicking off after 2026-10-16T23:59Z, through 2027. The picks
   and fingerprints are in `scripts/glicko_p3_frozen.json`. The interim look is not before
   2027-01-20, and the final look is not before 2028-01-20.
+- **P3-D holdout:** games kicking off after 2026-10-17T12:00Z, through 2027, on the same look
+  dates. Its pick and fingerprint are in `scripts/glicko_p3d_frozen.json`.
 
 ## 12. Candidates under test (not part of the live rating)
 
@@ -444,10 +448,19 @@ Frozen pick: $h = 0.3$, $w = 0.6$.
 - A neutral-site game within 150 miles of one campus gives that team half the home edge.
 - A time-zone term adds 0.5 points per zone the away team crossed.
 
-**D. FBS vs FCS.** The diagnostics found that P1's FBS-vs-FCS forecasts are about 15% too
-extreme: residual slope −0.149 [−0.204, −0.096]. FBS teams still win big, but by less than
-P1 predicts. The fix is declared and tested separately. Its record will be linked here once
-it is frozen.
+**D. FBS vs FCS (`GlickoShrinkX`).** The diagnostics found that P1's FBS-vs-FCS forecasts are
+about 15% too extreme: residual slope −0.149 [−0.204, −0.096]. FBS teams still win big, but by
+less than P1 predicts. Bundle D multiplies the expected margin of every FBS-vs-FCS game by
+$(1 - \lambda)$, in the forecast and in the update's surprise. Gains, variances and all other
+games are unchanged.
+
+- **Frozen pick:** $\lambda = 0.05$, so a 30-point forecast becomes 28.5, with σ_pred 12.5.
+- **Its plan:**
+  [`superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md`](superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md).
+- **2021–25, descriptive only:** it improves FBS-vs-FCS CRPS by 0.050, but the slope only
+  moves from −0.149 to −0.110. A flat shrink fixes about a quarter of the problem.
+- **Caveat:** its single σ_pred of 12.5, tuned on FCS games, makes its FBS-vs-FBS intervals a
+  little narrow.
 
 None of these goes live unless it passes its declared holdout test. **2021–25 numbers for
 them are descriptive only.**
