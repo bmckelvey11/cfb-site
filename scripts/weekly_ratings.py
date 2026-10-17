@@ -30,6 +30,7 @@ from scripts.pregame_replay_audit import snapshot
 # Possessions alternate, so a wider gap between the two teams' regulation drive counts
 # means drives are missing from the feed (~2% of games).
 MAX_DRIVE_GAP = 2
+RIDGE_H24_POINTS = 2.4  # Benz, Bliss and Lopez's FBS 2023 home edge, points of margin
 
 
 @dataclass(frozen=True)
@@ -193,6 +194,18 @@ def fit_ridge(games: pd.DataFrame, lam_ppp: float, lam_pace: float,
     table = table.join(_evidence(games, list(table.index)))
     return Ratings(mu=float(mu), nu=float(nu), h=float(h), c=float(games["ot"].mean()),
                    table=table, unrated=0.0)
+
+
+def h_from_points(points: float, games: pd.DataFrame) -> float:
+    """Home edge in points of margin -> points per possession: the margin moves by 2 * h * N."""
+    return points / (2.0 * float(games["N"].mean()))
+
+
+def fit_ridge_h24(games: pd.DataFrame, lam_ppp: float, lam_pace: float) -> Ratings:
+    """ridge_h24: ridge_v1 with the home edge held at 2.4 points of margin instead of refitted
+    each week. Adopted 2026-10-17 (rankings/docs/ridge-home-edge-2026-10-17.md)."""
+    h = h_from_points(RIDGE_H24_POINTS, games) if len(games) else None
+    return fit_ridge(games, lam_ppp, lam_pace, h_fixed=h)
 
 
 def fit_raw(games: pd.DataFrame) -> Ratings:

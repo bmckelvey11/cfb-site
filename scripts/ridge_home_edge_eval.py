@@ -29,9 +29,9 @@ from scripts.market_implied_scores import (
     BOOT_DRAWS, BOOT_SEED, CUTOFF, SD_GRID, bovada_opens, fit_sd, implied_scores, paired,
     scored_games, side_metrics,
 )
+from scripts.weekly_ratings import RIDGE_H24_POINTS as H_FIXED_POINTS, h_from_points
 
 VARIANTS = ("free", "carry", "fixed")
-H_FIXED_POINTS = 2.4                       # Benz, Bliss and Lopez, FBS 2023 (arXiv 2401.16392)
 PICK = [2014, 2015, 2016, 2017, 2018, 2019]
 CHECK = [2021, 2022, 2023, 2024, 2025]
 SKIP_CARRY = {2020}                        # empty stadiums: never carried forward
@@ -43,11 +43,6 @@ def carry_season(season: int) -> int:
     while s in SKIP_CARRY:
         s -= 1
     return s
-
-
-def h_from_points(points: float, fit_set: pd.DataFrame) -> float:
-    """Points of margin -> points per possession: the margin moves by 2 * h * N."""
-    return points / (2.0 * float(fit_set["N"].mean()))
 
 
 def season_end_h(root: Path, season: int) -> float:

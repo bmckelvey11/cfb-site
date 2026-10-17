@@ -50,3 +50,19 @@ def test_carry_never_uses_2020():
 def test_adopt_rule(choice, hi, expected):
     check = {"paired_minus_free": {"carry": {"crps": {"ci95": [-0.2, hi]}}}}
     assert adopt(choice, check) is expected
+
+
+def test_ridge_h24_holds_2_4_points_of_margin():
+    from scripts.weekly_ratings import fit_ridge_h24
+    g = _round_robin()
+    r = fit_ridge_h24(g, 20, 2)
+    assert math.isclose(2 * r.h * g["N"].mean(), 2.4)
+
+
+def test_weekly_forecast_uses_ridge_h24():
+    from scripts.weekly_forecast import forecast_week
+    g = _round_robin()
+    sched = pd.DataFrame([{"game_id": 999, "kickoff": g["kickoff"].max() + pd.Timedelta(days=7),
+                           "home": "A", "away": "B", "neutral": False}])
+    _, r, _ = forecast_week(g, sched, 2024, None)
+    assert math.isclose(2 * r.h * g["N"].mean(), 2.4)

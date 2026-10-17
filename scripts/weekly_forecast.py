@@ -3,7 +3,8 @@
     python -m scripts.weekly_forecast                    # next week with an unplayed game
     python -m scripts.weekly_forecast --season 2026 --week 4
 
-Fits `ridge_v1` (Release B, lambda 40/8; docs/weekly-ratings-2026-09-23.md) and `prior_v1`
+Fits `ridge_h24` (Release B's ridge_v1, lambda 40/8, with the home edge held at 2.4 points;
+rankings/docs/ridge-home-edge-2026-10-17.md) and `prior_v1`
 (the same ridge centred on each team's carryover prior; docs/weekly-priors-2026-09-23.md) on
 the season's completed, ungated FBS-vs-FBS games that kicked off before the week's first
 kickoff -- the frozen snapshot the evaluation scored -- and prints every game of the week:
@@ -13,7 +14,8 @@ the Bovada open and current total from lines_<season>.json.
 Forecasts only: nothing is scored, so the sealed 2026 prior_v3 confirmation is untouched.
 Release B found ridge_v1 0.33 points further from the total than the Bovada open, its gap to
 the open uninformative (slope 0.03), and no better than the mean when a team had under three
-games. The table is not a list of bets.
+games. The fixed home edge moves the implied home/away split, not the total. The table is not a
+list of bets.
 """
 from __future__ import annotations
 
@@ -24,7 +26,7 @@ import re
 import pandas as pd
 
 from scripts.weekly_rankings import RIDGE_V1, season_prior
-from scripts.weekly_ratings import Ratings, fit_ridge, fit_set, forecast_total
+from scripts.weekly_ratings import Ratings, fit_ridge, fit_ridge_h24, fit_set, forecast_total
 from scripts.weekly_ratings_eval import MIN_PRIOR_GAMES, OPEN_PROVIDER, load
 
 
@@ -69,7 +71,7 @@ def forecast_week(games: pd.DataFrame, sched: pd.DataFrame, season: int,
                   prior: pd.DataFrame | None) -> tuple[pd.DataFrame, Ratings, int]:
     """One row per scheduled game, from the snapshot frozen at the week's first kickoff."""
     fs = fit_set(games[games["season"] == season], sched["kickoff"].min())
-    ridge = fit_ridge(fs, *RIDGE_V1)
+    ridge = fit_ridge_h24(fs, *RIDGE_V1)
     pv1 = fit_ridge(fs, *RIDGE_V1, prior) if prior is not None else None
     n_games = ridge.table["n_games"]
     rows = []
@@ -120,8 +122,8 @@ def main(argv: list[str] | None = None) -> int:
           f"{r.nu:.1f} possessions a team, {r.c:.2f} overtime points a game. Bovada lines as of "
           f"the last lines fetch. {thin} of {len(df)} games have a team with under "
           f"{MIN_PRIOR_GAMES} FBS games (marked *), where ridge_v1 matched the mean and trailed "
-          f"the open by 0.65.\n")
-    print("| Kickoff (ET) | Game | G | Poss | Implied (away–home) | ridge_v1 | prior_v1 "
+          f"the open by 0.65. ridge_h24 is ridge_v1 with the home edge held at 2.4 points.\n")
+    print("| Kickoff (ET) | Game | G | Poss | Implied (away–home) | ridge_h24 | prior_v1 "
           "| Bovada open | Bovada now | ridge − open |")
     print("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
     for g in df.itertuples():
