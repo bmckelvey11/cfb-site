@@ -42,7 +42,24 @@ def column_types(header: list[str]) -> dict[str, str]:
 # Polymarket names teams by school (`teams[].alias`, "Georgia State"), with no mascot, so
 # there is no mascot strip here -- stripping a token off a school name is how "Georgia
 # State" would quietly become "Georgia". Add a line when a name shows up unresolved.
-ALIASES: dict[str, str] = {}
+# Keys and values are both `norm()`ed. The 14 below were unresolved in the first live pull
+# (2026-10-17) and were checked against `teams_2025.json`/`teams_2026.json` by school id.
+ALIASES: dict[str, str] = {
+    "appalachian state": "app state",
+    "central connecticut state": "central connecticut",
+    "grambling state": "grambling",
+    "liu": "long island university",
+    "louisiana monroe": "ul monroe",
+    "miami fl": "miami",                    # CFBD's plain `Miami`; `Miami (OH)` is its own
+    "nicholls state": "nicholls",
+    "penn": "pennsylvania",                 # the Quakers, not Penn State
+    "southeastern louisiana": "se louisiana",
+    "southern university": "southern",
+    "st thomas": "st thomas mn",
+    "tennessee martin": "ut martin",
+    "umass": "massachusetts",
+    "university at albany": "ualbany",
+}
 
 
 def school_key(name: str) -> str:

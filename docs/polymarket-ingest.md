@@ -35,6 +35,8 @@ python scripts/polymarket_flatten.py
 
 Measured 2026-10-17 for that week: 111 games, all with moneyline, spreads and totals, and
 roughly 50 full-game ladder rungs each (one game: 31 spreads, 21 totals from 35.5 to 75.5).
+A live pull at 10:31Z the same day listed 218 upcoming games (two weekends' worth),
+8,027 kept markets, 16,054 tick rows, and a 3.2MB snapshot file.
 
 ## Reading the rows
 
@@ -46,8 +48,19 @@ roughly 50 full-game ladder rungs each (one game: 31 spreads, 21 totals from 35.
 - `line` is the row's own team's handicap, the `oa_odds_tick` convention. Polymarket puts
   the line on the first outcome only ("Spread: James Madison (-12.5)" has line -12.5 and
   outcomes James Madison, Georgia State), so the second outcome gets `+12.5`.
-- No market is flagged as the main line. Pick it in the query: price nearest 0.5, or the
-  highest `liquidity`.
+- No market is flagged as the main line, and **price nearest 0.5 alone picks dead
+  markets.** A rung nobody quotes shows a placeholder price of 0.495/0.505 with a 0.01/0.99
+  book, so it lands on an empty bid or ask (measured 2026-10-17: 476 of 16,054 rows; one
+  game's "nearest 0.5" was Georgia State -20.5 while James Madison was a 0.765 moneyline
+  favourite). Filter first, then pick:
+
+  ```sql
+  SELECT * FROM stg.pm_market_tick
+   WHERE market = 'spreads' AND best_bid IS NOT NULL AND best_ask IS NOT NULL
+     AND best_ask - best_bid <= 0.05 AND liquidity >= 100
+  QUALIFY row_number() OVER (PARTITION BY pulled_at, event_id, side
+                             ORDER BY abs(price - 0.5), liquidity DESC) = 1
+  ```
 - `market` keeps Polymarket's word `moneyline` (`oa_odds_tick` says `h2h`).
 
 ## Team names

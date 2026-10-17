@@ -177,7 +177,9 @@ def test_the_csv_loads_into_duckdb_with_the_pinned_types(tmp_path):
     path = tmp_path / "out" / "pm_market_tick.csv"
     con = duckdb.connect()
     rel = con.read_csv(str(path), header=True, columns=column_types(TICK_COLUMNS))
-    rows = rel.filter("market = 'spreads'").order("side").fetchall()
+    # Only non-timestamp columns are fetched: materializing TIMESTAMPTZ needs pytz.
+    rows = rel.filter("market = 'spreads'").project("side, line").order("side").fetchall()
+    assert rows == [("away", 12.5), ("home", -12.5)]
     assert len(rows) == 2 and rel.filter("market = 'moneyline' AND line IS NULL").count("*").fetchone()[0] == 2
 
 
@@ -190,3 +192,15 @@ def test_the_loader_plans_both_tables_with_pinned_types(tmp_path):
     assert set(jobs) == set(PM_TABLES)
     assert jobs["pm_market_tick"]["schema"] == "stg"
     assert jobs["pm_market_tick"]["columns"]["line"] == "DOUBLE"
+
+
+@pytest.mark.parametrize("polymarket, cfbd", [
+    ("Miami (FL)", "Miami"), ("Louisiana-Monroe", "UL Monroe"), ("St. Thomas", "St. Thomas (MN)"),
+    ("Penn", "Pennsylvania"), ("University at Albany", "UAlbany"), ("Georgia State", "Georgia State"),
+])
+def test_polymarket_names_resolve_to_cfbd_schools(polymarket, cfbd):
+    from cfb_system_maker.oddsapi_schema import norm
+    from cfb_system_maker.polymarket_schema import school_key
+    schools = {norm(s): s for s in ("Miami", "Miami (OH)", "UL Monroe", "St. Thomas (MN)",
+                                    "Pennsylvania", "Penn State", "UAlbany", "Georgia State")}
+    assert schools.get(school_key(polymarket)) == cfbd
