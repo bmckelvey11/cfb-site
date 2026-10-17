@@ -157,7 +157,7 @@ def parse_time(value: Any) -> datetime | None:
 
 
 def _fetch(url: str, params: dict[str, Any]) -> Any:
-    full = f"{url}?{urllib.parse.urlencode(params)}" if params else url
+    full = f"{url}?{urllib.parse.urlencode(params, doseq=True)}" if params else url
     request = urllib.request.Request(full, headers=HEADERS)
     try:
         with urllib.request.urlopen(request, timeout=30) as response:

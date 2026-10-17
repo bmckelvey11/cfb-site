@@ -54,7 +54,8 @@ FINAL = {"id": "3", "slug": "cfb-applst-coast-2026-10-16", "title": "App State v
     (UPCOMING, "upcoming"),
     (FINAL, "final"),
     (dict(UPCOMING, period="CAN", ended=False, score=""), "other"),
-    (dict(UPCOMING, startTime="2026-10-17T16:00:00Z"), "other"),   # started, not flagged live
+    (dict(UPCOMING, startTime="2026-10-17T18:30:00Z"), "starting"),  # kicked off, keyset not caught up
+    (dict(UPCOMING, startTime="2026-10-17T06:00:00Z"), "other"),     # long past kickoff, no flag
 ])
 def test_state(event, expected):
     assert b.state(event, NOW) == expected
@@ -95,18 +96,23 @@ def test_board_keeps_live_and_soon_and_drops_the_rest():
     assert [g["slug"] for g in out["upcoming"]] == ["cfb-wisc-ucla-2026-10-17"]
 
 
-def fake_gamma(calls):
+def fake_gamma(calls, fresh=None):
     def fetch(url, params):
         calls.append(url)
         if url.endswith("/sports"):
             return [{"sport": "cfb", "series": "12756"}]
+        if url.endswith("/events"):
+            if fresh is None:
+                raise RuntimeError("HTTP 500")
+            return [e for e in fresh if e["slug"] in params["slug"]]
         return {"events": [LIVE, UPCOMING, FINAL]}
     return fetch
 
 
 def test_api_serves_the_board_and_caches_polymarket():
     calls = []
-    client = create_app(fetch_fn=fake_gamma(calls), clock=lambda: NOW, cache_seconds=60).test_client()
+    client = create_app(fetch_fn=fake_gamma(calls, fresh=[LIVE]), clock=lambda: NOW,
+                        cache_seconds=60).test_client()
     first = client.get("/api/live").get_json()
     client.get("/api/live")
     assert first["pulled_at"] == "2026-10-17T18:45:00Z"
@@ -149,3 +155,34 @@ def test_a_dead_moneyline_is_still_hidden():
     placeholder = dict(ML, bestAsk=0.5, liquidityNum=5)
     assert b.moneyline([placeholder], "Charleston Southern", "Clemson") is None
     assert b.moneyline([dict(ML, bestAsk=0.5)], "Charleston Southern", "Clemson") is None   # no bid, mid book
+
+
+def test_in_play_games_are_reread_through_the_fresher_slug_endpoint():
+    # keyset is minutes behind: its copy has Q4 7:52, the slug read has 6:42.
+    behind = dict(LIVE, elapsed="7:52", updatedAt="2026-10-17T18:58:00Z")
+    current = dict(LIVE, elapsed="6:42", updatedAt="2026-10-17T19:01:00Z")
+    calls = []
+
+    def fetch(url, params):
+        calls.append((url, params))
+        if url.endswith("/sports"):
+            return [{"sport": "cfb", "series": "12756"}]
+        if url.endswith("/events"):
+            return [current]
+        return {"events": [behind, UPCOMING]}
+
+    out = create_app(fetch_fn=fetch, clock=lambda: NOW).test_client().get("/api/live").get_json()
+    assert out["live"][0]["clock"] == "6:42" and out["live"][0]["updated_at"] == "2026-10-17T19:01:00Z"
+    slug_calls = [p for u, p in calls if u.endswith("/events")]
+    assert slug_calls == [{"slug": ["cfb-chsou-clmsn-2026-10-17"]}]     # upcoming games are not re-read
+
+
+def test_a_failed_slug_refresh_keeps_the_list_copy():
+    out = create_app(fetch_fn=fake_gamma([]), clock=lambda: NOW).test_client().get("/api/live").get_json()
+    assert out["live"][0]["clock"] == "12:09"
+
+
+def test_a_just_kicked_off_game_is_listed_with_the_live_games():
+    kicked = dict(UPCOMING, startTime="2026-10-17T18:30:00Z")
+    out = b.board([kicked], NOW)
+    assert [g["state"] for g in out["live"]] == ["starting"] and out["upcoming"] == []

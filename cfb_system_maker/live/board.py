@@ -10,6 +10,10 @@ Game state comes from the event itself (measured live 2026-10-17):
   `elapsed` the mm:ss game clock ("" at a break).
 - Finished: `ended` true, `period` "VFT". `closed=false` still returns these. `period` "CAN" is
   a cancelled game with `ended` false.
+- Starting: kicked off by `startTime` but not yet flagged `live`. `/events/keyset` is cached
+  a few minutes behind (18:58Z data served at 19:02Z), so for a while after kickoff a game has
+  neither flag; it is listed with the live games rather than dropped. `/events?slug=` is
+  fresher, which is why `app.py` re-reads live and starting games through it.
 
 Main line: Polymarket flags none, and a rung nobody quotes shows a 0.495/0.505 placeholder with a
 0.01/0.99 book, so "price nearest 50%" alone picks dead rungs. A rung counts only with both a bid
@@ -31,11 +35,12 @@ MAX_SPREAD = 0.10      # wider than 10 cents and `outcomePrices` no longer match
 MIN_LIQUIDITY = 100.0  # placeholder rungs carry $5
 LOPSIDED = 0.15        # a rung priced outside 15-85% is decided, not a line (Army -2.5 at 98.6%, up 49-24)
 SOON = timedelta(hours=3)
+STARTING = timedelta(hours=4)   # past kickoff with no live flag for longer than this: unknown
 FINAL_PERIODS = {"VFT", "FT", "F"}
 
 
 def state(event: dict, now: datetime) -> str:
-    """One of live, upcoming, final, other."""
+    """One of live, starting, upcoming, final, other."""
     if event.get("ended") or event.get("period") in FINAL_PERIODS:
         return "final"
     if event.get("period") == "CAN":
@@ -45,7 +50,15 @@ def state(event: dict, now: datetime) -> str:
     start = parse_time(event.get("startTime"))
     if start is None:
         return "other"
-    return "upcoming" if start > now else "other"   # started but not flagged live: unknown
+    if start > now:
+        return "upcoming"
+    return "starting" if now - start <= STARTING else "other"
+
+
+def in_play(event: dict, now: datetime) -> bool:
+    """Live or just kicked off: the games worth re-reading through the fresher `/events?slug=`."""
+    return (not str(event.get("slug", "")).endswith("-exact-margin")
+            and state(event, now) in ("live", "starting"))
 
 
 def board(events: list[dict], now: datetime, soon: timedelta = SOON) -> dict[str, list[dict]]:
@@ -55,7 +68,7 @@ def board(events: list[dict], now: datetime, soon: timedelta = SOON) -> dict[str
         if str(event.get("slug", "")).endswith("-exact-margin"):
             continue
         kind = state(event, now)
-        if kind == "live":
+        if kind in ("live", "starting"):
             live.append(game(event, kind))
         elif kind == "upcoming" and parse_time(event["startTime"]) <= now + soon:
             upcoming.append(game(event, kind))
@@ -75,6 +88,7 @@ def game(event: dict, kind: str) -> dict:
         "url": f"https://polymarket.com/event/{event.get('slug')}",
         "state": kind,
         "kickoff": event.get("startTime"),
+        "updated_at": event.get("updatedAt"),
         "away": away, "home": home,
         "away_score": away_score, "home_score": home_score,
         "period": event.get("period") or None,

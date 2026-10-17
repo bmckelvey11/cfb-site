@@ -79,8 +79,14 @@ next 3 hours. Code: `cfb_system_maker/live/` (`board.py` holds the rules), tests
 - **Stores nothing.** These are in-play prices; keeping them out of `ingest/` keeps them out of
   anything that joins a "line". `polymarket_client.is_upcoming_game` still drops started games
   from snapshots.
-- **Refresh:** the page polls every 30 s; the server re-reads Gamma at most every 20 s, one
-  `/events/keyset` walk (~4 pages) per refresh. Gamma needs no key and has no quota we have hit.
+- **Refresh:** the page polls every 30 s. `/events/keyset` is served from a cache a few
+  minutes behind (measured 2026-10-17: at 19:02Z it held Clemson at Q4 7:52, updated 18:58Z,
+  while `/events?slug=` had 6:42, updated 19:01Z), so the server walks it (~4 pages) only every
+  2 minutes for the game list, and re-reads live and just-started games every 20 s through
+  `/events?slug=a&slug=b...` in batches of 20. Each card shows its event's `updatedAt`. Gamma
+  needs no key and has no quota we have hit.
+- **Just kicked off:** a game past its `startTime` with no `live`/`ended` flag yet is listed
+  with the live games as "Kicking off" (up to 4 hours), not dropped.
 - **Game state** is on the event (measured 2026-10-17): `live`, `ended`, `score` as
   "away-home" in `teams[].ordering` order, `period` (`Q1`..`Q4`, `End Q2`, `End Q3`, `VFT`
   final, `CAN` cancelled) and `elapsed` (mm:ss, empty at a break). A game not yet started has
