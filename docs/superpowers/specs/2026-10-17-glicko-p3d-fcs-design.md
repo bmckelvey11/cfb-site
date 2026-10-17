@@ -69,6 +69,39 @@ The forecast SD is P1's, $\sqrt{u_h^2 + u_a^2 + \sigma_{pred}^2}$.
 About 120 FBS-vs-FCS games are played a season, and few after mid-October, so the interim look
 will be noisy and the final verdict rests mostly on 2027.
 
+## Build record — 2026-10-17
+
+Built as `GlickoShrinkX` in [`scripts/glicko_p3.py`](../../../scripts/glicko_p3.py), tuned and
+frozen by `python -m scripts.glicko_p3d_eval --freeze`
+([`scripts/glicko_p3d_eval.py`](../../../scripts/glicko_p3d_eval.py)) at 2026-10-17T08:37:43Z,
+after this spec was committed (f7064a2). The freeze read no game after 2025. The pick,
+σ_pred and a forecast fingerprint over 9,891 regular-season games with an FBS team, 2014–2025,
+are in [`scripts/glicko_p3d_frozen.json`](../../../scripts/glicko_p3d_frozen.json). λ = 0
+reproduces P1 exactly (`tests/test_glicko_p3d.py`), and P1's sealed fingerprint still matches.
+
+**Pick: λ = 0.05, σ_pred 12.5.** Tuning CRPS on FBS-vs-FCS 2014–2019, by λ (each at its best
+σ_pred): 0 → 9.2699, 0.05 → **9.2530**, 0.10 → 9.2617, 0.15 → 9.2997, 0.20 → 9.3709,
+0.25 → 9.4797. Not on a grid edge.
+
+**σ_pred caveat.** The declared selection tunes σ_pred on FBS-vs-FCS games only, and P1 itself
+also prefers 12.5 there. Bundle D uses that single σ_pred for every game, so its FBS-vs-FBS
+intervals are narrower than P1.1's 13.5. That, not λ, drives D's small FBS-vs-FBS cost below.
+The holdout reads D as frozen; any split of σ_pred by game type would be a new, separately
+declared trial.
+
+**2021–2025, descriptive only (this window decides nothing).** D minus P1 with σ_pred 13.5:
+
+| Population | Games | CRPS diff | 95% CI | MAE diff | 95% CI |
+| --- | --- | --- | --- | --- | --- |
+| FBS vs FCS | 602 | −0.050 | [−0.074, −0.029] | −0.046 | [−0.100, −0.004] |
+| FBS vs FBS | 3,730 | +0.004 | [−0.002, +0.010] | +0.005 | [+0.002, +0.009] |
+
+FBS-vs-FCS CRPS is lower in all five seasons (2021 −0.051, 2022 −0.013, 2023 −0.073, 2024
+−0.047, 2025 −0.064). Diagnostic D1, the FBS-vs-FCS residual slope, moves from −0.149
+[−0.224, −0.068] under P1 to −0.110 [−0.190, −0.025] under D. λ = 0.05 removes about a quarter
+of the over-extension, and larger λ fit worse in tuning, so most of the slope is not
+explained by a uniform shrink. FBS-vs-FBS coverage at 68%: P1.1 68.9%, D 66.7%.
+
 ## Trial accounting
 
 6 λ values × 11 σ_pred values = 66 fits, added to the family's count (21,625 before this spec).

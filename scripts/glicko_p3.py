@@ -25,6 +25,9 @@ C. `GlickoContext` -- game context, read per game through `run_ctx`:
    noise      observation variance x k for postseason games and FBS-vs-FCS games; the
               forecast SD uses the same multiplier on sigma_pred^2
    Defaults (H2013 = H2020 = P1's 2, slope 0, tz 0, k 1, ot/near off) are P1.
+D. `GlickoShrinkX` -- FBS-vs-FCS (docs/superpowers/specs/2026-10-17-glicko-p3d-fcs-design.md).
+   A cross-subdivision game's expected margin is (1 - lam) * P1's, in the forecast and in the
+   update's innovation; gains and variances are P1's. lam = 0 is P1.
 """
 from __future__ import annotations
 
@@ -220,6 +223,20 @@ def transfer_aware_rp(raw: Path, fbs_by_season: dict[int, set[str]]) -> tuple[di
         out[s] = _z(share)
         coverage[s] = {"teams": len(share), "transfers_into_fbs": n_in, "matched_to_ppa": n_matched}
     return out, coverage
+
+
+# --- D. FBS-vs-FCS shrink --------------------------------------------------------------
+
+class GlickoShrinkX(GlickoMargin):
+    def __init__(self, *args, lam: float = 0.0, **kw):
+        super().__init__(*args, **kw)
+        self.lam = lam
+
+    def forecast(self, h, a, neutral, t):
+        mhat, s, rd2 = super().forecast(h, a, neutral, t)
+        if self.div[h] != self.div[a]:
+            mhat *= 1.0 - self.lam
+        return mhat, s, rd2       # GlickoMargin.update reads this forecast: same shrunk innovation
 
 
 # --- C. game context -------------------------------------------------------------------

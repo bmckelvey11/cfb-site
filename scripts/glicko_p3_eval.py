@@ -90,8 +90,10 @@ def sd(f: pd.DataFrame, sigma_pred: float) -> np.ndarray:
     return np.sqrt(f["rd2"].to_numpy() + f["mult"].to_numpy() * sigma_pred ** 2)
 
 
-def mask(g: pd.DataFrame, seasons, *, regular=True) -> np.ndarray:
-    m = (g["home_div"] == FBS) & (g["away_div"] == FBS) & g["season"].isin(seasons)
+def mask(g: pd.DataFrame, seasons, *, regular=True, pop: str = "fbs_fbs") -> np.ndarray:
+    """pop: fbs_fbs, or fbs_fcs (one FBS team and one FCS team)."""
+    h, a = g["home_div"] == FBS, g["away_div"] == FBS
+    m = {"fbs_fbs": h & a, "fbs_fcs": h ^ a}[pop] & g["season"].isin(seasons)
     return (m & (g["season_type"] == "regular") if regular else m).to_numpy()
 
 
@@ -155,7 +157,7 @@ def metrics(mu, s, y) -> dict:
             "calib_slope": round(_logit_slope(np.log(p / (1 - p)), o), 3)}
 
 
-def paired(t: pd.DataFrame, a: str, b: str, kind: str) -> dict:
+def paired(t: pd.DataFrame, a: str, b: str, kind: str, seed: int = BOOT_SEED) -> dict:
     y = t["margin"].to_numpy(float)
     if kind == "crps":
         diff = crps(t[a].to_numpy(), t[a + "_sd"].to_numpy(), y) - crps(t[b].to_numpy(), t[b + "_sd"].to_numpy(), y)
@@ -163,7 +165,7 @@ def paired(t: pd.DataFrame, a: str, b: str, kind: str) -> dict:
         diff = np.abs(y - t[a].to_numpy()) - np.abs(y - t[b].to_numpy())
     diff = pd.Series(np.asarray(diff), index=t.index)
     sums = diff.groupby(t["season"].astype(str) + "-" + t["week"].astype(str)).agg(["sum", "count"])
-    idx = np.random.default_rng(BOOT_SEED).integers(0, len(sums), size=(BOOT_DRAWS, len(sums)))
+    idx = np.random.default_rng(seed).integers(0, len(sums), size=(BOOT_DRAWS, len(sums)))
     boot = sums["sum"].to_numpy()[idx].sum(1) / sums["count"].to_numpy()[idx].sum(1)
     lo, hi = np.percentile(boot, [2.5, 97.5])
     return {"n": int(len(t)), "diff": round(float(diff.mean()), 4),
