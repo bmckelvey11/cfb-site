@@ -91,6 +91,7 @@ All paths under `{CFB_DATA_ROOT}`. Run from repository root.
 | `eval_panel_vs_line.py` [`--min-n`] | `panel-vs-line-2026-09-17.md` | `processed/panel_vs_line.json` |
 | `eval_panel_ats.py` [`--min-bets`] | `panel-ats-2026-09-17.md` | `processed/panel_ats.json` |
 | `eval_model_columns_ats.py` | `model-columns-ats-2026-09-17.md` | `processed/model_columns_ats.json` |
+| `daily_spread_breakdown.py` | One day's board: market median spread (the-odds-api snapshot) vs Glicko P1 and the PT consensus, per FBS game. Display only, not a bet signal | `--out` CSV |
 | `edge_vs_market_move.py` | `actionable-picks-2026-09-17.md` § 0: regresses the served `edge` on the move since the opener | stdout |
 | `version_b_ceiling.py` | `line-movement-results.md` § version B read of 2026-09-17: E\|close − anchor\| (the CLV ceiling) and each week's anchor ET weekday | stdout |
 | `analyze_line_movement_distribution.py` [`--start`] [`--end`] [`--book`] | `line-movement-distribution-2026-09-18.md` | `research/spread/docs/img/line-movement-distribution.png`, `research/spread/docs/data/line-movement-frequency.csv` |
