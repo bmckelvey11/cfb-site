@@ -6,8 +6,8 @@ reference for reasoning, not a list of work. What is planned, in what order, and
 step must pass lives in [`rating-model-roadmap.md`](rating-model-roadmap.md). How the live
 Glicko rating works today is in [`glicko-method.md`](glicko-method.md).
 
-**Source.** Most of this page is a design review Blake shared on 2026-10-17, of a document
-named `glicko-college-football.md` that is not in this repo. It also cites the totals research
+**Source.** Most of this page is a design review Blake shared on 2026-10-17, of
+[`glicko-college-football.md`](glicko-college-football.md). It also cites the totals research
 in [`research/totals/docs/`](../../research/totals/docs/). Each idea below carries a **Here**
 note saying what this repo has already built or tested, so it can be read against the record.
 None of the ideas below has been tested here unless its Here note says so.

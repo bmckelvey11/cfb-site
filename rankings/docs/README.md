@@ -13,9 +13,7 @@ market-residual framing. Theory says what is true or believed, not what to build
 | Doc | Question it answers |
 | --- | --- |
 | [rating-model-theory.md](rating-model-theory.md) | What a football-native rating system should model (team strength vs market overlay vs decisions; offense, defense and pace states; observation noise; priors; regimes) and why literal chess Glicko is not the endpoint (from the 2026-10-17 external review) |
-
-The original design document the review responds to, `glicko-college-football.md`, is not in
-the repo yet. It is untracked in the working copy on Blake's Mac.
+| [glicko-college-football.md](glicko-college-football.md) | The original design for using Glicko in college football that the 2026-10-17 review responds to: why Glicko's uncertainty idea fits, the diagonal offense/defense/pace state model, offseason carryover, and the staged build plan. Its implementation-status notes refer to `models/shared/ratings/glicko`, which is not on this branch |
 
 ## Plans
 
