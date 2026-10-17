@@ -38,6 +38,7 @@ _VENDOR_PREFIXES = (
     ("an_", "actionnetwork"),
     ("pff_", "pff"),
     ("oa_", "oddsapi"),
+    ("pm_", "polymarket"),
     ("massey_", "massey"),
 )
 

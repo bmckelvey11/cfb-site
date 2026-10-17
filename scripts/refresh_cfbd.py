@@ -52,6 +52,8 @@ from pff_flatten import flatten as pff_flatten  # noqa: E402
 from pff_flatten import write as pff_write  # noqa: E402
 from oddsapi_flatten import IN_DIR as OA_IN_DIR  # noqa: E402
 from oddsapi_flatten import main as oddsapi_flatten_main  # noqa: E402
+from polymarket_flatten import IN_DIR as PM_IN_DIR  # noqa: E402
+from polymarket_flatten import main as polymarket_flatten_main  # noqa: E402
 
 # drives: possession counts for scripts/weekly_rankings.py, which refresh_cfbd.cmd runs
 # after this script; without them a new week's games are gated out of the ratings.
@@ -240,6 +242,22 @@ def _flatten_oddsapi() -> None:
         print("  unresolved team names above will land as NULL game_id", file=sys.stderr)
 
 
+def _flatten_polymarket() -> None:
+    """Regenerate the Polymarket CSVs the rebuild is about to load. Never fatal."""
+    print("=== flatten polymarket ===")
+    if not PM_IN_DIR.is_dir():
+        print(f"  no snapshots in {PM_IN_DIR}; nothing to flatten")
+        return
+    try:
+        rc = polymarket_flatten_main([])
+    except Exception as exc:
+        print(f"  FAILED {type(exc).__name__}: {exc}", file=sys.stderr)
+        print("  rebuilding against the CSVs already on disk")
+        return
+    if rc:
+        print("  unresolved team names above will have a blank school", file=sys.stderr)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--season", type=int, default=cfb_paths.current_season())
@@ -272,6 +290,7 @@ def main() -> int:
     _flatten_actionnetwork()
     _flatten_pff()
     _flatten_oddsapi()
+    _flatten_polymarket()
     _rebuild_games_csv(args.season)
 
     print("=== rebuild cfb.duckdb ===")
