@@ -1,7 +1,7 @@
 # Master dashboard — design
 
 **Status:** approved in brainstorming 2026-10-17 (project thread "master dashboard");
-revised the same day after an independent review against the code. This spec covers
+revised the same day after an independent review against the code and again after a Codex review (backup safety, separate settle and close states, de-vigged moneyline CLV, irreversible source lock, dollar-only drawdown, export-before-publish, pre-kickoff cutoff). This spec covers
 **phase 1**, built in three slices (1a, 1b, 1c), each with its own plan. Phases 2–3 are
 queued in `TODO.md` (`#dashboard-docs-viewer`, `#dashboard-research-index`,
 `#dashboard-todo-page`, `#dashboard-fold-existing-pages`) and get their own specs.
@@ -119,7 +119,7 @@ postgame separation, DK/FD lines); the mount itself needs these changes:
 | Slate, lines | `cfb.duckdb` via `matchup/queries.py`: `q.current_week` / `q.weeks` to map the board date to (season, week, season_type), then `q.slate(con, season, week, season_type, snap)` filtered to games kicking off on that local date | game_id, kickoff, teams, DK/FD lines | odds snapshot `pulled_at` within 24 h of the board date |
 | TV, weather | `q.slate` returns neither. The plan adds one query for both, reusing the sources `scripts/tv_grid.py` and the weather.football load already read | network, forecast | same as their loaders |
 | Spread board | `<DATA_DIR>/boards/spread/picks_<date>.json` | away, home, side, tier, top6, glicko, gap, note | file exists for the board date |
-| Red Panda overs | `models/over_zero/site/lib/board.json` (path configurable; that folder is a separate repo and may be absent) | per-game signal and edge | its generated timestamp is in the board's week |
+| Red Panda overs | `models/over_zero/site/lib/board.json` (path configurable; that folder is a separate repo and may be absent) | per-game signal and edge | its generated timestamp is in the board's week and before the cutoff (see Contemporaneous only) |
 | Greenline | `<DATA_DIR>/ingest/pff_scoreboard/pff_greenline_<season>_w<wk>.csv` | flag side, line, edge | capture for the board's week exists |
 | My bets | `<DATA_DIR>/bets/bets.sqlite` | see Tracker | always |
 
@@ -128,6 +128,15 @@ writes `picks_<date>.json` (the Saturday cloud task does) and `models/over_zero/
 in every checkout, so slice 1b starts by copying one real `picks_2026-10-17.json` and one
 real `board.json` into `tests/fixtures/hub/` (checked first for anything that must not be
 committed) and writing the readers against them.
+
+**Contemporaneous only.** The Board shows what was known *before* each game, never later
+information. Every reader takes a cutoff: for a future or in-progress date it is "now";
+for each game on a past date it is that game's kickoff. A capture whose `as_of` is after
+the cutoff is rejected, not shown. Sources that keep history (spread board by date,
+Greenline by week, odds snapshots) pick the latest capture at or before the cutoff.
+Sources that keep only the current file (Red Panda `board.json`) are used for a past game
+only if their `as_of` is before that kickoff; otherwise the cell says "no pre-kickoff
+capture". This is the root `CLAUDE.md` no-lookahead rule applied to the Board.
 
 Every reader returns rows plus an `as_of`, or a **Stale** marker naming the file and its
 date. A stale, missing or malformed source never fails the page: its column shows
@@ -187,13 +196,27 @@ One row per FBS game on the selected date, sorted by kickoff.
 | notes | text null | |
 | origin | text | logged / action_network / csv |
 | import_ref | text null | the original row, verbatim, for imported bets |
-| close_line, close_source, clv, clv_unit, result, pnl | null until graded | `clv_unit` is `points` (spread, total) or `prob` (moneyline) |
-| graded_at, created_at, updated_at | text | |
+| result, pnl, settled_at | null until settled | settlement: needs the final score only |
+| close_line, close_price, close_source, clv, clv_unit, close_status, close_checked_at | close side, filled independently | `close_status` is `pending` / `found` / `missing:<reason>`; `clv_unit` is `points` (spread, total) or `prob` (moneyline) |
+| first_settled_at | text null | set once, never cleared, never editable; the source lock keys off this |
+| deleted_at | text null | soft delete; see Edit / delete |
+| created_at, updated_at | text | |
 
-Table `bet_audit (bet_id, changed_at, field, old, new)` records every edit. Once a bet is
-graded its `source` cannot be changed, so per-source records cannot be relabelled after the
-result is known. The file is data and is never committed. Before any import it is copied to
-`bets.sqlite.bak`.
+Settlement and close are **two independent states**: a bet can be settled with its close
+still `pending` (score loaded before closing odds), or have its close found before the game
+ends. Each is filled and retried on its own (see Grading).
+
+Table `bet_audit (bet_id, changed_at, action, field, old, new)` records every insert, edit
+and delete. **The source lock** keys off `first_settled_at`, not the current grade: once a
+bet has ever been settled, `source` can never change, even if a later edit clears the
+current result. That is what stops per-source records being relabelled after the outcome is
+known.
+
+The file is data and is never committed. **Backups use SQLite's online backup API**
+(`sqlite3.Connection.backup`), never a file copy: with WAL on, committed bets can still be
+in `bets.sqlite-wal`, and copying only the main file would lose them. A backup is taken
+before every import and every `grade-bets` run, to `bets-<timestamp>.sqlite` in the same
+folder, keeping the last 20.
 
 ### Getting bets in
 
@@ -215,8 +238,13 @@ result is known. The file is data and is never committed. Before any import it i
   the import preview lists them as "possible duplicate" with the existing bet beside it,
   and Blake ticks which to keep. This is what stops a bet logged in the app and later
   imported from Action Network from counting twice.
-- **Edit / delete** any bet (`PATCH` / `DELETE /api/tracker/bets/<id>`). Editing a graded
-  bet's game, market, side, line, odds or stake clears its grade so it is graded again.
+- **Edit / delete** any bet (`PATCH` / `DELETE /api/tracker/bets/<id>`), every change
+  written to `bet_audit` first. What an edit invalidates:
+  - game, market, side, line, odds or stake → clears settlement **and** close fields;
+  - book → clears the close fields only (the close is book-specific; the result is not);
+  - `source` → refused with 409 once `first_settled_at` is set.
+  Deleting a bet sets `deleted_at`; the row and its audit history stay, and deleted bets
+  drop out of every total. A settled bet can be deleted but never erased.
 
 ### Grading
 
@@ -233,10 +261,43 @@ package. Slice 1a therefore starts with a **refactor commit, behaviour unchanged
 
 `hub/grading.py` then grades a bet with a known `game_id` directly, and only uses
 `find_game` for imports. Grading is **explicit**: a "Grade now" button and the
-`python -m cfb_system_maker grade-bets` command run
-`UPDATE ... WHERE graded_at IS NULL` in one transaction. GET requests never write. A bet
-without a final score stays **pending**, never a loss. Unmatched or reversed-team bets are
-flagged for review, as `ingest_bets.py` already reports.
+`python -m cfb_system_maker grade-bets` command run two passes in one transaction each:
+
+- **Settle pass:** bets with `settled_at IS NULL` and a final score → result, pnl,
+  `settled_at`, and `first_settled_at` if empty.
+- **Close pass:** bets with `close_status = 'pending'`, or `missing:*` and
+  `close_checked_at` older than 6 hours → look up the close. A close that is still absent
+  48 hours after kickoff stays `missing:<reason>` and is no longer retried automatically
+  ("Grade now" still retries it).
+
+GET requests never write. A bet without a final score stays **pending**, never a loss.
+Unmatched or reversed-team bets are flagged for review, as `ingest_bets.py` already
+reports.
+
+### CLV definition
+
+The standard (`docs/model-evaluation-standard.md`, "CLV done correctly") requires the
+reference close, cutoff, de-vig method and missing-quote rule to be fixed in advance. Here
+they are:
+
+- **Reference close:** the bettor's own book's close in `core.fact_game_line` if present;
+  otherwise the median across providers. The choice is recorded in `close_source`, and CLV
+  is also reported split by it. Never the most favourable book.
+- **Cutoff:** the warehouse close (`*_close` columns, the last pre-kickoff line). Quotes
+  after kickoff are never used.
+- **Spread and total:** CLV in points, as `ingest_bets.py` computes it today (spread
+  `line − close` on the bettor's side; totals via `models.middle.clv.clv_points`).
+- **Moneyline:** the current code subtracts raw implied probabilities
+  (`ingest_bets.py:231-248`), which the standard does not allow. A **separate commit after
+  the refactor** replaces it: take the reference book's paired closing prices
+  (`moneyline_home`, `moneyline_away`), de-vig the pair multiplicatively (each implied
+  probability divided by their sum), and report probability CLV = fair close probability
+  of the bettor's side − break-even probability of the bet price. With the median
+  reference, de-vig each provider's pair first, then take the median fair probability.
+  If no provider has both sides, the close is `missing:no paired close`; one side alone
+  is never used. That commit changes `ingest_bets.py`'s own moneyline output too, so the
+  two cannot disagree, and says so in its message.
+- **Pushes:** settle as push; CLV is still recorded (the price was still beaten or not).
 
 **Greenline marks are not written back in phase 1.** `greenline_bet_log.py --mark`
 overwrites existing marks, filters on week but not season, and with no ids marks the whole
@@ -258,13 +319,15 @@ does:
 - **Record and win rate:** W-L-P; win rate and its **Wilson 95%** interval use n = W + L
   (pushes excluded, and counted separately).
 - **ROI and P&L** with a 95% interval by **block bootstrap over weeks**, where a bet's week
-  is its game's (season, week), not `placed_at`. With fewer than 8 weeks of graded bets the
+  is its game's (season, week), not `placed_at`. With fewer than 8 weeks of settled bets the
   interval is not shown and the cell says "too few weeks".
 - **CLV** reported separately per unit: points (spread, total) and probability
   (moneyline), and by `close_source`. For each: mean, median and share of bets with
   positive CLV, with the same week-block interval on the mean.
-- **Max drawdown** of the bankroll line, in dollars and as a share of the peak.
-- Splits by source, market and week. Splits with fewer than 20 graded bets are greyed with
+- **Max drawdown in dollars** on the cumulative-P&L line, bets ordered by `settled_at` then
+  `bet_id`. There is no starting bankroll or deposit history in the ledger, so no
+  percentage drawdown is shown; adding bankroll configuration is a later change.
+- Splits by source, market and week. Splits with fewer than 20 settled bets are greyed with
   "small sample".
 - Model picks (spread board paper picks, Greenline's full graded board) are not mixed into
   the Tracker; they appear on the Board and Greenline pages.
@@ -288,7 +351,7 @@ does:
 
 ## Phone page (slice 1c)
 
-- **Content:** the Board (spread lean, Red Panda over, Greenline side), open bets, and the
+- **Content:** the Board (spread lean, Red Panda over, Greenline side only if the switch below is on), open bets, and the
   Tracker summary with intervals. Tapping a game shows lines, ratings and signals.
   "Updated at" timestamp at the top.
 - **Never on it:** PFF grades and projections, Greenline lines and edges, individual bet
@@ -296,13 +359,23 @@ does:
   subscription terms; the allowlist has one switch for it, **off by default**, so the
   phone Board shows no Greenline column until he turns it on.
 - **Export:** `python -m cfb_system_maker export-snapshot [--date]` calls the same payload
-  functions as the API (no HTTP, no writes) and writes
-  `<DATA_DIR>/boards/phone/snapshot_<date>.json`, keeping only fields on an explicit
-  **allowlist**, so a new PFF column cannot reach the phone by accident.
-- **Publish:** a scheduled task (Thursday 10 PM ET and Saturday 8 AM ET) pulls the latest
-  snapshot from the Mac with folder tools and republishes one private artifact at a fixed
-  URL. If the Mac is unreachable it republishes nothing, and the page's "updated at" shows
-  the age.
+  functions as the API (no HTTP, no writes), keeps only fields on an explicit
+  **allowlist** (so a new PFF column cannot reach the phone by accident), and writes
+  `<DATA_DIR>/boards/phone/snapshot.json` **atomically**: to a temp file in the same folder,
+  then `os.replace`. The file carries `generated_at` and the `as_of` of every source.
+- **Export runs first, on the Mac.** A launchd job (through `scripts/macos/cfb_job.sh`, like
+  the existing jobs) runs `export-snapshot` at Thursday 9:30 PM and Saturday 7:30 AM ET.
+- **Publish:** a scheduled task at Thursday 10 PM and Saturday 8 AM ET reads
+  `snapshot.json` from the Mac with folder tools and republishes **one** private artifact
+  at a fixed URL. It refuses to publish a snapshot whose `generated_at` is more than 90
+  minutes old or not newer than the one already published, and says so in its run log.
+  The page shows both **generated at** (from the snapshot) and **published at** (set by the
+  task). If the Mac is unreachable, nothing is republished and the timestamps show the age.
+- **Acceptance test before 1c is done** (integration, run once by hand, recorded in the
+  plan): publish twice from the task and confirm (a) the URL is the same both times,
+  (b) the page is private (opening it signed out or as another account is refused), and
+  (c) the second publish shows the newer `generated_at`. These are platform behaviours this
+  design assumes; if any fails, 1c stops and the design is revisited.
 - **Not in phase 1:** logging bets from the phone (needs a write-back sync).
 
 ## Errors
@@ -322,23 +395,41 @@ does:
 
 - `tests/test_ingest_bets_refactor.py` (1a): `grade_bet` on the `--self-check` cases; CLI
   output identical before and after the refactor.
-- `tests/test_bets_store.py` (1a): insert, two identical real bets are two rows, edit
-  clears grade, `source` locked after grading, audit rows, backup on import, WAL set.
+- `tests/test_bets_store.py` (1a): insert, two identical real bets are two rows, WAL set,
+  audit rows for insert/edit/delete.
+- `tests/test_bets_backup.py` (1a): write bets with checkpointing disabled so they sit only
+  in the WAL, back up through the backup API, restore into a fresh file, and assert every
+  committed bet is present; a plain file copy of the same state is shown to lose them.
+- `tests/test_bets_lifecycle.py` (1a): score before close → settled with close `pending`,
+  then a later close pass fills CLV; missing close retried, then `missing:*` after 48 h;
+  book edit clears close only; line edit clears both; edit after settlement then
+  `source` change → 409 (lock survives the cleared grade); soft delete keeps row and audit
+  and drops it from totals.
+- `tests/test_clv_moneyline.py` (1a, with the moneyline commit): de-vig of a paired close
+  against hand-computed values, median reference de-vigs per provider first, one-sided
+  close → `missing:no paired close`, post-kickoff quote never used.
 - `tests/test_hub_import.py` (1a): Action Network mapping (units → dollars, kickoff as
   estimated placed_at, abbreviations), possible-duplicate detection against a logged bet.
 - `tests/test_hub_grading.py` (1a): pending vs graded, CLV unit per market, reversed-team
   flag, GET never writes.
 - `tests/test_hub_tracker_stats.py` (1a): Wilson with pushes excluded, week-block bootstrap
-  on a fixed seed, "too few weeks" below 8, small-sample flag, max drawdown.
+  on a fixed seed, "too few weeks" below 8, small-sample flag, dollar max drawdown with
+  ties ordered by `bet_id`, no percentage drawdown field.
 - `tests/test_hub_guard.py` (1a): writes from a non-loopback `remote_addr` get 403.
 - `tests/test_hub_sources.py` (1b): each reader on the pinned real-file fixtures plus
   stale, missing, malformed and schema-changed cases; team-name join; unmatched rows.
 - `tests/test_hub_board.py` (1b): `/api/board` shape, date → week mapping, agreement
   marker, filters, stale banner.
+- `tests/test_hub_cutoff.py` (1b): for a past date, a Red Panda file regenerated after
+  kickoff is rejected ("no pre-kickoff capture"); a spread board and Greenline capture
+  dated after kickoff are skipped for the earlier one; today's date uses "now".
 - `tests/test_hub_preview.py` (1b): the `/preview` mount and its CSP header.
 - `tests/test_matchup_page.py` and `tests/test_web_betlog.py`: unchanged and passing.
 - `tests/test_snapshot.py` (1c): allowlist strips every PFF field, the Greenline switch,
-  snapshot equals the payload functions' output.
+  snapshot equals the payload functions' output, atomic write (a reader during a write
+  sees the old or new file, never a partial one), `generated_at` present.
+- Publish-task guard (1c): refuses a snapshot older than 90 minutes or not newer than the
+  last published one. Plus the manual acceptance test in Phone page.
 
 Fixtures live in `tests/fixtures/hub/`; no bet data or licensed data is committed.
 
