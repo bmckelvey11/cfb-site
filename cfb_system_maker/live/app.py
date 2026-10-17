@@ -30,7 +30,12 @@ SLUG_BATCH = 20
 def create_app(fetch_fn: pm.Fetcher | None = None,
                clock=lambda: datetime.now(timezone.utc),
                cache_seconds: float = CACHE_SECONDS,
-               list_seconds: float = LIST_SECONDS) -> Flask:
+               list_seconds: float = LIST_SECONDS,
+               fbs: frozenset[str] | None = None) -> Flask:
+    if fbs is None:
+        from cfb_paths import RAW, current_season
+        fbs = board_mod.load_fbs(RAW, current_season())
+        log.info("FBS filter: %d schools", len(fbs))
     app = Flask(__name__)
     fetch = fetch_fn or pm._fetch
     lock = threading.Lock()
@@ -67,8 +72,8 @@ def create_app(fetch_fn: pm.Fetcher | None = None,
             log.warning("polymarket pull failed: %s", exc)
             return jsonify(error="polymarket_unavailable",
                            message="Couldn't reach Polymarket. Retrying shortly."), 503
-        out = board_mod.board(evs, clock())
-        return jsonify(pulled_at=pulled.isoformat().replace("+00:00", "Z"), **out)
+        out = board_mod.board(evs, clock(), fbs=fbs)
+        return jsonify(pulled_at=pulled.isoformat().replace("+00:00", "Z"), fbs_available=bool(fbs), **out)
 
     return app
 

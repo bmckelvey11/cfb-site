@@ -99,3 +99,7 @@ next 3 hours. Code: `cfb_system_maker/live/` (`board.py` holds the rules), tests
   `outcomePrices` is stale (one live O/U 35.5 showed 0.5275 against a 0.055/1.0 book), so the
   page shows the bid/ask midpoint, never `outcomePrices`. With no rung passing, the card shows
   a dash: blowouts often have no live spread at all.
+- **FBS only** (on by default, remembered per browser) keeps games with at least one FBS
+  team, so Clemson vs Charleston Southern stays and Idaho vs Montana goes. The FBS list is
+  CFBD's `raw/fbs_teams_{season}.json` (last season's if this season's is not scraped yet),
+  matched through `polymarket_schema.school_key`. With neither file, the toggle is hidden.

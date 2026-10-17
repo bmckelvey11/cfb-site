@@ -29,7 +29,10 @@ import json
 from datetime import datetime, timedelta
 from typing import Any
 
+from pathlib import Path
+
 from cfb_system_maker.polymarket_client import parse_time
+from cfb_system_maker.polymarket_schema import school_key
 
 MAX_SPREAD = 0.10      # wider than 10 cents and `outcomePrices` no longer matches the book
 MIN_LIQUIDITY = 100.0  # placeholder rungs carry $5
@@ -61,7 +64,22 @@ def in_play(event: dict, now: datetime) -> bool:
             and state(event, now) in ("live", "starting"))
 
 
-def board(events: list[dict], now: datetime, soon: timedelta = SOON) -> dict[str, list[dict]]:
+def load_fbs(raw_dir: Path, season: int) -> frozenset[str]:
+    """`school_key`s of this season's FBS teams from CFBD's `fbs_teams_{season}.json`.
+
+    Falls back to last season's file before this season's is scraped; empty when neither
+    exists, and the page then hides its FBS filter.
+    """
+    for year in (season, season - 1):
+        path = Path(raw_dir) / f"fbs_teams_{year}.json"
+        if path.exists():
+            rows = json.loads(path.read_text(encoding="utf-8"))
+            return frozenset(school_key(r["school"]) for r in rows if r.get("school"))
+    return frozenset()
+
+
+def board(events: list[dict], now: datetime, soon: timedelta = SOON,
+          fbs: frozenset[str] = frozenset()) -> dict[str, list[dict]]:
     """Live games, then games kicking off within `soon`. Exact-margin companions are skipped."""
     live, upcoming = [], []
     for event in events:
@@ -69,15 +87,15 @@ def board(events: list[dict], now: datetime, soon: timedelta = SOON) -> dict[str
             continue
         kind = state(event, now)
         if kind in ("live", "starting"):
-            live.append(game(event, kind))
+            live.append(game(event, kind, fbs))
         elif kind == "upcoming" and parse_time(event["startTime"]) <= now + soon:
-            upcoming.append(game(event, kind))
+            upcoming.append(game(event, kind, fbs))
     live.sort(key=lambda g: (g["kickoff"] or "", g["title"]))
     upcoming.sort(key=lambda g: (g["kickoff"] or "", g["title"]))
     return {"live": live, "upcoming": upcoming}
 
 
-def game(event: dict, kind: str) -> dict:
+def game(event: dict, kind: str, fbs: frozenset[str] = frozenset()) -> dict:
     away, home = teams(event)
     away_score, home_score = score(event.get("score"))
     markets = event.get("markets") or []
@@ -90,6 +108,8 @@ def game(event: dict, kind: str) -> dict:
         "kickoff": event.get("startTime"),
         "updated_at": event.get("updatedAt"),
         "away": away, "home": home,
+        "away_fbs": bool(away) and school_key(away) in fbs,
+        "home_fbs": bool(home) and school_key(home) in fbs,
         "away_score": away_score, "home_score": home_score,
         "period": event.get("period") or None,
         "clock": event.get("elapsed") or None,

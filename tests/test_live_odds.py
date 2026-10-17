@@ -6,6 +6,7 @@ Event and market fields are copied from a live pull of cfb-chsou-clmsn-2026-10-1
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -112,7 +113,7 @@ def fake_gamma(calls, fresh=None):
 def test_api_serves_the_board_and_caches_polymarket():
     calls = []
     client = create_app(fetch_fn=fake_gamma(calls, fresh=[LIVE]), clock=lambda: NOW,
-                        cache_seconds=60).test_client()
+                        cache_seconds=60, fbs=frozenset()).test_client()
     first = client.get("/api/live").get_json()
     client.get("/api/live")
     assert first["pulled_at"] == "2026-10-17T18:45:00Z"
@@ -124,12 +125,12 @@ def test_api_serves_the_board_and_caches_polymarket():
 def test_api_reports_a_failed_pull_as_json():
     def broken(url, params):
         raise RuntimeError("HTTP 403")
-    res = create_app(fetch_fn=broken, clock=lambda: NOW).test_client().get("/api/live")
+    res = create_app(fetch_fn=broken, clock=lambda: NOW, fbs=frozenset()).test_client().get("/api/live")
     assert res.status_code == 503 and res.get_json()["error"] == "polymarket_unavailable"
 
 
 def test_page_renders():
-    res = create_app(fetch_fn=fake_gamma([]), clock=lambda: NOW).test_client().get("/")
+    res = create_app(fetch_fn=fake_gamma([]), clock=lambda: NOW, fbs=frozenset()).test_client().get("/")
     assert res.status_code == 200 and b"Live odds" in res.data
 
 
@@ -171,14 +172,14 @@ def test_in_play_games_are_reread_through_the_fresher_slug_endpoint():
             return [current]
         return {"events": [behind, UPCOMING]}
 
-    out = create_app(fetch_fn=fetch, clock=lambda: NOW).test_client().get("/api/live").get_json()
+    out = create_app(fetch_fn=fetch, clock=lambda: NOW, fbs=frozenset()).test_client().get("/api/live").get_json()
     assert out["live"][0]["clock"] == "6:42" and out["live"][0]["updated_at"] == "2026-10-17T19:01:00Z"
     slug_calls = [p for u, p in calls if u.endswith("/events")]
     assert slug_calls == [{"slug": ["cfb-chsou-clmsn-2026-10-17"]}]     # upcoming games are not re-read
 
 
 def test_a_failed_slug_refresh_keeps_the_list_copy():
-    out = create_app(fetch_fn=fake_gamma([]), clock=lambda: NOW).test_client().get("/api/live").get_json()
+    out = create_app(fetch_fn=fake_gamma([]), clock=lambda: NOW, fbs=frozenset()).test_client().get("/api/live").get_json()
     assert out["live"][0]["clock"] == "12:09"
 
 
@@ -186,3 +187,18 @@ def test_a_just_kicked_off_game_is_listed_with_the_live_games():
     kicked = dict(UPCOMING, startTime="2026-10-17T18:30:00Z")
     out = b.board([kicked], NOW)
     assert [g["state"] for g in out["live"]] == ["starting"] and out["upcoming"] == []
+
+
+def test_fbs_flags_come_from_cfbd_fbs_teams(tmp_path):
+    (tmp_path / "fbs_teams_2025.json").write_text(json.dumps([{"school": "Clemson"}, {"school": "Miami"}]))
+    fbs = b.load_fbs(tmp_path, 2026)                         # falls back to last season's file
+    g = b.game(LIVE, "live", fbs)
+    assert (g["away_fbs"], g["home_fbs"]) == (False, True)
+    assert b.school_key("Miami (FL)") in fbs                  # Polymarket spelling via ALIASES
+
+
+def test_no_fbs_file_hides_the_filter(tmp_path):
+    assert b.load_fbs(tmp_path, 2026) == frozenset()
+    out = create_app(fetch_fn=fake_gamma([], fresh=[LIVE]), clock=lambda: NOW, fbs=frozenset()) \
+        .test_client().get("/api/live").get_json()
+    assert out["fbs_available"] is False

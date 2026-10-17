@@ -48,7 +48,10 @@
   function render() {
     if (!data) return;
     const term = $("q").value.trim().toLowerCase();
-    const keep = (g) => !term || `${g.away} ${g.home}`.toLowerCase().includes(term);
+    $("fbs-wrap").hidden = !data.fbs_available;
+    const fbsOnly = data.fbs_available && $("fbs").checked;   // at least one FBS team
+    const keep = (g) => (!term || `${g.away} ${g.home}`.toLowerCase().includes(term))
+      && (!fbsOnly || g.away_fbs || g.home_fbs);
     for (const [id, empty] of [["live", "No games in progress."], ["upcoming", "Nothing kicks off in the next 3 hours."]]) {
       const games = data[id].filter(keep);
       $(id).innerHTML = games.length ? games.map(card).join("") : `<p class="empty">${empty}</p>`;
@@ -70,6 +73,11 @@
     }
   }
 
+  try { $("fbs").checked = localStorage.getItem("live-fbs") !== "0"; } catch (e) { /* storage blocked */ }
+  $("fbs").addEventListener("change", () => {
+    try { localStorage.setItem("live-fbs", $("fbs").checked ? "1" : "0"); } catch (e) { /* storage blocked */ }
+    last.clear(); render();
+  });
   $("q").addEventListener("input", () => { last.clear(); render(); });
   poll();
   setInterval(poll, POLL_MS);
