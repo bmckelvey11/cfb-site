@@ -165,7 +165,7 @@ converted to `$`; equations have not been brought to the where-table standard.
 
 | Doc | What it is |
 | --- | --- |
-| [design-system.md](design-system.md) | Saturday Signal design system |
+| [design-system.md](design-system.md) | UI design system (Minimalist Modern): tokens, type, components, and what the app leaves out |
 | [bet-labs-parity-plan.md](bet-labs-parity-plan.md) | Bet Labs parity plan |
 | [betting-system-builder-implementation-plan.md](betting-system-builder-implementation-plan.md) | System builder implementation plan |
 | [model-tuning-lab-plan.md](model-tuning-lab-plan.md) | Model Tuning Lab plan of record (Revision 2.0), including the parallel Release C split |

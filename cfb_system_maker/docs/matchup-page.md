@@ -24,7 +24,7 @@ uses `autoPort`, so it starts on a free port when a terminal copy already holds 
 | `matchup/queries.py` | One function per section; the per-request warehouse connection |
 | `matchup/stats.py` | The stat registry: table, column, direction, format, eligibility verdict |
 | `matchup/odds.py` | The newest Odds API snapshot, read straight from `data/ingest/oddsapi/` |
-| `matchup/static/`, `templates/` | Vanilla JS and CSS on the unit's Saturday Signal tokens |
+| `matchup/static/`, `templates/` | Vanilla JS and CSS on the unit's design tokens (docs/design-system.md) |
 
 ## How it reads data
 

@@ -1,4 +1,4 @@
-/* Saturday Signal — Spacing, Radius, Shadow & Layout Tokens */
+/* Minimalist Modern — Spacing, Radius, Shadow & Layout Tokens */
 
 :root {
   /* ── Space Scale (base unit: 4px) ── */
@@ -18,26 +18,30 @@
   --space-32: 8rem;      /* 128px */
 
   /* ── Border Radius ── */
-  /* Editorial aesthetic: minimal, near-square. Nothing bubbly. */
+  /* Soft, confident corners: 8px controls, 12px cards and panels. */
   --radius-none: 0;
-  --radius-xs:   1px;
-  --radius-sm:   2px;    /* buttons, inputs */
-  --radius-md:   4px;    /* small cards, dropdowns */
-  --radius-lg:   8px;    /* cards, panels */
-  --radius-xl:   12px;   /* modals, large containers */
-  --radius-2xl:  16px;   /* sheets */
+  --radius-xs:   4px;    /* inline code, tiny tags */
+  --radius-sm:   8px;    /* buttons, inputs, controls, pills */
+  --radius-md:   10px;   /* small cards, brand mark */
+  --radius-lg:   12px;   /* cards, panels, table wrappers */
+  --radius-xl:   16px;   /* modals, the stats band */
+  --radius-2xl:  20px;   /* sheets */
   --radius-full: 9999px; /* pills, avatars, chips */
 
-  /* ── Box Shadows (warm-tinted) ── */
-  --shadow-xs:  0 1px 2px rgba(28, 21, 16, 0.06);
-  --shadow-sm:  0 1px 3px rgba(28, 21, 16, 0.08), 0 1px 2px rgba(28, 21, 16, 0.05);
-  --shadow-md:  0 4px 12px rgba(28, 21, 16, 0.09), 0 2px 4px rgba(28, 21, 16, 0.05);
-  --shadow-lg:  0 8px 24px rgba(28, 21, 16, 0.11), 0 4px 8px rgba(28, 21, 16, 0.06);
-  --shadow-xl:  0 16px 40px rgba(28, 21, 16, 0.13), 0 8px 16px rgba(28, 21, 16, 0.07);
-  --shadow-2xl: 0 32px 64px rgba(28, 21, 16, 0.16), 0 16px 24px rgba(28, 21, 16, 0.08);
+  /* ── Box Shadows (slate-tinted, layered) ── */
+  --shadow-xs:  0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm:  0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md:  0 4px 6px rgba(15, 23, 42, 0.07), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-lg:  0 10px 15px rgba(15, 23, 42, 0.08), 0 4px 6px rgba(15, 23, 42, 0.04);
+  --shadow-xl:  0 20px 25px rgba(15, 23, 42, 0.10), 0 8px 10px rgba(15, 23, 42, 0.04);
+  --shadow-2xl: 0 32px 64px rgba(15, 23, 42, 0.16), 0 16px 24px rgba(15, 23, 42, 0.08);
 
-  /* Focus ring — used on interactive elements */
-  --shadow-focus: 0 0 0 3px var(--color-focus-ring, rgba(201, 75, 46, 0.30));
+  /* Accent-tinted lift — primary buttons on hover, featured elements */
+  --shadow-accent:    0 4px 14px rgba(0, 82, 255, 0.25);
+  --shadow-accent-lg: 0 8px 24px rgba(0, 82, 255, 0.35);
+
+  /* Focus ring — 2px canvas gap, then 2px accent (ring-2 ring-offset-2) */
+  --shadow-focus: 0 0 0 2px var(--canvas, #FAFAFA), 0 0 0 4px var(--color-focus-ring, #0052FF);
 
   /* ── Z-Index Scale ── */
   --z-base:     0;     /* @kind other */
@@ -66,4 +70,6 @@
   --transition-normal: 200ms ease-out;   /* @kind other */
   --transition-slow:   300ms ease-out;   /* @kind other */
   --transition-modal:  300ms ease-in-out; /* @kind other */
+  --ease-out-expo:     cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+  --transition-lift:   200ms var(--ease-out-expo);   /* @kind other */
 }

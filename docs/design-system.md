@@ -1,293 +1,139 @@
-# Design system: Saturday Signal
+# Design system: Minimalist Modern
 
-Repo-wide visual rules for the Flask UI. Tokens ship at `cfb_system_maker/static/tokens/{colors,typography,spacing}.css`; the stylesheet that
-consumes them is `cfb_system_maker/static/styles.css`. Change a value here, change it
-in the token files — `styles.css` defines no raw hex of its own except `#fff`.
+Repo-wide visual rules for the Flask UI (`cfb_system_maker/`) and the matchup page, which
+serves the same token files. Tokens ship at
+`cfb_system_maker/static/tokens/{colors,typography,spacing}.css`; the stylesheet that
+consumes them is `cfb_system_maker/static/styles.css`. Change a value here, change it in
+the token files. `styles.css` takes every color, font, radius and shadow through
+`var(--*)` and holds no raw hex.
 
-Originally delivered as a design handoff; the sections below are that document,
-with paths updated to where the files actually live.
+Adopted 2026-10-17, replacing Saturday Signal (slate blue, Instrument Sans, near-square
+corners). The old version of this file is in git history at the commit before that date.
 
-## Overview
+## What the system is, and what this app takes from it
 
-CFB System Maker is a college-football backtesting workbench: the user composes a betting "system" out of filters (bet type, side, line range, conference, situational features), runs it against historical game and line data, and reads the result as a record, ROI, significance statistics and a profit curve. Systems can be saved, compared against each other on a holdout season, and tracked forward against this week's posted lines.
+Minimalist Modern is "clarity through structure, character through bold detail": a
+near-monochrome slate palette, one Electric Blue accent used as a gradient, a
+serif/sans/mono type pairing, soft layered shadows, and gentle motion.
 
-The existing app is a Flask + Jinja2 application (`cfb_system_maker/`) with server-rendered templates and a single hand-written stylesheet. **This handoff covers a visual restyle only.** Every screen, route, control and data field is unchanged from the current app — what changes is typography, color, spacing, radius, table density and control styling, all now sourced from the Saturday Signal design system.
+The source spec was written for a marketing landing page (React, Tailwind, Framer Motion,
+hero graphic, pricing, testimonials). This app is a data tool with server-rendered Jinja
+templates and one hand-written stylesheet, so it adopts the parts that help people read
+numbers and leaves out the rest:
 
-## About the Design Files
+| Taken | Left out, and why |
+|---|---|
+| Electric Blue gradient on primary buttons, brand mark, active timeframe pill | Hero graphic, rotating rings, floating cards: they compete with charts |
+| Off-white canvas, white cards, layered slate shadows | Gradient text in headlines: hurts scanning of page titles |
+| Calistoga titles, Inter UI, JetBrains Mono labels and stat values | Asymmetric layouts: the editor's two-column shell already works |
+| Section-label pills with an accent dot | Tailwind / cva / Framer Motion: the app has no build step; plain CSS does the same |
+| One inverted dark band for the headline backtest numbers | Section padding of 7–11rem: far too sparse for a workbench |
+| Hover lifts, staggered fade-up on load, pulsing dot on live picks | |
 
-The handoff shipped one stylesheet plus six HTML prototypes. The stylesheet is now
-`cfb_system_maker/static/styles.css`; the prototypes are references only and are not
-checked in.
+## Tokens
 
-The handoff claimed the stylesheet "deliberately preserves every class name from the
-original," so the Jinja templates would need no markup changes. **That claim is not
-quite true.** Diffing the old stylesheet's selectors against the new one, filtered to
-classes the templates and JS actually emit, turned up rules the restyle dropped:
+Token **names** are unchanged from Saturday Signal (`--signal-*`, `--ink-*`, `--space-*`,
+`--radius-*`, `--shadow-*`), so no rule in `styles.css` had to be renamed; only values moved.
 
-- the whole filter modal (`.filter-modal__*`) and the feature-group collapse/search
-  states — the handoff admits this one under Known issues #4;
-- the progressive-enhancement toggles `.js .filter-fallback` and `.filter-search`,
-  without which every filter renders its no-JS fallback select *and* its launcher
-  button side by side;
-- the row rename/delete popover (`.row-menu__pop`), `.error-page`, `.cm-*` current-match
-  lines, `.load-system-select`, `.trend-cell`.
-
-All of those are carried forward verbatim at the end of `styles.css` under a marked
-block. They pick up the new palette through the `--accent` / `--border` / `--panel`
-aliases at the top of the file, but keep the old 6px radii — restyling them onto the
-tokens is the outstanding follow-up.
-
-Rules that *were* legitimately retired: the per-chart blocks (`.cumulative-chart`,
-`.range-chart`, `.betlog-chart`), superseded by `.chart-card`, which the templates
-already carry alongside them; and `.compare-page.app-shell`, since compare moved to
-`.dash-shell`.
-
-If you re-run this exercise after another design pass, the check is: every class in
-(old selectors − new selectors) that still appears in `templates/*.html` or
-`static/*.js` is markup with no rule behind it.
-
-## Fidelity
-
-**High-fidelity.** Colors, typography, spacing, radii and states are final and specified exactly. Recreate pixel-perfectly.
-
-Two caveats on the content, not the styling:
-
-- All numbers, team names, system names and dates in the HTML files are **realistic placeholders**, not real backtest output. Do not treat any figure as a target value.
-- The screens render one representative state each. Empty states, error banners, the `missing_data` state and the filter modal are styled in `cfb.css` but not shown in the HTML files. Their class names are documented below.
-
-## Design tokens
-
-Tokens live in `static/tokens/{colors,typography,spacing}.css`; `static/styles.css` imports all three at the top and is the only file the templates link. The restyled rules consume tokens exclusively through `var(--*)` and define no raw hex of their own except `#fff` — the carried-forward block at the end of the file is the exception and still has literals in it.
-
-### Color
-
-The palette is cool slate throughout. There is no warm neutral anywhere in the system.
-
-**Signal (brand accent)**
+### Color (`colors.css`)
 
 | Token | Value | Use |
 |---|---|---|
-| `--signal-50` | `#EEF2F8` | — (see Known issues) |
-| `--signal-100` | `#DDE5F1` | Selected filter chip / checked control background |
-| `--signal-200` | `#BAC9E3` | |
-| `--signal-300` | `#8AAACE` | |
-| `--signal-400` | `#567298` | |
-| `--signal-500` | `#2E4A6B` | **Brand primary** — buttons, active tab, focus ring, links |
-| `--signal-600` | `#233856` | Button hover |
-| `--signal-700` | `#192840` | Text on `--signal-100` backgrounds |
-| `--signal-800` | `#0F1C2E` | |
-| `--signal-900` | `#070D18` | |
+| `--signal-500` | `#0052FF` | **Accent** — links, active tab, focus ring, checked controls |
+| `--signal-400` | `#4D7CFF` | Gradient endpoint (the spec's `accent-secondary`) |
+| `--signal-50` / `--signal-700` | `#EEF4FF` / `#0035A6` | Selected control fill / its text |
+| `--gradient-accent` | `--signal-500 → --signal-400`, left to right | Primary buttons, active timeframe pill, label dots |
+| `--gradient-accent-diag` | same, 135° | Brand mark |
+| `--canvas` | `#FAFAFA` | Page background (`--bg`) |
+| `--ink-0` | `#FFFFFF` | Cards, panels, tables |
+| `--ink-50` … `--ink-900` | Tailwind slate 50–900 | Neutrals; `--ink-900` `#0F172A` is text and the dark band |
+| `--ink-200` | `#E2E8F0` | Default border |
+| `--success-500` / `--error-500` | `#2A7A4E` / `#C23030` | Profit / loss on light surfaces (unchanged) |
+| `--success-on-dark` / `--error-on-dark` | `#4ADE80` / `#F87171` | Profit / loss inside the dark band |
 
-**Ink (neutrals)**
+Green and red stay the data colors for profit and loss everywhere, including charts. The
+blue accent is for interaction and emphasis, never for a result.
 
-| Token | Value | Use |
-|---|---|---|
-| `--ink-0` | `#FFFFFF` | Panel / card / table surface |
-| `--ink-50` | `#EEF2F8` | Page background, table row hover, range-filter fill |
-| `--ink-100` | `#E2E6EE` | Table row divider, hairline borders |
-| `--ink-200` | `#CDD2DC` | Default border (1px), control border (1.5px) |
-| `--ink-300` | `#A8ADB9` | Emphasized border, chart zero line, disabled text |
-| `--ink-400` | `#7E8494` | Micro-labels, overlines, placeholder, footer text |
-| `--ink-500` | `#5C6272` | Secondary copy, fieldset legends |
-| `--ink-600` | `#424854` | Verdict copy, match-row detail |
-| `--ink-700` | `#2C3038` | Theory / long-form body copy |
-| `--ink-800` | `#1B1E24` | **Table header background** |
-| `--ink-900` | `#111318` | Primary text |
+### Type (`typography.css`)
 
-**Semantic**
+Three Google Fonts faces: **Calistoga** (`--font-display`, one weight, 400), **Inter**
+(`--font-body`, 400–700), **JetBrains Mono** (`--font-mono`, 400/500).
 
-| Token | Value | Use |
-|---|---|---|
-| `--success-500` | `#2A7A4E` | Positive ROI, profit, winning chart segment |
-| `--success-50` / `--success-700` | `#F0FAF5` / `#1A5234` | `win` pill background / text |
-| `--error-500` | `#C23030` | Negative ROI, loss, losing chart segment |
-| `--error-50` / `--error-700` | `#FEF3F1` / `#8A1F1F` | `loss` pill background / text |
-| `--warning-500` / `--warning-50` / `--warning-700` | `#B87314` / `#FDFBF0` / `#7A4D0D` | Lookahead warning, stale-registry banner |
-| `--info-50` / `--info-700` | `#EEF3FC` / `#133470` | `Search` badge |
+1. Calistoga is for page titles only: `h1` (20px, sidebar brand and dashboard titles) and
+   `h2` (24px, workspace heading, `--type-title-md`). Never set it bold; the browser would
+   fake a weight it does not have.
+2. Mono is for stat values, chart axes and section labels (`--type-section-label`: 11px,
+   uppercase, 0.15em tracking). It is **not** used in table cells.
+3. Tables and body copy are Inter with `font-variant-numeric: tabular-nums` (set on
+   `body`), which keeps numeric columns aligned without a monospace face.
+4. CTA labels are sentence case: "Run system", "Save filter", "New system".
 
-### Typography
+### Radius, shadow, motion (`spacing.css`)
 
-Three faces, loaded from Google Fonts in `tokens/typography.css`:
+- Radius: `--radius-sm` **8px** controls, buttons, pills; `--radius-lg` **12px** cards,
+  panels, table wrappers; `--radius-xl` **16px** the filter modal and the stats band;
+  `--radius-full` label pills and timeframe pills.
+- Shadows are slate-tinted (`rgba(15, 23, 42, …)`), `--shadow-sm` on panels, `--shadow-md`
+  on hover and the dashboard side panel, `--shadow-xl` on the stats band and popovers.
+  `--shadow-accent` / `--shadow-accent-lg` are the blue glow under a hovered primary button.
+- Focus: `--shadow-focus` is a 2px canvas gap plus a 2px `--signal-500` ring on inputs;
+  other controls use a 2px `--signal-500` outline with offset. Never remove it.
+- Motion: `--transition-lift` (200ms, `--ease-out-expo` = `cubic-bezier(0.16, 1, 0.3, 1)`)
+  for hover lifts. All animation and transition is switched off under
+  `prefers-reduced-motion: reduce` by the last rule in `styles.css`.
 
-```
-Instrument Serif   --font-display   400 + italic
-Instrument Sans    --font-body      400 / 500 / 600 / 700 + italic 400
-JetBrains Mono     --font-mono      400 / 500
-```
+## Components
 
-**Three rules that are easy to get wrong:**
+- **Primary button** (bare `button`): gradient fill, white 14px/500 label, 40px tall,
+  8px radius. Hover lifts 1px, brightens, and takes `--shadow-accent`; active scales to
+  0.98. Secondary buttons (`.edit-filter`, modal toggles, `#theory-suggest`, …) override the
+  fill and are listed in one `:is(...)` rule that drops the glow but keeps the lift.
+- **Secondary CTA** (`.dash-cta`): white, 1px border, slate text; hover fills
+  `--ink-100` and tints the border blue.
+- **Controls** (`input`, `select`, `.segmented label`, `.check`, `.filter-launcher`):
+  40px tall, 1px `--ink-200` border. Checked or set: `--signal-500` border,
+  `--signal-50` fill, `--signal-700` text.
+- **Section label**: panel headings (`.theory-panel h3`, `.chart-card h3`,
+  `.season-breakdown h3`, `.coverage h3`, `.picks-heading h3`,
+  `.system-summary-heading h3`, `.cm-heading`, or any `.section-label`) render as a mono
+  pill with a 30%-blue border, 5%-blue fill and a gradient dot. On
+  `.picks-panel.is-live` (this week has picks) the dot pulses.
+- **Stats band** (`.metrics.stat-band`, the six headline chips on the editor): `--ink-900`
+  background with a corner blue glow and a 32px dot grid at 4% opacity. Inside it,
+  `--text`, `--border`, `--success-500` and `--error-500` are re-pointed to their on-dark
+  values, so the graded colors and `.positive` / `.negative` need no rules of their own.
+  This is the only inverted surface in the app; keep it that way so it stays the focus.
+- **Metric cards** (`.metrics article` outside the band): white, 12px radius,
+  `--shadow-xs`, lift 2px on hover.
+- **Tables**: light sticky header (`--ink-50`, `--ink-500` 10px uppercase text, 1px
+  bottom rule), 12px Inter cells, `white-space: nowrap` except `.systems-table` and
+  `.finalist-table`. Win/loss/push pills keep the semantic success/error/ink fills.
+- **One gradient button per area.** In the sidebar that is Run; the two save buttons
+  (`.form-actions button[formaction]`) use the secondary white treatment.
+- **Entrance**: children of `.workspace` and `.dash-main` fade up 16px over 0.7s,
+  staggered 50ms. The sticky "Current system" panel fades only, since a transform would
+  break its sticky positioning mid-animation.
 
-1. **Instrument Serif is reserved for 48px and up.** Heroes, covers, marketing. It appears **nowhere** in this product — every screen here tops out at a 24px heading. If you find yourself setting the serif in an app screen, that is a bug.
-2. **JetBrains Mono is for stat values only** — the big numbers in metric chips, and the chart axis labels. It is **not** used in tables. (This changed late; earlier drafts had mono throughout the tables.)
-3. **Tables run in Instrument Sans with `font-variant-numeric: tabular-nums`**, which is also set on `body`. That is what keeps numeric columns aligned without a monospace face.
+## Layout
 
-Applied sizes:
+Unchanged: `.app-shell` (320px sticky sidebar + workspace) for the editor, `.dash-shell`
+(centered, max 1440px) for My Systems, Compare, Bet Log and Search Run. Below 900px the
+sidebar collapses behind a "Show filters" button and metric grids go to two columns.
 
-| Element | Font | Size | Weight | Tracking | Line-height |
-|---|---|---|---|---|---|
-| `h1` (sidebar brand, page title) | Sans | 20px | 600 | −0.02em | 1.5 |
-| `h2` (workspace heading) | Sans | 24px | 600 | −0.02em | 1.25 |
-| `h3` / panel headings | Sans | 9px | 600 | 0.14em, uppercase | 1.5 |
-| Body / default | Sans | 14px | 400 | 0 | 1.5 |
-| Table header `th` | Sans | 9px | 600 | 0.08em, uppercase | — |
-| Table cell `td` | Sans | 12px | 400 | 0 | — |
-| Metric chip label | Sans | 9px | 600 | 0.14em, uppercase | — |
-| Metric chip value | **Mono** | 18px | 500 | −0.04em | 1.15 |
-| Quality-stat value | **Mono** | 14px | 500 | −0.04em | 1.15 |
-| Fieldset legend | Sans | 10px | 600 | 0.14em, uppercase | — |
-| Control / input / button | Sans | 12px | 400–500 | 0 | — |
-| Result pill | Sans | 10px | 600 | 0.04em, uppercase | — |
-| Chart axis | **Mono** | 10px | 400 | — | — |
-| Footer disclaimer | Sans | 10px | 400 | 0 | 1.65 |
+## Pages that copy the tokens instead of linking them
 
-### Spacing
-
-4px base. `--space-1` 4 · `--space-2` 8 · `--space-3` 12 · `--space-4` 16 · `--space-5` 20 · `--space-6` 24 · `--space-8` 32 · `--space-10` 40 · `--space-12` 48 · `--space-16` 64.
-
-### Radius
-
-Deliberately tight — the previous app used 6px everywhere.
-
-`--radius-xs` 1px · `--radius-sm` **2px** (buttons, inputs, controls, pills, active-filter rows) · `--radius-md` **4px** (range-filter card, brand mark) · `--radius-lg` **8px** (metric chips, panels, table wrappers, filter-modal shell) · `--radius-full` 9999px (timeframe pills, range track and thumbs).
-
-`spacing.css` also defines `--radius-xl` 12px and calls it the modal radius. That is the generic design-system default; this product tops out at `lg`, and 12px reads bubbly against 2px controls, so the filter modal uses `--radius-lg` like every other panel.
-
-### Shadows & transitions
-
-Only one shadow is used in these screens: `--shadow-focus` (`0 0 0 3px var(--color-focus-ring)`) on focused inputs. Panels rely on 1px borders rather than elevation.
-
-`--transition-fast` 150ms ease-out is used on every interactive state change.
-
-## Screens
-
-The six prototypes all share the stylesheet that is now `static/styles.css`. Each
-section below names the Jinja template the screen maps to. Two shell types:
-
-- **`.app-shell`** — `display: grid; grid-template-columns: 320px minmax(0, 1fr)`. Used by System Editor and Past Matches. Left column is a sticky, independently-scrolling filter panel (`position: sticky; top: 0; max-height: 100dvh; overflow-y: auto; overflow-x: hidden`).
-- **`.dash-shell`** — centered column, `max-width: var(--container-2xl)` (1440px), `padding: 24px 32px`, `gap: 20px`. Used by My Systems, Compare, Bet Log, Search Run.
-
-Both are followed by `.site-footer`, a full-width white bar with the responsible-gambling disclaimer at 10px `--ink-400`.
-
----
-
-### 1. System Editor — `screens/system-editor.html`
-
-Maps to `templates/index.html`, `tab=graph`. Design width 1440px.
-
-**Purpose.** Compose a system in the left panel, read its backtest in the right.
-
-**Left panel (320px).** In order: brand lockup (38px `--signal-500` square with mono "CFB", then `h1` and a season range); Bet Type select; Spread Side segmented pair; Position checkbox pair; a 2-column `.field-grid` of five filter-launcher buttons (Season, Week, Team, Conference, Sportsbook — Sportsbook spans both columns via `.full-width`); the Line Range card; the Feature Filters section; a Theory textarea; the form actions; and the Load System block.
-
-- **`.filter-launcher`** — the app's characteristic control. Full-width, left-aligned, 34px tall, 1.5px `--ink-200` border, 2px radius, white. **Must have `min-width: 0` and `text-overflow: ellipsis`** — the labels carry filter values ("Spread Between −21 and −7") and overflowed the panel before this was added. When a filter is set, the template adds `data-has-filter="1"`, which switches it to `--signal-500` border, `--signal-100` fill, `--signal-700` text, weight 500.
-- **`.segmented label` / `.check`** — flex row, 8px gap, 34px min-height, 1.5px border, 2px radius. Checked state (via `:has(input:checked)`) matches the active launcher: signal border, `--signal-100` fill, `--signal-700` text, weight 500. Accent color on the native input is `--signal-500`.
-- **`.stat-row`** — team-scoped numeric features render the stat name once with two compact 28px "Bet-side" / "Opponent" buttons to its right, each an independent filter.
-- **Run system** button — full-width, 36px, `--signal-500` fill, white 12px/500 sentence-case label. Hover `--signal-600`. **Sentence case, not uppercase** — this differs from the design system's `Button` component, see Known issues.
-
-**Right workspace.** 24px padding, 16px flex-column gap.
-
-1. `.workspace-header` — `h2` "Backtest Results" + bet count, with a "Fade System" checkbox pushed right.
-2. **`.metrics.stat-chips`** — `repeat(auto-fit, minmax(158px, 1fr))`. Six chips: Record, Hit Rate, Margin, Money Won, ROI, Grade. White, 1px `--ink-200`, 8px radius, 12px/16px padding. Label 9px uppercase `--ink-400`; value 18px mono 500 with `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`. Money Won and ROI take `.positive` (`--success-500`) or `.negative` (`--error-500`).
-3. `.theory-panel` — the system's rationale, 14px/1.65 `--ink-700`, capped at `--content-narrow` (640px).
-4. **`.active-filters-panel`** — every applied filter as a plain-English sentence. Each `li` is a 12px row on `--ink-50` with a 1px `--ink-100` border and 2px radius, containing the sentence (`flex: 1`), an "Edit" button (26px, transparent, signal text — inverts to signal fill on hover), and a `×` remove link (26px square, `--ink-400`, goes `--error-500` on `--error-50` on hover).
-5. `.tabs` — Results Graph / Past Matches. 1px bottom border on the nav; the active link takes `--signal-500` text and a 2px `--signal-500` bottom border with `margin-bottom: -1px` so it sits on the rule.
-6. `.metrics.stats-panel` — twelve significance statistics, `minmax(126px, 1fr)`, 14px mono values.
-7. `.stats-verdict` — prose interpretation, 14px/1.65 `--ink-600`.
-8. `.season-breakdown` — a small per-season table inside a padded card.
-9. `.coverage` — bulleted list of feature-filter coverage percentages.
-10. **Two charts.** Both `viewBox="0 0 520 170"`, `preserveAspectRatio="none"`, 170px tall. Each draws the same geometry twice, clipped above and below the zero line, so the curve paints `--success-500` where it is above zero and `--error-500` where it dips below. Areas are the same color at `opacity: 0.10`; strokes are 1.75px with round joins; the zero line is 1px `--ink-300` dashed `3 3`. Point markers render only when there are ≤60 of them. Axis labels are 10px mono `--ink-400`.
-
-### 2. Past Matches — `screens/past-matches.html`
-
-Same shell and sidebar; `tab=matches`. The charts are replaced by a ten-column table: Season, Week, Team, Opponent, Score, Side, Spread, Total, Result, Profit.
-
-**Table styling (applies to every table in the app).**
-
-- Wrapper `.table-wrap`: white, 1px `--ink-200`, 8px radius, `overflow: auto`.
-- `thead th`: `position: sticky; top: 0`, background `--ink-800`, text `--ink-100`, 9px 600 uppercase 0.08em tracking, 8px/10px padding, `white-space: nowrap`.
-- `tbody td`: 12px sans, 8px/10px padding, 1px `--ink-100` top border, `vertical-align: top`, **`white-space: nowrap`** (team names wrapped to two lines before this).
-- `.systems-table` and `.finalist-table` override back to `white-space: normal` because they carry wrapping prose.
-- Row hover: `--ink-50`.
-- **`.pill`** — result marker, 19px min-height, 7px horizontal padding, 2px radius, 10px 600 uppercase. `.win` → `--success-50` / `--success-700`; `.loss` → `--error-50` / `--error-700`; `.push` → `--ink-100` / `--ink-600`.
-- Profit cells take `.positive` / `.negative`.
-
-### 3. My Systems — `screens/my-systems.html`
-
-Maps to `templates/dashboard.html`. `.dash-columns` is `minmax(0, 1fr) 340px`.
-
-- **`.dash-header`** — brand lockup left, `.dash-cta` buttons right. A CTA is a 34px outline button: transparent, 1.5px `--signal-500`, signal text, 12px/500 — inverting to a signal fill on hover.
-- Two tab rows: standard `.tabs` for My Systems / Example Systems, then `.timeframe-tabs` — borderless, 11px mono, fully-rounded pills; the active one is a `--signal-500` fill with white text.
-- **`.systems-table`** — System, Type, Record, Money Won, ROI, Trend, actions. The System cell holds a 14px/500 link plus an 11px `--ink-500` theory line capped at 46ch; search-derived systems add a `.badge-search` chip (9px uppercase, `--info-50` / `--info-700`) and a mono candidates-tested line.
-- **`.sparkline`** — 96×24 SVG polyline, no fill, 1.5px stroke, `--success-500` when up and `--error-500` when down; an em-dash in `--ink-300` when empty.
-- **`.dash-side`** (340px, sticky at 16px) — "Current Matches". Each `.match-row` is a card on `--ink-50` with a **2px `--signal-500` left border**, containing a mono kickoff/type row, the play at 14px/500, the matchup, the source system link, and `.cm-tag` chips for the match reasons.
-
-### 4. Compare — `screens/compare.html`
-
-Maps to `templates/compare.html`. `.compare-picker` is a card holding an `auto-fill minmax(200px, 1fr)` grid of system checkboxes, a multi-select for holdout seasons, and a Compare button.
-
-`.compare-table` is transposed — metrics down the left, one column per system. **The first column is `position: sticky; left: 0`** with a white background, `--ink-500` text and weight 500, so metric names stay visible while comparing many systems. The sticky header cell keeps the `--ink-800` background.
-
-### 5. Bet Log — `screens/bet-log.html`
-
-Maps to `templates/betlog.html`. Three CLV chips (N, Mean CLV, t-stat), a coverage note, a by-season table, a single-line CLV chart (`viewBox="0 0 520 150"`, one `--success-500` polyline, no clipped bands), and the bet history table.
-
-Rows missing a closing line collapse their last two cells into one `colspan="2"` `.clv-missing` cell in `--ink-400`.
-
-### 6. Search Run — `screens/search-run.html`
-
-Maps to `templates/search_run.html`. A finalist table (index, filters text, holdout record, ROI, raw p, corrected p, BH significance) inside a `.dash-shell` + `.workspace`, followed by `.narration-panel` — a theory-panel card with a "Narrate results" button and the generated narration at 14px/1.65 `--ink-700`.
-
-## Interactions & behavior
-
-Behavior is entirely unchanged; the restyle adds no new interactions. For completeness:
-
-- **Filter launchers** open `<dialog id="filter-modal">`, driven by `static/filter_modal.js`, which reads the `data-candidate-id` / `data-control` / `data-perspective` / `data-description` attributes off the button. `cfb.css` does not restyle the modal internals — see Known issues.
-- **Every filter control submits `#filters-form` by GET**; system state lives entirely in the query string. The Fade System checkbox sits in the workspace but binds back via `form="filters-form"`.
-- **Sorting, pagination and tab switching are all server round-trips.** No client-side table state.
-- **Hover:** buttons darken to `--signal-600`; unselected controls take an `--ink-300` border; table rows take an `--ink-50` background; CTAs invert to a signal fill. All at 150ms ease-out.
-- **Focus:** inputs take a `--signal-500` border plus the 3px `--color-focus-ring` glow. Do not remove the focus ring — several controls have no other affordance.
-- **Reduced motion:** not currently handled. Only 150ms color transitions exist, so this is low-risk, but wrapping them in a `prefers-reduced-motion` guard would be correct.
-
-## Template changes required
-
-The handoff listed four. All four are now closed — kept here with their outcomes so the
-next reader does not redo them:
-
-1. ~~Split the Record chip.~~ **Done** in `templates/index.html` — Record (`W-L-P`) and Hit Rate (`NN.N%`) are separate chips, six in the row. `dashboard.html` needed no change: its Record is a table column, not a chip, and `2155-2009-47, 51.7%` fits the column fine.
-2. ~~CTA casing.~~ **Done** — Run system, Save system, Save filter, Clear filter, New system. Screen names stay Title Case where they are the name of a screen rather than an action: My Systems, Bet Log, System Editor, Copy to My Systems.
-3. ~~Add `.system-cell` / `.actions-cell` classes.~~ **Already present** — `dashboard.html` carries both (plus `.actions-cell--copy` on the examples tab), and every cell in the row computes to `white-space: normal`. The finalist table needs no per-cell class: `.finalist-table tbody td` covers all of it.
-4. ~~Delete `static/styles.css` and replace it with `screens/cfb.css` renamed.~~ **Done** — the `url_for('static', filename='styles.css')` links are unchanged; the old stylesheet is recoverable at commit `2115c21`.
-
-## Assets
-
-- **Brand mark** — the app's own 38px rounded square with mono "CFB" text. No image asset; pure CSS.
-- **Saturday Signal mark** — `assets/logo-mark.svg` in the design system (a dot with three radiating arcs, `currentColor`, any size). Not used in these screens, but available if the product picks up Saturday Signal branding.
-- **Fonts** — Instrument Serif, Instrument Sans and JetBrains Mono via the Google Fonts `@import` in `tokens/typography.css`. Self-host the WOFF2 files for production.
-- **Icons** — none in these screens. The design system nominates Lucide (2px stroke, round caps, no fill) if icons are added.
-- No photography, no illustration, no emoji.
-
-## Known issues to be aware of
-
-These were real defects in the source design system, not things to reproduce faithfully.
-Numbers 1-3 still stand; 4 is closed:
-
-1. **`--signal-50` and `--ink-50` are the same value** (`#EEF2F8`). Anything tinted with the accent-light token is invisible against the page background, which is why selected controls in `cfb.css` use `--signal-100` instead. If you fix the token, `--signal-100` usages can move back down a step.
-2. **The shadow stack is still warm-tinted** — `--shadow-xs` through `--shadow-2xl` use `rgba(28, 21, 16, …)`, a brown left over from an earlier palette. They are barely used in these screens, but they are wrong against slate. `rgba(17, 19, 24, …)` is the correct tint.
-3. **The design system's `Button` component force-uppercases every label**, which contradicts the sentence-case CTA rule in its own writing guidelines. `cfb.css` follows the guidelines, not the component. If you adopt the shared component library, expect this conflict.
-4. ~~The filter modal is unstyled by this pass.~~ **Done** — the modal is on the tokens now: chips inherit the `.metrics` treatment (18px mono over a 9px uppercase label) instead of overriding it, the value table takes the app's `--ink-800` sticky header, the seven secondary buttons collapse into one rule whose pressed state is the `--signal-100` fill used by `.segmented` / `.check`, and the shell is `--radius-lg`. The block carries no raw hex. `filter_modal.js` still builds the controls, so its hooks — inline `left`/`width` on the dual-range fill, inline opacity on the chips, and the `.is-active` / `.is-selected` / `.positive` / `.negative` classes — are preserved deliberately.
+`scripts/weekly_rankings_page.html` and `models/middle/middle_calculator.html` inline
+their own copy of the old Saturday Signal values. They are standalone outputs and were not
+moved; if they should match the app, copy the new token values in.
 
 ## Files
 
 ```
 docs/design-system.md                      ← this file (the rules)
 cfb_system_maker/static/
-├── styles.css                             ← the restyle; imports the three token files
+├── styles.css                             ← consumes the tokens; signature elements at the end
 └── tokens/
-    ├── colors.css                         signal + ink palettes, semantic aliases
+    ├── colors.css                         signal + ink palettes, gradient, semantic aliases
     ├── typography.css                     font imports, type scale, semantic type styles
-    └── spacing.css                        space scale, radius, shadows, z-index, widths
+    └── spacing.css                        space, radius, shadows, z-index, widths, motion
 ```
-
-The six reference screens (`system-editor.html`, `past-matches.html`, `my-systems.html`,
-`compare.html`, `bet-log.html`, `search-run.html`) are prototypes, not templates, and are
-deliberately not checked in. They live in the original handoff folder if you need to
-compare pixels.

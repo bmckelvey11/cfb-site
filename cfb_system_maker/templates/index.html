@@ -487,7 +487,7 @@
           <p class="save-error">Some filter values in the URL couldn't be read and were ignored. Check the active filters below.</p>
           {% endif %}
 
-          <section class="metrics stat-chips" aria-label="Backtest metrics">
+          <section class="metrics stat-chips stat-band" aria-label="Backtest metrics">
             <article><span>Record</span><strong>{{ result.wins }}-{{ result.losses }}-{{ result.pushes }}</strong></article>
             <article><span>Hit Rate</span><strong>{{ "%.1f%%"|format(result.hit_rate * 100) }}</strong></article>
             <article><span>Margin</span><strong class="{{ 'positive' if result.average_margin and result.average_margin > 0 else 'negative' if result.average_margin and result.average_margin < 0 else '' }}">{% if result.average_margin is not none %}{{ "%.1f"|format(result.average_margin) }}{% else %}&mdash;{% endif %}</strong></article>
@@ -536,7 +536,7 @@
             {% endif %}
           </section>
 
-          <section class="picks-panel" aria-label="This week's picks">
+          <section class="picks-panel{% if picks.state == 'populated' and picks.total %} is-live{% endif %}" aria-label="This week's picks">
             <div class="picks-heading">
               <h3>This Week's Picks{% if picks.state == 'populated' and picks.total %} ({{ picks.total }}){% endif %}</h3>
               {% if picks.state == 'populated' and picks.fetched_at %}<span class="picks-timestamp">Lines as of {{ picks.fetched_at }}</span>{% endif %}
