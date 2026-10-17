@@ -79,20 +79,7 @@ def fetch_markets(
     pulled = (now or datetime.now(timezone.utc)).replace(microsecond=0)
     series_id = find_series_id(fetch, sport)
 
-    raw_events: list[dict] = []
-    cursor = None
-    pages = 0
-    while pages < MAX_PAGES:
-        params: dict[str, Any] = {"series_id": series_id, "closed": "false", "limit": PAGE_LIMIT}
-        if cursor:
-            params["after_cursor"] = cursor
-        body = fetch(f"{BASE_URL}/events/keyset", params)
-        pages += 1
-        raw_events.extend(body.get("events") or [])
-        cursor = body.get("next_cursor")
-        if not cursor:
-            break
-
+    raw_events, pages = list_events(fetch, series_id)
     events = [trim_event(e, market_types) for e in raw_events if is_upcoming_game(e, pulled)]
     return {
         "pulled_at": pulled.isoformat().replace("+00:00", "Z"),
@@ -103,6 +90,24 @@ def fetch_markets(
         "events_seen": len(raw_events),
         "events": events,
     }
+
+
+def list_events(fetch: Fetcher, series_id: str) -> tuple[list[dict], int]:
+    """Every open event in the series, untrimmed, following `next_cursor`. (events, pages)"""
+    events: list[dict] = []
+    cursor = None
+    pages = 0
+    while pages < MAX_PAGES:
+        params: dict[str, Any] = {"series_id": series_id, "closed": "false", "limit": PAGE_LIMIT}
+        if cursor:
+            params["after_cursor"] = cursor
+        body = fetch(f"{BASE_URL}/events/keyset", params)
+        pages += 1
+        events.extend(body.get("events") or [])
+        cursor = body.get("next_cursor")
+        if not cursor:
+            break
+    return events, pages
 
 
 def is_upcoming_game(event: dict, pulled: datetime) -> bool:

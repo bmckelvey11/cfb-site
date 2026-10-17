@@ -1,0 +1,159 @@
+"""Turn Polymarket's open CFB events into a live board: score, clock, and each game's main lines.
+
+Read-only and display-only. Nothing here is stored, so these in-play prices never reach the
+warehouse (they would be lookahead to anything that joins them as a "line").
+
+Game state comes from the event itself (measured live 2026-10-17):
+
+- Not started: no `live`/`ended`/`score`/`period`/`elapsed` keys at all; `startTime` is kickoff.
+- Live: `live` true, `score` "away-home" (e.g. "0-37"), `period` "Q1".."Q4", "End Q2", "End Q3",
+  `elapsed` the mm:ss game clock ("" at a break).
+- Finished: `ended` true, `period` "VFT". `closed=false` still returns these. `period` "CAN" is
+  a cancelled game with `ended` false.
+
+Main line: Polymarket flags none, and a rung nobody quotes shows a 0.495/0.505 placeholder with a
+0.01/0.99 book, so "price nearest 50%" alone picks dead rungs. A rung counts only with both a bid
+and an ask no more than `MAX_SPREAD` apart and at least `MIN_LIQUIDITY`; of those, the one whose
+midpoint is nearest 50% is the main line. A game with no such rung shows no line rather than a
+stale one -- blowouts often have no live spread at all.
+"""
+from __future__ import annotations
+
+import json
+from datetime import datetime, timedelta
+from typing import Any
+
+from cfb_system_maker.polymarket_client import parse_time
+
+MAX_SPREAD = 0.10      # wider than 10 cents and `outcomePrices` no longer matches the book
+MIN_LIQUIDITY = 100.0  # placeholder rungs carry $5
+SOON = timedelta(hours=3)
+FINAL_PERIODS = {"VFT", "FT", "F"}
+
+
+def state(event: dict, now: datetime) -> str:
+    """One of live, upcoming, final, other."""
+    if event.get("ended") or event.get("period") in FINAL_PERIODS:
+        return "final"
+    if event.get("period") == "CAN":
+        return "other"
+    if event.get("live"):
+        return "live"
+    start = parse_time(event.get("startTime"))
+    if start is None:
+        return "other"
+    return "upcoming" if start > now else "other"   # started but not flagged live: unknown
+
+
+def board(events: list[dict], now: datetime, soon: timedelta = SOON) -> dict[str, list[dict]]:
+    """Live games, then games kicking off within `soon`. Exact-margin companions are skipped."""
+    live, upcoming = [], []
+    for event in events:
+        if str(event.get("slug", "")).endswith("-exact-margin"):
+            continue
+        kind = state(event, now)
+        if kind == "live":
+            live.append(game(event, kind))
+        elif kind == "upcoming" and parse_time(event["startTime"]) <= now + soon:
+            upcoming.append(game(event, kind))
+    live.sort(key=lambda g: (g["kickoff"] or "", g["title"]))
+    upcoming.sort(key=lambda g: (g["kickoff"] or "", g["title"]))
+    return {"live": live, "upcoming": upcoming}
+
+
+def game(event: dict, kind: str) -> dict:
+    away, home = teams(event)
+    away_score, home_score = score(event.get("score"))
+    markets = event.get("markets") or []
+    return {
+        "id": event.get("id"),
+        "slug": event.get("slug"),
+        "title": event.get("title"),
+        "url": f"https://polymarket.com/event/{event.get('slug')}",
+        "state": kind,
+        "kickoff": event.get("startTime"),
+        "away": away, "home": home,
+        "away_score": away_score, "home_score": home_score,
+        "period": event.get("period") or None,
+        "clock": event.get("elapsed") or None,
+        "moneyline": moneyline(markets, away, home),
+        "spread": main_line(markets, "spreads"),
+        "total": main_line(markets, "totals"),
+    }
+
+
+def teams(event: dict) -> tuple[str | None, str | None]:
+    """(away, home) school names. Falls back to the "Away vs. Home" title."""
+    names = {t.get("ordering"): t.get("alias") or t.get("name") for t in event.get("teams") or []}
+    if names.get("away") and names.get("home"):
+        return names["away"], names["home"]
+    parts = str(event.get("title") or "").split(" vs. ")
+    return (parts[0], parts[1]) if len(parts) == 2 else (None, None)
+
+
+def score(raw: Any) -> tuple[int | None, int | None]:
+    """ "0-37" is away 0, home 37."""
+    try:
+        away, home = str(raw).split("-")
+        return int(away), int(home)
+    except (TypeError, ValueError):
+        return None, None
+
+
+def quote(market: dict) -> dict | None:
+    """The first outcome's book, or None when it is too thin or too wide to trust."""
+    bid, ask = market.get("bestBid"), market.get("bestAsk")
+    if bid is None or ask is None or ask - bid > MAX_SPREAD or bid <= 0 or ask >= 1:
+        return None
+    if (market.get("liquidityNum") or 0) < MIN_LIQUIDITY:
+        return None
+    outcomes = _list(market.get("outcomes"))
+    return {
+        "mid": round((bid + ask) / 2, 4), "bid": bid, "ask": ask,
+        "line": market.get("line"),
+        "first": outcomes[0] if outcomes else None,
+        "second": outcomes[1] if len(outcomes) > 1 else None,
+        "liquidity": round(market.get("liquidityNum") or 0),
+        "volume": round(market.get("volumeNum") or 0),
+        "updated_at": market.get("updatedAt"),
+        "slug": market.get("slug"),
+    }
+
+
+def main_line(markets: list[dict], kind: str) -> dict | None:
+    """The tradable rung of `kind` whose midpoint is nearest 50%; ties go to more liquidity."""
+    quotes = [q for m in markets if m.get("sportsMarketType") == kind and (q := quote(m))]
+    if not quotes:
+        return None
+    return min(quotes, key=lambda q: (abs(q["mid"] - 0.5), -q["liquidity"]))
+
+
+def moneyline(markets: list[dict], away: str | None, home: str | None) -> dict | None:
+    """Home win chance from the moneyline book, oriented to home whichever outcome is first."""
+    for market in markets:
+        if market.get("sportsMarketType") != "moneyline":
+            continue
+        bid, ask = market.get("bestBid"), market.get("bestAsk")
+        if ask is None:
+            return None
+        bid = bid or 0.0          # no bid at all on a near-certain loser
+        if ask - bid > MAX_SPREAD:
+            return None
+        mid = (bid + ask) / 2
+        outcomes = _list(market.get("outcomes"))
+        if outcomes and home and outcomes[0] != home:
+            mid = 1 - mid
+        return {"home": round(mid, 4), "away": round(1 - mid, 4),
+                "liquidity": round(market.get("liquidityNum") or 0),
+                "updated_at": market.get("updatedAt")}
+    return None
+
+
+def _list(raw: Any) -> list:
+    """`outcomes` arrives as a JSON-encoded string."""
+    if isinstance(raw, list):
+        return raw
+    try:
+        return json.loads(raw or "[]")
+    except (TypeError, ValueError):
+        return []

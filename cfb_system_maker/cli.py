@@ -97,6 +97,8 @@ def main(argv: list[str] | None = None) -> int:
         return _web(args)
     if args.command == "matchup":
         return _matchup(args)
+    if args.command == "live":
+        return _live(args)
     if args.command == "duckdb":
         return _duckdb(args)
     parser.print_help()
@@ -735,6 +737,20 @@ def _matchup(args: argparse.Namespace) -> int:
     return 0
 
 
+def _live(args: argparse.Namespace) -> int:
+    from cfb_system_maker.live.app import create_app
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    app = create_app()
+    if args.debug:
+        app.run(host="127.0.0.1", port=args.port, debug=True)
+    else:
+        from waitress import serve
+
+        serve(app, host="127.0.0.1", port=args.port, threads=4)
+    return 0
+
+
 def print_result(name: str, result: BacktestResult) -> None:
     print(f"\n{name}")
     print(f"Bets: {result.bets}")
@@ -1000,5 +1016,9 @@ def _build_parser() -> argparse.ArgumentParser:
     matchup = subparsers.add_parser("matchup", help="team matchup page at 127.0.0.1")
     matchup.add_argument("--port", type=int, default=int(os.environ.get("PORT") or 5050))
     matchup.add_argument("--debug", action="store_true")
+
+    live = subparsers.add_parser("live", help="live in-game Polymarket odds page at 127.0.0.1")
+    live.add_argument("--port", type=int, default=int(os.environ.get("PORT") or 5060))
+    live.add_argument("--debug", action="store_true")
 
     return parser

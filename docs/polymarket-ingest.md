@@ -68,3 +68,25 @@ A live pull at 10:31Z the same day listed 218 upcoming games (two weekends' wort
 Polymarket names teams by school (`teams[].alias`: "Georgia State", "James Madison"), so
 the rule is `norm()` plus `polymarket_schema.ALIASES`, with no mascot strip. The flatten
 exits 1 and lists any name that does not match a CFBD school; add it to `ALIASES`.
+
+## Live odds page
+
+`python -m cfb_system_maker live` serves <http://127.0.0.1:5060>: every game in progress with
+its score, clock, win chance, and main live spread and total, plus games kicking off in the
+next 3 hours. Code: `cfb_system_maker/live/` (`board.py` holds the rules), tests:
+`tests/test_live_odds.py`. Run it on the Mac; the cloud gets 403 from Gamma.
+
+- **Stores nothing.** These are in-play prices; keeping them out of `ingest/` keeps them out of
+  anything that joins a "line". `polymarket_client.is_upcoming_game` still drops started games
+  from snapshots.
+- **Refresh:** the page polls every 30 s; the server re-reads Gamma at most every 20 s, one
+  `/events/keyset` walk (~4 pages) per refresh. Gamma needs no key and has no quota we have hit.
+- **Game state** is on the event (measured 2026-10-17): `live`, `ended`, `score` as
+  "away-home" in `teams[].ordering` order, `period` (`Q1`..`Q4`, `End Q2`, `End Q3`, `VFT`
+  final, `CAN` cancelled) and `elapsed` (mm:ss, empty at a break). A game not yet started has
+  none of these keys.
+- **Main line** is the same filter-then-pick rule as above, tighter for live books: both a bid
+  and an ask, at most 10 cents apart, at least $100 liquidity, then nearest 50%. A wide book's
+  `outcomePrices` is stale (one live O/U 35.5 showed 0.5275 against a 0.055/1.0 book), so the
+  page shows the bid/ask midpoint, never `outcomePrices`. With no rung passing, the card shows
+  a dash: blowouts often have no live spread at all.

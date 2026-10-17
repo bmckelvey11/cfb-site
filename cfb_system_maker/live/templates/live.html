@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Live Odds</title>
+  <link rel="stylesheet" href="/tokens/colors.css">
+  <link rel="stylesheet" href="/tokens/typography.css">
+  <link rel="stylesheet" href="/tokens/spacing.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='live.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">Live odds</span>
+    <span class="source">Polymarket, in-game</span>
+    <label class="filter"><input type="search" id="q" placeholder="Filter teams" aria-label="Filter teams"></label>
+    <span class="snap" id="snap" role="status" aria-live="polite"></span>
+  </header>
+  <main>
+    <p class="note">Prices are Polymarket's live chance of each side, the midpoint of its bid and ask.
+      A dash means no rung is quoted tightly enough to trust right now.</p>
+    <section aria-labelledby="h-live"><h2 id="h-live">In progress</h2><div class="grid" id="live"></div></section>
+    <section aria-labelledby="h-soon"><h2 id="h-soon">Kicking off in the next 3 hours</h2><div class="grid" id="upcoming"></div></section>
+  </main>
+  <script src="{{ url_for('static', filename='live.js') }}"></script>
+</body>
+</html>
