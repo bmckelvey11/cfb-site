@@ -29,6 +29,7 @@ What to build and test next, and the preregistered designs that bind each test.
 | [specs/2026-09-24-glicko-p1-2026-confirmation-design.md](specs/2026-09-24-glicko-p1-2026-confirmation-design.md) | P1's sealed 2026 confirmation: its encompassing slope against the open, read once after the season |
 | [specs/2026-10-16-glicko-p3-bundles-design.md](specs/2026-10-16-glicko-p3-bundles-design.md) | Bundles P3-A (schedule strength), P3-B (preseason start), P3-C (game context): grids, holdout and adopt rule, with the build record |
 | [specs/2026-10-17-glicko-p3d-fcs-design.md](specs/2026-10-17-glicko-p3d-fcs-design.md) | Bundle P3-D: shrink FBS-vs-FCS forecasts, declared before build, with the build record |
+| [specs/2026-10-17-market-implied-score-design.md](specs/2026-10-17-market-implied-score-design.md) | Market-implied score baseline $(T \pm M)/2$: comparators, scoring and limits, declared before build |
 
 ## Method and versions
 
