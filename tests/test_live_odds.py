@@ -125,3 +125,27 @@ def test_api_reports_a_failed_pull_as_json():
 def test_page_renders():
     res = create_app(fetch_fn=fake_gamma([]), clock=lambda: NOW).test_client().get("/")
     assert res.status_code == 200 and b"Live odds" in res.data
+
+
+def spread(line, bid, ask, liq):
+    return {"id": f"s{line}", "sportsMarketType": "spreads", "line": line,
+            "outcomes": "[\"Army\", \"Tulane\"]", "bestBid": bid, "bestAsk": ask, "liquidityNum": liq}
+
+
+def test_a_decided_rung_is_not_a_main_line():
+    # Army -2.5 at 98.6% was the only tight spread book while Army led 49-24 (2026-10-17).
+    assert b.main_line([spread(-2.5, 0.98, 0.992, 39000)], "spreads") is None
+    assert b.main_line([spread(-2.5, 0.98, 0.992, 39000), spread(-24.5, 0.47, 0.53, 800)],
+                       "spreads")["line"] == -24.5
+
+
+def test_a_wide_moneyline_still_shows_but_is_flagged():
+    market = dict(ML, outcomes="[\"Murray State\", \"Drake\"]", bestBid=0.43, bestAsk=0.54, liquidityNum=4500)
+    ml = b.moneyline([market], "Murray State", "Drake")
+    assert ml["home"] == pytest.approx(0.515) and ml["wide"] is True
+
+
+def test_a_dead_moneyline_is_still_hidden():
+    placeholder = dict(ML, bestAsk=0.5, liquidityNum=5)
+    assert b.moneyline([placeholder], "Charleston Southern", "Clemson") is None
+    assert b.moneyline([dict(ML, bestAsk=0.5)], "Charleston Southern", "Clemson") is None   # no bid, mid book

@@ -33,7 +33,7 @@
     const ml = g.moneyline;
     const row = (team, sc, chance, side) => `<div class="team"><span class="name">${esc(team)}</span>
       ${live ? `<span class="score">${sc ?? ""}</span>` : ""}
-      <span class="win">${ml ? pct(chance) : "–"}${ml ? move(`${g.slug}:ml-${side}`, chance) : ""}</span></div>`;
+      <span class="win${ml && ml.wide ? " wide" : ""}"${ml && ml.wide ? ' title="Wide book: bid and ask more than 10 cents apart"' : ""}>${ml ? pct(chance) : "–"}${ml ? move(`${g.slug}:ml-${side}`, chance) : ""}</span></div>`;
     return `<article class="card${live ? " is-live" : ""}">
       <header><span class="status">${live ? '<i class="dot" aria-hidden="true"></i>' : ""}${status}</span>
         <a href="${esc(g.url)}" target="_blank" rel="noopener">Polymarket ↗</a></header>

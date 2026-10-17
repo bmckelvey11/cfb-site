@@ -86,7 +86,10 @@ next 3 hours. Code: `cfb_system_maker/live/` (`board.py` holds the rules), tests
   final, `CAN` cancelled) and `elapsed` (mm:ss, empty at a break). A game not yet started has
   none of these keys.
 - **Main line** is the same filter-then-pick rule as above, tighter for live books: both a bid
-  and an ask, at most 10 cents apart, at least $100 liquidity, then nearest 50%. A wide book's
+  and an ask, at most 10 cents apart, at least $100 liquidity, priced 15-85%, then nearest 50%.
+  The 15-85% band matters in blowouts, where the only tight book can be a decided rung (Army
+  -2.5 at 98.6% while up 49-24, measured 2026-10-17). The moneyline skips the width and band
+  rules and is greyed when its book is wider than 10 cents. A wide book's
   `outcomePrices` is stale (one live O/U 35.5 showed 0.5275 against a 0.055/1.0 book), so the
   page shows the bid/ask midpoint, never `outcomePrices`. With no rung passing, the card shows
   a dash: blowouts often have no live spread at all.

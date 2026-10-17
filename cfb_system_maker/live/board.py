@@ -13,9 +13,11 @@ Game state comes from the event itself (measured live 2026-10-17):
 
 Main line: Polymarket flags none, and a rung nobody quotes shows a 0.495/0.505 placeholder with a
 0.01/0.99 book, so "price nearest 50%" alone picks dead rungs. A rung counts only with both a bid
-and an ask no more than `MAX_SPREAD` apart and at least `MIN_LIQUIDITY`; of those, the one whose
-midpoint is nearest 50% is the main line. A game with no such rung shows no line rather than a
-stale one -- blowouts often have no live spread at all.
+and an ask no more than `MAX_SPREAD` apart and at least `MIN_LIQUIDITY`, priced between `LOPSIDED` and
+1 - `LOPSIDED`; of those, the one whose midpoint is nearest 50% is the main line. A game with no
+such rung shows no line rather than a stale or decided one -- blowouts often have no live spread
+at all. The moneyline is shown even from a wider book, flagged `wide`, since a team's win chance
+is the number wanted however lopsided it is.
 """
 from __future__ import annotations
 
@@ -27,6 +29,7 @@ from cfb_system_maker.polymarket_client import parse_time
 
 MAX_SPREAD = 0.10      # wider than 10 cents and `outcomePrices` no longer matches the book
 MIN_LIQUIDITY = 100.0  # placeholder rungs carry $5
+LOPSIDED = 0.15        # a rung priced outside 15-85% is decided, not a line (Army -2.5 at 98.6%, up 49-24)
 SOON = timedelta(hours=3)
 FINAL_PERIODS = {"VFT", "FT", "F"}
 
@@ -122,7 +125,8 @@ def quote(market: dict) -> dict | None:
 
 def main_line(markets: list[dict], kind: str) -> dict | None:
     """The tradable rung of `kind` whose midpoint is nearest 50%; ties go to more liquidity."""
-    quotes = [q for m in markets if m.get("sportsMarketType") == kind and (q := quote(m))]
+    quotes = [q for m in markets if m.get("sportsMarketType") == kind and (q := quote(m))
+              and LOPSIDED <= q["mid"] <= 1 - LOPSIDED]
     if not quotes:
         return None
     return min(quotes, key=lambda q: (abs(q["mid"] - 0.5), -q["liquidity"]))
@@ -134,16 +138,17 @@ def moneyline(markets: list[dict], away: str | None, home: str | None) -> dict |
         if market.get("sportsMarketType") != "moneyline":
             continue
         bid, ask = market.get("bestBid"), market.get("bestAsk")
-        if ask is None:
+        if ask is None or (market.get("liquidityNum") or 0) < MIN_LIQUIDITY:
             return None
-        bid = bid or 0.0          # no bid at all on a near-certain loser
-        if ask - bid > MAX_SPREAD:
-            return None
+        if bid is None:           # no bid at all: fine on a near-certain loser, else a dead book
+            if ask > MAX_SPREAD:
+                return None
+            bid = 0.0
         mid = (bid + ask) / 2
         outcomes = _list(market.get("outcomes"))
         if outcomes and home and outcomes[0] != home:
             mid = 1 - mid
-        return {"home": round(mid, 4), "away": round(1 - mid, 4),
+        return {"home": round(mid, 4), "away": round(1 - mid, 4), "wide": ask - bid > MAX_SPREAD,
                 "liquidity": round(market.get("liquidityNum") or 0),
                 "updated_at": market.get("updatedAt")}
     return None
