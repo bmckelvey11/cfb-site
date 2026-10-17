@@ -51,9 +51,10 @@ about 2 points too much. Every season from 2021 to 2025 favours both fixed varia
 +1.23). The bias is largest when the fit has the fewest games and shrinks as the season fills
 in. That fits the suspected cause: the team ratings are shrunk toward average while $h$ is not,
 so early on $h$ absorbs part of the strength gap between better home teams and their visitors.
-The fitted $h$ itself shows it directly. In 2014–2022 (2020 not scored), `free`'s home edge in points
-of margin ($2h\bar N$) was **9.2–13.2 at week 2** (36–52 games in the fit), 4.8–9.0 at week 4,
-and settled at **2.5–3.5 by the end of the regular season**. Every season decays the same way. The
+The fitted $h$ itself shows it directly. In 2014–2025 (2020 not scored), `free`'s home edge in points
+of margin ($2h\bar N$) was **8.3–13.3 at week 2** (36–52 games in the fit), 4.8–9.2 at week 4,
+and settled at **2.5–4.2 by the end of the regular season** (2024 and 2025 were the highest,
+at about 4.0 and 4.2). Every season decays the same way. The
 end-of-season fits are 0.10–0.17 points per possession for 2013–2024.
 
 **Totals are unchanged.** Total MAE is identical across variants (13.825 in 2014–19, 13.074 in
