@@ -29,6 +29,7 @@ What to build and test next, and the preregistered designs that bind each test.
 | [specs/2026-10-17-glicko-p3d-fcs-design.md](specs/2026-10-17-glicko-p3d-fcs-design.md) | Bundle P3-D: shrink FBS-vs-FCS forecasts, declared before build, with the build record |
 | [specs/2026-10-17-market-implied-score-design.md](specs/2026-10-17-market-implied-score-design.md) | Market-implied score baseline $(T \pm M)/2$: comparators, scoring and limits, declared before build |
 | [specs/2026-10-17-ridge-home-edge-design.md](specs/2026-10-17-ridge-home-edge-design.md) | `ridge_v1`'s home edge: free vs carried from last season vs fixed at 2.4 points, pick on 2014–19 and adopt rule on 2021–25, declared before build |
+| [specs/2026-10-18-team-home-edge-design.md](specs/2026-10-18-team-home-edge-design.md) | Per-team home edge: is it detectable in our data (split-half reliability), and does an empirical-Bayes shrunk per-team term improve `ridge_h24`? Declared before build |
 
 ## Method and versions
 
