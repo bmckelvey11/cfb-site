@@ -196,8 +196,10 @@ One row per FBS game on the selected date, sorted by kickoff.
 | notes | text null | |
 | origin | text | logged / action_network / csv |
 | import_ref | text null | the original row, verbatim, for imported bets |
-| result, pnl, settled_at | null until settled | settlement: needs the final score only |
-| close_line, close_price, close_source, clv, clv_unit, close_status, close_checked_at | close side, filled independently | `close_status` is `pending` / `found` / `missing:<reason>`; `clv_unit` is `points` (spread, total) or `prob` (moneyline) |
+| result, pnl, settled_at | null until settled | settlement needs `core.fact_game.completed` true and both scores; `settled_at` is processing time, never used to order bets |
+| kickoff_at, season, week | null until matched | from the matched game; `kickoff_at` is the economic order of bets |
+| version | integer | +1 on every write; grading writes only if the version it read is unchanged |
+| close_line, close_price, close_source, close_quoted_at, clv, clv_unit, close_status, close_checked_at | close side, filled independently | `close_status` is `pending` / `found` / `missing:<reason>`; `clv_unit` is `points` (spread, total) or `prob` (moneyline) |
 | first_settled_at | text null | set once, never cleared, never editable; the source lock keys off this |
 | deleted_at | text null | soft delete; see Edit / delete |
 | created_at, updated_at | text | |
@@ -216,7 +218,7 @@ The file is data and is never committed. **Backups use SQLite's online backup AP
 (`sqlite3.Connection.backup`), never a file copy: with WAL on, committed bets can still be
 in `bets.sqlite-wal`, and copying only the main file would lose them. A backup is taken
 before every import and every `grade-bets` run, to `bets-<timestamp>.sqlite` in the same
-folder, keeping the last 20.
+folder (name carries microseconds and a random suffix; written as `.part`, then renamed), keeping the last 20.
 
 ### Getting bets in
 
@@ -234,7 +236,9 @@ folder, keeping the last 20.
   - our own grading decides `result` and `pnl`; AN's `result` and `units_net` are kept in
     `import_ref` and a mismatch is listed for review.
 - **Duplicates.** After an imported row is matched to a game, it is compared with existing
-  bets on (game_id, market, side, line, odds, book). Matches are **not** skipped silently:
+  bets, and with earlier rows of the same file, on (game_id, market, side, line, odds), with sides
+  in the ledger's team-name form and books equal **or unknown on either side** (Action Network
+  exports carry no book, so an unknown book never proves a different wager). Matches are **not** skipped silently:
   the import preview lists them as "possible duplicate" with the existing bet beside it,
   and Blake ticks which to keep. This is what stops a bet logged in the app and later
   imported from Action Network from counting twice.
@@ -263,12 +267,14 @@ package. Slice 1a therefore starts with a **refactor commit, behaviour unchanged
 `find_game` for imports. Grading is **explicit**: a "Grade now" button and the
 `python -m cfb_system_maker grade-bets` command run two passes in one transaction each:
 
-- **Settle pass:** bets with `settled_at IS NULL` and a final score → result, pnl,
-  `settled_at`, and `first_settled_at` if empty.
-- **Close pass:** bets with `close_status = 'pending'`, or `missing:*` and
-  `close_checked_at` older than 6 hours → look up the close. A close that is still absent
-  48 hours after kickoff stays `missing:<reason>` and is no longer retried automatically
-  ("Grade now" still retries it).
+- **Settle pass:** bets with `settled_at IS NULL` whose game is `completed` with both
+  scores → result, pnl, `settled_at`, and `first_settled_at` if empty. A live score with
+  `completed` false never settles.
+- **Close pass:** only bets whose kickoff has passed. A found close is final; `missing:*`
+  is retried on every run until 48 hours after kickoff, and "Grade now" retries it at any
+  age. The full state table is in the slice 1a plan, Task 5.
+- Each write is conditional on the bet's `version`, so a bet edited while grading runs is
+  skipped and picked up next run rather than given a stale result.
 
 GET requests never write. A bet without a final score stays **pending**, never a loss.
 Unmatched or reversed-team bets are flagged for review, as `ingest_bets.py` already
@@ -283,8 +289,13 @@ they are:
 - **Reference close:** the bettor's own book's close in `core.fact_game_line` if present;
   otherwise the median across providers. The choice is recorded in `close_source`, and CLV
   is also reported split by it. Never the most favourable book.
-- **Cutoff:** the warehouse close (`*_close` columns, the last pre-kickoff line). Quotes
-  after kickoff are never used.
+- **Cutoff and provenance:** a close is looked up only after kickoff. First choice is a
+  timed Odds API snapshot (`core.fact_game_odds.pulled_at`) in the 90 minutes before
+  kickoff. Otherwise the warehouse's `*_close` / `moneyline_*` columns, which carry no
+  timestamp, are accepted only when the warehouse was loaded after kickoff
+  (`meta.load_report.loaded_at`), so the value is the vendor's final pre-game line and not
+  a mid-week quote. `close_source` records which (`oddsapi:` or `cfbd:`) and CLV is
+  reported split by it.
 - **Spread and total:** CLV in points, as `ingest_bets.py` computes it today (spread
   `line − close` on the bettor's side; totals via `models.middle.clv.clv_points`).
 - **Moneyline:** the current code subtracts raw implied probabilities
@@ -324,8 +335,8 @@ does:
 - **CLV** reported separately per unit: points (spread, total) and probability
   (moneyline), and by `close_source`. For each: mean, median and share of bets with
   positive CLV, with the same week-block interval on the mean.
-- **Max drawdown in dollars** on the cumulative-P&L line, bets ordered by `settled_at` then
-  `bet_id`. There is no starting bankroll or deposit history in the ledger, so no
+- **Max drawdown in dollars** on the cumulative-P&L line, bets ordered by
+  (`kickoff_at`, `placed_at`, `bet_id`), so grading order and imports cannot move a bet. There is no starting bankroll or deposit history in the ledger, so no
   percentage drawdown is shown; adding bankroll configuration is a later change.
 - Splits by source, market and week. Splits with fewer than 20 settled bets are greyed with
   "small sample".
@@ -401,7 +412,7 @@ does:
   in the WAL, back up through the backup API, restore into a fresh file, and assert every
   committed bet is present; a plain file copy of the same state is shown to lose them.
 - `tests/test_bets_lifecycle.py` (1a): score before close → settled with close `pending`,
-  then a later close pass fills CLV; missing close retried, then `missing:*` after 48 h;
+  then a later close pass fills CLV; a pre-kickoff run stores no close; live score never settles; a bet edited mid-run is skipped; missing close retried until 48 h after kickoff;
   book edit clears close only; line edit clears both; edit after settlement then
   `source` change → 409 (lock survives the cleared grade); soft delete keeps row and audit
   and drops it from totals.
