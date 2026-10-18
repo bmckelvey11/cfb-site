@@ -30,6 +30,7 @@ from scripts.pregame_replay_audit import snapshot
 # Possessions alternate, so a wider gap between the two teams' regulation drive counts
 # means drives are missing from the feed (~2% of games).
 MAX_DRIVE_GAP = 2
+RIDGE_H24_POINTS = 2.4  # Benz, Bliss and Lopez's FBS 2023 home edge, points of margin
 
 
 @dataclass(frozen=True)
@@ -124,12 +125,14 @@ def _evidence(games: pd.DataFrame, teams: list[str]) -> pd.DataFrame:
     }).reindex(teams).fillna(0).astype(int)
 
 
-def fit_ppp(games: pd.DataFrame, lam: float,
-            prior: pd.DataFrame | None = None) -> tuple[float, float, pd.DataFrame]:
+def fit_ppp(games: pd.DataFrame, lam: float, prior: pd.DataFrame | None = None,
+            h_fixed: float | None = None) -> tuple[float, float, pd.DataFrame]:
     """(mu, h, O/D table) by possession-weighted ridge; mu and h unpenalized.
 
     With `prior` (columns O0, D0), each rating is prior + deviation and only the
-    deviation is penalized: guide §7.5's shrink-toward-the-prior fit.
+    deviation is penalized: guide §7.5's shrink-toward-the-prior fit. With `h_fixed`,
+    h is not fitted: it moves to the left-hand side and O/D are fitted given it
+    (rankings/docs/specs/2026-10-17-ridge-home-edge-design.md).
     """
     rows = _team_rows(games)
     teams = sorted(set(rows["team"]) | set(rows["opp"]))
@@ -143,8 +146,12 @@ def fit_ppp(games: pd.DataFrame, lam: float,
     x[np.arange(len(rows)), 2 + rows["team"].map(idx)] = 1.0
     x[np.arange(len(rows)), 2 + k + rows["opp"].map(idx)] = 1.0
     y = rows["y"].to_numpy(float) - rows["team"].map(o0).to_numpy() - rows["opp"].map(d0).to_numpy()
+    if h_fixed is not None:
+        y = y - h_fixed * x[:, 1]
+        x[:, 1] = 0.0  # empty column: lstsq's min-norm answer leaves its coefficient at 0
     b = _solve(x, y, rows["w"].to_numpy(float), np.r_[0.0, 0.0, np.full(2 * k, lam)])
-    return b[0], b[1], pd.DataFrame({"O": b[2:2 + k] + o0.to_numpy(),
+    h = b[1] if h_fixed is None else h_fixed
+    return b[0], h, pd.DataFrame({"O": b[2:2 + k] + o0.to_numpy(),
                                      "D": b[2 + k:] + d0.to_numpy()}, index=teams)
 
 
@@ -171,12 +178,13 @@ def _prior_col(prior: pd.DataFrame | None, col: str, teams: list[str]) -> pd.Ser
 
 
 def fit_ridge(games: pd.DataFrame, lam_ppp: float, lam_pace: float,
-              prior: pd.DataFrame | None = None) -> Ratings:
+              prior: pd.DataFrame | None = None, h_fixed: float | None = None) -> Ratings:
     """`prior=None` is Release B's ridge_v1; a prior (O0, D0, P0 by team) is prior_v1.
 
-    Teams with a prior but no games yet are rated at their prior.
+    Teams with a prior but no games yet are rated at their prior. `h_fixed` holds the
+    home edge (points per possession) instead of fitting it.
     """
-    mu, h, od = fit_ppp(games, lam_ppp, prior)
+    mu, h, od = fit_ppp(games, lam_ppp, prior, h_fixed)
     nu, p = fit_pace(games, lam_pace, prior)
     table = od.join(p, how="outer")
     if prior is not None:
@@ -186,6 +194,18 @@ def fit_ridge(games: pd.DataFrame, lam_ppp: float, lam_pace: float,
     table = table.join(_evidence(games, list(table.index)))
     return Ratings(mu=float(mu), nu=float(nu), h=float(h), c=float(games["ot"].mean()),
                    table=table, unrated=0.0)
+
+
+def h_from_points(points: float, games: pd.DataFrame) -> float:
+    """Home edge in points of margin -> points per possession: the margin moves by 2 * h * N."""
+    return points / (2.0 * float(games["N"].mean()))
+
+
+def fit_ridge_h24(games: pd.DataFrame, lam_ppp: float, lam_pace: float) -> Ratings:
+    """ridge_h24: ridge_v1 with the home edge held at 2.4 points of margin instead of refitted
+    each week. Adopted 2026-10-17 (rankings/docs/ridge-home-edge-2026-10-17.md)."""
+    h = h_from_points(RIDGE_H24_POINTS, games) if len(games) else None
+    return fit_ridge(games, lam_ppp, lam_pace, h_fixed=h)
 
 
 def fit_raw(games: pd.DataFrame) -> Ratings:
